@@ -1,16 +1,3 @@
-To create a descriptive README for your Next.js dashboard for CallLive, you can include the following sections:
-
-1. **Project Title**
-2. **Description**
-3. **Features**
-4. **Installation**
-5. **Usage**
-6. **Contributing**
-7. **License**
-
-Here's an example of what the README could look like:
-
----
 
 # CallLive Dashboard
 
