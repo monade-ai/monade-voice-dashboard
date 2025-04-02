@@ -1,36 +1,91 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
-## Getting Started
+# CallLive Dashboard
 
-First, run the development server:
+A dashboard for clients and developers to work with CallLive bots, built with Next.js.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## Description
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+The CallLive Dashboard is a web application designed to provide an intuitive interface for managing and interacting with CallLive bots. Built with Next.js, this dashboard offers a seamless experience for both clients and developers, allowing them to configure, monitor, and deploy bots efficiently.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Features
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- **User Authentication**: Secure login and registration system.
+- **Bot Management**: Create, update, and delete CallLive bots.
+- **Real-time Monitoring**: View real-time statistics and logs of bot activities.
+- **Customizable Settings**: Configure bot behavior and settings.
+- **Responsive Design**: Accessible on both desktop and mobile devices.
+- **Developer Tools**: Access to API keys, documentation, and developer resources.
 
-## Learn More
+## Installation
 
-To learn more about Next.js, take a look at the following resources:
+To get started with the CallLive Dashboard, follow these steps:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+1. **Clone the repository**:
+   ```bash
+   git clone https://github.com/CallLive-ai/dashboard.git
+   cd dashboard
+   ```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+2. **Install dependencies**:
+   ```bash
+   npm install
+   ```
 
-## Deploy on Vercel
+3. **Set up environment variables**:
+   Create a `.env.local` file in the root directory and add the necessary environment variables (e.g., database connection strings, API keys).
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+4. **Run the development server**:
+   ```bash
+   npm run dev
+   ```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+   The development server will start on `http://localhost:3000`.
+
+## Usage
+
+To use the CallLive Dashboard, follow these steps:
+
+1. **Start the application**:
+   ```bash
+   npm run dev
+   ```
+
+2. **Open your browser**:
+   Navigate to `http://localhost:3000` to access the dashboard.
+
+3. **Log in or register**:
+   Use your credentials to log in or create a new account.
+
+4. **Manage your bots**:
+   Use the dashboard interface to create, update, and monitor your CallLive bots.
+
+## Contributing
+
+We welcome contributions from the community! If you would like to contribute to the CallLive Dashboard, please follow these steps:
+
+1. **Fork the repository**:
+   Click the "Fork" button at the top right of this repository's page.
+
+2. **Create a new branch**:
+   ```bash
+   git checkout -b feature/your-feature-name
+   ```
+
+3. **Make your changes**:
+   Implement your changes and commit them with a descriptive message.
+
+4. **Push your changes**:
+   ```bash
+   git push origin feature/your-feature-name
+   ```
+
+5. **Create a pull request**:
+   Open a pull request from your forked repository's branch to the main repository's `main` branch.
+
+## License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for more details.
+
+---
+
+This README provides a comprehensive overview of your project, guiding users through installation, usage, and contribution processes. You can customize it further to fit the specific needs and features of your CallLive dashboard.
