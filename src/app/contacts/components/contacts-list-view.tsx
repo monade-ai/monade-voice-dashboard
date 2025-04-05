@@ -397,7 +397,7 @@ const ContactListView: React.FC<ContactListViewProps> = ({
                         </thead>
                         <tbody>
                           {currentContacts.map((contact) => (
-                            <tr key={contact.id} className="border-t hover:bg-muted/30">
+                            <tr key={contact.id} className="border-t hover:bg-muted">
                               <td className="p-4">{contact.name}</td>
                               <td className="p-4">{contact.phone}</td>
                               <td className="p-4 text-center">
