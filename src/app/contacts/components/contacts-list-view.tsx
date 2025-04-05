@@ -29,7 +29,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { useContactsContext } from '../contexts/contacts-context';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-
+import { initiateExotelCall } from '@/lib/services/exotel-service';
 interface PhoneAssistant {
   id: string;
   name: string;
@@ -567,28 +567,33 @@ const ContactListView: React.FC<ContactListViewProps> = ({
             setRemainingTime(5);
             setIsCallInitiating(false);
           }}
-          onCall={(phoneNumber) => {
+          onCall={async (phoneNumber) => {
             setIsCallInitiating(true);
             setCallStatus('initiating');
             
-            // Simulate call initiation
             const timer = setInterval(() => {
-              setRemainingTime((prev) => {
-                if (prev <= 1) {
-                  clearInterval(timer);
-                  setCallStatus('connecting');
-                  
-                  // Simulate connection
-                  setTimeout(() => {
-                    setCallStatus('connected');
-                    setIsCallInitiating(false);
-                  }, 2000);
-                  
-                  return 0;
-                }
-                return prev - 1;
-              });
+              setRemainingTime((prev) => prev > 1 ? prev - 1 : 1);
             }, 1000);
+
+            try {
+              const response = await initiateExotelCall({
+                phone_number: phoneNumber,
+                callback_url: "http://my.exotel.com/calllive1/exoml/start_voice/918357"
+              });
+
+              clearInterval(timer);
+              setCallStatus('connecting');
+              
+              setTimeout(() => {
+                setCallStatus('connected');
+                setIsCallInitiating(false);
+              }, 2000);
+            } catch (error) {
+              clearInterval(timer);
+              setCallStatus('failed');
+              setIsCallInitiating(false);
+              console.error('Failed to initiate call:', error);
+            }
           }}
           isCallInitiating={isCallInitiating}
           callStatus={callStatus}
