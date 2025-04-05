@@ -594,6 +594,7 @@ const ContactListView: React.FC<ContactListViewProps> = ({
           callStatus={callStatus}
           remainingTime={remainingTime}
           phoneNumber={selectedContact.phone}
+          contactName={selectedContact.name}
         />
       )}
     </div>

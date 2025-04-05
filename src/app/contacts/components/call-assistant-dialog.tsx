@@ -27,6 +27,7 @@ interface CallAssistantDialogProps {
   callStatus: 'idle' | 'initiating' | 'connecting' | 'connected' | 'failed' | 'completed';
   remainingTime: number;
   phoneNumber: string;
+  contactName:string;
 }
 
 export function CallAssistantDialog({
@@ -38,6 +39,7 @@ export function CallAssistantDialog({
   callStatus,
   remainingTime,
   phoneNumber,
+  contactName
 }: CallAssistantDialogProps) {
   useEffect(() => {
     if (isOpen && callStatus === 'idle') {
@@ -64,7 +66,7 @@ export function CallAssistantDialog({
                 : 'Connecting your call...'}
             </p>
             <p className="text-sm text-slate-500 text-center">
-              You'll be connected with {assistant.name} shortly
+              {contactName} will be connected with {assistant.name} shortly
             </p>
           </div>
         );
