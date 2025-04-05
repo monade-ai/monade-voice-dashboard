@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
+import { CallAssistantDialog } from './call-assistant-dialog';
 import { 
   Plus, 
   Search, 
@@ -14,7 +15,9 @@ import {
   MoreHorizontal,
   Trash2,
   Edit,
-  Copy
+  Copy,
+  Phone,
+  X
 } from 'lucide-react';
 import { 
   DropdownMenu, 
@@ -25,6 +28,19 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useContactsContext } from '../contexts/contacts-context';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+
+interface PhoneAssistant {
+  id: string;
+  name: string;
+  avatar?: string;
+}
+
+const MOCK_PHONE_ASSISTANTS: PhoneAssistant[] = [
+  { id: '1', name: 'Sales Assistant' },
+  { id: '2', name: 'Support Assistant' },
+  { id: '3', name: 'Customer Service Assistant' }
+];
 
 interface ContactListViewProps {
   onCreateList: () => void;
@@ -56,6 +72,29 @@ const ContactListView: React.FC<ContactListViewProps> = ({
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [newListCreated, setNewListCreated] = useState(false);
+  const [isCallDialogOpen, setIsCallDialogOpen] = useState(false);
+  const [selectedContact, setSelectedContact] = useState<any>(null);
+  const [selectedAssistant, setSelectedAssistant] = useState<PhoneAssistant | null>(null);
+  const [callStatus, setCallStatus] = useState<'idle' | 'initiating' | 'connecting' | 'connected' | 'failed' | 'completed'>('idle');
+  const [remainingTime, setRemainingTime] = useState(5);
+  const [isCallInitiating, setIsCallInitiating] = useState(false);
+  const [activeCall, setActiveCall] = useState<{ startTime: number } | null>(null);
+  const [callDuration, setCallDuration] = useState<number>(0);
+  
+  // Update call duration
+  useEffect(() => {
+    if (!activeCall) {
+      setCallDuration(0);
+      return;
+    }
+    
+    const timer = setInterval(() => {
+      const duration = Math.floor((Date.now() - activeCall.startTime) / 1000);
+      setCallDuration(duration);
+    }, 1000);
+  
+    return () => clearInterval(timer);
+  }, [activeCall]);
   
   const itemsPerPage = 10;
 
@@ -352,6 +391,7 @@ const ContactListView: React.FC<ContactListViewProps> = ({
                           <tr className="bg-muted/50">
                             <th className="text-left p-4 font-medium">Name</th>
                             <th className="text-left p-4 font-medium">Phone</th>
+                            <th className="text-center p-4 font-medium">Call</th>
                             <th className="text-right p-4 font-medium">Actions</th>
                           </tr>
                         </thead>
@@ -360,6 +400,20 @@ const ContactListView: React.FC<ContactListViewProps> = ({
                             <tr key={contact.id} className="border-t hover:bg-muted/30">
                               <td className="p-4">{contact.name}</td>
                               <td className="p-4">{contact.phone}</td>
+                              <td className="p-4 text-center">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedContact(contact);
+                                    setIsCallDialogOpen(true);
+                                  }}
+                                  className="hover:text-primary"
+                                >
+                                  <Phone className="h-4 w-4" />
+                                </Button>
+                              </td>
                               <td className="p-4 text-right">
                                 <DropdownMenu>
                                   <DropdownMenuTrigger asChild>
@@ -469,6 +523,78 @@ const ContactListView: React.FC<ContactListViewProps> = ({
             )}
           </div>
         </div>
+      )}
+
+      {/* Phone Assistant Selection Dialog */}
+      <Dialog open={isCallDialogOpen && !selectedAssistant} onOpenChange={setIsCallDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Select Phone Assistant</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            {selectedContact && (
+              <div className="px-4 py-2 bg-muted rounded-lg">
+                <p className="font-medium">Calling:</p>
+                <p>{selectedContact.name} - {selectedContact.phone}</p>
+              </div>
+            )}
+            {MOCK_PHONE_ASSISTANTS.map((assistant) => (
+              <Button
+                key={assistant.id}
+                variant="outline"
+                className="justify-start"
+                onClick={() => {
+                  setSelectedAssistant(assistant);
+                }}
+              >
+                <User className="mr-2 h-4 w-4" />
+                {assistant.name}
+              </Button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Call Assistant Dialog */}
+      {selectedAssistant && selectedContact && (
+        <CallAssistantDialog
+          assistant={selectedAssistant}
+          isOpen={isCallDialogOpen}
+          onClose={() => {
+            setIsCallDialogOpen(false);
+            setSelectedAssistant(null);
+            setCallStatus('idle');
+            setRemainingTime(5);
+            setIsCallInitiating(false);
+          }}
+          onCall={(phoneNumber) => {
+            setIsCallInitiating(true);
+            setCallStatus('initiating');
+            
+            // Simulate call initiation
+            const timer = setInterval(() => {
+              setRemainingTime((prev) => {
+                if (prev <= 1) {
+                  clearInterval(timer);
+                  setCallStatus('connecting');
+                  
+                  // Simulate connection
+                  setTimeout(() => {
+                    setCallStatus('connected');
+                    setIsCallInitiating(false);
+                  }, 2000);
+                  
+                  return 0;
+                }
+                return prev - 1;
+              });
+            }, 1000);
+          }}
+          isCallInitiating={isCallInitiating}
+          callStatus={callStatus}
+          remainingTime={remainingTime}
+          phoneNumber={selectedContact.phone}
+        />
       )}
     </div>
   );
