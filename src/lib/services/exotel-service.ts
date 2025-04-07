@@ -3,9 +3,9 @@ interface ExotelCallParams {
   callback_url: string;
 }
 
-const EXOTEL_API_URL = '/api/exotel/call';
-const EXOTEL_API_KEY = 'Kj8d6c8842b54e88378066cdc54133693';
-const EXOTEL_FUNCTIONS_KEY = 'woImAXBkyOY9QjIFRufHf64l86fbnOsMH1CHXG6C2TqQAzFuKiexNA==';
+const EXOTEL_API_URL = process.env.EXOTEL_API_URL;
+const EXOTEL_API_KEY = process.env.EXOTEL_API_KEY;
+const EXOTEL_FUNCTIONS_KEY = process.env.EXOTEL_FUNCTIONS_KEY;
 
 export async function initiateExotelCall(params: ExotelCallParams): Promise<Response> {
   const response = await fetch(EXOTEL_API_URL, {
