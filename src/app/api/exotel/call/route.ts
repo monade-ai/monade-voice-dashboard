@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 
-const EXOTEL_API_URL = 'https://outbound-exotel-service.azurewebsites.net/api/call';
-const EXOTEL_API_KEY = 'Kj8d6c8842b54e88378066cdc54133693';
-const EXOTEL_FUNCTIONS_KEY = 'woImAXBkyOY9QjIFRufHf64l86fbnOsMH1CHXG6C2TqQAzFuKiexNA==';
+const EXOTEL_API_URL = process.env.EXOTEL_API_URL;
+const EXOTEL_API_KEY = process.env.EXOTEL_API_KEY;
+const EXOTEL_FUNCTIONS_KEY = process.env.EXOTEL_FUNCTIONS_KEY;
 
 export async function POST(request: Request) {
   try {
