@@ -6,6 +6,7 @@ import Image from 'next/image';
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useLogout } from "./utils/logout";
 import { 
   BarChart4, 
   Layers, 
@@ -18,7 +19,8 @@ import {
   HelpCircle,
   ChevronDown,
   ChevronRight,
-  Contact2
+  Contact2,
+  LogOut
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -102,6 +104,8 @@ function SidebarSection({ title, children }: SectionProps) {
 export function Sidebar() {
   const pathname = usePathname();
   const [expandedSection, setExpandedSection] = useState<string | null>(null);
+
+  const logout = useLogout();
 
   const toggleSection = (section: string) => {
     setExpandedSection(expandedSection === section ? null : section);
@@ -248,6 +252,14 @@ export function Sidebar() {
           label="Help"
           isActive={pathname === '/help'}
         />
+
+      <button
+        onClick={logout}
+        className="mt-2 flex items-center gap-2 text-sm text-red-500 hover:text-red-700 transition"
+      >
+        <LogOut size={18} />
+        Logout
+      </button>
       </div>
     </div>
   );
