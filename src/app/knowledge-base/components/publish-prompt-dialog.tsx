@@ -11,7 +11,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { RadioGroup, RadioGroupItem } from "../../../components/ui/radio-group"
 import { Check, Zap, CheckCircle2 } from "lucide-react"
 
 interface PublishPromptDialogProps {

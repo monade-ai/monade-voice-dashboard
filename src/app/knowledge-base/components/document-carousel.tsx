@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { ChevronLeft, ChevronRight, Download, FileText, Trash2, Zap } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { PublishPromptDialog } from "@/components/publish-prompt-dialog"
+import { PublishPromptDialog } from "../components/publish-prompt-dialog"
 
 export function DocumentCarousel() {
   const [currentIndex, setCurrentIndex] = useState(0)

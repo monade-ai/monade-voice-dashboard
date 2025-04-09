@@ -4,7 +4,6 @@ import type React from "react"
 
 import { useState } from "react"
 import { useEditor, EditorContent } from "@tiptap/react"
-import StarterKit from "@tiptap/starter-kit"
 import Placeholder from "@tiptap/extension-placeholder"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -12,7 +11,7 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Bold, Italic, List, ListOrdered, Heading2, Sparkles, Save, FileUp, Zap } from "lucide-react"
-import { PublishPromptDialog } from "@/components/publish-prompt-dialog"
+import { PublishPromptDialog } from "../components/publish-prompt-dialog"
 
 export function PromptEditor() {
   const [isPublishOpen, setIsPublishOpen] = useState(false)
@@ -21,7 +20,7 @@ export function PromptEditor() {
 
   const editor = useEditor({
     extensions: [
-      StarterKit,
+     
       Placeholder.configure({
         placeholder: "Write your prompt here...",
       }),

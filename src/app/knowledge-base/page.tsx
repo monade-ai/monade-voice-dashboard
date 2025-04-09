@@ -2,8 +2,8 @@ import type { Metadata } from "next"
 import Link from "next/link"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { FileText, MessageSquare, PlusCircle, Upload } from "lucide-react"
-import { PromptCarousel } from "@/components/prompt-carousel"
-import { DocumentCarousel } from "@/components/document-carousel"
+import { PromptCarousel } from "./components/prompt-carousel"
+import { DocumentCarousel } from "./components/document-carousel"
 
 export const metadata: Metadata = {
   title: "Knowledge Base & Prompt Management",

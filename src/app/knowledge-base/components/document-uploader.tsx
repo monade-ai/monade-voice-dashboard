@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { FileUp, X, Check, Loader2 } from "lucide-react"
-import { PublishPromptDialog } from "@/components/publish-prompt-dialog"
+import { PublishPromptDialog } from "../components/publish-prompt-dialog"
 
 export function DocumentUploader() {
   const [files, setFiles] = useState<File[]>([])

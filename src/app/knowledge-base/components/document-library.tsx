@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Download, FileText, Trash2, Zap } from "lucide-react"
 import { useState } from "react"
-import { PublishPromptDialog } from "@/components/publish-prompt-dialog"
+import { PublishPromptDialog } from "../components/publish-prompt-dialog"
 
 export function DocumentLibrary() {
   const [isPublishOpen, setIsPublishOpen] = useState(false)

@@ -3,7 +3,7 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Home } from "lucide-react"
-import { DocumentUploader } from "@/components/document-uploader"
+import { DocumentUploader } from "../components/document-uploader"
 
 export const metadata: Metadata = {
   title: "Upload Document | Knowledge Base & Prompt Management",

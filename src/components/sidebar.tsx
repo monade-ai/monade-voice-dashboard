@@ -173,10 +173,10 @@ export function Sidebar() {
             isActive={pathname === '/tools'}
           />
           <NavItem
-            href="/files"
+            href="/knowledge-base"
             icon={<FileText size={18} />}
             label="Files"
-            isActive={pathname === '/files'}
+            isActive={pathname === '/knowledge-base'}
           />
           <NavItem
             href="/squads"

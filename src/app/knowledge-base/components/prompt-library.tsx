@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Edit, Trash2, Zap } from "lucide-react"
 import Link from "next/link"
-import { PublishPromptDialog } from "@/components/publish-prompt-dialog"
+import { PublishPromptDialog } from "../components/publish-prompt-dialog"
 import { useState } from "react"
 
 export function PromptLibrary() {
