@@ -404,7 +404,7 @@ const ContactUploadDialog: React.FC<ContactUploadDialogProps> = ({
             <AlertTriangle className="h-4 w-4 text-amber-500" />
             <AlertDescription className="text-amber-800 text-sm">
               <strong>Note:</strong> Please add the country code to all phone numbers in your file before uploading.
-              <div className="mt-1 text-xs">For example: U.S. numbers should start with +1, like +11234xxxxxxx</div>
+              <div className="mt-1 text-xs">For example: Indian numbers should start with +91, like +91234xxxxxxx</div>
             </AlertDescription>
           </Alert>
         </div>
