@@ -74,6 +74,7 @@ const ContactListView: React.FC<ContactListViewProps> = ({
   const [newListCreated, setNewListCreated] = useState(false);
   const [isCallDialogOpen, setIsCallDialogOpen] = useState(false);
   const [selectedContact, setSelectedContact] = useState<any>(null);
+  const [selectedContacts, setSelectedContacts] = useState<Set<string>>(new Set());
   const [selectedAssistant, setSelectedAssistant] = useState<PhoneAssistant | null>(null);
   const [callStatus, setCallStatus] = useState<'idle' | 'initiating' | 'connecting' | 'connected' | 'failed' | 'completed'>('idle');
   const [remainingTime, setRemainingTime] = useState(5);
@@ -332,6 +333,11 @@ const ContactListView: React.FC<ContactListViewProps> = ({
                   <div className="flex items-center gap-2">
                     <div className="text-sm text-muted-foreground">
                       {selectedList.count} {selectedList.count === 1 ? 'contact' : 'contacts'}
+                      {selectedContacts.size > 0 && (
+                        <span className="ml-2 text-sm text-muted-foreground">
+                          ({selectedContacts.size} selected)
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -348,6 +354,22 @@ const ContactListView: React.FC<ContactListViewProps> = ({
                     />
                   </div>
                   <div className="flex gap-2 w-full sm:w-auto">
+                    {selectedContacts.size > 0 && (
+                      <Button 
+                        variant="secondary"
+                        onClick={() => {
+                          const selectedContactsList = currentContacts.filter(contact => selectedContacts.has(contact.id));
+                          if (selectedContactsList.length > 0) {
+                            setSelectedContact(selectedContactsList[0]);
+                            setIsCallDialogOpen(true);
+                          }
+                        }}
+                        className="flex-1 sm:flex-initial mr-2"
+                      >
+                        <Phone className="mr-2 h-4 w-4" />
+                        Call Selected ({selectedContacts.size})
+                      </Button>
+                    )}
                     <Button 
                       variant="outline" 
                       onClick={onUploadContacts}
@@ -389,6 +411,20 @@ const ContactListView: React.FC<ContactListViewProps> = ({
                       <table className="w-full">
                         <thead>
                           <tr className="bg-muted/50">
+                            <th className="text-left p-4 font-medium">
+                              <input
+                                type="checkbox"
+                                className="h-4 w-4 rounded border-gray-300"
+                                checked={currentContacts.length > 0 && selectedContacts.size === currentContacts.length}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setSelectedContacts(new Set(currentContacts.map(contact => contact.id)));
+                                  } else {
+                                    setSelectedContacts(new Set());
+                                  }
+                                }}
+                              />
+                            </th>
                             <th className="text-left p-4 font-medium">Name</th>
                             <th className="text-left p-4 font-medium">Phone</th>
                             <th className="text-center p-4 font-medium">Call</th>
@@ -398,6 +434,22 @@ const ContactListView: React.FC<ContactListViewProps> = ({
                         <tbody>
                           {currentContacts.map((contact) => (
                             <tr key={contact.id} className="border-t hover:bg-muted">
+                              <td className="p-4">
+                                <input
+                                  type="checkbox"
+                                  className="h-4 w-4 rounded border-gray-300"
+                                  checked={selectedContacts.has(contact.id)}
+                                  onChange={(e) => {
+                                    const newSelected = new Set(selectedContacts);
+                                    if (e.target.checked) {
+                                      newSelected.add(contact.id);
+                                    } else {
+                                      newSelected.delete(contact.id);
+                                    }
+                                    setSelectedContacts(newSelected);
+                                  }}
+                                />
+                              </td>
                               <td className="p-4">{contact.name}</td>
                               <td className="p-4">{contact.phone}</td>
                               <td className="p-4 text-center">
@@ -583,11 +635,10 @@ const ContactListView: React.FC<ContactListViewProps> = ({
 
               clearInterval(timer);
               setCallStatus('connecting');
-              
-              setTimeout(() => {
+          
                 setCallStatus('connected');
                 setIsCallInitiating(false);
-              }, 2000);
+              
             } catch (error) {
               clearInterval(timer);
               setCallStatus('failed');
