@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
 import { useEditor, EditorContent, BubbleMenu } from "@tiptap/react"
 import StarterKit from "@tiptap/starter-kit"
 import Placeholder from "@tiptap/extension-placeholder"
@@ -49,7 +49,11 @@ import {
 } from "@/components/ui/tooltip"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 
-export function PromptEditor() {
+interface PromptEditorProps {
+  promptId?: string;
+}
+
+export function PromptEditor({ promptId }: PromptEditorProps) {
   const [isPublishOpen, setIsPublishOpen] = useState(false)
   const [promptTitle, setPromptTitle] = useState("")
   const [isAIEnhancing, setIsAIEnhancing] = useState(false)
@@ -57,7 +61,7 @@ export function PromptEditor() {
   const [markdownContent, setMarkdownContent] = useState("")
   const [linkUrl, setLinkUrl] = useState("")
   const [linkPopoverOpen, setLinkPopoverOpen] = useState(false)
-
+  
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -93,6 +97,65 @@ export function PromptEditor() {
       setMarkdownContent(markdown);
     },
   })
+
+  // Load prompt data if promptId is provided
+  useEffect(() => {
+    if (promptId) {
+      // In a real application, this would fetch the prompt from an API
+      // For now, we'll use our mock data
+      const prompts = [
+        {
+          id: "1",
+          title: "Customer Support Assistant",
+          description: "Handles common customer inquiries and provides helpful responses",
+          content: "# Customer Support Assistant\n\nYou are a helpful customer support assistant. Your goal is to provide clear, concise answers to customer questions and resolve their issues efficiently.\n\n## Guidelines\n\n- Be polite and professional at all times\n- Ask clarifying questions when needed\n- Provide step-by-step instructions for technical issues\n- Offer alternative solutions when possible",
+          agents: ["Support Bot"],
+          updatedAt: "2 days ago",
+        },
+        {
+          id: "2",
+          title: "Product Recommendation Engine",
+          description: "Suggests products based on customer preferences and browsing history",
+          content: "# Product Recommendation Engine\n\nYou are a product recommendation assistant. Your goal is to help customers find products that match their needs and preferences.\n\n## Guidelines\n\n- Ask about customer preferences and requirements\n- Consider budget constraints\n- Highlight key features and benefits\n- Compare similar products when relevant",
+          agents: ["Sales Assistant", "Website Bot"],
+          updatedAt: "1 week ago",
+        },
+        {
+          id: "3",
+          title: "Technical Troubleshooting Guide",
+          description: "Walks users through common technical issues and solutions",
+          content: "# Technical Troubleshooting Guide\n\nYou are a technical support specialist. Your goal is to help users diagnose and resolve technical issues with our products.\n\n## Guidelines\n\n- Start with basic troubleshooting steps\n- Ask for error messages and system information\n- Provide clear, step-by-step instructions\n- Escalate complex issues when necessary",
+          agents: ["Support Bot"],
+          updatedAt: "3 days ago",
+        },
+        {
+          id: "4",
+          title: "Onboarding Sequence",
+          description: "Guides new users through product features and setup",
+          content: "# Onboarding Sequence\n\nYou are an onboarding assistant. Your goal is to help new users get started with our product and understand its key features.\n\n## Guidelines\n\n- Welcome new users warmly\n- Explain core features progressively\n- Provide tips for getting started\n- Offer help resources for further learning",
+          agents: ["Website Bot"],
+          updatedAt: "5 days ago",
+        },
+        {
+          id: "5",
+          title: "Feature Announcement",
+          description: "Introduces users to new product features and updates",
+          content: "# Feature Announcement\n\nYou are announcing new features to our users. Your goal is to highlight the benefits and value of our latest updates.\n\n## Guidelines\n\n- Clearly explain what's new\n- Highlight key benefits and use cases\n- Provide examples of how to use new features\n- Direct users to documentation for more details",
+          agents: [],
+          updatedAt: "1 day ago",
+        },
+      ];
+      
+      const prompt = prompts.find(p => p.id === promptId);
+      if (prompt) {
+        setPromptTitle(prompt.title);
+        // Set the editor content when the editor is ready
+        if (editor) {
+          editor.commands.setContent(prompt.content);
+        }
+      }
+    }
+  }, [promptId, editor])
 
   const handleAIAssist = () => {
     // Simulate AI enhancement

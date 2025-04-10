@@ -13,8 +13,7 @@ export function PromptLibrary() {
   const [selectedPrompt, setSelectedPrompt] = useState<any>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [filteredPrompts, setFilteredPrompts] = useState<any[]>([])
-
-  const prompts = [
+  const [prompts, setPrompts] = useState([
     {
       id: "1",
       title: "Customer Support Assistant",
@@ -50,7 +49,16 @@ export function PromptLibrary() {
       agents: [],
       updatedAt: "1 day ago",
     },
-  ]
+  ])
+
+  const handleDelete = (promptId: string) => {
+    // Remove the prompt from the prompts array
+    const updatedPrompts = prompts.filter(prompt => prompt.id !== promptId);
+    setPrompts(updatedPrompts);
+    
+    // Also update filtered prompts to reflect the deletion
+    setFilteredPrompts(prevFiltered => prevFiltered.filter(prompt => prompt.id !== promptId));
+  }
 
   const handlePublish = (prompt: any) => {
     setSelectedPrompt(prompt)
@@ -146,6 +154,7 @@ export function PromptLibrary() {
                     <Button
                       variant="ghost"
                       size="icon"
+                      onClick={() => handleDelete(prompt.id)}
                       className="h-9 w-9 rounded-full bg-red-50 hover:bg-red-100 shadow-sm hover:shadow transition-all duration-200"
                     >
                       <Trash2 className="h-4 w-4 text-red-600" />

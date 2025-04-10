@@ -15,8 +15,8 @@ export function PromptCarousel() {
   const [selectedPrompt, setSelectedPrompt] = useState<any>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const [visibleCards, setVisibleCards] = useState(3)
-
-  const prompts = [
+  const [prompts, setPrompts] = useState([
+    
     {
       id: "1",
       title: "Customer Support Assistant",
@@ -51,10 +51,17 @@ export function PromptCarousel() {
       description: "Introduces users to new product features and updates",
       agents: [],
       updatedAt: "1 day ago",
-    },
-  ]
-
+    }
+  ])
+  
+  const handleDelete = (promptId: string) => {
+    // Remove the prompt from the prompts array
+    const updatedPrompts = prompts.filter(prompt => prompt.id !== promptId);
+    setPrompts(updatedPrompts);
+  }
+  
   useEffect(() => {
+
     const updateVisibleCards = () => {
       if (window.innerWidth < 640) {
         setVisibleCards(1)
@@ -146,6 +153,7 @@ export function PromptCarousel() {
                     <Button
                       variant="ghost"
                       size="icon"
+                      onClick={() => handleDelete(prompt.id)}
                       className="h-7 w-7 rounded-full bg-red-50 hover:bg-red-100 shadow-sm hover:shadow transition-all duration-200"
                     >
                       <Trash2 className="h-3.5 w-3.5 text-red-600" />
@@ -173,7 +181,7 @@ export function PromptCarousel() {
         </Button>
 
         <Button variant="outline" asChild className="rounded-full px-6">
-          <Link href="/konwldege-base/prompts">View All Prompts</Link>
+          <Link href="/knowledge-base/prompts">View All Prompts</Link>
         </Button>
 
         <Button
