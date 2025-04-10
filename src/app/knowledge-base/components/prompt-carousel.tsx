@@ -7,6 +7,7 @@ import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from "@/comp
 import { ChevronLeft, ChevronRight, Edit, Trash2, Zap } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { PublishPromptDialog } from "../components/publish-prompt-dialog"
+import { Badge } from "@/components/ui/badge"
 
 export function PromptCarousel() {
   const [currentIndex, setCurrentIndex] = useState(0)
@@ -95,39 +96,59 @@ export function PromptCarousel() {
           {prompts.map((prompt) => (
             <div key={prompt.id} className={cn("px-2 transition-opacity duration-300", `w-full sm:w-1/2 lg:w-1/3`)}>
               <Card className="h-full transform transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
-                <CardHeader>
+                <CardHeader className="pb-2">
                   <div>
-                    <CardTitle>{prompt.title}</CardTitle>
-                    <CardDescription className="mt-1">{prompt.description}</CardDescription>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-base font-medium leading-tight">{prompt.title}</CardTitle>
+                      {prompt.agents.length > 0 && (
+                        <Badge variant="outline" className="bg-amber-50 text-amber-700 text-[10px] px-2 py-0.5">
+                          {prompt.agents.length} {prompt.agents.length === 1 ? 'agent' : 'agents'}
+                        </Badge>
+                      )}
+                    </div>
+                    <CardDescription className="mt-1 line-clamp-2 text-xs">{prompt.description}</CardDescription>
+                    
+                    {/* {prompt.agents.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {prompt.agents.map((agent) => (
+                          <span 
+                            key={agent} 
+                            className="inline-block px-2 py-0.5 bg-slate-100 rounded-full text-[10px] font-medium text-slate-600"
+                          >
+                            {agent}
+                          </span>
+                        ))}
+                      </div>
+                    )} */}
                   </div>
                 </CardHeader>
-                <CardFooter className="flex justify-between border-t pt-4">
-                  <div className="text-xs text-muted-foreground">Updated {prompt.updatedAt}</div>
-                  <div className="flex gap-3">
+                <CardFooter className="flex justify-between border-t h-[44px] py-2 mt-1">
+                  <div className="text-[10px] text-muted-foreground">Updated {prompt.updatedAt}</div>
+                  <div className="flex gap-1">
                     <Button
                       variant="ghost"
                       size="icon"
                       onClick={() => handlePublish(prompt)}
-                      className="h-9 w-9 rounded-full bg-purple-50 hover:bg-purple-100 shadow-sm hover:shadow transition-all duration-200"
+                      className="h-7 w-7 rounded-full bg-amber-50 hover:bg-amber-100 shadow-sm hover:shadow transition-all duration-200"
                     >
-                      <Zap className="h-4 w-4 text-purple-600" />
+                      <Zap className="h-3.5 w-3.5 text-amber-600" />
                     </Button>
                     <Button
                       variant="ghost"
                       size="icon"
                       asChild
-                      className="h-9 w-9 rounded-full bg-blue-50 hover:bg-blue-100 shadow-sm hover:shadow transition-all duration-200"
+                      className="h-7 w-7 rounded-full bg-slate-50 hover:bg-slate-100 shadow-sm hover:shadow transition-all duration-200"
                     >
                       <Link href={`/knowledge-base/editor/${prompt.id}`}>
-                        <Edit className="h-4 w-4 text-blue-600" />
+                        <Edit className="h-3.5 w-3.5 text-slate-600" />
                       </Link>
                     </Button>
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-9 w-9 rounded-full bg-red-50 hover:bg-red-100 shadow-sm hover:shadow transition-all duration-200"
+                      className="h-7 w-7 rounded-full bg-red-50 hover:bg-red-100 shadow-sm hover:shadow transition-all duration-200"
                     >
-                      <Trash2 className="h-4 w-4 text-red-600" />
+                      <Trash2 className="h-3.5 w-3.5 text-red-600" />
                     </Button>
                   </div>
                 </CardFooter>
@@ -145,14 +166,14 @@ export function PromptCarousel() {
           disabled={currentIndex === 0}
           className={cn(
             "rounded-full transition-opacity",
-            currentIndex === 0 ? "opacity-50 cursor-not-allowed" : "hover:bg-primary/10",
+            currentIndex === 0 ? "opacity-50 cursor-not-allowed" : "hover:bg-amber-50",
           )}
         >
           <ChevronLeft className="h-5 w-5" />
         </Button>
 
         <Button variant="outline" asChild className="rounded-full px-6">
-          <Link href="/prompts">View All Prompts</Link>
+          <Link href="/konwldege-base/prompts">View All Prompts</Link>
         </Button>
 
         <Button
@@ -162,7 +183,7 @@ export function PromptCarousel() {
           disabled={currentIndex >= maxIndex}
           className={cn(
             "rounded-full transition-opacity",
-            currentIndex >= maxIndex ? "opacity-50 cursor-not-allowed" : "hover:bg-primary/10",
+            currentIndex >= maxIndex ? "opacity-50 cursor-not-allowed" : "hover:bg-amber-50",
           )}
         >
           <ChevronRight className="h-5 w-5" />
