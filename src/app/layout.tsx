@@ -1,13 +1,9 @@
+// app/layout.tsx (Server Component)
 
-
-import React from 'react';
-import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { Sidebar } from '../components/sidebar';
-import { Toaster } from 'sonner';
-import { PipecatProvider } from './assistants/providers/pipcat-provider';
-
 import "./globals.css";
+import ClientLayout from './client-layout';
+import type { Metadata } from "next";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -21,28 +17,18 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Calllive.ai",
-  description: "",
+  description: "Your AI-powered call assistant",
 };
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
     <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
-        <Toaster richColors position="bottom-center" />
-         <div className="flex h-screen">
-          <Sidebar />
-          <main className="flex-1 overflow-auto bg-[#f8f5f0] text-gray-800">
-          <PipecatProvider>
-            {children}
-            </PipecatProvider>
-          </main>
-         </div>
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+        <ClientLayout>{children}</ClientLayout>
       </body>
     </html>
   );

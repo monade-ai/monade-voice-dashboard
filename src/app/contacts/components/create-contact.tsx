@@ -112,7 +112,7 @@ const CreateContact: React.FC<CreateContactProps> = ({ onCancel, onSuccess }) =>
           <p className="text-red-500 text-sm">{errors.phone}</p>
         )}
         <p className="text-xs text-muted-foreground">
-          Include country code (e.g., +1 for US numbers)
+          Include country code (e.g., +91 for Indian numbers)
         </p>
       </div>
       
