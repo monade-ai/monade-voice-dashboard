@@ -24,7 +24,7 @@ export default function PromptsPage() {
           <h1 className="text-3xl font-bold tracking-tight">Prompt Library</h1>
         </div>
         <Button asChild className="rounded-full">
-          <Link href="/editor">
+          <Link href="/knowledge-base/editor">
             <PlusCircle className="mr-2 h-4 w-4" />
             Create Prompt
           </Link>
