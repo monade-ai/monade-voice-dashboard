@@ -10,13 +10,22 @@ export async function middleware(req: NextRequest) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   const authRoutes = ["/auth/login", "/auth/signup", "/auth/callback"];
   const currentPath = req.nextUrl.pathname;
   const isAuthRoute = authRoutes.some((route) =>
     currentPath.startsWith(route)
   );
+  const authRoutes = ["/auth/login", "/auth/signup", "/auth/callback"];
+  const currentPath = req.nextUrl.pathname;
+  const isAuthRoute = authRoutes.some((route) =>
+    currentPath.startsWith(route)
+  );
 
+  if (!isAuthRoute && !user) {
   if (!isAuthRoute && !user) {
     return NextResponse.redirect(new URL("/auth/login", req.url));
   }
@@ -29,5 +38,6 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
+  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
   matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
 };
