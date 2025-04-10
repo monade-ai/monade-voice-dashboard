@@ -52,7 +52,7 @@ export function RecentPrompts() {
             <div className="text-sm text-muted-foreground">Updated {prompt.updatedAt}</div>
             <div className="flex gap-2">
               <Button variant="outline" size="sm" asChild>
-                <Link href={`/editor/${prompt.id}`}>
+                <Link href={`/knowledge-base/editor/${prompt.id}`}>
                   <Edit className="mr-2 h-3.5 w-3.5" />
                   Edit
                 </Link>

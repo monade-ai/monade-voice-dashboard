@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -38,7 +37,7 @@ export function DocumentUploader() {
 
       // Auto-upload when files are dropped
       if (newFiles.length > 0) {
-        simulateUpload()
+        simulateUpload(newFiles[0])
       }
     }
   }
@@ -50,7 +49,7 @@ export function DocumentUploader() {
 
       // Auto-upload when files are selected
       if (newFiles.length > 0) {
-        simulateUpload()
+        simulateUpload(newFiles[0])
       }
     }
   }
@@ -59,17 +58,42 @@ export function DocumentUploader() {
     setFiles((prev) => prev.filter((_, i) => i !== index))
   }
 
-  const simulateUpload = () => {
-    setIsUploading(true)
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.readAsDataURL(file)
+      reader.onload = () => resolve(reader.result as string)
+      reader.onerror = error => reject(error)
+    })
+  }
 
-    // Simulate upload process
-    setTimeout(() => {
-      setIsUploading(false)
+  const simulateUpload = async (file: File) => {
+    setIsUploading(true)
+    try {
+      const base64 = await fileToBase64(file)
+
+      const storedData = {
+        title: documentTitle,
+        description: documentDescription,
+        fileName: file.name,
+        fileSize: file.size,
+        fileType: file.type,
+        content: base64,
+      }
+
+      localStorage.setItem("CallLiveDocuments", JSON.stringify(storedData))
       setUploadComplete(true)
-    }, 2000)
+    } catch (error) {
+      console.error("Failed to convert file:", error)
+      alert("Failed to process file. Please try again.")
+    } finally {
+      setIsUploading(false)
+    }
   }
 
   const handlePublish = () => {
+    const saved = localStorage.getItem("CallLiveDocuments")
+    console.log("Stored Document:", saved)
     setIsPublishOpen(true)
   }
 

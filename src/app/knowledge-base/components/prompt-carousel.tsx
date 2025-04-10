@@ -118,7 +118,7 @@ export function PromptCarousel() {
                       asChild
                       className="h-9 w-9 rounded-full bg-blue-50 hover:bg-blue-100 shadow-sm hover:shadow transition-all duration-200"
                     >
-                      <Link href={`/editor/${prompt.id}`}>
+                      <Link href={`/knowledge-base/editor/${prompt.id}`}>
                         <Edit className="h-4 w-4 text-blue-600" />
                       </Link>
                     </Button>

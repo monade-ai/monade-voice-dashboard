@@ -23,7 +23,7 @@ export default function HomePage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
-        <Link href="/upload" className="group">
+        <Link href="/knowledge-base/upload" className="group">
           <div className="relative overflow-hidden rounded-xl border-2 border-dashed p-8 h-60 flex flex-col items-center justify-center text-center transition-all duration-300 hover:border-primary hover:bg-primary/5 group-hover:shadow-lg">
             <div className="absolute inset-0 bg-gradient-to-br from-blue-50 to-indigo-50 opacity-50 transition-opacity duration-300 group-hover:opacity-100" />
             <div className="relative z-10">
@@ -36,7 +36,7 @@ export default function HomePage() {
           </div>
         </Link>
 
-        <Link href="/editor" className="group">
+        <Link href="/knowledge-base/editor" className="group">
           <div className="relative overflow-hidden rounded-xl border-2 border-dashed p-8 h-60 flex flex-col items-center justify-center text-center transition-all duration-300 hover:border-primary hover:bg-primary/5 group-hover:shadow-lg">
             <div className="absolute inset-0 bg-gradient-to-br from-purple-50 to-pink-50 opacity-50 transition-opacity duration-300 group-hover:opacity-100" />
             <div className="relative z-10">
