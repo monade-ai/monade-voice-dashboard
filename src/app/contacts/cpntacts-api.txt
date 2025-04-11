@@ -1,0 +1,500 @@
+# Contacts API Documentation
+
+This document provides a comprehensive guide to the Contacts API endpoints, including example cURL commands for each operation. The API requires authentication using JWT tokens obtained from Supabase.
+
+## Base URLs
+
+- API Base URL: `http://localhost:8000` (replace with your actual API URL in production)
+- Supabase URL: Your Supabase project URL
+
+## Authentication
+
+All API endpoints (except authentication endpoints) require a valid JWT token in the Authorization header.
+
+### Login with Supabase
+
+```bash
+curl -X POST "{{supabase_url}}/auth/v1/token?grant_type=password" \
+  -H "apikey: {{supabase_anon_key}}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "your-email@example.com",
+    "password": "your-password"
+  }'
+```
+
+Response:
+```json
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "bearer",
+  "expires_in": 3600,
+  "refresh_token": "aaaabbbbccccdddd",
+  "user": {
+    "id": "uuid-of-user",
+    "email": "your-email@example.com"
+  }
+}
+```
+
+### Get Current User
+
+```bash
+curl -X GET "{{api_url}}/me" \
+  -H "Authorization: Bearer {{access_token}}"
+```
+
+Response:
+```json
+{
+  "user_id": "uuid-of-user"
+}
+```
+
+## Contact Lists
+
+### Create Contact List
+
+```bash
+curl -X POST "{{api_url}}/api/contact-lists/" \
+  -H "Authorization: Bearer {{access_token}}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "My Contact List",
+    "description": "A list of my important contacts"
+  }'
+```
+
+Response:
+```json
+{
+  "id": "list-uuid",
+  "name": "My Contact List",
+  "description": "A list of my important contacts",
+  "owner_id": "user-uuid",
+  "contact_count": 0,
+  "created_at": "2025-04-11T10:00:00.000Z",
+  "updated_at": "2025-04-11T10:00:00.000Z"
+}
+```
+
+### Get All Contact Lists
+
+```bash
+curl -X GET "{{api_url}}/api/contact-lists/" \
+  -H "Authorization: Bearer {{access_token}}"
+```
+
+Response:
+```json
+{
+  "lists": [
+    {
+      "id": "list-uuid-1",
+      "name": "My Contact List",
+      "description": "A list of my important contacts",
+      "owner_id": "user-uuid",
+      "contact_count": 5,
+      "created_at": "2025-04-11T10:00:00.000Z",
+      "updated_at": "2025-04-11T10:00:00.000Z"
+    },
+    {
+      "id": "list-uuid-2",
+      "name": "Work Contacts",
+      "description": "Professional contacts",
+      "owner_id": "user-uuid",
+      "contact_count": 12,
+      "created_at": "2025-04-10T14:30:00.000Z",
+      "updated_at": "2025-04-10T14:30:00.000Z"
+    }
+  ]
+}
+```
+
+### Get Specific Contact List
+
+```bash
+curl -X GET "{{api_url}}/api/contact-lists/{{list_id}}" \
+  -H "Authorization: Bearer {{access_token}}"
+```
+
+Response:
+```json
+{
+  "id": "list-uuid",
+  "name": "My Contact List",
+  "description": "A list of my important contacts",
+  "owner_id": "user-uuid",
+  "contact_count": 5,
+  "created_at": "2025-04-11T10:00:00.000Z",
+  "updated_at": "2025-04-11T10:00:00.000Z"
+}
+```
+
+### Update Contact List
+
+```bash
+curl -X PUT "{{api_url}}/api/contact-lists/{{list_id}}" \
+  -H "Authorization: Bearer {{access_token}}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Updated List Name",
+    "description": "Updated description"
+  }'
+```
+
+Response:
+```json
+{
+  "id": "list-uuid",
+  "name": "Updated List Name",
+  "description": "Updated description",
+  "owner_id": "user-uuid",
+  "contact_count": 5,
+  "created_at": "2025-04-11T10:00:00.000Z",
+  "updated_at": "2025-04-11T11:30:00.000Z"
+}
+```
+
+### Get List Contacts
+
+```bash
+curl -X GET "{{api_url}}/api/contact-lists/{{list_id}}/contacts" \
+  -H "Authorization: Bearer {{access_token}}"
+```
+
+Response:
+```json
+[
+  {
+    "id": "contact-uuid-1",
+    "name": "John Doe",
+    "phone": "+15551234567",
+    "metadata": {
+      "notes": "Important client",
+      "source": "Conference"
+    },
+    "created_at": "2025-04-11T10:15:00.000Z",
+    "updated_at": "2025-04-11T10:15:00.000Z"
+  },
+  {
+    "id": "contact-uuid-2",
+    "name": "Jane Smith",
+    "phone": "+15559876543",
+    "metadata": {
+      "notes": "Product manager",
+      "source": "Referral"
+    },
+    "created_at": "2025-04-11T10:20:00.000Z",
+    "updated_at": "2025-04-11T10:20:00.000Z"
+  }
+]
+```
+
+### Delete Contact List
+
+```bash
+curl -X DELETE "{{api_url}}/api/contact-lists/{{list_id}}" \
+  -H "Authorization: Bearer {{access_token}}"
+```
+
+Response:
+```json
+{
+  "id": "list-uuid",
+  "deleted": true
+}
+```
+
+## Contacts
+
+### Create Contact
+
+```bash
+curl -X POST "{{api_url}}/api/contacts/list/{{list_id}}" \
+  -H "Authorization: Bearer {{access_token}}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "John Doe",
+    "phone": "+15551234567",
+    "metadata": {
+      "notes": "Important client",
+      "source": "Conference"
+    }
+  }'
+```
+
+Response:
+```json
+{
+  "id": "contact-uuid",
+  "name": "John Doe",
+  "phone": "+15551234567",
+  "metadata": {
+    "notes": "Important client",
+    "source": "Conference"
+  },
+  "created_at": "2025-04-11T12:00:00.000Z",
+  "updated_at": "2025-04-11T12:00:00.000Z"
+}
+```
+
+### Get Contact
+
+```bash
+curl -X GET "{{api_url}}/api/contacts/{{contact_id}}" \
+  -H "Authorization: Bearer {{access_token}}"
+```
+
+Response:
+```json
+{
+  "id": "contact-uuid",
+  "name": "John Doe",
+  "phone": "+15551234567",
+  "metadata": {
+    "notes": "Important client",
+    "source": "Conference"
+  },
+  "created_at": "2025-04-11T12:00:00.000Z",
+  "updated_at": "2025-04-11T12:00:00.000Z"
+}
+```
+
+### Update Contact
+
+```bash
+curl -X PUT "{{api_url}}/api/contacts/{{contact_id}}" \
+  -H "Authorization: Bearer {{access_token}}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "John Doe Updated",
+    "phone": "+15551234567",
+    "metadata": {
+      "notes": "Updated notes",
+      "source": "Conference",
+      "status": "active"
+    }
+  }'
+```
+
+Response:
+```json
+{
+  "id": "contact-uuid",
+  "name": "John Doe Updated",
+  "phone": "+15551234567",
+  "metadata": {
+    "notes": "Updated notes",
+    "source": "Conference",
+    "status": "active"
+  },
+  "created_at": "2025-04-11T12:00:00.000Z",
+  "updated_at": "2025-04-11T13:30:00.000Z"
+}
+```
+
+### Bulk Create Contacts
+
+```bash
+curl -X POST "{{api_url}}/api/contacts/list/{{list_id}}/bulk" \
+  -H "Authorization: Bearer {{access_token}}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "contacts": [
+      {
+        "name": "Jane Smith",
+        "phone": "+15559876543",
+        "metadata": {
+          "notes": "Product manager",
+          "source": "Referral"
+        }
+      },
+      {
+        "name": "Bob Johnson",
+        "phone": "+15554567890",
+        "metadata": {
+          "notes": "Developer",
+          "source": "Conference"
+        }
+      }
+    ]
+  }'
+```
+
+Response:
+```json
+{
+  "added_count": 2
+}
+```
+
+### Search Contacts
+
+```bash
+curl -X GET "{{api_url}}/api/contacts/search/?q=John" \
+  -H "Authorization: Bearer {{access_token}}"
+```
+
+Response:
+```json
+[
+  {
+    "id": "contact-uuid-1",
+    "name": "John Doe",
+    "phone": "+15551234567",
+    "metadata": {
+      "notes": "Important client",
+      "source": "Conference"
+    },
+    "created_at": "2025-04-11T12:00:00.000Z",
+    "updated_at": "2025-04-11T13:30:00.000Z"
+  },
+  {
+    "id": "contact-uuid-2",
+    "name": "Johnny Smith",
+    "phone": "+15557654321",
+    "metadata": {
+      "notes": "Potential client",
+      "source": "Website"
+    },
+    "created_at": "2025-04-10T09:15:00.000Z",
+    "updated_at": "2025-04-10T09:15:00.000Z"
+  }
+]
+```
+
+### Search Contacts in a Specific List
+
+```bash
+curl -X GET "{{api_url}}/api/contacts/search/?q=John&list_id={{list_id}}" \
+  -H "Authorization: Bearer {{access_token}}"
+```
+
+Response:
+```json
+[
+  {
+    "id": "contact-uuid-1",
+    "name": "John Doe",
+    "phone": "+15551234567",
+    "metadata": {
+      "notes": "Important client",
+      "source": "Conference"
+    },
+    "created_at": "2025-04-11T12:00:00.000Z",
+    "updated_at": "2025-04-11T13:30:00.000Z"
+  }
+]
+```
+
+### Remove Contact from List
+
+```bash
+curl -X DELETE "{{api_url}}/api/contacts/list/{{list_id}}/{{contact_id}}" \
+  -H "Authorization: Bearer {{access_token}}"
+```
+
+Response:
+```json
+{
+  "list_id": "list-uuid",
+  "contact_id": "contact-uuid",
+  "removed": true
+}
+```
+
+### Delete Contact
+
+```bash
+curl -X DELETE "{{api_url}}/api/contacts/{{contact_id}}" \
+  -H "Authorization: Bearer {{access_token}}"
+```
+
+Response:
+```json
+{
+  "id": "contact-uuid",
+  "deleted": true
+}
+```
+
+## Environment Variables for Frontend
+
+Your frontend implementation should manage the following environment variables:
+
+- `API_URL`: The base URL of your Contacts API (e.g., http://localhost:8000)
+- `SUPABASE_URL`: Your Supabase project URL
+- `SUPABASE_ANON_KEY`: Your Supabase anonymous key (public)
+
+For authentication, you should:
+1. Implement the Supabase login flow
+2. Store the received JWT token securely
+3. Include the token in all API requests in the Authorization header
+
+## Authentication Flow Implementation
+
+```javascript
+// Example authentication flow in JavaScript
+
+// 1. Login and get JWT token
+async function login(email, password) {
+  const response = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+    method: 'POST',
+    headers: {
+      'apikey': SUPABASE_ANON_KEY,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ email, password })
+  });
+  
+  const data = await response.json();
+  
+  if (response.ok) {
+    // Store the token securely
+    localStorage.setItem('access_token', data.access_token);
+    return data;
+  } else {
+    throw new Error(data.error || 'Login failed');
+  }
+}
+
+// 2. Function to make authenticated API requests
+async function apiRequest(endpoint, method = 'GET', body = null) {
+  const token = localStorage.getItem('access_token');
+  
+  if (!token) {
+    throw new Error('Not authenticated');
+  }
+  
+  const options = {
+    method,
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    }
+  };
+  
+  if (body) {
+    options.body = JSON.stringify(body);
+  }
+  
+  const response = await fetch(`${API_URL}${endpoint}`, options);
+  const data = await response.json();
+  
+  if (response.ok) {
+    return data;
+  } else {
+    throw new Error(data.detail || 'Request failed');
+  }
+}
+
+// Examples of using the apiRequest function
+async function createContactList(name, description) {
+  return apiRequest('/api/contact-lists/', 'POST', { name, description });
+}
+
+async function getContactLists() {
+  return apiRequest('/api/contact-lists/');
+}
+```

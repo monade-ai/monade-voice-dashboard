@@ -2,16 +2,11 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, Suspense } from 'react';
 import { format, subDays } from 'date-fns';
+import dynamic from 'next/dynamic';
 
-// Components
-import { MetricsCard } from './components/metrics-card';
-import { LineChart } from './components/line-chart';
-import { BarChart } from './components/bar-chart';
-import { FailedCallsList } from './components/failed-calls-list';
-import { SectionHeader } from '../../components/section-header';
-import { DateRangePicker } from './components/date-range-picker';
+// Static imports for essential components
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -21,6 +16,30 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { RefreshCw } from 'lucide-react';
+import { SectionHeader } from '../../components/section-header';
+
+// Dynamic imports with lazy loading
+const MetricsCard = dynamic(() => import('./components/metrics-card').then(mod => ({ default: mod.MetricsCard })), {
+  loading: () => <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm h-[200px] animate-pulse" />
+});
+
+const LineChart = dynamic(() => import('./components/line-chart').then(mod => ({ default: mod.LineChart })), {
+  ssr: false,
+  loading: () => <div className="h-64 bg-gray-100 animate-pulse rounded" />
+});
+
+const BarChart = dynamic(() => import('./components/bar-chart').then(mod => ({ default: mod.BarChart })), {
+  ssr: false,
+  loading: () => <div className="h-64 bg-gray-100 animate-pulse rounded" />
+});
+
+const DateRangePicker = dynamic(() => import('./components/date-range-picker').then(mod => ({ default: mod.DateRangePicker })), {
+  loading: () => <div className="h-10 w-48 bg-gray-100 animate-pulse rounded" />
+});
+
+const FailedCallsList = dynamic(() => import('./components/failed-calls-list').then(mod => ({ default: mod.FailedCallsList })), {
+  loading: () => <div className="h-64 bg-gray-100 animate-pulse rounded" />
+});
 
 // Data hook
 import { useDashboardData } from '../hooks/use-dashboard-data';
@@ -33,8 +52,10 @@ export default function DashboardPage() {
   const today = new Date();
   const thirtyDaysAgo = subDays(today, 30);
   
-  // Format for display
-  const defaultDateRange = `${format(thirtyDaysAgo, 'MM/dd/yyyy')} - ${format(today, 'MM/dd/yyyy')}`;
+  // Format for display - memoized to prevent recalculation
+  const defaultDateRange = useMemo(() => {
+    return `${format(thirtyDaysAgo, 'MM/dd/yyyy')} - ${format(today, 'MM/dd/yyyy')}`;
+  }, [thirtyDaysAgo, today]);
   
   // State for dashboard filters
   const [dateRange, setDateRange] = useState(defaultDateRange);
@@ -44,39 +65,22 @@ export default function DashboardPage() {
   // Add state for view more functionality
   const [showAllFailedCalls, setShowAllFailedCalls] = useState(false);
   
-  // Convert display dates to API format
-  const [dateFrom, dateTo] = dateRange.split(' - ').map(d => {
-    // If the date is in format MM/DD/YYYY, convert to YYYY-MM-DD
-    const parts = d.split('/');
-    if (parts.length === 3) {
-      return `${parts[2]}-${parts[0]}-${parts[1]}`;
-    }
-    return d;
-  });
+  // Convert display dates to API format - memoized
+  const [dateFrom, dateTo] = useMemo(() => {
+    return dateRange.split(' - ').map(d => {
+      // If the date is in format MM/DD/YYYY, convert to YYYY-MM-DD
+      const parts = d.split('/');
+      if (parts.length === 3) {
+        return `${parts[2]}-${parts[0]}-${parts[1]}`;
+      }
+      return d;
+    });
+  }, [dateRange]);
 
-  // Handle date range change
-  const handleDateRangeChange = (newDateRange: string) => {
+  // Handle date range change - memoized callback
+  const handleDateRangeChange = useCallback((newDateRange: string) => {
     setDateRange(newDateRange);
-  };
-
-  // Handle refresh button click - explicitly refresh data
-  const handleRefresh = () => {
-    refreshData();
-  };
-
-  // Function to handle date range picker changes
-  const handleDatePickerChange = (dates: [Date, Date]) => {
-    const [start, end] = dates;
-    const formattedRange = `${format(start, 'MM/dd/yyyy')} - ${format(end, 'MM/dd/yyyy')}`;
-    setDateRange(formattedRange);
-  };
-  
-  // Handle "View More" button click for failed calls
-  const handleViewMoreFailedCalls = () => {
-    // In a real app, this would navigate to a more detailed view
-    // For demo purposes, we'll just toggle the state
-    setShowAllFailedCalls(true);
-  };
+  }, []);
 
   // Fetch dashboard data using the hook
   const {
@@ -95,66 +99,270 @@ export default function DashboardPage() {
     useMockData: true // Set to false to use real API
   });
 
-  return (
-    <div className="container mx-auto p-4 md:p-6 bg-[#f8f5f0]">
-      {/* Dashboard Header */}
-      <div className="p-4 bg-white border border-gray-200 rounded-lg shadow-sm mb-6">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-amber-700">Overview</h1>
-            <p className="text-sm text-gray-500 mt-1">Analytics dashboard for call metrics and performance</p>
+  // Function to handle date range picker changes - memoized callback
+  const handleDatePickerChange = useCallback((dates: [Date, Date]) => {
+    const [start, end] = dates;
+    const formattedRange = `${format(start, 'MM/dd/yyyy')} - ${format(end, 'MM/dd/yyyy')}`;
+    setDateRange(formattedRange);
+  }, []);
+  
+  // Handle refresh button click - memoized callback
+  const handleRefresh = useCallback(() => {
+    if (refreshData) {
+      refreshData();
+    }
+  }, [refreshData]);
+  
+  // Handle "View More" button click for failed calls - memoized callback
+  const handleViewMoreFailedCalls = useCallback(() => {
+    setShowAllFailedCalls(true);
+  }, []);
+  
+  // Memoize the dashboard header to prevent unnecessary re-renders
+  const dashboardHeader = useMemo(() => (
+    <div className="p-4 bg-white border border-gray-200 rounded-lg shadow-sm mb-6">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-amber-700">Overview</h1>
+          <p className="text-sm text-gray-500 mt-1">Analytics dashboard for call metrics and performance</p>
+        </div>
+        
+        <div className="flex flex-col sm:flex-row flex-wrap gap-3 w-full md:w-auto">
+          <div className="w-full sm:w-auto">
+            <DateRangePicker 
+              dateRange={dateRange}
+              onDateRangeChange={handleDateRangeChange}
+            />
           </div>
           
-          <div className="flex flex-col sm:flex-row flex-wrap gap-3 w-full md:w-auto">
-            <div className="w-full sm:w-auto">
-              <DateRangePicker 
-                dateRange={dateRange}
-                onDateRangeChange={handleDateRangeChange}
-              />
-            </div>
+          <div className="flex gap-2">
+            <Select
+              value={groupBy}
+              onValueChange={setGroupBy}
+            >
+              <SelectTrigger className="w-32 h-10 bg-white border-gray-300 text-gray-700">
+                <SelectValue placeholder="Group by" />
+              </SelectTrigger>
+              <SelectContent className="bg-white border-gray-300 text-gray-700">
+                <SelectItem value="day">Day</SelectItem>
+                <SelectItem value="week">Week</SelectItem>
+                <SelectItem value="month">Month</SelectItem>
+              </SelectContent>
+            </Select>
             
-            <div className="flex gap-2">
-              <Select
-                value={groupBy}
-                onValueChange={setGroupBy}
-              >
-                <SelectTrigger className="w-32 h-10 bg-white border-gray-300 text-gray-700">
-                  <SelectValue placeholder="Group by" />
-                </SelectTrigger>
-                <SelectContent className="bg-white border-gray-300 text-gray-700">
-                  <SelectItem value="day">Day</SelectItem>
-                  <SelectItem value="week">Week</SelectItem>
-                  <SelectItem value="month">Month</SelectItem>
-                </SelectContent>
-              </Select>
-              
-              <Select
-                value={assistantFilter}
-                onValueChange={setAssistantFilter}
-              >
-                <SelectTrigger className="w-48 h-10 bg-white border-gray-300 text-gray-700">
-                  <SelectValue placeholder="Filter by Assistant" />
-                </SelectTrigger>
-                <SelectContent className="bg-white border-gray-300 text-gray-700">
-                  <SelectItem value="all">All Assistants</SelectItem>
-                  <SelectItem value="new">New Assistant</SelectItem>
-                  <SelectItem value="unknown">Unknown Assistant</SelectItem>
-                </SelectContent>
-              </Select>
-              
-              <Button
-                variant="outline"
-                className="h-10 bg-white border-gray-300 text-gray-700 hover:bg-gray-50"
-                onClick={handleRefresh}
-                disabled={loading}
-              >
-                <RefreshCw className={`h-4 w-4 mr-2 text-amber-600 ${loading ? 'animate-spin' : ''}`} />
-                Refresh
-              </Button>
-            </div>
+            <Select
+              value={assistantFilter}
+              onValueChange={setAssistantFilter}
+            >
+              <SelectTrigger className="w-48 h-10 bg-white border-gray-300 text-gray-700">
+                <SelectValue placeholder="Filter by Assistant" />
+              </SelectTrigger>
+              <SelectContent className="bg-white border-gray-300 text-gray-700">
+                <SelectItem value="all">All Assistants</SelectItem>
+                <SelectItem value="new">New Assistant</SelectItem>
+                <SelectItem value="unknown">Unknown Assistant</SelectItem>
+              </SelectContent>
+            </Select>
+            
+            <Button
+              variant="outline"
+              className="h-10 bg-white border-gray-300 text-gray-700 hover:bg-gray-50"
+              onClick={handleRefresh}
+              disabled={loading}
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 text-amber-600 ${loading ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
           </div>
         </div>
       </div>
+    </div>
+  ), [dateRange, groupBy, assistantFilter, loading, handleDateRangeChange, handleRefresh]);
+
+  // Memoize the metrics cards to prevent unnecessary re-renders
+  const metricsCards = useMemo(() => (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <MetricsCard
+        title="Total Call Minutes"
+        value={metrics.totalCallMinutes.total.toFixed(2)}
+        subtitle="Minutes spent on calls"
+      >
+        <LineChart
+          data={metrics.totalCallMinutes.points}
+          xKey="date"
+          yKey="minutes"
+          color="#d97706" // amber-600
+          formatX={(date) => format(new Date(date), 'MM/dd')}
+          formatY={(value) => `${value} min`}
+          hideGrid={true}
+          hideTicks={true}
+        />
+      </MetricsCard>
+      
+      <MetricsCard
+        title="Number of Calls"
+        value={formatNumber(metrics.numberOfCalls.total)}
+        subtitle="Total calls made"
+      >
+        <LineChart
+          data={metrics.numberOfCalls.points}
+          xKey="date"
+          yKey="count"
+          color="#0ea5e9" // sky-500
+          formatX={(date) => format(new Date(date), 'MM/dd')}
+          formatY={(value) => value.toString()}
+          hideGrid={true}
+          hideTicks={true}
+        />
+      </MetricsCard>
+      
+      <MetricsCard
+        title="Total Spent"
+        value={formatCurrency(metrics.totalSpent.total)}
+        subtitle="Cost of all calls"
+      >
+        <LineChart
+          data={metrics.totalSpent.points}
+          xKey="date"
+          yKey="amount"
+          color="#10b981" // emerald-500
+          formatX={(date) => format(new Date(date), 'MM/dd')}
+          formatY={(value) => formatCurrency(value)}
+          hideGrid={true}
+          hideTicks={true}
+        />
+      </MetricsCard>
+      
+      <MetricsCard
+        title="Avg. Cost Per Call"
+        value={formatCurrency(metrics.avgCostPerCall.total)}
+        subtitle="Average cost per call"
+      >
+        <LineChart
+          data={metrics.avgCostPerCall.points}
+          xKey="date"
+          yKey="amount"
+          color="#8b5cf6" // violet-500
+          formatX={(date) => format(new Date(date), 'MM/dd')}
+          formatY={(value) => formatCurrency(value)}
+          hideGrid={true}
+          hideTicks={true}
+        />
+      </MetricsCard>
+    </div>
+  ), [metrics]);
+
+  // Memoize the analysis charts to prevent unnecessary re-renders
+  const analysisCharts = useMemo(() => (
+    <>
+      {/* Middle Row - Charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        {/* Call End Reason */}
+        <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+          <h2 className="text-lg font-semibold mb-4 text-gray-800">Call End Reason</h2>
+          <div className="h-64">
+            <BarChart
+              data={analysis.callEndReason}
+              xKey="reason"
+              yKey="count"
+              color="#f59e0b" // amber-500
+              formatY={(value) => value.toString()}
+            />
+          </div>
+        </div>
+        
+        {/* Call Duration by Assistant */}
+        <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+          <h2 className="text-lg font-semibold mb-4 text-gray-800">Call Duration by Assistant</h2>
+          <div className="h-64">
+            <LineChart
+              data={analysis.callDurationByAssistant}
+              xKey="date"
+              yKey={['New Assistant', 'Unknown Assistant']}
+              color={['#0ea5e9', '#8b5cf6']} // sky-500, violet-500
+              formatX={(date) => format(new Date(date), 'MM/dd')}
+              formatY={(value) => `${value} min`}
+              showLegend={true}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Bottom Row - More Charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        {/* Cost Breakdown */}
+        <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+          <h2 className="text-lg font-semibold mb-4 text-gray-800">Cost Breakdown</h2>
+          <div className="h-64">
+            <BarChart
+              data={analysis.costBreakdown}
+              xKey="category"
+              yKey="amount"
+              color="#10b981" // emerald-500
+              formatY={(value) => formatCurrency(value)}
+            />
+          </div>
+        </div>
+        
+        {/* Success Evaluation */}
+        <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+          <h2 className="text-lg font-semibold mb-4 text-gray-800">Success Evaluation</h2>
+          <div className="h-64">
+            <BarChart
+              data={analysis.successEvaluation}
+              xKey="metric"
+              yKey="percentage"
+              color="#8b5cf6" // violet-500
+              formatY={(value) => `${value}%`}
+            />
+          </div>
+        </div>
+      </div>
+    </>
+  ), [analysis]);
+
+  // Memoize the failed calls list to prevent unnecessary re-renders
+  const failedCallsSection = useMemo(() => (
+    <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm mb-6">
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-lg font-semibold text-gray-800">Recent Unsuccessful Calls</h2>
+        {!showAllFailedCalls && failedCalls.length > 3 && (
+          <Button 
+            variant="link" 
+            className="text-amber-600 hover:text-amber-700"
+            onClick={handleViewMoreFailedCalls}
+          >
+            View All
+          </Button>
+        )}
+      </div>
+      <FailedCallsList 
+        calls={showAllFailedCalls ? failedCalls : failedCalls.slice(0, 3)} 
+      />
+    </div>
+  ), [failedCalls, showAllFailedCalls, handleViewMoreFailedCalls]);
+
+  // Memoize the concurrent calls chart to prevent unnecessary re-renders
+  const concurrentCallsChart = useMemo(() => (
+    <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+      <h2 className="text-lg font-semibold mb-4 text-gray-800">Concurrent Calls</h2>
+      <div className="h-64">
+        <LineChart
+          data={concurrentCalls}
+          xKey="date"
+          yKey="count"
+          color="#f59e0b" // amber-500
+          formatX={(date) => format(new Date(date), 'MM/dd')}
+          formatY={(value) => value.toString()}
+        />
+      </div>
+    </div>
+  ), [concurrentCalls]);
+
+  return (
+    <div className="container mx-auto p-4 md:p-6 bg-[#f8f5f0]">
+      {/* Dashboard Header */}
+      {dashboardHeader}
 
       {/* Error state */}
       {error && (
@@ -181,171 +389,26 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Top Row - Key Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <MetricsCard
-          title="Total Call Minutes"
-          value={metrics.totalCallMinutes.total.toFixed(2)}
-        >
-          <LineChart
-            data={metrics.totalCallMinutes.points}
-            xKey="date"
-            yKey="minutes"
-            color="#d97706" // amber-600
-            formatX={(date) => format(new Date(date), 'MM/dd')}
-            formatY={(value) => `${value} min`}
-            hideGrid={true}
-            hideTicks={true}
-          />
-        </MetricsCard>
+      {/* Wrap content in Suspense boundaries for better loading experience */}
+      <Suspense fallback={<div className="h-[200px] bg-gray-100 animate-pulse rounded mb-6" />}>
+        {/* Top Row - Key Metrics */}
+        {metricsCards}
+      </Suspense>
 
-        <MetricsCard
-          title="Number of Calls"
-          value={metrics.numberOfCalls.total}
-        >
-          <LineChart
-            data={metrics.numberOfCalls.points}
-            xKey="date"
-            yKey="calls"
-            color="#2563eb" // blue-600
-            formatX={(date) => format(new Date(date), 'MM/dd')}
-            formatY={(value) => value.toString()}
-            hideGrid={true}
-            hideTicks={true}
-          />
-        </MetricsCard>
+      <Suspense fallback={<div className="h-[400px] bg-gray-100 animate-pulse rounded mb-6" />}>
+        {/* Analysis Charts */}
+        {analysisCharts}
+      </Suspense>
 
-        <MetricsCard
-          title="Total Spent"
-          value={formatCurrency(metrics.totalSpent.total)}
-        >
-          <LineChart
-            data={metrics.totalSpent.points}
-            xKey="date"
-            yKey="amount"
-            color="#ea580c" // orange-600
-            formatX={(date) => format(new Date(date), 'MM/dd')}
-            formatY={(value) => formatCurrency(value)}
-            hideGrid={true}
-            hideTicks={true}
-          />
-        </MetricsCard>
+      <Suspense fallback={<div className="h-[200px] bg-gray-100 animate-pulse rounded mb-6" />}>
+        {/* Failed Calls List */}
+        {failedCallsSection}
+      </Suspense>
 
-        <MetricsCard
-          title="Average Cost per Call"
-          value={formatCurrency(metrics.avgCostPerCall.total)}
-        >
-          <LineChart
-            data={metrics.avgCostPerCall.points}
-            xKey="date"
-            yKey="cost"
-            color="#059669" // emerald-600
-            formatX={(date) => format(new Date(date), 'MM/dd')}
-            formatY={(value) => formatCurrency(value)}
-            hideGrid={true}
-            hideTicks={true}
-          />
-        </MetricsCard>
-      </div>
-
-      {/* Call Analysis Section */}
-      <SectionHeader title="Call Analysis" />
-
-      {/* Middle Row - Bar Charts */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-        <div className="bg-white border border-gray-200 rounded-lg p-4 hover:border-amber-300 transition-all shadow-sm">
-          <h3 className="text-sm font-medium text-gray-500 mb-4">Reason Call Ended</h3>
-          <BarChart
-            data={analysis.callEndReason}
-            xKey="date"
-            bars={[
-              { key: 'customer-ended-call', color: '#818cf8' }, // indigo
-              { key: 'assistant-ended-call', color: '#4ade80' }, // green
-            ]}
-            formatY={(value) => value.toString()}
-            chartHeight={240}
-          />
-        </div>
-
-        <div className="bg-white border border-gray-200 rounded-lg p-4 hover:border-amber-300 transition-all shadow-sm">
-          <h3 className="text-sm font-medium text-gray-500 mb-4">Average Call Duration by Assistant</h3>
-          <BarChart
-            data={analysis.callDurationByAssistant}
-            xKey="date"
-            bars={[
-              { key: 'Unknown Assistant', color: '#8b5cf6' }, // violet
-              { key: 'New Assistant', color: '#4ade80' }, // green
-            ]}
-            formatY={(value) => `${value.toFixed(1)}m`}
-            chartHeight={240}
-          />
-        </div>
-
-        <div className="bg-white border border-gray-200 rounded-lg p-4 hover:border-amber-300 transition-all shadow-sm">
-          <h3 className="text-sm font-medium text-gray-500 mb-4">Cost Breakdown</h3>
-          <BarChart
-            data={analysis.costBreakdown}
-            xKey="date"
-            bars={[
-              { key: 'LLM', color: '#8b5cf6', stackId: 'stack' }, // violet
-              { key: 'STT', color: '#f97316', stackId: 'stack' }, // orange
-              { key: 'TTS', color: '#0ea5e9', stackId: 'stack' }, // sky
-              { key: 'VAPI', color: '#ec4899', stackId: 'stack' }, // pink
-            ]}
-            formatY={(value) => formatCurrency(value)}
-            chartHeight={240}
-          />
-        </div>
-      </div>
-
-      {/* Bottom Row */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        <div className="bg-white border border-gray-200 rounded-lg p-4 hover:border-amber-300 transition-all shadow-sm">
-          <h3 className="text-sm font-medium text-gray-500 mb-4">Success Evaluation</h3>
-          <BarChart
-            data={analysis.successEvaluation}
-            xKey="date"
-            bars={[
-              { key: 'True', color: '#4ade80' }, // green
-              { key: 'False', color: '#f87171' }, // red
-              { key: 'Unknown', color: '#9ca3af' }, // gray
-            ]}
-            formatY={(value) => value.toString()}
-            chartHeight={240}
-          />
-        </div>
-
-        <FailedCallsList
-          calls={failedCalls.slice(0, showAllFailedCalls ? failedCalls.length : 5)}
-          onViewMore={handleViewMoreFailedCalls}
-          showViewMore={!showAllFailedCalls && failedCalls.length > 5}
-        />
-
-        <div className="bg-white border border-gray-200 rounded-lg p-4 hover:border-amber-300 transition-all shadow-sm">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-sm font-medium text-gray-500">Number of Concurrent Calls</h3>
-            <select 
-              className="bg-white border-gray-300 text-gray-700 text-xs rounded-md p-1"
-              value={groupBy}
-              onChange={(e) => setGroupBy(e.target.value)}
-            >
-              <option value="day">Day</option>
-              <option value="week">Week</option>
-              <option value="month">Month</option>
-            </select>
-          </div>
-          <div className="h-[240px]">
-            <LineChart
-              data={concurrentCalls}
-              xKey="date"
-              yKey="calls"
-              color="#d97706" // amber-600
-              formatX={(date) => format(new Date(date.split(' ')[0]), 'MM/dd')}
-              formatY={(value) => value.toString()}
-            />
-          </div>
-        </div>
-      </div>
+      <Suspense fallback={<div className="h-[200px] bg-gray-100 animate-pulse rounded" />}>
+        {/* Concurrent Calls Chart */}
+        {concurrentCallsChart}
+      </Suspense>
     </div>
   );
 }
