@@ -1,0 +1,76 @@
+{
+  "sidebar": {
+    "organization": "Organisation",
+    "overview": "Übersicht",
+    "build": "Erstellung",
+    "assistants": "Assistenten",
+    "workflows": "Arbeitsabläufe",
+    "contacts": "Kontaktlisten",
+    "phoneNumbers": "Telefonnummern",
+    "tools": "Werkzeuge",
+    "files": "Dateien",
+    "squads": "Teams",
+    "providerKeys": "Anbieter-Schlüssel",
+    "test": "Test",
+    "phone": "Telefon",
+    "web": "Web",
+    "observe": "Beobachten",
+    "calls": "Anrufe",
+    "community": "Gemeinschaft",
+    "communityLink": "Gemeinschaft",
+    "orgSettings": "Organisations-Einstellungen",
+    "orgSettingsLink": "Organisations-Einstellungen",
+    "accountSettings": "Kontoeinstellungen",
+    "accountSettingsLink": "Kontoeinstellungen",
+    "help": "Hilfe",
+    "logout": "Abmelden",
+    "language": "Sprache"
+  },
+  "common": {
+    "save": "Speichern",
+    "cancel": "Abbrechen",
+    "delete": "Löschen",
+    "edit": "Bearbeiten",
+    "create": "Erstellen",
+    "search": "Suchen",
+    "loading": "Lädt...",
+    "noResults": "Keine Ergebnisse gefunden"
+  },
+  "dashboard": {
+    "title": "Übersicht",
+    "description": "Analyse-Dashboard für Anrufmetriken und Leistung",
+    "metrics": {
+      "totalCallMinutes": "Gesamte Anrufminuten",
+      "numberOfCalls": "Anzahl der Anrufe",
+      "totalSpent": "Gesamtkosten",
+      "avgCostPerCall": "Durchschnittliche Kosten pro Anruf"
+    },
+    "charts": {
+      "callEndReason": "Anrufbeendigungsgrund",
+      "callDurationByAssistant": "Anrufzeit durch Assistent",
+      "costBreakdown": "Kostenaufschlüsselung",
+      "successEvaluation": "Erfolgbewertung",
+      "concurrentCalls": "Gleichzeitige Anrufe"
+    },
+    "failedCalls": {
+      "title": "Neueste erfolglose Anrufe",
+      "viewAll": "Alle anzeigen"
+    }
+  },
+  "assistants": "Assistenten",
+  "workflows": "Arbeitsabläufe",
+  "contacts": "Kontaktlisten",
+  "phoneNumbers": "Telefonnummern",
+  "tools": "Werkzeuge",
+  "files": "Dateien",
+  "squads": "Teams",
+  "providerKeys": "Anbieter-Schlüssel",
+  "test": "Test",
+  "calls": "Anrufe",
+  "community": "Gemeinschaft",
+  "orgSettings": "Organisations-Einstellungen",
+  "accountSettings": "Kontoeinstellungen",
+  "help": "Hilfe",
+  "logout": "Abmelden",
+  "language": "Sprache"
+}

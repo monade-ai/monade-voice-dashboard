@@ -1,0 +1,76 @@
+{
+  "sidebar": {
+  "organization": "संगठन",
+  "overview": "अवलोकन",
+  "build": "निर्माण",
+  "assistants": "सहायक",
+  "workflows": "कार्यप्रवाह",
+  "contacts": "संपर्क सूची",
+  "phoneNumbers": "फ़ोन नंबर",
+  "tools": "उपकरण",
+  "files": "फ़ाइलें",
+  "squads": "टीमें",
+  "providerKeys": "प्रदाता कुंजी",
+  "test": "परीक्षा",
+  "phone": "फ़ोन",
+  "web": "वेब",
+  "observe": "निरीक्षण",
+  "calls": "कॉल",
+  "community": "समुदाय",
+  "communityLink": "समुदाय",
+  "orgSettings": "संगठन सेटिंग्स",
+  "orgSettingsLink": "संगठन सेटिंग्स",
+  "accountSettings": "खाता सेटिंग्स",
+  "accountSettingsLink": "खाता सेटिंग्स",
+  "help": "सहायता",
+  "logout": "लॉगआउट",
+  "language": "भाषा"
+  },
+  "common": {
+  "save": "सहेजें",
+  "cancel": "रद्द करें",
+  "delete": "मिटाएं",
+  "edit": "संपादित करें",
+  "create": "बनाएं",
+  "search": "खोजें",
+  "loading": "लोड हो रहा है...",
+  "noResults": "कोई परिणाम नहीं मिला"
+  },
+  "dashboard": {
+  "title": "अवलोकन",
+  "description": "कॉल मेट्रिक्स और प्रदर्शन विश्लेषण डैशबोर्ड",
+  "metrics": {
+  "totalCallMinutes": "कुल कॉल मिनट",
+  "numberOfCalls": "कॉल की संख्या",
+  "totalSpent": "कुल खर्च",
+  "avgCostPerCall": "प्रति कॉल औसत लागत"
+  },
+  "charts": {
+  "callEndReason": "कॉल समाप्ति कारण",
+  "callDurationByAssistant": "सहायक द्वारा कॉल अवधि",
+  "costBreakdown": "लागत विवरण",
+  "successEvaluation": "सफलता मूल्यांकन",
+  "concurrentCalls": "एक साथ कॉल"
+  },
+  "failedCalls": {
+  "title": "हाल ही में असफल कॉल",
+  "viewAll": "सभी देखें"
+  }
+  },
+  "assistants": "सहायक",
+  "workflows": "कार्यप्रवाह",
+  "contacts": "संपर्क सूची",
+  "phoneNumbers": "फ़ोन नंबर",
+  "tools": "उपकरण",
+  "files": "फ़ाइलें",
+  "squads": "टीमें",
+  "providerKeys": "प्रदाता कुंजी",
+  "test": "परीक्षा",
+  "calls": "कॉल",
+  "community": "समुदाय",
+  "orgSettings": "संगठन सेटिंग्स",
+  "accountSettings": "खाता सेटिंग्स",
+  "help": "सहायता",
+  "logout": "लॉगआउट",
+  "language": "भाषा"
+ }

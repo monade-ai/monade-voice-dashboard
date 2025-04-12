@@ -1,0 +1,76 @@
+{
+  "sidebar": {
+    "organization": "ORGANIZATION",
+    "overview": "Overview",
+    "build": "BUILD",
+    "assistants": "Assistants",
+    "workflows": "Workflows",
+    "contacts": "Contact Lists",
+    "phoneNumbers": "Phone Numbers",
+    "tools": "Tools",
+    "files": "Files",
+    "squads": "Squads",
+    "providerKeys": "Provider Keys",
+    "test": "TEST",
+    "phone": "Phone",
+    "web": "Web",
+    "observe": "OBSERVE",
+    "calls": "Calls",
+    "community": "COMMUNITY",
+    "communityLink": "Community",
+    "orgSettings": "ORG SETTINGS",
+    "orgSettingsLink": "Org Settings",
+    "accountSettings": "ACCOUNT SETTINGS",
+    "accountSettingsLink": "Account Settings",
+    "help": "Help",
+    "logout": "Logout",
+    "language": "Language"
+  },
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "create": "Create",
+    "search": "Search",
+    "loading": "Loading",
+    "noResults": "No results found"
+  },
+    "dashboard": {
+      "title": "Overview",
+      "description": "Analytics dashboard for call metrics and performance",
+      "metrics": {
+        "totalCallMinutes": "Total Call Minutes",
+        "numberOfCalls": "Number of Calls",
+        "totalSpent": "Total Spent",
+        "avgCostPerCall": "Avg. Cost Per Call"
+      },
+      "charts": {
+        "callEndReason": "Call End Reason",
+        "callDurationByAssistant": "Call Duration by Assistant",
+        "costBreakdown": "Cost Breakdown",
+        "successEvaluation": "Success Evaluation",
+        "concurrentCalls": "Concurrent Calls"
+      },
+      "failedCalls": {
+        "title": "Recent Unsuccessful Calls",
+        "viewAll": "View All"
+      }
+    },
+    "assistants": "Assistants",
+    "workflows": "Workflows",
+    "contacts": "Contact Lists",
+    "phoneNumbers": "Phone Numbers",
+    "tools": "Tools",
+    "files": "Files",
+    "squads": "Squads",
+    "providerKeys": "Provider Keys",
+    "test": "Test",
+    "calls": "Calls",
+    "community": "Community",
+    "orgSettings": "Org Settings",
+    "accountSettings": "Account Settings",
+    "help": "Help",
+    "logout": "Logout",
+    "language": "Language"
+  }

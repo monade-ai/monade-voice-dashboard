@@ -3,7 +3,7 @@
 'use client';
 
 import Image from 'next/image';
-import React, { useState, useCallback, memo } from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useLogout } from "./utils/logout";
@@ -20,9 +20,12 @@ import {
   ChevronDown,
   ChevronRight,
   Contact2,
-  LogOut
+  LogOut,
+  Globe
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useTranslations } from '@/i18n/translations-context';
+import { LanguageSelector } from '@/components/language-selector';
 
 interface NavItemProps {
   href: string;
@@ -35,8 +38,7 @@ interface NavItemProps {
   childItems?: Array<{ href: string; label: string }>;
 }
 
-// Memoize NavItem to prevent unnecessary re-renders
-const NavItem = memo(function NavItem({
+function NavItem({
   href,
   icon,
   label,
@@ -82,15 +84,14 @@ const NavItem = memo(function NavItem({
       )}
     </>
   );
-});
+}
 
 interface SectionProps {
   title: string;
   children: React.ReactNode;
 }
 
-// Memoize SidebarSection to prevent unnecessary re-renders
-const SidebarSection = memo(function SidebarSection({ title, children }: SectionProps) {
+function SidebarSection({ title, children }: SectionProps) {
   return (
     <div className="mb-4">
       <div className="px-4 py-2">
@@ -101,18 +102,18 @@ const SidebarSection = memo(function SidebarSection({ title, children }: Section
       <div>{children}</div>
     </div>
   );
-});
+}
 
 export function Sidebar() {
   const pathname = usePathname();
   const [expandedSection, setExpandedSection] = useState<string | null>(null);
+  const { t } = useTranslations();
 
   const logout = useLogout();
 
-  // Memoize the toggle function to prevent recreation on each render
-  const toggleSection = useCallback((section: string) => {
+  const toggleSection = (section: string) => {
     setExpandedSection(expandedSection === section ? null : section);
-  }, [expandedSection]);
+  };
 
   return (
     <div className="w-64 h-full bg-white border-r border-gray-200 flex flex-col overflow-y-auto shadow-md">
@@ -128,7 +129,7 @@ export function Sidebar() {
           </div>
         </div>
 
-        <SidebarSection title="ORGANIZATION">
+        <SidebarSection title={t('sidebar.organization')}>
           <div className="px-3 py-2">
             <div className="flex items-center space-x-2">
               <div className="w-3 h-3 rounded-full bg-cyan-500"></div>
@@ -139,90 +140,139 @@ export function Sidebar() {
           <NavItem
             href="/dashboard"
             icon={<BarChart4 size={18} />}
-            label="Overview"
+            label={t('sidebar.overview')}
             isActive={pathname === '/dashboard' || pathname === '/'}
           />
         </SidebarSection>
 
-        <SidebarSection title="BUILD">
+        <SidebarSection title={t('sidebar.build')}>
           <NavItem
             href="/assistants"
             icon={<Layers size={18} />}
-            label="Assistants"
+            label={t('sidebar.assistants')}
             isActive={pathname === '/assistants'}
           />
-          
-          <NavItem
-            href="/knowledge-base"
-            icon={<FileText size={18} />}
-            label="Knowledge Base"
-            isActive={pathname.startsWith('/knowledge-base')}
-          />
-          
           <NavItem
             href="/workflow"
-            icon={<Wrench size={18} />}
-            label="Workflow"
-            isActive={pathname.startsWith('/workflow')}
+            icon={<Layers size={18} />}
+            label={t('sidebar.workflows')}
+            isActive={pathname === '/workflows'}
           />
-        </SidebarSection>
-
-        <SidebarSection title="ENGAGE">
           <NavItem
             href="/contacts"
             icon={<Contact2 size={18} />}
-            label="Contacts"
-            isActive={pathname.startsWith('/contacts')}
+            label={t('sidebar.contacts')}
+            isActive={pathname === '/contacts'}
           />
-          
           <NavItem
-            href="#"
+            href="/phone-numbers"
             icon={<PhoneCall size={18} />}
-            label="Call Logs"
-            isActive={pathname.startsWith('/call-logs')}
+            label={t('sidebar.phoneNumbers')}
+            isActive={pathname === '/phone-numbers'}
           />
-        </SidebarSection>
-
-        <SidebarSection title="SETTINGS">
           <NavItem
-            href="#"
-            icon={<Settings size={18} />}
-            label="Account Settings"
-            isActive={pathname.startsWith('/settings/account')}
+            href="/tools"
+            icon={<Wrench size={18} />}
+            label={t('sidebar.tools')}
+            isActive={pathname === '/tools'}
           />
-          
           <NavItem
-            href="#"
+            href="/knowledge-base"
+            icon={<FileText size={18} />}
+            label={t('sidebar.files')}
+            isActive={pathname === '/knowledge-base'}
+          />
+          <NavItem
+            href="/squads"
             icon={<Users size={18} />}
-            label="Team Members"
-            isActive={pathname.startsWith('/settings/team')}
+            label={t('sidebar.squads')}
+            isActive={pathname === '/squads'}
           />
-          
           <NavItem
-            href="#"
+            href="/provider-keys"
             icon={<Key size={18} />}
-            label="API Keys"
-            isActive={pathname.startsWith('/settings/api-keys')}
+            label={t('sidebar.providerKeys')}
+            isActive={pathname === '/provider-keys'}
           />
         </SidebarSection>
 
-        <SidebarSection title="HELP">
+        <SidebarSection title={t('sidebar.test')}>
           <NavItem
-            href="#"
-            icon={<HelpCircle size={18} />}
-            label="Documentation"
-            isActive={false}
+            href="/test"
+            icon={<PhoneCall size={18} />}
+            label={t('sidebar.test')}
+            hasChildren={true}
+            isOpen={expandedSection === 'test'}
+            onClick={() => toggleSection('test')}
+            childItems={[
+              { href: '/test/phone', label: t('sidebar.phone') },
+              { href: '/test/web', label: t('sidebar.web') },
+            ]}
+            isActive={pathname.startsWith('/test')}
           />
-          
-          <div
-            role="button"
-            onClick={logout}
-            className="flex items-center p-2 my-1 rounded-md transition-colors group text-gray-600 hover:bg-amber-50 hover:text-amber-700 cursor-pointer"
-          >
-            <div className="mr-3 text-xl"><LogOut size={18} /></div>
-            <span className="text-sm">Logout</span>
-          </div>
         </SidebarSection>
+
+        <SidebarSection title={t('sidebar.observe')}>
+          <NavItem
+            href="/calls"
+            icon={<PhoneCall size={18} />}
+            label={t('sidebar.calls')}
+            isActive={pathname === '/calls'}
+          />
+        </SidebarSection>
+
+        <SidebarSection title={t('sidebar.community')}>
+          <NavItem
+            href="/community"
+            icon={<Users size={18} />}
+            label={t('sidebar.communityLink')}
+            isActive={pathname === '/community'}
+          />
+        </SidebarSection>
+
+        <SidebarSection title={t('sidebar.orgSettings')}>
+          <NavItem
+            href="/org-settings"
+            icon={<Settings size={18} />}
+            label={t('sidebar.orgSettingsLink')}
+            isActive={pathname === '/org-settings'}
+          />
+        </SidebarSection>
+
+        <SidebarSection title={t('sidebar.accountSettings')}>
+          <NavItem
+            href="/account-settings"
+            icon={<Settings size={18} />}
+            label={t('sidebar.accountSettingsLink')}
+            isActive={pathname === '/account-settings'}
+          />
+        </SidebarSection>
+      </div>
+
+      <div className="mt-auto p-4 border-t border-gray-800">
+        <NavItem
+          href="/help"
+          icon={<HelpCircle size={18} />}
+          label={t('sidebar.help')}
+          isActive={pathname === '/help'}
+        />
+
+        <button
+          onClick={logout}
+          className="mt-2 flex items-center gap-2 text-sm text-red-500 hover:text-red-700 transition"
+        >
+          <LogOut size={18} />
+          {t('sidebar.logout')}
+        </button>
+        
+        {/* Language Selector */}
+        <div className="mt-4 pt-4 border-t border-gray-200">
+          <div className="flex items-center text-sm text-gray-500 mb-2 px-2">
+            <Globe size={16} className="mr-2" />
+            {t('sidebar.language')}
+          </div>
+          <LanguageSelector />
+        </div>
       </div>
     </div>
   );

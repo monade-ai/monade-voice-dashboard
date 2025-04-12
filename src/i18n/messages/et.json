@@ -1,0 +1,76 @@
+{
+  "sidebar": {
+  "organization": "Organisatsioon",
+  "overview": "Ülevaade",
+  "build": "Ehitus",
+  "assistants": "Abimehed",
+  "workflows": "Töövood",
+  "contacts": "Kontaktide loendid",
+  "phoneNumbers": "Telefoninumbrid",
+  "tools": "Tööriistad",
+  "files": "Failid",
+  "squads": "Meeskonnad",
+  "providerKeys": "Pakkuja võtmed",
+  "test": "Test",
+  "phone": "Telefon",
+  "web": "Veeb",
+  "observe": "Jälgi",
+  "calls": "Kõned",
+  "community": "Kogukond",
+  "communityLink": "Kogukond",
+  "orgSettings": "Organisatsiooni seaded",
+  "orgSettingsLink": "Organisatsiooni seaded",
+  "accountSettings": "Konto seaded",
+  "accountSettingsLink": "Konto seaded",
+  "help": "Abi",
+  "logout": "Välja logimine",
+  "language": "Keel"
+  },
+  "common": {
+  "save": "Salvesta",
+  "cancel": "Tühista",
+  "delete": "Kustuta",
+  "edit": "Muuda",
+  "create": "Loo",
+  "search": "Otsi",
+  "loading": "Laadimine...",
+  "noResults": "Ei leitud tulemusi"
+  },
+  "dashboard": {
+  "title": "Ülevaade",
+  "description": "Kõne mõõdikute ja jõudluse analüüsi paneel",
+  "metrics": {
+  "totalCallMinutes": "Kõne koguminutid",
+  "numberOfCalls": "Kõnede arv",
+  "totalSpent": "Kogukulu",
+  "avgCostPerCall": "Kõne keskmine maksumus"
+  },
+  "charts": {
+  "callEndReason": "Kõne lõpetamise põhjus",
+  "callDurationByAssistant": "Abimehe kõne kestus",
+  "costBreakdown": "Kulude jaotus",
+  "successEvaluation": "Edu hindamine",
+  "concurrentCalls": "Üheaegsed kõned"
+  },
+  "failedCalls": {
+  "title": "Viimased ebaõnnestunud kõned",
+  "viewAll": "Kõik näita"
+  }
+  },
+  "assistants": "Abimehed",
+  "workflows": "Töövood",
+  "contacts": "Kontaktide loendid",
+  "phoneNumbers": "Telefoninumbrid",
+  "tools": "Tööriistad",
+  "files": "Failid",
+  "squads": "Meeskonnad",
+  "providerKeys": "Pakkuja võtmed",
+  "test": "Test",
+  "calls": "Kõned",
+  "community": "Kogukond",
+  "orgSettings": "Organisatsiooni seaded",
+  "accountSettings": "Konto seaded",
+  "help": "Abi",
+  "logout": "Välja logimine",
+  "language": "Keel"
+ }

@@ -5,6 +5,7 @@
 import React, { useState, useEffect, useMemo, useCallback, Suspense } from 'react';
 import { format, subDays } from 'date-fns';
 import dynamic from 'next/dynamic';
+import { useTranslations } from '@/i18n/translations-context';
 
 // Static imports for essential components
 import { Button } from '@/components/ui/button';
@@ -48,6 +49,8 @@ import { useDashboardData } from '../hooks/use-dashboard-data';
 import { formatCurrency, formatDuration, formatNumber } from '@/lib/utils';
 
 export default function DashboardPage() {
+  const { t } = useTranslations();
+  
   // Get current date and 30 days ago for default range
   const today = new Date();
   const thirtyDaysAgo = subDays(today, 30);
@@ -123,8 +126,8 @@ export default function DashboardPage() {
     <div className="p-4 bg-white border border-gray-200 rounded-lg shadow-sm mb-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-amber-700">Overview</h1>
-          <p className="text-sm text-gray-500 mt-1">Analytics dashboard for call metrics and performance</p>
+          <h1 className="text-2xl font-bold text-amber-700">{t('dashboard.title')}</h1>
+          <p className="text-sm text-gray-500 mt-1">{t('dashboard.description')}</p>
         </div>
         
         <div className="flex flex-col sm:flex-row flex-wrap gap-3 w-full md:w-auto">
@@ -259,7 +262,7 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         {/* Call End Reason */}
         <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-          <h2 className="text-lg font-semibold mb-4 text-gray-800">Call End Reason</h2>
+          <h2 className="text-lg font-semibold mb-4 text-gray-800">{t('dashboard.charts.callEndReason')}</h2>
           <div className="h-64">
             <BarChart
               data={analysis.callEndReason}
@@ -273,7 +276,7 @@ export default function DashboardPage() {
         
         {/* Call Duration by Assistant */}
         <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-          <h2 className="text-lg font-semibold mb-4 text-gray-800">Call Duration by Assistant</h2>
+          <h2 className="text-lg font-semibold mb-4 text-gray-800">{t('dashboard.charts.callDurationByAssistant')}</h2>
           <div className="h-64">
             <LineChart
               data={analysis.callDurationByAssistant}
@@ -292,7 +295,7 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         {/* Cost Breakdown */}
         <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-          <h2 className="text-lg font-semibold mb-4 text-gray-800">Cost Breakdown</h2>
+          <h2 className="text-lg font-semibold mb-4 text-gray-800">{t('dashboard.charts.costBreakdown')}</h2>
           <div className="h-64">
             <BarChart
               data={analysis.costBreakdown}
@@ -306,7 +309,7 @@ export default function DashboardPage() {
         
         {/* Success Evaluation */}
         <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-          <h2 className="text-lg font-semibold mb-4 text-gray-800">Success Evaluation</h2>
+          <h2 className="text-lg font-semibold mb-4 text-gray-800">{t('dashboard.charts.successEvaluation')}</h2>
           <div className="h-64">
             <BarChart
               data={analysis.successEvaluation}
@@ -325,14 +328,14 @@ export default function DashboardPage() {
   const failedCallsSection = useMemo(() => (
     <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm mb-6">
       <div className="flex justify-between items-center mb-4">
-        <h2 className="text-lg font-semibold text-gray-800">Recent Unsuccessful Calls</h2>
+        <h2 className="text-lg font-semibold text-gray-800">{t('dashboard.failedCalls.title')}</h2>
         {!showAllFailedCalls && failedCalls.length > 3 && (
           <Button 
             variant="link" 
             className="text-amber-600 hover:text-amber-700"
             onClick={handleViewMoreFailedCalls}
           >
-            View All
+            {t('dashboard.failedCalls.viewAll')}
           </Button>
         )}
       </div>
@@ -345,7 +348,7 @@ export default function DashboardPage() {
   // Memoize the concurrent calls chart to prevent unnecessary re-renders
   const concurrentCallsChart = useMemo(() => (
     <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-      <h2 className="text-lg font-semibold mb-4 text-gray-800">Concurrent Calls</h2>
+      <h2 className="text-lg font-semibold mb-4 text-gray-800">{t('dashboard.charts.concurrentCalls')}</h2>
       <div className="h-64">
         <LineChart
           data={concurrentCalls}
