@@ -1,4 +1,55 @@
 {
+  "contacts": {
+    "title": "Contact Lists",
+    "create_list": {
+      "title": "Create Contact List",
+      "description": "Categorize customers into separate groups for better targeting."
+    },
+    "upload": "Upload",
+    "import": "Import from CRM",
+    "add_contact": {
+    "title": "Add Contact",
+    "description": "Add new contact to your list"
+  },
+    "emptyState": {
+      "title": "Create your First Contact List",
+      "description": "Categorize customers into separate groups for better targeting.",
+      "createButton": "Create First Contact List"
+    },
+    "emptyContacts": {
+      "title": "No contacts in this list",
+      "description": "You can either upload contacts or create manually."
+    },
+  "validation": {
+    "nameRequired": "Name is required",
+    "phoneRequired": "Phone number is required",
+    "phoneFormat": "Phone number must include country code (e.g., +11234567890)",
+    "selectListFirst": "Please select a contact list first"
+  },
+  "labels": {
+    "name": "Name",
+    "phoneNumber": "Phone Number"
+  },
+  "placeholders": {
+    "name": "John Doe",
+    "phoneNumber": "+11234567890"
+  },
+  "helperText": {
+    "phoneNumber": "Include country code (e.g., +91 for Indian numbers)"
+  },
+    "table": {
+      "name": "Name",
+      "phone": "Phone",
+      "call": "Call",
+      "actions": "Actions"
+    },
+    "actions": {
+      "edit": "Edit",
+      "move": "Move to list",
+      "delete": "Delete",
+      "deleteConfirm": "Are you sure you want to delete this contact?"
+    }
+  },
   "sidebar": {
     "organization": "ORGANIZATION",
     "overview": "Overview",
@@ -59,7 +110,7 @@
     },
     "assistants": "Assistants",
     "workflows": "Workflows",
-    "contacts": "Contact Lists",
+    "contactslist": "Contact Lists",
     "phoneNumbers": "Phone Numbers",
     "tools": "Tools",
     "files": "Files",

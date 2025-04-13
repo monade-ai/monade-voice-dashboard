@@ -30,6 +30,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useContactsContext } from '../contexts/contacts-context';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { initiateExotelCall } from '@/lib/services/exotel-service';
+import { useTranslations } from '@/i18n/translations-context';
+
 interface PhoneAssistant {
   id: string;
   name: string;
@@ -55,6 +57,9 @@ const ContactListView: React.FC<ContactListViewProps> = ({
   onImportContacts,
   onCreateContact
 }) => {
+  // Move the hook call inside the component
+  const { t } = useTranslations();
+  
   const { 
     contactLists, 
     contacts, 
@@ -146,10 +151,10 @@ const ContactListView: React.FC<ContactListViewProps> = ({
         <Users className="w-12 h-12 text-primary" />
       </div>
       <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-teal-400 bg-clip-text text-transparent">
-        Create your First Contact List
+        {t('contacts.emptyState.title')}
       </h2>
       <p className="text-muted-foreground mt-2 mb-6 max-w-md">
-        Categorize customers into separate groups for better targeting.
+        {t('contacts.emptyState.description')}
       </p>
       <Button 
         size="lg" 
@@ -157,7 +162,7 @@ const ContactListView: React.FC<ContactListViewProps> = ({
         className="flex items-center"
       >
         <Plus className="mr-2 h-4 w-4" />
-        Create First Contact List
+        {t('contacts.emptyState.createButton')}
       </Button>
     </div>
   );

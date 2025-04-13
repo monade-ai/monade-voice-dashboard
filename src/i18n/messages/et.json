@@ -1,4 +1,39 @@
 {
+  "contacts": {
+    "title": "Kontaktide nimekirjad",
+    "createList": "Loo kontaktide nimekiri",
+    "newList": "Uus kontaktide nimekiri",
+    "upload": "Laadi üles",
+    "import": "Impordi CRM-ist",
+    "addContact": "Lisa kontakt",
+    "emptyState": {
+      "title": "Loo oma esimene kontaktide nimekiri",
+      "description": "Kategoriseeri kliente eraldi gruppidesse parema sihtgrupi saavutamiseks.",
+      "createButton": "Loo esimene kontaktide nimekiri"
+    },
+    "emptyContacts": {
+      "title": "Selles nimekirjas pole kontakte",
+      "description": "Saad kas kontakte üles laadida või käsitsi luua."
+    },
+    "form": {
+      "name": "Nimi",
+      "phone": "Telefoninumber",
+      "countryCode": "Sisesta riigikood (nt +91 India numbrite jaoks)",
+      "required": "See väli on kohustuslik"
+    },
+    "table": {
+      "name": "Nimi",
+      "phone": "Telefon",
+      "call": "Helista",
+      "actions": "Tegevused"
+    },
+    "actions": {
+      "edit": "Muuda",
+      "move": "Liiguta nimekirja",
+      "delete": "Kustuta",
+      "deleteConfirm": "Kas olete kindel, et soovite selle kontakti kustutada?"
+    }
+  },
   "sidebar": {
   "organization": "Organisatsioon",
   "overview": "Ülevaade",
@@ -59,7 +94,7 @@
   },
   "assistants": "Abimehed",
   "workflows": "Töövood",
-  "contacts": "Kontaktide loendid",
+  "contactsList": "Kontaktide loendid",
   "phoneNumbers": "Telefoninumbrid",
   "tools": "Tööriistad",
   "files": "Failid",

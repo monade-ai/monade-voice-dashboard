@@ -7,6 +7,7 @@ import { useContactsContext } from '../contexts/contacts-context';
 import { Contact } from '@/app/hooks/use-contacts';
 import { Label } from '@/components/ui/label';
 import { z } from 'zod';
+import { useTranslation } from 'react-i18next';
 
 interface CreateContactProps {
   onCancel: () => void;
@@ -28,6 +29,7 @@ const contactSchema = z.object({
 });
 
 const CreateContact: React.FC<CreateContactProps> = ({ onCancel, onSuccess }) => {
+  const { t } = useTranslation();
   const { selectedList, addContactToList } = useContactsContext();
   
   // Form state
@@ -77,11 +79,11 @@ const CreateContact: React.FC<CreateContactProps> = ({ onCancel, onSuccess }) =>
     <form onSubmit={handleSubmit} className="space-y-4 py-4">
       <div className="space-y-2">
         <Label htmlFor="name">
-          Name <span className="text-red-500">*</span>
+          {t('contacts.labels.name')} <span className="text-red-500">*</span>
         </Label>
         <Input
           id="name"
-          placeholder="John Doe"
+          placeholder={t('contacts.placeholders.name')}
           value={name}
           onChange={(e) => {
             setName(e.target.value);
@@ -96,11 +98,11 @@ const CreateContact: React.FC<CreateContactProps> = ({ onCancel, onSuccess }) =>
       
       <div className="space-y-2">
         <Label htmlFor="phone">
-          Phone Number <span className="text-red-500">*</span>
+          {t('contacts.labels.phoneNumber')} <span className="text-red-500">*</span>
         </Label>
         <Input
           id="phone"
-          placeholder="+11234567890"
+          placeholder={t('contacts.placeholders.phoneNumber')}
           value={phone}
           onChange={(e) => {
             setPhone(e.target.value);
@@ -112,16 +114,16 @@ const CreateContact: React.FC<CreateContactProps> = ({ onCancel, onSuccess }) =>
           <p className="text-red-500 text-sm">{errors.phone}</p>
         )}
         <p className="text-xs text-muted-foreground">
-          Include country code (e.g., +91 for Indian numbers)
+          {t('contacts.helperText.phoneNumber')}
         </p>
       </div>
       
       <div className="flex justify-end gap-2 pt-4">
         <Button type="button" variant="outline" onClick={onCancel}>
-          Cancel
+          {t('common.cancel')}
         </Button>
         <Button type="submit">
-          Add Contact
+          {t('contacts.addContact.title')}
         </Button>
       </div>
     </form>
