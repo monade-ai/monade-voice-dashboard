@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react"
 import Link from "next/link"
+import { useTranslations } from "@/i18n/translations-context"
 import { Button } from "@/components/ui/button"
 import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { ChevronLeft, ChevronRight, Edit, Trash2, Zap } from "lucide-react"
@@ -10,6 +11,7 @@ import { PublishPromptDialog } from "../components/publish-prompt-dialog"
 import { Badge } from "@/components/ui/badge"
 
 export function PromptCarousel() {
+  const { t } = useTranslations();
   const [currentIndex, setCurrentIndex] = useState(0)
   const [isPublishOpen, setIsPublishOpen] = useState(false)
   const [selectedPrompt, setSelectedPrompt] = useState<any>(null)
@@ -19,36 +21,36 @@ export function PromptCarousel() {
     
     {
       id: "1",
-      title: "Customer Support Assistant",
-      description: "Handles common customer inquiries and provides helpful responses",
-      agents: ["Support Bot"],
+      title: t("promptCarousel.customerSupportAssistant"),
+      description: t("promptCarousel.handlesCommonCustomerInquiries"),
+      agents: [t("promptCarousel.supportBot")],
       updatedAt: "2 days ago",
     },
     {
       id: "2",
-      title: "Product Recommendation Engine",
-      description: "Suggests products based on customer preferences and browsing history",
-      agents: ["Sales Assistant", "Website Bot"],
+      title: t("promptCarousel.productRecommendationEngine"),
+      description: t("promptCarousel.suggestsProductsBasedOnCustomer"),
+      agents: [t("promptCarousel.salesAssistant"), t("promptCarousel.websiteBot")],
       updatedAt: "1 week ago",
     },
     {
       id: "3",
-      title: "Technical Troubleshooting Guide",
-      description: "Walks users through common technical issues and solutions",
-      agents: ["Support Bot"],
+      title: t("promptCarousel.technicalTroubleshootingGuide"),
+      description: t("promptCarousel.walksUsersThroughCommonTechnical"),
+      agents: [t("promptCarousel.supportBot")],
       updatedAt: "3 days ago",
     },
     {
       id: "4",
-      title: "Onboarding Sequence",
-      description: "Guides new users through product features and setup",
-      agents: ["Website Bot"],
+      title: t("promptCarousel.onboardingSequence"),
+      description: t("promptCarousel.guidesNewUsersThroughProduct"),
+      agents: [t("promptCarousel.websiteBot")],
       updatedAt: "5 days ago",
     },
     {
       id: "5",
-      title: "Feature Announcement",
-      description: "Introduces users to new product features and updates",
+      title: t("promptCarousel.featureAnnouncement"),
+      description: t("promptCarousel.introducesUsersToNewProduct"),
       agents: [],
       updatedAt: "1 day ago",
     }
@@ -109,7 +111,7 @@ export function PromptCarousel() {
                       <CardTitle className="text-base font-medium leading-tight">{prompt.title}</CardTitle>
                       {prompt.agents.length > 0 && (
                         <Badge variant="outline" className="bg-amber-50 text-amber-700 text-[10px] px-2 py-0.5">
-                          {prompt.agents.length} {prompt.agents.length === 1 ? 'agent' : 'agents'}
+                          {prompt.agents.length} {t(prompt.agents.length === 1 ? 'promptCarousel.agent' : 'promptCarousel.agents')}
                         </Badge>
                       )}
                     </div>
@@ -130,7 +132,7 @@ export function PromptCarousel() {
                   </div>
                 </CardHeader>
                 <CardFooter className="flex justify-between border-t h-[44px] py-2 mt-1">
-                  <div className="text-[10px] text-muted-foreground">Updated {prompt.updatedAt}</div>
+                  <div className="text-[10px] text-muted-foreground">{t("promptCarousel.updated")} {prompt.updatedAt}</div>
                   <div className="flex gap-1">
                     <Button
                       variant="ghost"
@@ -181,7 +183,7 @@ export function PromptCarousel() {
         </Button>
 
         <Button variant="outline" asChild className="rounded-full px-6">
-          <Link href="/knowledge-base/prompts">View All Prompts</Link>
+          <Link href="/knowledge-base/prompts">{t("promptCarousel.viewAllPrompts")}</Link>
         </Button>
 
         <Button

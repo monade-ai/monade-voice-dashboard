@@ -139,5 +139,24 @@
     "accountSettings": "Account Settings",
     "help": "Help",
     "logout": "Logout",
-    "language": "Language"
+    "language": "Language",
+    "promptCarousel": {
+      "customerSupportAssistant": "Customer Support Assistant",
+      "handlesCommonCustomerInquiries": "Handles common customer inquiries and provides helpful responses",
+      "productRecommendationEngine": "Product Recommendation Engine",
+      "suggestsProductsBasedOnCustomer": "Suggests products based on customer preferences and browsing history",
+      "technicalTroubleshootingGuide": "Technical Troubleshooting Guide",
+      "walksUsersThroughCommonTechnical": "Walks users through common technical issues and solutions",
+      "onboardingSequence": "Onboarding Sequence",
+      "guidesNewUsersThroughProduct": "Guides new users through product features and setup",
+      "featureAnnouncement": "Feature Announcement",
+      "introducesUsersToNewProduct": "Introduces users to new product features and updates",
+      "supportBot": "Support Bot",
+      "salesAssistant": "Sales Assistant",
+      "websiteBot": "Website Bot",
+      "updated": "Updated",
+      "agent": "agent",
+      "agents": "agents",
+      "viewAllPrompts": "View All Prompts"
+    }
   }
