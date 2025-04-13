@@ -68,7 +68,7 @@ export function RecentPrompts() {
 
       <div className="flex justify-center">
         <Button variant="outline" asChild>
-          <Link href="/prompts">View All Prompts</Link>
+          <Link href="/knowledge-base/prompts">View All Prompts</Link>
         </Button>
       </div>
     </div>

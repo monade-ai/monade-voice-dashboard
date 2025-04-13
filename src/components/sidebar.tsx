@@ -20,9 +20,12 @@ import {
   ChevronDown,
   ChevronRight,
   Contact2,
-  LogOut
+  LogOut,
+  Globe
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useTranslations } from '@/i18n/translations-context';
+import { LanguageSelector } from '@/components/language-selector';
 
 interface NavItemProps {
   href: string;
@@ -104,6 +107,7 @@ function SidebarSection({ title, children }: SectionProps) {
 export function Sidebar() {
   const pathname = usePathname();
   const [expandedSection, setExpandedSection] = useState<string | null>(null);
+  const { t } = useTranslations();
 
   const logout = useLogout();
 
@@ -125,7 +129,7 @@ export function Sidebar() {
           </div>
         </div>
 
-        <SidebarSection title="ORGANIZATION">
+        <SidebarSection title={t('sidebar.organization')}>
           <div className="px-3 py-2">
             <div className="flex items-center space-x-2">
               <div className="w-3 h-3 rounded-full bg-cyan-500"></div>
@@ -136,110 +140,110 @@ export function Sidebar() {
           <NavItem
             href="/dashboard"
             icon={<BarChart4 size={18} />}
-            label="Overview"
+            label={t('sidebar.overview')}
             isActive={pathname === '/dashboard' || pathname === '/'}
           />
         </SidebarSection>
 
-        <SidebarSection title="BUILD">
+        <SidebarSection title={t('sidebar.build')}>
           <NavItem
             href="/assistants"
             icon={<Layers size={18} />}
-            label="Assistants"
+            label={t('sidebar.assistants')}
             isActive={pathname === '/assistants'}
           />
           <NavItem
             href="/workflow"
             icon={<Layers size={18} />}
-            label="Workflows"
+            label={t('sidebar.workflows')}
             isActive={pathname === '/workflows'}
           />
           <NavItem
             href="/contacts"
             icon={<Contact2 size={18} />}
-            label="Contact Lists"
+            label={t('sidebar.contacts')}
             isActive={pathname === '/contacts'}
           />
           <NavItem
             href="/phone-numbers"
             icon={<PhoneCall size={18} />}
-            label="Phone Numbers"
+            label={t('sidebar.phoneNumbers')}
             isActive={pathname === '/phone-numbers'}
           />
           <NavItem
             href="/tools"
             icon={<Wrench size={18} />}
-            label="Tools"
+            label={t('sidebar.tools')}
             isActive={pathname === '/tools'}
           />
           <NavItem
             href="/knowledge-base"
             icon={<FileText size={18} />}
-            label="Files"
+            label={t('sidebar.files')}
             isActive={pathname === '/knowledge-base'}
           />
           <NavItem
             href="/squads"
             icon={<Users size={18} />}
-            label="Squads"
+            label={t('sidebar.squads')}
             isActive={pathname === '/squads'}
           />
           <NavItem
             href="/provider-keys"
             icon={<Key size={18} />}
-            label="Provider Keys"
+            label={t('sidebar.providerKeys')}
             isActive={pathname === '/provider-keys'}
           />
         </SidebarSection>
 
-        <SidebarSection title="TEST">
+        <SidebarSection title={t('sidebar.test')}>
           <NavItem
             href="/test"
             icon={<PhoneCall size={18} />}
-            label="Test"
+            label={t('sidebar.test')}
             hasChildren={true}
             isOpen={expandedSection === 'test'}
             onClick={() => toggleSection('test')}
             childItems={[
-              { href: '/test/phone', label: 'Phone' },
-              { href: '/test/web', label: 'Web' },
+              { href: '/test/phone', label: t('sidebar.phone') },
+              { href: '/test/web', label: t('sidebar.web') },
             ]}
             isActive={pathname.startsWith('/test')}
           />
         </SidebarSection>
 
-        <SidebarSection title="OBSERVE">
+        <SidebarSection title={t('sidebar.observe')}>
           <NavItem
             href="/calls"
             icon={<PhoneCall size={18} />}
-            label="Calls"
+            label={t('sidebar.calls')}
             isActive={pathname === '/calls'}
           />
         </SidebarSection>
 
-        <SidebarSection title="COMMUNITY">
+        <SidebarSection title={t('sidebar.community')}>
           <NavItem
             href="/community"
             icon={<Users size={18} />}
-            label="Community"
+            label={t('sidebar.communityLink')}
             isActive={pathname === '/community'}
           />
         </SidebarSection>
 
-        <SidebarSection title="ORG SETTINGS">
+        <SidebarSection title={t('sidebar.orgSettings')}>
           <NavItem
             href="/org-settings"
             icon={<Settings size={18} />}
-            label="Org Settings"
+            label={t('sidebar.orgSettingsLink')}
             isActive={pathname === '/org-settings'}
           />
         </SidebarSection>
 
-        <SidebarSection title="ACCOUNT SETTINGS">
+        <SidebarSection title={t('sidebar.accountSettings')}>
           <NavItem
             href="/account-settings"
             icon={<Settings size={18} />}
-            label="Account Settings"
+            label={t('sidebar.accountSettingsLink')}
             isActive={pathname === '/account-settings'}
           />
         </SidebarSection>
@@ -249,17 +253,26 @@ export function Sidebar() {
         <NavItem
           href="/help"
           icon={<HelpCircle size={18} />}
-          label="Help"
+          label={t('sidebar.help')}
           isActive={pathname === '/help'}
         />
 
-      <button
-        onClick={logout}
-        className="mt-2 flex items-center gap-2 text-sm text-red-500 hover:text-red-700 transition"
-      >
-        <LogOut size={18} />
-        Logout
-      </button>
+        <button
+          onClick={logout}
+          className="mt-2 flex items-center gap-2 text-sm text-red-500 hover:text-red-700 transition"
+        >
+          <LogOut size={18} />
+          {t('sidebar.logout')}
+        </button>
+        
+        {/* Language Selector */}
+        <div className="mt-4 pt-4 border-t border-gray-200">
+          <div className="flex items-center text-sm text-gray-500 mb-2 px-2">
+            <Globe size={16} className="mr-2" />
+            {t('sidebar.language')}
+          </div>
+          <LanguageSelector />
+        </div>
       </div>
     </div>
   );

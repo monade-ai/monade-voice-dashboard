@@ -1,0 +1,111 @@
+{
+  "contacts": {
+    "title": "Kontaktlisten",
+    "createList": "Kontaktliste erstellen",
+    "newList": "Neue Kontaktliste",
+    "upload": "Hochladen",
+    "import": "Aus CRM importieren",
+    "addContact": "Kontakt hinzufügen",
+    "emptyState": {
+      "title": "Erstellen Sie Ihre erste Kontaktliste",
+      "description": "Kategorisieren Sie Kunden in separate Gruppen für eine bessere Zielgruppenansprache.",
+      "createButton": "Erste Kontaktliste erstellen"
+    },
+    "emptyContacts": {
+      "title": "Keine Kontakte in dieser Liste",
+      "description": "Sie können entweder Kontakte hochladen oder manuell erstellen."
+    },
+    "form": {
+      "name": "Name",
+      "phone": "Telefonnummer",
+      "countryCode": "Ländervorwahl einbeziehen (z.B. +91 für indische Nummern)",
+      "required": "Dieses Feld ist erforderlich"
+    },
+    "table": {
+      "name": "Name",
+      "phone": "Telefon",
+      "call": "Anrufen",
+      "actions": "Aktionen"
+    },
+    "actions": {
+      "edit": "Bearbeiten",
+      "move": "In Liste verschieben",
+      "delete": "Löschen",
+      "deleteConfirm": "Möchten Sie diesen Kontakt wirklich löschen?"
+    }
+  },
+  "sidebar": {
+    "organization": "Organisation",
+    "overview": "Übersicht",
+    "build": "Erstellung",
+    "assistants": "Assistenten",
+    "workflows": "Arbeitsabläufe",
+    "contacts": "Kontaktlisten",
+    "phoneNumbers": "Telefonnummern",
+    "tools": "Werkzeuge",
+    "files": "Dateien",
+    "squads": "Teams",
+    "providerKeys": "Anbieter-Schlüssel",
+    "test": "Test",
+    "phone": "Telefon",
+    "web": "Web",
+    "observe": "Beobachten",
+    "calls": "Anrufe",
+    "community": "Gemeinschaft",
+    "communityLink": "Gemeinschaft",
+    "orgSettings": "Organisations-Einstellungen",
+    "orgSettingsLink": "Organisations-Einstellungen",
+    "accountSettings": "Kontoeinstellungen",
+    "accountSettingsLink": "Kontoeinstellungen",
+    "help": "Hilfe",
+    "logout": "Abmelden",
+    "language": "Sprache"
+  },
+  "common": {
+    "save": "Speichern",
+    "cancel": "Abbrechen",
+    "delete": "Löschen",
+    "edit": "Bearbeiten",
+    "create": "Erstellen",
+    "search": "Suchen",
+    "loading": "Lädt...",
+    "noResults": "Keine Ergebnisse gefunden"
+  },
+  "dashboard": {
+    "title": "Übersicht",
+    "description": "Analyse-Dashboard für Anrufmetriken und Leistung",
+    "metrics": {
+      "totalCallMinutes": "Gesamte Anrufminuten",
+      "numberOfCalls": "Anzahl der Anrufe",
+      "totalSpent": "Gesamtkosten",
+      "avgCostPerCall": "Durchschnittliche Kosten pro Anruf"
+    },
+    "charts": {
+      "callEndReason": "Anrufbeendigungsgrund",
+      "callDurationByAssistant": "Anrufzeit durch Assistent",
+      "costBreakdown": "Kostenaufschlüsselung",
+      "successEvaluation": "Erfolgbewertung",
+      "concurrentCalls": "Gleichzeitige Anrufe"
+    },
+    "failedCalls": {
+      "title": "Neueste erfolglose Anrufe",
+      "viewAll": "Alle anzeigen"
+    }
+  },
+  "assistants": "Assistenten",
+  "workflows": "Arbeitsabläufe",
+  "contactsList": "Kontaktlisten",
+  "phoneNumbers": "Telefonnummern",
+  "tools": "Werkzeuge",
+  "files": "Dateien",
+  "squads": "Teams",
+  "providerKeys": "Anbieter-Schlüssel",
+  "test": "Test",
+  "calls": "Anrufe",
+  "community": "Gemeinschaft",
+  "orgSettings": "Organisations-Einstellungen",
+  "accountSettings": "Kontoeinstellungen",
+  "help": "Hilfe",
+  "logout": "Abmelden",
+  "language": "Sprache"
+}

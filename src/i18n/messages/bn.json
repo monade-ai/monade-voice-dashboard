@@ -1,0 +1,111 @@
+{
+  "contacts": {
+    "title": "যোগাযোগ তালিকা",
+    "createList": "যোগাযোগ তালিকা তৈরি করুন",
+    "newList": "নতুন যোগাযোগ তালিকা",
+    "upload": "আপলোড করুন",
+    "import": "CRM থেকে আমদানি করুন",
+    "addContact": "যোগাযোগ যোগ করুন",
+    "emptyState": {
+      "title": "আপনার প্রথম যোগাযোগ তালিকা তৈরি করুন",
+      "description": "ভাল লক্ষ্যবস্তুর জন্য গ্রাহকদের পৃথক শ্রেণীতে বিভক্ত করুন।",
+      "createButton": "প্রথম যোগাযোগ তালিকা তৈরি করুন"
+    },
+    "emptyContacts": {
+      "title": "এই তালিকায় কোনো যোগাযোগ নেই",
+      "description": "আপনি যোগাযোগ আপলোড করতে পারেন বা ম্যানুয়ালি তৈরি করতে পারেন।"
+    },
+    "form": {
+      "name": "নাম",
+      "phone": "ফোন নম্বর",
+      "countryCode": "দেশের কোড অন্তর্ভুক্ত করুন (যেমন, ভারতীয় নম্বরের জন্য +91)",
+      "required": "এই ক্ষেত্রটি প্রয়োজনীয়"
+    },
+    "table": {
+      "name": "নাম",
+      "phone": "ফোন",
+      "call": "কল করুন",
+      "actions": "ক্রিয়াকলাপ"
+    },
+    "actions": {
+      "edit": "সম্পাদনা করুন",
+      "move": "তালিকায় সরান",
+      "delete": "মুছে ফেলা",
+      "deleteConfirm": "আপনি কি এই যোগাযোগটি মুছে ফেলতে চান?"
+    }
+  },
+  "sidebar": {
+    "organization": "সংস্থা",
+    "overview": "সংক্ষিপ্ত বিবরণ",
+    "build": "নির্মাণ",
+    "assistants": "সহকারী",
+    "workflows": "কর্মপ্রবাহ",
+    "contacts": "যোগাযোগ তালিকা",
+    "phoneNumbers": "ফোন নম্বর",
+    "tools": "টুলস",
+    "files": "ফাইল",
+    "squads": "স্কোয়াড",
+    "providerKeys": "প্রদানকারী কী",
+    "test": "পরীক্ষা",
+    "phone": "ফোন",
+    "web": "ওয়েব",
+    "observe": "পর্যবেক্ষণ",
+    "calls": "কল",
+    "community": "সম্প্রদায়",
+    "communityLink": "সম্প্রদায়",
+    "orgSettings": "সংস্থা সেটিংস",
+    "orgSettingsLink": "সংস্থা সেটিংস",
+    "accountSettings": "অ্যাকাউন্ট সেটিংস",
+    "accountSettingsLink": "অ্যাকাউন্ট সেটিংস",
+    "help": "সহায়তা",
+    "logout": "প্রস্থান",
+    "language": "ভাষা"
+  },
+  "common": {
+    "save": "সংরক্ষণ",
+    "cancel": "বাতিল",
+    "delete": "মুছে ফেলুন",
+    "edit": "সম্পাদনা",
+    "create": "তৈরি করুন",
+    "search": "অনুসন্ধান",
+    "loading": "লোড হচ্ছে",
+    "noResults": "কোন ফলাফল পাওয়া যায়নি"
+  },
+  "dashboard": {
+    "title": "সংক্ষিপ্ত বিবরণ",
+    "description": "কল মেট্রিক্স এবং কর্মক্ষমতা বিশ্লেষণ ড্যাশবোর্ড",
+    "metrics": {
+      "totalCallMinutes": "মোট কল মিনিট",
+      "numberOfCalls": "কলের সংখ্যা",
+      "totalSpent": "মোট ব্যয়",
+      "avgCostPerCall": "প্রতি কল গড় খরচ"
+    },
+    "charts": {
+      "callEndReason": "কল শেষ কারণ",
+      "callDurationByAssistant": "সহকারী দ্বারা কল সময়কাল",
+      "costBreakdown": "খরচ ভাঙ্গন",
+      "successEvaluation": "সাফল্য মূল্যায়ন",
+      "concurrentCalls": "একযোগে কল"
+    },
+    "failedCalls": {
+      "title": "সাম্প্রতিক অসফল কল",
+      "viewAll": "সব দেখুন"
+    }
+  },
+  "assistants": "সহকারী",
+  "workflows": "কর্মপ্রবাহ",
+  "contactsList": "যোগাযোগ তালিকা",
+  "phoneNumbers": "ফোন নম্বর",
+  "tools": "টুলস",
+  "files": "ফাইল",
+  "squads": "স্কোয়াড",
+  "providerKeys": "প্রদানকারী কী",
+  "test": "পরীক্ষা",
+  "calls": "কল",
+  "community": "সম্প্রদায়",
+  "orgSettings": "সংস্থা সেটিংস",
+  "accountSettings": "অ্যাকাউন্ট সেটিংস",
+  "help": "সহায়তা",
+  "logout": "প্রস্থান",
+  "language": "ভাষা"
+}

@@ -3,14 +3,19 @@
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Download, FileText, Trash2, Zap } from "lucide-react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { PublishPromptDialog } from "../components/publish-prompt-dialog"
+import { areSimilar } from "@/lib/utils/levenshtein"
 
 export function DocumentLibrary() {
   const [isPublishOpen, setIsPublishOpen] = useState(false)
   const [selectedDocument, setSelectedDocument] = useState<any>(null)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [filteredDocuments, setFilteredDocuments] = useState<any[]>([])
 
   const documents = [
+    // Sample documents array remains the same
+
     {
       id: "1",
       title: "Product Manual v2.3.pdf",
@@ -58,8 +63,41 @@ export function DocumentLibrary() {
     setIsPublishOpen(true)
   }
 
+  // Update filtered documents when search query changes
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setFilteredDocuments(documents);
+      return;
+    }
+
+    const filtered = documents.filter(doc => {
+      const searchLower = searchQuery.toLowerCase();
+      return (
+        areSimilar(doc.title, searchQuery) ||
+        doc.description.toLowerCase().includes(searchLower) ||
+        doc.type.toLowerCase().includes(searchLower)
+      );
+    });
+
+    setFilteredDocuments(filtered);
+  }, [searchQuery]);
+
+  // Handle search input change
+  const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchQuery(event.target.value);
+  };
+
   return (
     <div>
+      <div className="p-4">
+        <input
+          type="search"
+          placeholder="Search documents..."
+          className="w-full px-4 py-2 rounded-md border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          value={searchQuery}
+          onChange={handleSearchChange}
+        />
+      </div>
       <div className="rounded-md">
         <table className="w-full">
           <thead>
@@ -71,7 +109,7 @@ export function DocumentLibrary() {
             </tr>
           </thead>
           <tbody>
-            {documents.map((doc, index) => (
+            {filteredDocuments.map((doc, index) => (
               <tr key={doc.id} className={index !== documents.length - 1 ? "border-b" : ""}>
                 <td className="py-3 px-4">
                   <div className="flex items-center gap-3">

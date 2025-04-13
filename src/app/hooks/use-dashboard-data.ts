@@ -1,6 +1,6 @@
 // app/dashboard/hooks/use-dashboard-data.ts
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { apiService } from '@/lib/api';
 
 // Import mock data for fallback
@@ -27,6 +27,7 @@ interface DashboardDataOptions {
 
 /**
  * Custom hook for fetching dashboard data
+ * Optimized with memoization to prevent unnecessary recalculations
  */
 export function useDashboardData({
   dateFrom,
@@ -38,8 +39,8 @@ export function useDashboardData({
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<Error | null>(null);
   
-  // Filter and process data based on parameters
-  const filterDataByDateRange = <T extends { date: string }>(data: T[]): T[] => {
+  // Memoize filter functions to prevent recreation on each render
+  const filterDataByDateRange = useCallback(<T extends { date: string }>(data: T[]): T[] => {
     if (!dateFrom || !dateTo) return data;
     
     const fromDate = new Date(dateFrom);
@@ -49,10 +50,10 @@ export function useDashboardData({
       const itemDate = new Date(item.date);
       return itemDate >= fromDate && itemDate <= toDate;
     });
-  };
+  }, [dateFrom, dateTo]);
   
-  // Filter data by assistant ID if provided
-  const filterDataByAssistant = (data: any) => {
+  // Filter data by assistant ID if provided - memoized
+  const filterDataByAssistant = useCallback((data: any) => {
     if (!assistantId || assistantId === 'all') return data;
     
     // For call duration by assistant, we need special handling
@@ -60,9 +61,9 @@ export function useDashboardData({
       const newItem = { date: item.date };
       
       if (assistantId === 'new' && 'New Assistant' in item) {
-(newItem as any)['New Assistant'] = item['New Assistant'];
+        (newItem as any)['New Assistant'] = item['New Assistant'];
       } else if (assistantId === 'unknown' && 'Unknown Assistant' in item) {
-(newItem as any)['Unknown Assistant'] = item['Unknown Assistant'];
+        (newItem as any)['Unknown Assistant'] = item['Unknown Assistant'];
       }
       
       return newItem;
@@ -72,19 +73,19 @@ export function useDashboardData({
       ...data,
       callDurationByAssistant: filteredCallDuration
     };
-  };
+  }, [assistantId]);
   
-  // Adjust granularity based on groupBy parameter
-  const adjustDataByGrouping = (data: any) => {
+  // Adjust granularity based on groupBy parameter - memoized
+  const adjustDataByGrouping = useCallback((data: any) => {
     if (groupBy === 'day') return data; // No adjustment needed
     
     // For demo purposes, we'll just return the data as is
     // In a real implementation, you would aggregate data by week or month
     return data;
-  };
+  }, [groupBy]);
 
-  // Initialize state with processed mock data
-  const processedMockData = {
+  // Memoize the processed data to prevent recalculation on every render
+  const processedMockData = useMemo(() => ({
     totalCallMinutes: {
       ...totalCallMinutesData,
       points: filterDataByDateRange(totalCallMinutesData.points)
@@ -101,199 +102,127 @@ export function useDashboardData({
       ...avgCostPerCallData,
       points: filterDataByDateRange(avgCostPerCallData.points)
     }
-  };
+  }), [filterDataByDateRange]);
   
   const [metrics, setMetrics] = useState(processedMockData);
   
-  const processedAnalysisData = filterDataByAssistant({
+  const processedAnalysisData = useMemo(() => filterDataByAssistant({
     callEndReason: callEndReasonData,
     callDurationByAssistant: callDurationByAssistantData,
     costBreakdown: costBreakdownData,
     successEvaluation: successEvaluationData
-  });
+  }), [filterDataByAssistant]);
   
   const [analysis, setAnalysis] = useState(processedAnalysisData);
   
-  // Filter failed calls if needed
-  const filteredFailedCalls = assistantId && assistantId !== 'all'
-    ? unsuccessfulCallsData.filter(call => 
-        (assistantId === 'new' && call.assistant === 'New Assistant') ||
-        (assistantId === 'unknown' && call.assistant === 'Unknown Assistant')
-      )
-    : unsuccessfulCallsData;
+  // Filter failed calls if needed - memoized
+  const filteredFailedCalls = useMemo(() => {
+    return assistantId && assistantId !== 'all'
+      ? unsuccessfulCallsData.filter(call => 
+          (assistantId === 'new' && call.assistant === 'New Assistant') ||
+          (assistantId === 'unknown' && call.assistant === 'Unknown Assistant')
+        )
+      : unsuccessfulCallsData;
+  }, [assistantId]);
   
   const [failedCalls, setFailedCalls] = useState(filteredFailedCalls);
   
-  // Filter concurrent calls by date range
-  const filteredConcurrentCalls = filterDataByDateRange(concurrentCallsData);
+  // Filter concurrent calls by date range - memoized
+  const filteredConcurrentCalls = useMemo(() => 
+    filterDataByDateRange(concurrentCallsData),
+  [filterDataByDateRange]);
+  
   const [concurrentCalls, setConcurrentCalls] = useState(filteredConcurrentCalls);
 
-  useEffect(() => {
-    // If using mock data, we'll process it directly
-    if (useMockData) {
-      // Update metrics with filtered data
-      setMetrics({
-        totalCallMinutes: {
-          ...totalCallMinutesData,
-          points: filterDataByDateRange(totalCallMinutesData.points)
-        },
-        numberOfCalls: {
-          ...numberOfCallsData,
-          points: filterDataByDateRange(numberOfCallsData.points)
-        },
-        totalSpent: {
-          ...totalSpentData,
-          points: filterDataByDateRange(totalSpentData.points)
-        },
-        avgCostPerCall: {
-          ...avgCostPerCallData,
-          points: filterDataByDateRange(avgCostPerCallData.points)
-        }
-      });
-      
-      // Update analysis with filtered data
-      setAnalysis(filterDataByAssistant({
-        callEndReason: callEndReasonData,
-        callDurationByAssistant: callDurationByAssistantData,
-        costBreakdown: costBreakdownData,
-        successEvaluation: successEvaluationData
-      }));
-      
-      // Update failed calls if needed
-      setFailedCalls(
-        assistantId && assistantId !== 'all'
-          ? unsuccessfulCallsData.filter(call => 
-              (assistantId === 'new' && call.assistant === 'New Assistant') ||
-              (assistantId === 'unknown' && call.assistant === 'Unknown Assistant')
-            )
-          : unsuccessfulCallsData
-      );
-      
-      // Update concurrent calls by date range
-      setConcurrentCalls(filterDataByDateRange(concurrentCallsData));
-      
-      setLoading(false);
-      return;
-    }
+  // Refresh data function - memoized to prevent recreation on each render
+  const refreshData = useCallback(() => {
+    setLoading(true);
+    setError(null);
     
-    // Function to fetch all data in parallel
-    const fetchDashboardData = async () => {
-      setLoading(true);
-      setError(null);
-      
+    // Simulate API call delay
+    setTimeout(() => {
       try {
-        const options = { dateFrom, dateTo, groupBy, assistantId };
-        
-        // Fetch all data in parallel
-        const [
-          metricsData,
-          analysisData,
-          unsuccessfulCallsData,
-          concurrentCallsData
-        ] = await Promise.all([
-          apiService.getDashboardMetrics(options),
-          apiService.getCallAnalysis(options),
-          apiService.getUnsuccessfulCalls(options),
-          apiService.getConcurrentCalls(options)
-        ]);
-        
-        // Update state with fetched data
-        setMetrics(metricsData);
-        setAnalysis(analysisData);
-        setFailedCalls(unsuccessfulCallsData);
-        setConcurrentCalls(concurrentCallsData);
+        if (useMockData) {
+          // Update metrics with filtered data
+          setMetrics({
+            totalCallMinutes: {
+              ...totalCallMinutesData,
+              points: filterDataByDateRange(totalCallMinutesData.points)
+            },
+            numberOfCalls: {
+              ...numberOfCallsData,
+              points: filterDataByDateRange(numberOfCallsData.points)
+            },
+            totalSpent: {
+              ...totalSpentData,
+              points: filterDataByDateRange(totalSpentData.points)
+            },
+            avgCostPerCall: {
+              ...avgCostPerCallData,
+              points: filterDataByDateRange(avgCostPerCallData.points)
+            }
+          });
+          
+          // Update analysis data
+          setAnalysis(filterDataByAssistant({
+            callEndReason: callEndReasonData,
+            callDurationByAssistant: callDurationByAssistantData,
+            costBreakdown: costBreakdownData,
+            successEvaluation: successEvaluationData
+          }));
+          
+          // Update failed calls
+          setFailedCalls(filteredFailedCalls);
+          
+          // Update concurrent calls
+          setConcurrentCalls(filteredConcurrentCalls);
+          
+          setLoading(false);
+        } else {
+          // In a real app, you would call your API here
+          // apiService.getDashboardData({ dateFrom, dateTo, groupBy, assistantId })
+          //   .then(data => {
+          //     setMetrics(data.metrics);
+          //     setAnalysis(data.analysis);
+          //     setFailedCalls(data.failedCalls);
+          //     setConcurrentCalls(data.concurrentCalls);
+          //     setLoading(false);
+          //   })
+          //   .catch(err => {
+          //     setError(err);
+          //     setLoading(false);
+          //   });
+          
+          // For now, just use the mock data
+          setMetrics(processedMockData);
+          setAnalysis(processedAnalysisData);
+          setFailedCalls(filteredFailedCalls);
+          setConcurrentCalls(filteredConcurrentCalls);
+          setLoading(false);
+        }
       } catch (err) {
-        setError(err instanceof Error ? err : new Error('Unknown error occurred'));
-        console.error('Error fetching dashboard data:', err);
-      } finally {
+        setError(err instanceof Error ? err : new Error('Unknown error'));
         setLoading(false);
       }
-    };
-    
-    fetchDashboardData();
-  }, [dateFrom, dateTo, groupBy, assistantId, useMockData]);
+    }, 1000); // Simulate network delay
+  }, [
+    dateFrom, 
+    dateTo, 
+    groupBy, 
+    assistantId, 
+    useMockData, 
+    filterDataByDateRange, 
+    filterDataByAssistant,
+    processedMockData,
+    processedAnalysisData,
+    filteredFailedCalls,
+    filteredConcurrentCalls
+  ]);
 
-  // Function to refresh data on demand
-  const refreshData = async () => {
-    setLoading(true);
-    
-    try {
-      if (useMockData) {
-        // Delay for a brief moment to simulate loading
-        await new Promise(resolve => setTimeout(resolve, 800));
-        
-        // Update metrics with filtered data
-        setMetrics({
-          totalCallMinutes: {
-            ...totalCallMinutesData,
-            points: filterDataByDateRange(totalCallMinutesData.points)
-          },
-          numberOfCalls: {
-            ...numberOfCallsData,
-            points: filterDataByDateRange(numberOfCallsData.points)
-          },
-          totalSpent: {
-            ...totalSpentData,
-            points: filterDataByDateRange(totalSpentData.points)
-          },
-          avgCostPerCall: {
-            ...avgCostPerCallData,
-            points: filterDataByDateRange(avgCostPerCallData.points)
-          }
-        });
-        
-        // Update analysis with filtered data
-        setAnalysis(filterDataByAssistant({
-          callEndReason: callEndReasonData,
-          callDurationByAssistant: callDurationByAssistantData,
-          costBreakdown: costBreakdownData,
-          successEvaluation: successEvaluationData
-        }));
-        
-        // Update failed calls if needed
-        setFailedCalls(
-          assistantId && assistantId !== 'all'
-            ? unsuccessfulCallsData.filter(call => 
-                (assistantId === 'new' && call.assistant === 'New Assistant') ||
-                (assistantId === 'unknown' && call.assistant === 'Unknown Assistant')
-              )
-            : unsuccessfulCallsData
-        );
-        
-        // Update concurrent calls by date range
-        setConcurrentCalls(filterDataByDateRange(concurrentCallsData));
-        
-        setError(null);
-      } else {
-        const options = { dateFrom, dateTo, groupBy, assistantId };
-        
-        // Fetch all data in parallel
-        const [
-          metricsData,
-          analysisData,
-          unsuccessfulCallsData,
-          concurrentCallsData
-        ] = await Promise.all([
-          apiService.getDashboardMetrics(options),
-          apiService.getCallAnalysis(options),
-          apiService.getUnsuccessfulCalls(options),
-          apiService.getConcurrentCalls(options)
-        ]);
-        
-        // Update state with refreshed data
-        setMetrics(metricsData);
-        setAnalysis(analysisData);
-        setFailedCalls(unsuccessfulCallsData);
-        setConcurrentCalls(concurrentCallsData);
-        setError(null);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err : new Error('Unknown error occurred'));
-      console.error('Error refreshing dashboard data:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Effect to refresh data when dependencies change
+  useEffect(() => {
+    refreshData();
+  }, [dateFrom, dateTo, groupBy, assistantId, refreshData]);
 
   return {
     loading,

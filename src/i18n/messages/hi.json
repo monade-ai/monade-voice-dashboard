@@ -1,0 +1,173 @@
+{
+  "knowledgeBase": {
+    "title": "ज्ञान आधार प्रबंधन",
+    "description": "अपने ज्ञान आधार में दस्तावेज़ अपलोड करें या अपने एआई एजेंटों के लिए कस्टम संकेत बनाएं",
+    "uploadDocument": {
+      "title": "दस्तावेज़ अपलोड करें",
+      "description": "अपने एआई एजेंटों को बढ़ाने के लिए अपने ज्ञान आधार में दस्तावेज़ जोड़ें"
+    },
+    "createPrompt": {
+      "title": "प्रॉम्प्ट बनाएं",
+      "description": "अपने एआई एजेंटों की प्रतिक्रियाओं को मार्गदर्शन करने के लिए कस्टम प्रॉम्प्ट बनाएं"
+    },
+    "tabs": {
+      "prompts": "प्रॉम्प्ट्स",
+      "documents": "दस्तावेज़"
+    }
+  },
+  "contacts": {
+    "title": "संपर्क सूची",
+    "create_list": {
+      "title": "संपर्क सूची बनाएं",
+      "description": "बेहतर लक्ष्यीकरण के लिए ग्राहकों को अलग-अलग समूहों में वर्गीकृत करें."
+    },
+    "upload": "अपलोड",
+    "import": "सीआरएम से आयात करें",
+    "add_contact": {
+    "title": "संपर्क जोड़ें",
+    "description": "अपनी सूची में नया संपर्क जोड़ें"
+  },
+    "emptyState": {
+      "title": "अपनी पहली संपर्क सूची बनाएं",
+      "description": "बेहतर लक्ष्यीकरण के लिए ग्राहकों को अलग-अलग समूहों में वर्गीकृत करें।",
+      "createButton": "पहली संपर्क सूची बनाएं"
+    },
+    "emptyContacts": {
+      "title": "इस सूची में कोई संपर्क नहीं है",
+      "description": "आप या तो संपर्क अपलोड कर सकते हैं या मैन्युअल रूप से बना सकते हैं।"
+    },
+  "validation": {
+    "nameRequired": "नाम आवश्यक है",
+    "phoneRequired": "फ़ोन नंबर आवश्यक है",
+    "phoneFormat": "फ़ोन नंबर में देश कोड शामिल होना चाहिए (जैसे, +11234567890)",
+    "selectListFirst": "पहले एक संपर्क सूची का चयन करें"
+  },
+  "labels": {
+    "name": "नाम",
+    "phoneNumber": "फ़ोन नंबर"
+  },
+  "placeholders": {
+    "name": "जॉन डो",
+    "phoneNumber": "+11234567890"
+  },
+  "helperText": {
+    "phoneNumber": "देश कोड शामिल करें (जैसे, भारतीय नंबरों के लिए +91)"
+  },
+    "table": {
+      "name": "नाम",
+      "phone": "फ़ोन",
+      "call": "कॉल",
+      "actions": "कार्य"
+    },
+    "actions": {
+      "edit": "संपादित करें",
+      "move": "सूची में ले जाएं",
+      "delete": "हटाएं",
+      "deleteConfirm": "क्या आप वाकई इस संपर्क को हटाना चाहते हैं?"
+    }
+  },
+  "sidebar": {
+    "organization": "संगठन",
+    "overview": "अवलोकन",
+    "build": "बनाएं",
+    "assistants": "सहायक",
+    "workflows": "कार्यप्रवाह",
+    "contacts": "संपर्क सूची",
+    "phoneNumbers": "फ़ोन नंबर",
+    "tools": "उपकरण",
+    "files": "फ़ाइलें",
+    "squads": "दस्ते",
+    "providerKeys": "प्रदाता कुंजी",
+    "test": "जांच",
+    "phone": "फ़ोन",
+    "web": "वेब",
+    "observe": "निरीक्षण करें",
+    "calls": "कॉल",
+    "community": "समुदाय",
+    "communityLink": "समुदाय",
+    "orgSettings": "संगठन सेटिंग्स",
+    "orgSettingsLink": "संगठन सेटिंग्स",
+    "accountSettings": "खाता सेटिंग्स",
+    "accountSettingsLink": "खाता सेटिंग्स",
+    "help": "मदद",
+    "logout": "लॉग आउट",
+    "language": "भाषा"
+  },
+  "common": {
+    "save": "सहेजें",
+    "cancel": "रद्द करें",
+    "delete": "हटाएं",
+    "edit": "संपादित करें",
+    "create": "बनाएं",
+    "search": "खोजें",
+    "loading": "लोड हो रहा है",
+    "noResults": "कोई परिणाम नहीं मिला"
+  },
+    "dashboard": {
+      "title": "अवलोकन",
+      "description": "कॉल मेट्रिक्स और प्रदर्शन के लिए एनालिटिक्स डैशबोर्ड",
+      "metrics": {
+        "totalCallMinutes": "कुल कॉल मिनट",
+        "numberOfCalls": "कॉल की संख्या",
+        "totalSpent": "कुल खर्च",
+        "avgCostPerCall": "प्रति कॉल औसत लागत"
+      },
+      "charts": {
+        "callEndReason": "कॉल समाप्त होने का कारण",
+        "callDurationByAssistant": "सहायक द्वारा कॉल अवधि",
+        "costBreakdown": "लागत टूटना",
+        "successEvaluation": "सफलता मूल्यांकन",
+        "concurrentCalls": "समवर्ती कॉल"
+      },
+      "failedCalls": {
+        "title": "हाल की असफल कॉल",
+        "viewAll": "सभी देखें"
+      }
+    },
+    "assistants": "सहायक",
+    "workflows": "कार्यप्रवाह",
+    "contactslist": "संपर्क सूची",
+    "phoneNumbers": "फ़ोन नंबर",
+    "tools": "उपकरण",
+    "files": "फ़ाइलें",
+    "squads": "दस्ते",
+    "providerKeys": "प्रदाता कुंजी",
+    "test": "जांच",
+    "calls": "कॉल",
+    "community": "समुदाय",
+    "orgSettings": "संगठन सेटिंग्स",
+    "accountSettings": "खाता सेटिंग्स",
+    "help": "मदद",
+    "logout": "लॉग आउट",
+    "language": "भाषा",
+    "promptCarousel": {
+      "customerSupportAssistant": "ग्राहक सहायता सहायक",
+      "handlesCommonCustomerInquiries": "सामान्य ग्राहक पूछताछ को संभालता है और उपयोगी प्रतिक्रियाएं प्रदान करता है",
+      "productRecommendationEngine": "उत्पाद अनुशंसा इंजन",
+      "suggestsProductsBasedOnCustomer": "ग्राहक वरीयताओं और ब्राउज़िंग इतिहास के आधार पर उत्पादों का सुझाव देता है",
+      "technicalTroubleshootingGuide": "तकनीकी समस्या निवारण गाइड",
+      "walksUsersThroughCommonTechnical": "उपयोगकर्ताओं को सामान्य तकनीकी मुद्दों और समाधानों के माध्यम से मार्गदर्शन करता है",
+      "onboardingSequence": "ऑनबोर्डिंग अनुक्रम",
+      "guidesNewUsersThroughProduct": "नए उपयोगकर्ताओं को उत्पाद सुविधाओं और सेटअप के माध्यम से मार्गदर्शन करता है",
+      "featureAnnouncement": "फ़ीचर घोषणा",
+      "introducesUsersToNewProduct": "नए उपयोगकर्ताओं को नए उत्पाद सुविधाओं और अपडेट से परिचित कराता है",
+      "supportBot": "समर्थन बॉट",
+      "salesAssistant": "सेल्स असिस्टेंट",
+      "websiteBot": "वेबसाइट बॉट",
+      "updated": "अपडेट किया गया",
+      "agent": "एजेंट",
+      "agents": "एजेंट",
+      "viewAllPrompts": "सभी संकेत देखें"
+    },
+    "documentCarousel": {
+      "viewAllDocuments": "सभी दस्तावेज़ देखें"
+    },
+    "documentCard": {
+      "uploadedAt": "अपलोड किया गया",
+      "actions": {
+        "publish": "प्रकाशित करें",
+        "download": "डाउनलोड करें",
+        "delete": "हटाएं"
+      }
+    }
+  }

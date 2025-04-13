@@ -1,6 +1,6 @@
 // app/dashboard/components/dashboard-header.tsx
 
-import React, { useState } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { CalendarIcon, ChevronDownIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -41,8 +41,8 @@ export function DashboardHeader({
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [calendarOpen, setCalendarOpen] = useState(false);
 
-  // Parse the current date range
-  const parseDateRange = () => {
+  // Parse the current date range - memoized to prevent recalculation on every render
+  const [startDate, endDate] = useMemo(() => {
     try {
       const [startStr, endStr] = dateRange.split(' - ');
       if (!startStr || !endStr) return [new Date(), new Date()];
@@ -69,12 +69,10 @@ export function DashboardHeader({
       console.error("Error parsing date range:", error);
       return [new Date(), new Date()];
     }
-  };
+  }, [dateRange]);
 
-  const [startDate, endDate] = parseDateRange();
-
-  // Handle calendar date selection
-  const handleCalendarSelect = (date: Date | undefined) => {
+  // Handle calendar date selection - memoized callback to prevent recreation on each render
+  const handleCalendarSelect = useCallback((date: Date | undefined) => {
     if (!date) return;
     setDate(date);
     
@@ -89,10 +87,10 @@ export function DashboardHeader({
     }
     
     setCalendarOpen(false);
-  };
+  }, [onDateRangeChange]);
 
-  // Set predefined date ranges
-  const setPresetRange = (days: number) => {
+  // Set predefined date ranges - memoized callback
+  const setPresetRange = useCallback((days: number) => {
     const end = new Date();
     const start = subDays(end, days);
     
@@ -101,7 +99,7 @@ export function DashboardHeader({
     if (onDateRangeChange) {
       onDateRangeChange(newDateRange);
     }
-  };
+  }, [onDateRangeChange]);
 
   return (
     <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from 'react';
+import { useTranslations } from '@/i18n/translations-context';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { ContactsProvider } from '../contexts/contacts-context';
@@ -16,6 +17,7 @@ import { Contact } from '@/app/hooks/use-contacts';
  * Manages dialogs and provides the contacts context to child components.
  */
 const ContactListPage: React.FC = () => {
+  const {t}= useTranslations();
   // Dialog states
   const [showCreateListDialog, setShowCreateListDialog] = useState(false);
   const [showUploadDialog, setShowUploadDialog] = useState(false);
@@ -81,17 +83,15 @@ const ContactListPage: React.FC = () => {
         <Dialog open={showCreateListDialog} onOpenChange={setShowCreateListDialog}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Create Contact List</DialogTitle>
+              <DialogTitle>{t('contacts.create_list.title')}</DialogTitle>
               <DialogDescription>
-                Create a new list to organize your contacts.
+                {t('contacts.create_list.description')}
               </DialogDescription>
             </DialogHeader>
             
             <CreateContactListDialog 
               onSubmit={(name, description) => {
-                // We don't need to handle list creation here anymore
-                // It's being handled directly by the CreateContactListDialog component
-                // through the ContactsContext
+              
               }}
               onClose={() => setShowCreateListDialog(false)}
             />
@@ -121,9 +121,9 @@ const ContactListPage: React.FC = () => {
         <Dialog open={showCreateContactDialog} onOpenChange={setShowCreateContactDialog}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Add New Contact</DialogTitle>
+              <DialogTitle>{t('contacts.add_contact.title')}</DialogTitle>
               <DialogDescription>
-                Add a new contact to your list.
+                {t('contacts.add_contact.description')}
               </DialogDescription>
             </DialogHeader>
             

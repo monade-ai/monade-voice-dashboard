@@ -5,13 +5,15 @@ import { Badge } from "@/components/ui/badge"
 import { Edit, Trash2, Zap } from "lucide-react"
 import Link from "next/link"
 import { PublishPromptDialog } from "../components/publish-prompt-dialog"
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { areSimilar } from "@/lib/utils/levenshtein"
 
 export function PromptLibrary() {
   const [isPublishOpen, setIsPublishOpen] = useState(false)
   const [selectedPrompt, setSelectedPrompt] = useState<any>(null)
-
-  const prompts = [
+  const [searchQuery, setSearchQuery] = useState('')
+  const [filteredPrompts, setFilteredPrompts] = useState<any[]>([])
+  const [prompts, setPrompts] = useState([
     {
       id: "1",
       title: "Customer Support Assistant",
@@ -47,15 +49,54 @@ export function PromptLibrary() {
       agents: [],
       updatedAt: "1 day ago",
     },
-  ]
+  ])
+
+  const handleDelete = (promptId: string) => {
+    // Remove the prompt from the prompts array
+    const updatedPrompts = prompts.filter(prompt => prompt.id !== promptId);
+    setPrompts(updatedPrompts);
+    
+    // Also update filtered prompts to reflect the deletion
+    setFilteredPrompts(prevFiltered => prevFiltered.filter(prompt => prompt.id !== promptId));
+  }
 
   const handlePublish = (prompt: any) => {
     setSelectedPrompt(prompt)
     setIsPublishOpen(true)
   }
 
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setFilteredPrompts(prompts);
+      return;
+    }
+
+    const filtered = prompts.filter(prompt => {
+      const searchLower = searchQuery.toLowerCase();
+      return (
+        areSimilar(prompt.title, searchQuery) ||
+        prompt.description.toLowerCase().includes(searchLower)
+      );
+    });
+
+    setFilteredPrompts(filtered);
+  }, [searchQuery]);
+
+  const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchQuery(event.target.value);
+  };
+
   return (
     <div>
+      <div className="p-4">
+        <input
+          type="search"
+          placeholder="Search prompts..."
+          className="w-full px-4 py-2 rounded-md border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          value={searchQuery}
+          onChange={handleSearchChange}
+        />
+      </div>
       <div className="rounded-md">
         <table className="w-full">
           <thead>
@@ -67,7 +108,7 @@ export function PromptLibrary() {
             </tr>
           </thead>
           <tbody>
-            {prompts.map((prompt, index) => (
+            {filteredPrompts.map((prompt, index) => (
               <tr key={prompt.id} className={index !== prompts.length - 1 ? "border-b" : ""}>
                 <td className="py-3 px-4">
                   <div>
@@ -113,6 +154,7 @@ export function PromptLibrary() {
                     <Button
                       variant="ghost"
                       size="icon"
+                      onClick={() => handleDelete(prompt.id)}
                       className="h-9 w-9 rounded-full bg-red-50 hover:bg-red-100 shadow-sm hover:shadow transition-all duration-200"
                     >
                       <Trash2 className="h-4 w-4 text-red-600" />
