@@ -1,4 +1,20 @@
 {
+  "knowledgeBase": {
+    "title": "Knowledge Base Management",
+    "description": "Upload documents to your knowledge base or create custom prompts for your AI agents",
+    "uploadDocument": {
+      "title": "Upload Document",
+      "description": "Add documents to your knowledge base to enhance your AI agents"
+    },
+    "createPrompt": {
+      "title": "Create Prompt",
+      "description": "Create custom prompts to guide your AI agents' responses"
+    },
+    "tabs": {
+      "prompts": "Prompts",
+      "documents": "Documents"
+    }
+  },
   "contacts": {
     "title": "Contact Lists",
     "create_list": {
