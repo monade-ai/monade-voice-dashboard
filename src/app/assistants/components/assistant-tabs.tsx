@@ -8,7 +8,9 @@ import {
   Terminal, 
   LineChart, 
   Volume2,
-  Trash2 
+  Trash2,
+  Calendar,
+  BarChart3
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAssistants } from '../../hooks/use-assistants-context';
@@ -17,6 +19,9 @@ import ModelTab from './tab-views/model-tab';
 import { Button } from '@/components/ui/button';
 import DeleteConfirmationModal from '../delete-confirmation-modal';
 
+// Import the new components for call management
+import CallScheduling from './tab-views/call-management/call-scheduling';
+import CallInsights from './tab-views/call-management/call-insights';
 // Placeholder components for other tabs that will be implemented later
 const PlaceholderTab = ({ title }: { title: string }) => (
   <div className="p-8 text-center text-gray-500">
@@ -94,10 +99,15 @@ export default function AssistantTabs() {
             <Settings className="h-4 w-4 mr-2" />
             Advanced
           </TabsTrigger>
-          <TabsTrigger value="analysis" className="flex-1 data-[state=active]:bg-white data-[state=active]:shadow-sm">
-            <LineChart className="h-4 w-4 mr-2" />
-            Analysis
+          <TabsTrigger value="scheduling" className="flex-1 data-[state=active]:bg-white data-[state=active]:shadow-sm">
+            <Calendar className="h-4 w-4 mr-2" />
+            Scheduling
           </TabsTrigger>
+          <TabsTrigger value="insights" className="flex-1 data-[state=active]:bg-white data-[state=active]:shadow-sm">
+            <BarChart3 className="h-4 w-4 mr-2" />
+            Insights
+          </TabsTrigger>
+
         </TabsList>
 
         {/* Tab contents with Suspense for each tab */}
@@ -121,6 +131,14 @@ export default function AssistantTabs() {
         
         <TabsContent value="advanced" className="mt-6">
           <PlaceholderTab title="Advanced" />
+        </TabsContent>
+        
+        <TabsContent value="scheduling" className="mt-6">
+          <CallScheduling />
+        </TabsContent>
+        
+        <TabsContent value="insights" className="mt-6">
+          <CallInsights />
         </TabsContent>
         
         <TabsContent value="analysis" className="mt-6">
