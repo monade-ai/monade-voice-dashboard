@@ -1,13 +1,15 @@
 "use client"
 
-import type React from "react"
-import { useState } from "react"
+import { useState, useCallback } from "react"
+import { v4 as uuidv4 } from 'uuid'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { FileUp, X, Check, Loader2 } from "lucide-react"
 import { PublishPromptDialog } from "../components/publish-prompt-dialog"
+import { DocumentMetadata, DocumentStorage } from "../api/knowldege-api"
+import { useToast } from "../hooks/use-toast"
 
 export function DocumentUploader() {
   const [files, setFiles] = useState<File[]>([])
@@ -17,6 +19,7 @@ export function DocumentUploader() {
   const [documentTitle, setDocumentTitle] = useState("")
   const [documentDescription, setDocumentDescription] = useState("")
   const [isPublishOpen, setIsPublishOpen] = useState(false)
+  const { toast } = useToast()
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault()
@@ -37,6 +40,7 @@ export function DocumentUploader() {
 
       // Auto-upload when files are dropped
       if (newFiles.length > 0) {
+        setDocumentTitle(newFiles[0].name)
         simulateUpload(newFiles[0])
       }
     }
@@ -49,6 +53,7 @@ export function DocumentUploader() {
 
       // Auto-upload when files are selected
       if (newFiles.length > 0) {
+        setDocumentTitle(newFiles[0].name)
         simulateUpload(newFiles[0])
       }
     }
@@ -62,7 +67,12 @@ export function DocumentUploader() {
     return new Promise((resolve, reject) => {
       const reader = new FileReader()
       reader.readAsDataURL(file)
-      reader.onload = () => resolve(reader.result as string)
+      reader.onload = () => {
+        // Extract the base64 part from the data URL
+        const base64 = reader.result as string
+        const base64Content = base64.split(',')[1]
+        resolve(base64Content)
+      }
       reader.onerror = error => reject(error)
     })
   }
@@ -72,28 +82,38 @@ export function DocumentUploader() {
     try {
       const base64 = await fileToBase64(file)
 
-      const storedData = {
-        title: documentTitle,
+      // Create document metadata
+      const documentMetadata: DocumentMetadata = {
+        id: uuidv4(),
+        title: documentTitle || file.name,
         description: documentDescription,
-        fileName: file.name,
+        fileType: file.type.split('/')[1]?.toUpperCase() || 'UNKNOWN',
         fileSize: file.size,
-        fileType: file.type,
         content: base64,
+        uploadedAt: new Date().toISOString()
       }
 
-      localStorage.setItem("CallLiveDocuments", JSON.stringify(storedData))
+      // Save to storage
+      DocumentStorage.saveDocument(documentMetadata)
+      
+      toast({
+        title: "Document uploaded",
+        description: `${file.name} has been added to your knowledge base.`
+      })
+
       setUploadComplete(true)
     } catch (error) {
-      console.error("Failed to convert file:", error)
-      alert("Failed to process file. Please try again.")
+      console.error("Failed to process file:", error)
+      toast({
+        title: "Upload failed",
+        description: "Failed to process the document. Please try again.",
+      })
     } finally {
       setIsUploading(false)
     }
   }
 
   const handlePublish = () => {
-    const saved = localStorage.getItem("CallLiveDocuments")
-    console.log("Stored Document:", saved)
     setIsPublishOpen(true)
   }
 
@@ -194,6 +214,7 @@ export function DocumentUploader() {
         open={isPublishOpen}
         onOpenChange={setIsPublishOpen}
         promptTitle={documentTitle || files[0]?.name || "Document"}
+        documentContent={files.length > 0 ? { file: files[0], title: documentTitle } : null}
       />
     </div>
   )
