@@ -280,12 +280,12 @@ const CallInsights: FC = () => {
     <div className="bg-white rounded-lg shadow-sm border h-full overflow-hidden flex flex-col">
       <div className="p-4 bg-gradient-to-b from-indigo-50 to-white">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-medium text-gray-700">Call Analytics & Insights</h3>
+          <h3 className="text-base font-semibold text-gray-800">Call Analytics & Insights</h3>
           
           <div className="flex items-center space-x-2">
             <div className="relative">
               <select
-                className="appearance-none pl-8 pr-8 py-1.5 rounded-lg border border-gray-200 text-sm text-gray-600 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                className="appearance-none pl-8 pr-8 py-1.5 rounded-lg border border-gray-200 text-sm font-medium text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300 shadow-sm"
                 value={timeFilter}
                 onChange={(e) => setTimeFilter(e.target.value)}
               >
@@ -295,9 +295,9 @@ const CallInsights: FC = () => {
                   </option>
                 ))}
               </select>
-              <Filter className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Filter className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-indigo-500" />
               <div className="absolute right-2 top-1/2 transform -translate-y-1/2 pointer-events-none">
-                <svg className="h-4 w-4 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
+                <svg className="h-4 w-4 text-indigo-500" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
                 </svg>
               </div>
@@ -307,32 +307,32 @@ const CallInsights: FC = () => {
         
         {/* Best time insights cards */}
         <div className="grid grid-cols-3 gap-4 mb-6">
-          <div className="bg-amber-50 rounded-lg p-3 border border-amber-100">
-            <div className="flex items-center justify-between mb-1">
-              <h4 className="text-xs font-medium text-amber-700">Best Time to Call</h4>
-              <Zap className="h-3.5 w-3.5 text-amber-600" />
+          <div className="bg-amber-50 rounded-lg p-3.5 border border-amber-200 shadow-sm hover:shadow-md transition-shadow">
+            <div className="flex items-center justify-between mb-1.5">
+              <h4 className="text-sm font-semibold text-amber-700">Best Time to Call</h4>
+              <Zap className="h-4 w-4 text-amber-600" />
             </div>
-            <div className="text-lg font-bold text-amber-800">{bestTimeInfo.time}</div>
-            <div className="text-xs text-amber-600 mt-0.5">{bestTimeInfo.rate}% success rate</div>
+            <div className="text-xl font-bold text-amber-800">{bestTimeInfo.time}</div>
+            <div className="text-sm text-amber-600 mt-0.5 font-medium">{bestTimeInfo.rate}% success rate</div>
           </div>
           
-          <div className="bg-blue-50 rounded-lg p-3 border border-blue-100">
-            <div className="flex items-center justify-between mb-1">
-              <h4 className="text-xs font-medium text-blue-700">Recommended Days</h4>
-              <Calendar className="h-3.5 w-3.5 text-blue-600" />
+          <div className="bg-blue-50 rounded-lg p-3.5 border border-blue-200 shadow-sm hover:shadow-md transition-shadow">
+            <div className="flex items-center justify-between mb-1.5">
+              <h4 className="text-sm font-semibold text-blue-700">Recommended Days</h4>
+              <Calendar className="h-4 w-4 text-blue-600" />
             </div>
-            <div className="text-lg font-bold text-blue-800">{recommendedDaysInfo.days}</div>
-            <div className="text-xs text-blue-600 mt-0.5">{recommendedDaysInfo.improvement} higher engagement</div>
+            <div className="text-xl font-bold text-blue-800">{recommendedDaysInfo.days}</div>
+            <div className="text-sm text-blue-600 mt-0.5 font-medium">{recommendedDaysInfo.improvement} higher engagement</div>
           </div>
           
-          <div className="bg-amber-50 rounded-lg p-3 border border-amber-100">
-            <div className="flex items-center justify-between mb-1">
-              <h4 className="text-xs font-medium text-amber-700">Contact List Insights</h4>
-              <Users className="h-3.5 w-3.5 text-amber-600" />
+          <div className="bg-amber-50 rounded-lg p-3.5 border border-amber-200 shadow-sm hover:shadow-md transition-shadow">
+            <div className="flex items-center justify-between mb-1.5">
+              <h4 className="text-sm font-semibold text-amber-700">Contact List Insights</h4>
+              <Users className="h-4 w-4 text-amber-600" />
             </div>
             {contactListInsights.map((insight, index) => (
               <div key={index} className="text-sm font-medium text-amber-800">
-                {insight.list}: {insight.bestTime}
+                {insight.list}: <span className="text-amber-600">{insight.bestTime}</span>
               </div>
             ))}
           </div>
@@ -351,16 +351,16 @@ const CallInsights: FC = () => {
               exit={{ opacity: 0, y: -20 }}
               className="h-full"
             >
-              <div className="mb-3 flex items-center">
+              <div className="mb-4 flex items-center">
                 <button
                   onClick={() => setSelectedInsight(null)}
-                  className="mr-2 p-1 rounded-full hover:bg-gray-100"
+                  className="mr-3 p-1.5 rounded-full hover:bg-gray-100 border border-gray-200 shadow-sm"
                 >
-                  <svg className="h-5 w-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg className="h-5 w-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                   </svg>
                 </button>
-                <h3 className="text-sm font-medium text-gray-700">
+                <h3 className="text-base font-semibold text-gray-800">
                   {insightCards.find(card => card.id === selectedInsight)?.label}
                 </h3>
               </div>
@@ -394,79 +394,87 @@ const CallInsights: FC = () => {
                 {insightCards.map(card => (
                   <motion.button
                     key={card.id}
-                    className={`bg-${card.color}-50 rounded-lg p-4 border border-${card.color}-100 text-left hover:shadow-md transition-shadow`}
+                    className={`bg-${card.color}-50 rounded-lg p-5 border border-${card.color}-200 text-left hover:shadow-md transition-shadow shadow-sm`}
                     onClick={() => toggleInsight(card.id)}
                     whileHover={{ y: -2 }}
                     whileTap={{ scale: 0.98 }}
                   >
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="text-sm font-medium text-gray-700">{card.label}</h4>
-                      <card.icon className={`h-4 w-4 text-${card.color}-600`} />
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="text-base font-semibold text-gray-800">{card.label}</h4>
+                      <card.icon className={`h-5 w-5 text-${card.color}-600`} />
                     </div>
                     
                     {/* Mini preview based on card type */}
                     {card.id === 'sentiment' && (
-                      <div className="flex items-center space-x-1">
-                        <div className="bg-amber-200 h-6 rounded-l-md" style={{ width: `${sentimentData.positive}%` }}></div>
-                        <div className="bg-gray-200 h-6" style={{ width: `${sentimentData.neutral}%` }}></div>
-                        <div className="bg-red-200 h-6 rounded-r-md" style={{ width: `${sentimentData.negative}%` }}></div>
+                      <div className="space-y-2">
+                        <div className="flex items-center space-x-1">
+                          <div className="bg-green-400 h-7 rounded-l-md" style={{ width: `${sentimentData.positive}%` }}></div>
+                          <div className="bg-gray-300 h-7" style={{ width: `${sentimentData.neutral}%` }}></div>
+                          <div className="bg-red-400 h-7 rounded-r-md" style={{ width: `${sentimentData.negative}%` }}></div>
+                        </div>
+                        <div className="flex justify-between text-xs font-medium">
+                          <div className="text-green-700">{sentimentData.positive}% Positive</div>
+                          <div className="text-gray-600">{sentimentData.neutral}% Neutral</div>
+                          <div className="text-red-700">{sentimentData.negative}% Negative</div>
+                        </div>
                       </div>
                     )}
                     
                     {card.id === 'disconnect' && (
-                      <div className="space-y-1">
+                      <div className="space-y-2">
                         {disconnectData.reasons.slice(0, 3).map((reason, i) => (
                           <div key={i} className="flex items-center text-xs">
                             <div 
-                              className="h-1.5 rounded-full bg-red-400 mr-2" 
+                              className="h-2 rounded-full bg-red-500 mr-2.5" 
                               style={{ width: `${reason.percentage}%`, maxWidth: '120px' }}
                             ></div>
-                            <span className="text-gray-600 truncate">{reason.reason}</span>
+                            <span className="text-gray-700 font-medium truncate">{reason.reason}</span>
+                            <span className="ml-auto text-red-600 font-semibold">{reason.percentage}%</span>
                           </div>
                         ))}
                       </div>
                     )}
                     
                     {card.id === 'quality' && (
-                      <div className="space-y-2">
+                      <div className="space-y-3">
                         <div className="flex items-center">
-                          <div className="w-24 mr-2">
-                            <div className="text-xs text-gray-600">Audio Clarity</div>
-                            <div className="h-1.5 w-full bg-gray-200 rounded-full mt-1">
+                          <div className="w-28 mr-3">
+                            <div className="text-xs font-medium text-gray-700">Audio Clarity</div>
+                            <div className="h-2 w-full bg-gray-200 rounded-full mt-1.5">
                               <div 
-                                className="h-1.5 bg-blue-500 rounded-full" 
+                                className="h-2 bg-blue-600 rounded-full" 
                                 style={{ width: `${qualityData.audioClarity}%` }}
                               ></div>
                             </div>
                           </div>
-                          <div className="text-blue-600 font-medium">{qualityData.audioClarity}%</div>
+                          <div className="text-blue-700 font-semibold text-sm">{qualityData.audioClarity}%</div>
                         </div>
                         
                         <div className="flex items-center">
-                          <div className="w-24 mr-2">
-                            <div className="text-xs text-gray-600">Response Time</div>
-                            <div className="h-1.5 w-full bg-gray-200 rounded-full mt-1">
+                          <div className="w-28 mr-3">
+                            <div className="text-xs font-medium text-gray-700">Response Time</div>
+                            <div className="h-2 w-full bg-gray-200 rounded-full mt-1.5">
                               <div 
-                                className="h-1.5 bg-blue-500 rounded-full" 
+                                className="h-2 bg-blue-600 rounded-full" 
                                 style={{ width: `${qualityData.responseTime}%` }}
                               ></div>
                             </div>
                           </div>
-                          <div className="text-blue-600 font-medium">{qualityData.responseTime}%</div>
+                          <div className="text-blue-700 font-semibold text-sm">{qualityData.responseTime}%</div>
                         </div>
                       </div>
                     )}
                     
                     {card.id === 'topics' && (
-                      <div className="space-y-1">
+                      <div className="space-y-2">
                         {topicsData.topics.slice(0, 4).map((topic, i) => (
                           <div key={i} className="flex items-center justify-between text-xs">
-                            <span className="text-gray-600 truncate">{topic.topic}</span>
+                            <span className="text-gray-700 font-medium truncate">{topic.topic}</span>
                             <span 
-                              className={`px-1.5 py-0.5 rounded-full text-xs ${
-                                topic.sentiment === 'positive' ? 'bg-green-100 text-green-600' :
-                                topic.sentiment === 'neutral' ? 'bg-gray-100 text-gray-600' :
-                                'bg-red-100 text-red-600'
+                              className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                                topic.sentiment === 'positive' ? 'bg-green-100 text-green-700 border border-green-200' :
+                                topic.sentiment === 'neutral' ? 'bg-gray-100 text-gray-700 border border-gray-200' :
+                                'bg-red-100 text-red-700 border border-red-200'
                               }`}
                             >
                               {topic.count}
@@ -481,7 +489,7 @@ const CallInsights: FC = () => {
               
               {/* Call success by time of day chart */}
               <div>
-                <h3 className="text-sm font-medium text-gray-700 mb-3">Call Success by Time of Day</h3>
+                <h3 className="text-base font-semibold text-gray-800 mb-3">Call Success by Time of Day</h3>
                 <TimeOfDayChart data={timeOfDayData} />
               </div>
             </motion.div>

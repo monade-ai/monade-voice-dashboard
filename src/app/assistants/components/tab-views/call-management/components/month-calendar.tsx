@@ -57,13 +57,19 @@ export default function MonthCalendar({ month, schedules, selectedRange, onDateS
   
   // Check if a date is in the selected range
   function isDateInRange(date, range) {
-    if (!range || !range.start || !range.end) return false;
+    if (!range || !range.start) return false;
     
-    const formattedDate = date.toDateString();
-    const startDate = new Date(range.start).toDateString();
-    const endDate = new Date(range.end).toDateString();
+    // Convert to midnight UTC for consistent comparison
+    const dateTime = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+    const startTime = new Date(range.start.getFullYear(), range.start.getMonth(), range.start.getDate()).getTime();
     
-    return formattedDate >= startDate && formattedDate <= endDate;
+    // If we only have a start date, just check if this is the start date
+    if (!range.end) {
+      return dateTime === startTime;
+    }
+    
+    const endTime = new Date(range.end.getFullYear(), range.end.getMonth(), range.end.getDate()).getTime();
+    return dateTime >= startTime && dateTime <= endTime;
   }
   
   // Check if a date has a schedule
@@ -125,8 +131,8 @@ export default function MonthCalendar({ month, schedules, selectedRange, onDateS
   const year = month.getFullYear();
   
   return (
-    <div className="bg-white rounded-lg mt-2">
-      <div className="text-center mb-2 font-medium text-sm text-gray-700">
+    <div className="bg-white rounded-lg mt-2 max-w-md mx-auto">
+      <div className="text-center mb-4 font-medium text-xl text-gray-700">
         {monthName} {year}
       </div>
       
@@ -152,17 +158,40 @@ export default function MonthCalendar({ month, schedules, selectedRange, onDateS
               >
                 <button
                   onClick={() => handleDateClick(day)}
-                  className={`w-8 h-8 flex items-center justify-center rounded-full relative ${
+                  className={`w-8 h-8 flex items-center justify-center relative ${
                     day.isSelected 
                       ? 'text-white' 
-                      : day.isCurrentMonth 
-                        ? 'hover:bg-gray-100' 
-                        : 'hover:bg-gray-50'
+                      : selectedRange?.start && selectedRange?.end && 
+                        day.date.getTime() > selectedRange.start.getTime() && 
+                        day.date.getTime() < selectedRange.end.getTime() 
+                          ? 'text-gray-800 hover:bg-amber-200' 
+                          : day.isCurrentMonth 
+                            ? 'hover:bg-gray-100' 
+                            : 'hover:bg-gray-50'
                   }`}
                 >
+                  {/* Background for dates in range but not start/end */}
+                  {!day.isSelected && selectedRange?.start && selectedRange?.end && 
+                    new Date(day.date.getFullYear(), day.date.getMonth(), day.date.getDate()).getTime() > 
+                    new Date(selectedRange.start.getFullYear(), selectedRange.start.getMonth(), selectedRange.start.getDate()).getTime() && 
+                    new Date(day.date.getFullYear(), day.date.getMonth(), day.date.getDate()).getTime() < 
+                    new Date(selectedRange.end.getFullYear(), selectedRange.end.getMonth(), selectedRange.end.getDate()).getTime() && (
+                    <div className="absolute inset-0 bg-amber-100" />
+                  )}
+                  
                   {day.isSelected && (
                     <motion.div 
-                      className="absolute inset-0 bg-blue-600 rounded-full"
+                      className={`absolute inset-0 ${selectedRange?.start && selectedRange?.end && 
+                        new Date(day.date.getFullYear(), day.date.getMonth(), day.date.getDate()).getTime() === 
+                        new Date(selectedRange.start.getFullYear(), selectedRange.start.getMonth(), selectedRange.start.getDate()).getTime() ? 'bg-amber-600 rounded-l-full' : 
+                        selectedRange?.end && 
+                        new Date(day.date.getFullYear(), day.date.getMonth(), day.date.getDate()).getTime() === 
+                        new Date(selectedRange.end.getFullYear(), selectedRange.end.getMonth(), selectedRange.end.getDate()).getTime() ? 'bg-amber-600 rounded-r-full' : 
+                        'bg-amber-500'} ${(selectedRange?.start && selectedRange?.end && 
+                        new Date(day.date.getFullYear(), day.date.getMonth(), day.date.getDate()).getTime() > 
+                        new Date(selectedRange.start.getFullYear(), selectedRange.start.getMonth(), selectedRange.start.getDate()).getTime() && 
+                        new Date(day.date.getFullYear(), day.date.getMonth(), day.date.getDate()).getTime() < 
+                        new Date(selectedRange.end.getFullYear(), selectedRange.end.getMonth(), selectedRange.end.getDate()).getTime()) ? 'rounded-none' : 'rounded-full'}`}
                       initial={{ scale: 0.8 }}
                       animate={{ scale: 1 }}
                       transition={{ duration: 0.2 }}
@@ -175,7 +204,7 @@ export default function MonthCalendar({ month, schedules, selectedRange, onDateS
                   
                   {/* Schedule indicator dot */}
                   {day.hasSchedule && !day.isSelected && (
-                    <div className="absolute bottom-0 h-1 w-1 bg-green-500 rounded-full" />
+                    <div className="absolute bottom-0 h-1 w-1 bg-amber-500 rounded-full" />
                   )}
                 </button>
               </div>
@@ -186,7 +215,7 @@ export default function MonthCalendar({ month, schedules, selectedRange, onDateS
       
       {/* Selected date info */}
       {selectedRange && selectedRange.start && (
-        <div className="mt-2 text-xs text-blue-600 font-medium">
+        <div className="mt-4 text-sm text-amber-600 font-medium text-center">
           {selectedRange.start && selectedRange.end 
             ? `${selectedRange.start.toLocaleDateString()} - ${selectedRange.end.toLocaleDateString()}`
             : `${selectedRange.start.toLocaleDateString()} - Select end date`
