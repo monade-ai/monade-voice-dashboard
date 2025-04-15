@@ -1,5 +1,7 @@
-import { Action } from '../store/workflow-store';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+
+import { Action } from '../store/workflow-store';
+
 import { JsonEditor } from './json-editor';
 
 interface ActionEditorProps {
@@ -23,7 +25,7 @@ export function ActionEditor({ title, description, actions, onChange }: ActionEd
     return json.every(action => 
       typeof action === 'object' && 
       action !== null &&
-      typeof action.type === 'string'
+      typeof action.type === 'string',
     );
   };
 

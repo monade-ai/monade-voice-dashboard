@@ -1,6 +1,7 @@
 // app/dashboard/hooks/use-dashboard-data.ts
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
+
 import { apiService } from '@/lib/api';
 
 // Import mock data for fallback
@@ -14,7 +15,7 @@ import {
   costBreakdownData,
   successEvaluationData,
   unsuccessfulCallsData,
-  concurrentCallsData
+  concurrentCallsData,
 } from '../dashboard/data/mock-data';
 
 interface DashboardDataOptions {
@@ -34,7 +35,7 @@ export function useDashboardData({
   dateTo,
   groupBy = 'day',
   assistantId,
-  useMockData = true // Default to mock data for now
+  useMockData = true, // Default to mock data for now
 }: DashboardDataOptions) {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<Error | null>(null);
@@ -48,6 +49,7 @@ export function useDashboardData({
     
     return data.filter(item => {
       const itemDate = new Date(item.date);
+
       return itemDate >= fromDate && itemDate <= toDate;
     });
   }, [dateFrom, dateTo]);
@@ -71,7 +73,7 @@ export function useDashboardData({
     
     return {
       ...data,
-      callDurationByAssistant: filteredCallDuration
+      callDurationByAssistant: filteredCallDuration,
     };
   }, [assistantId]);
   
@@ -88,20 +90,20 @@ export function useDashboardData({
   const processedMockData = useMemo(() => ({
     totalCallMinutes: {
       ...totalCallMinutesData,
-      points: filterDataByDateRange(totalCallMinutesData.points)
+      points: filterDataByDateRange(totalCallMinutesData.points),
     },
     numberOfCalls: {
       ...numberOfCallsData,
-      points: filterDataByDateRange(numberOfCallsData.points)
+      points: filterDataByDateRange(numberOfCallsData.points),
     },
     totalSpent: {
       ...totalSpentData,
-      points: filterDataByDateRange(totalSpentData.points)
+      points: filterDataByDateRange(totalSpentData.points),
     },
     avgCostPerCall: {
       ...avgCostPerCallData,
-      points: filterDataByDateRange(avgCostPerCallData.points)
-    }
+      points: filterDataByDateRange(avgCostPerCallData.points),
+    },
   }), [filterDataByDateRange]);
   
   const [metrics, setMetrics] = useState(processedMockData);
@@ -110,7 +112,7 @@ export function useDashboardData({
     callEndReason: callEndReasonData,
     callDurationByAssistant: callDurationByAssistantData,
     costBreakdown: costBreakdownData,
-    successEvaluation: successEvaluationData
+    successEvaluation: successEvaluationData,
   }), [filterDataByAssistant]);
   
   const [analysis, setAnalysis] = useState(processedAnalysisData);
@@ -119,9 +121,9 @@ export function useDashboardData({
   const filteredFailedCalls = useMemo(() => {
     return assistantId && assistantId !== 'all'
       ? unsuccessfulCallsData.filter(call => 
-          (assistantId === 'new' && call.assistant === 'New Assistant') ||
-          (assistantId === 'unknown' && call.assistant === 'Unknown Assistant')
-        )
+        (assistantId === 'new' && call.assistant === 'New Assistant') ||
+          (assistantId === 'unknown' && call.assistant === 'Unknown Assistant'),
+      )
       : unsuccessfulCallsData;
   }, [assistantId]);
   
@@ -147,20 +149,20 @@ export function useDashboardData({
           setMetrics({
             totalCallMinutes: {
               ...totalCallMinutesData,
-              points: filterDataByDateRange(totalCallMinutesData.points)
+              points: filterDataByDateRange(totalCallMinutesData.points),
             },
             numberOfCalls: {
               ...numberOfCallsData,
-              points: filterDataByDateRange(numberOfCallsData.points)
+              points: filterDataByDateRange(numberOfCallsData.points),
             },
             totalSpent: {
               ...totalSpentData,
-              points: filterDataByDateRange(totalSpentData.points)
+              points: filterDataByDateRange(totalSpentData.points),
             },
             avgCostPerCall: {
               ...avgCostPerCallData,
-              points: filterDataByDateRange(avgCostPerCallData.points)
-            }
+              points: filterDataByDateRange(avgCostPerCallData.points),
+            },
           });
           
           // Update analysis data
@@ -168,7 +170,7 @@ export function useDashboardData({
             callEndReason: callEndReasonData,
             callDurationByAssistant: callDurationByAssistantData,
             costBreakdown: costBreakdownData,
-            successEvaluation: successEvaluationData
+            successEvaluation: successEvaluationData,
           }));
           
           // Update failed calls
@@ -216,7 +218,7 @@ export function useDashboardData({
     processedMockData,
     processedAnalysisData,
     filteredFailedCalls,
-    filteredConcurrentCalls
+    filteredConcurrentCalls,
   ]);
 
   // Effect to refresh data when dependencies change
@@ -231,6 +233,6 @@ export function useDashboardData({
     analysis,
     failedCalls,
     concurrentCalls,
-    refreshData
+    refreshData,
   };
 }

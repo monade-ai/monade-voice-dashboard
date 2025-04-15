@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+
 import { EXOTEL_CONFIG } from '@/lib/services/exotel-config';
 
 export async function POST(request: Request) {
@@ -10,9 +11,9 @@ export async function POST(request: Request) {
       headers: {
         'Content-Type': 'application/json',
         'X-API-Key': EXOTEL_CONFIG.API_KEY,
-        'x-functions-key': EXOTEL_CONFIG.FUNCTIONS_KEY
+        'x-functions-key': EXOTEL_CONFIG.FUNCTIONS_KEY,
       },
-      body: JSON.stringify(body)
+      body: JSON.stringify(body),
     });
 
     if (!response.ok) {
@@ -20,12 +21,14 @@ export async function POST(request: Request) {
     }
 
     const data = await response.json();
+
     return NextResponse.json(data);
   } catch (error) {
     console.error('Error in Exotel API route:', error);
+
     return NextResponse.json(
       { error: 'Failed to initiate call' },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

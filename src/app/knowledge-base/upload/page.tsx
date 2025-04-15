@@ -1,14 +1,16 @@
-import type { Metadata } from "next"
-import Link from "next/link"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Home } from "lucide-react"
-import { DocumentUploader } from "../components/document-uploader"
+import type { Metadata } from 'next';
+import Link from 'next/link';
+import { Home } from 'lucide-react';
+
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+
+import { DocumentUploader } from '../components/document-uploader';
 
 export const metadata: Metadata = {
-  title: "Upload Document | Knowledge Base & Prompt Management",
-  description: "Upload documents to your knowledge base",
-}
+  title: 'Upload Document | Knowledge Base & Prompt Management',
+  description: 'Upload documents to your knowledge base',
+};
 
 export default function UploadPage() {
   return (
@@ -36,5 +38,5 @@ export default function UploadPage() {
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }

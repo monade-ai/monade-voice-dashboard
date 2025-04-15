@@ -1,6 +1,7 @@
 import { Node, XYPosition } from 'reactflow';
-import { PipecatNode, NodeProperties } from '../store/workflow-store';
 import { v4 as uuidv4 } from 'uuid';
+
+import { PipecatNode, NodeProperties } from '../store/workflow-store';
 
 /**
  * Creates a new node with the given type and position
@@ -14,76 +15,76 @@ export function createNodeFromType(nodeType: string, position: XYPosition): Pipe
   
   // Set default properties based on node type
   switch (nodeType) {
-    case 'startNode':
-      label = 'Start';
-      properties = {
-        role_messages: [
-          { role: 'system', content: "Enter bot's personality/role..." },
-        ],
-        task_messages: [
-          { role: 'system', content: 'Enter initial task...' },
-        ],
-        pre_actions: [],
-        post_actions: [],
-      };
-      break;
+  case 'startNode':
+    label = 'Start';
+    properties = {
+      role_messages: [
+        { role: 'system', content: 'Enter bot\'s personality/role...' },
+      ],
+      task_messages: [
+        { role: 'system', content: 'Enter initial task...' },
+      ],
+      pre_actions: [],
+      post_actions: [],
+    };
+    break;
       
-    case 'flowNode':
-      label = 'Flow Node';
-      properties = {
-        task_messages: [
-          { role: 'system', content: 'Enter task message...' },
-        ],
-        pre_actions: [],
-        post_actions: [],
-      };
-      break;
+  case 'flowNode':
+    label = 'Flow Node';
+    properties = {
+      task_messages: [
+        { role: 'system', content: 'Enter task message...' },
+      ],
+      pre_actions: [],
+      post_actions: [],
+    };
+    break;
       
-    case 'endNode':
-      label = 'End Node';
-      properties = {
-        task_messages: [
-          { role: 'system', content: 'Enter final task message...' },
-        ],
-        pre_actions: [],
-        post_actions: [],
-      };
-      break;
+  case 'endNode':
+    label = 'End Node';
+    properties = {
+      task_messages: [
+        { role: 'system', content: 'Enter final task message...' },
+      ],
+      pre_actions: [],
+      post_actions: [],
+    };
+    break;
       
-    case 'functionNode':
-      label = 'Function';
-      properties = {
-        task_messages: [
-          { role: 'system', content: 'Function node' },
-        ],
-        function: {
-          name: 'function_name',
-          description: 'Function description',
-          parameters: {
-            type: 'object',
-            properties: {}
-          }
+  case 'functionNode':
+    label = 'Function';
+    properties = {
+      task_messages: [
+        { role: 'system', content: 'Function node' },
+      ],
+      function: {
+        name: 'function_name',
+        description: 'Function description',
+        parameters: {
+          type: 'object',
+          properties: {},
         },
-        isNodeFunction: false
-      };
-      break;
+      },
+      isNodeFunction: false,
+    };
+    break;
       
-    case 'mergeNode':
-      label = 'Merge';
-      properties = {
-        task_messages: [
-          { role: 'system', content: 'Merge node' },
-        ],
-      };
-      break;
+  case 'mergeNode':
+    label = 'Merge';
+    properties = {
+      task_messages: [
+        { role: 'system', content: 'Merge node' },
+      ],
+    };
+    break;
       
-    default:
-      label = 'Unknown Node';
-      properties = {
-        task_messages: [
-          { role: 'system', content: 'Unknown node type' },
-        ],
-      };
+  default:
+    label = 'Unknown Node';
+    properties = {
+      task_messages: [
+        { role: 'system', content: 'Unknown node type' },
+      ],
+    };
   }
   
   // Create the node with the defined properties
@@ -94,8 +95,8 @@ export function createNodeFromType(nodeType: string, position: XYPosition): Pipe
     data: {
       properties,
       label,
-      nodeType
-    }
+      nodeType,
+    },
   };
 }
 
@@ -108,7 +109,7 @@ export function createNodeFromType(nodeType: string, position: XYPosition): Pipe
 export function cloneNode(node: PipecatNode, newPosition?: XYPosition): PipecatNode {
   const position = newPosition || {
     x: node.position.x + 50,
-    y: node.position.y + 50
+    y: node.position.y + 50,
   };
   
   return {
@@ -118,8 +119,8 @@ export function cloneNode(node: PipecatNode, newPosition?: XYPosition): PipecatN
     selected: false,
     data: {
       ...node.data,
-      properties: JSON.parse(JSON.stringify(node.data.properties))
-    }
+      properties: JSON.parse(JSON.stringify(node.data.properties)),
+    },
   };
 }
 

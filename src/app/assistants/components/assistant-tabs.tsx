@@ -10,14 +10,17 @@ import {
   Volume2,
   Trash2,
   Calendar,
-  BarChart3
+  BarChart3,
 } from 'lucide-react';
+
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
+
 import { useAssistants } from '../../hooks/use-assistants-context';
+import DeleteConfirmationModal from '../delete-confirmation-modal';
+
 import CostDisplay from './cost-display';
 import ModelTab from './tab-views/model-tab';
-import { Button } from '@/components/ui/button';
-import DeleteConfirmationModal from '../delete-confirmation-modal';
 
 // Import the new components for call management
 import CallScheduling from './tab-views/call-management/call-scheduling';

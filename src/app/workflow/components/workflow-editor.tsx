@@ -14,7 +14,7 @@ import ReactFlow, {
   addEdge,
   BackgroundVariant,
   ReactFlowProvider,
-  Panel
+  Panel,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 
@@ -39,7 +39,7 @@ export function WorkflowEditor() {
     onConnect,
     onNodeSelect,
     selectedNode,
-    resetSelection
+    resetSelection,
   } = useWorkflowStore();
 
   // Reference to the React Flow instance

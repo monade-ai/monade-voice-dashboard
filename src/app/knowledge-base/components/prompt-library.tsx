@@ -1,55 +1,57 @@
-"use client"
+'use client';
 
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Edit, Trash2, Zap } from "lucide-react"
-import Link from "next/link"
-import { PublishPromptDialog } from "../components/publish-prompt-dialog"
-import { useState, useEffect } from "react"
-import { areSimilar } from "@/lib/utils/levenshtein"
+import { Edit, Trash2, Zap } from 'lucide-react';
+import Link from 'next/link';
+import { useState, useEffect } from 'react';
+
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { areSimilar } from '@/lib/utils/levenshtein';
+
+import { PublishPromptDialog } from '../components/publish-prompt-dialog';
 
 export function PromptLibrary() {
-  const [isPublishOpen, setIsPublishOpen] = useState(false)
-  const [selectedPrompt, setSelectedPrompt] = useState<any>(null)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [filteredPrompts, setFilteredPrompts] = useState<any[]>([])
+  const [isPublishOpen, setIsPublishOpen] = useState(false);
+  const [selectedPrompt, setSelectedPrompt] = useState<any>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filteredPrompts, setFilteredPrompts] = useState<any[]>([]);
   const [prompts, setPrompts] = useState([
     {
-      id: "1",
-      title: "Customer Support Assistant",
-      description: "Handles common customer inquiries and provides helpful responses",
-      agents: ["Support Bot"],
-      updatedAt: "2 days ago",
+      id: '1',
+      title: 'Customer Support Assistant',
+      description: 'Handles common customer inquiries and provides helpful responses',
+      agents: ['Support Bot'],
+      updatedAt: '2 days ago',
     },
     {
-      id: "2",
-      title: "Product Recommendation Engine",
-      description: "Suggests products based on customer preferences and browsing history",
-      agents: ["Sales Assistant", "Website Bot"],
-      updatedAt: "1 week ago",
+      id: '2',
+      title: 'Product Recommendation Engine',
+      description: 'Suggests products based on customer preferences and browsing history',
+      agents: ['Sales Assistant', 'Website Bot'],
+      updatedAt: '1 week ago',
     },
     {
-      id: "3",
-      title: "Technical Troubleshooting Guide",
-      description: "Walks users through common technical issues and solutions",
-      agents: ["Support Bot"],
-      updatedAt: "3 days ago",
+      id: '3',
+      title: 'Technical Troubleshooting Guide',
+      description: 'Walks users through common technical issues and solutions',
+      agents: ['Support Bot'],
+      updatedAt: '3 days ago',
     },
     {
-      id: "4",
-      title: "Onboarding Sequence",
-      description: "Guides new users through product features and setup",
-      agents: ["Website Bot"],
-      updatedAt: "5 days ago",
+      id: '4',
+      title: 'Onboarding Sequence',
+      description: 'Guides new users through product features and setup',
+      agents: ['Website Bot'],
+      updatedAt: '5 days ago',
     },
     {
-      id: "5",
-      title: "Feature Announcement",
-      description: "Introduces users to new product features and updates",
+      id: '5',
+      title: 'Feature Announcement',
+      description: 'Introduces users to new product features and updates',
       agents: [],
-      updatedAt: "1 day ago",
+      updatedAt: '1 day ago',
     },
-  ])
+  ]);
 
   const handleDelete = (promptId: string) => {
     // Remove the prompt from the prompts array
@@ -58,21 +60,23 @@ export function PromptLibrary() {
     
     // Also update filtered prompts to reflect the deletion
     setFilteredPrompts(prevFiltered => prevFiltered.filter(prompt => prompt.id !== promptId));
-  }
+  };
 
   const handlePublish = (prompt: any) => {
-    setSelectedPrompt(prompt)
-    setIsPublishOpen(true)
-  }
+    setSelectedPrompt(prompt);
+    setIsPublishOpen(true);
+  };
 
   useEffect(() => {
     if (!searchQuery.trim()) {
       setFilteredPrompts(prompts);
+
       return;
     }
 
     const filtered = prompts.filter(prompt => {
       const searchLower = searchQuery.toLowerCase();
+
       return (
         areSimilar(prompt.title, searchQuery) ||
         prompt.description.toLowerCase().includes(searchLower)
@@ -109,7 +113,7 @@ export function PromptLibrary() {
           </thead>
           <tbody>
             {filteredPrompts.map((prompt, index) => (
-              <tr key={prompt.id} className={index !== prompts.length - 1 ? "border-b" : ""}>
+              <tr key={prompt.id} className={index !== prompts.length - 1 ? 'border-b' : ''}>
                 <td className="py-3 px-4">
                   <div>
                     <div className="font-medium">{prompt.title}</div>
@@ -171,5 +175,5 @@ export function PromptLibrary() {
         <PublishPromptDialog open={isPublishOpen} onOpenChange={setIsPublishOpen} promptTitle={selectedPrompt.title} />
       )}
     </div>
-  )
+  );
 }

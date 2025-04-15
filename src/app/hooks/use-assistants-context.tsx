@@ -69,8 +69,8 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
   const updateAssistant = (id: string, updatedData: Partial<Assistant>) => {
     setAssistants((prev) =>
       prev.map((assistant) =>
-        assistant.id === id ? { ...assistant, ...updatedData } : assistant
-      )
+        assistant.id === id ? { ...assistant, ...updatedData } : assistant,
+      ),
     );
     
     // Update current assistant if it's the one being modified

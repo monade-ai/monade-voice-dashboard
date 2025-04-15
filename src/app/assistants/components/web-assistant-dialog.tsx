@@ -1,22 +1,24 @@
- 'use client';
+'use client';
 
 import { useState, useEffect, useCallback } from 'react';
 import { Mic, MicOff, MessageCircle, X } from 'lucide-react';
+import {
+  useRTVIClient,
+  useRTVIClientTransportState,
+  useRTVIClientEvent,
+  RTVIClientAudio,
+} from '@pipecat-ai/client-react';
+import { LLMFunctionCallData, RTVIEvent, LLMHelper } from '@pipecat-ai/client-js';
+
 import { Button } from '@/components/ui/button';
-import { AudioVisualizer } from './audio-visualiser';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  useRTVIClient,
-  useRTVIClientTransportState,
-  useRTVIClientEvent,
-  RTVIClientAudio,
-} from "@pipecat-ai/client-react";
-import { LLMFunctionCallData, RTVIEvent, LLMHelper } from "@pipecat-ai/client-js";
+
+import { AudioVisualizer } from './audio-visualiser';
 
 interface WebAssistantDialogProps {
   url: string;
@@ -37,7 +39,7 @@ export function WebAssistantDialog({
   // PipeCat RTVI client states
   const client = useRTVIClient();
   const transportState = useRTVIClientTransportState();
-  const isConnected = ["connected", "ready"].includes(transportState);
+  const isConnected = ['connected', 'ready'].includes(transportState);
   const [isConnecting, setIsConnecting] = useState(false);
   const [isListening, setIsListening] = useState(false);
   // Using Float32Array for compatibility with AudioVisualizer
@@ -46,8 +48,8 @@ export function WebAssistantDialog({
   
   // Initialize LLM helper when client is available
   useEffect(() => {
-    if (client && !client.getHelper("llm")) {
-      client.registerHelper("llm", new LLMHelper({}));
+    if (client && !client.getHelper('llm')) {
+      client.registerHelper('llm', new LLMHelper({}));
     }
   }, [client]);
   
@@ -62,10 +64,10 @@ export function WebAssistantDialog({
       if (data && data.text && (data.is_final === undefined || data.is_final === true)) {
         setMessages(prev => [...prev, {
           text: data.text,
-          sender: 'user'
+          sender: 'user',
         }]);
       }
-    }, [])
+    }, []),
   );
   
   // Handle bot transcript events from RTVI
@@ -76,10 +78,10 @@ export function WebAssistantDialog({
       if (data && data.text) {
         setMessages(prev => [...prev, {
           text: data.text,
-          sender: 'assistant'
+          sender: 'assistant',
         }]);
       }
-    }, [])
+    }, []),
   );
   
   // Note: AudioLevel event doesn't exist in current API
@@ -87,6 +89,7 @@ export function WebAssistantDialog({
   useEffect(() => {
     if (!isListening) {
       setAudioData(null);
+
       return;
     }
     
@@ -117,16 +120,16 @@ export function WebAssistantDialog({
             await client.disconnect();
           }
         } catch (err) {
-          console.error("Error during cleanup:", err);
+          console.error('Error during cleanup:', err);
           setError(err instanceof Error ? err : new Error(String(err)));
         }
       }
-    }, [client, isConnected])
+    }, [client, isConnected]),
   );
 
   // Reset connecting state when transport state changes
   useEffect(() => {
-    if (isConnected || transportState === "disconnected") {
+    if (isConnected || transportState === 'disconnected') {
       setIsConnecting(false);
     }
   }, [transportState, isConnected]);
@@ -146,10 +149,10 @@ export function WebAssistantDialog({
           // Add initial message from assistant
           setMessages([{
             text: `Hi there! I'm ${assistantName}. How can I help you today?`,
-            sender: 'assistant'
+            sender: 'assistant',
           }]);
         } catch (err) {
-          console.error("Connection error:", err);
+          console.error('Connection error:', err);
           setError(err instanceof Error ? err : new Error(String(err)));
           setIsConnecting(false);
         }
@@ -166,7 +169,7 @@ export function WebAssistantDialog({
           setAudioData([]);
           setError(null);
         } catch (err) {
-          console.error("Disconnection error:", err);
+          console.error('Disconnection error:', err);
           setError(err instanceof Error ? err : new Error(String(err)));
         }
       };
@@ -253,11 +256,11 @@ export function WebAssistantDialog({
               </Button>
               
               <Button
-                variant={isListening ? "destructive" : "default"}
+                variant={isListening ? 'destructive' : 'default'}
                 size="icon"
                 disabled={!isConnected}
                 onClick={toggleRecording}
-                className={isListening ? "bg-red-500 hover:bg-red-600" : "bg-amber-500 hover:bg-amber-600"}
+                className={isListening ? 'bg-red-500 hover:bg-red-600' : 'bg-amber-500 hover:bg-amber-600'}
               >
                 {isListening ? (
                   <MicOff className="h-4 w-4" />

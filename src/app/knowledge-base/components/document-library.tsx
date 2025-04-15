@@ -1,36 +1,38 @@
-"use client"
+'use client';
 
-import { useState, useEffect } from "react"
-import Link from "next/link"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
-import { Download, FileText, Trash2, Zap, FileType, FileSpreadsheet, File, FileCode, Search, Plus } from "lucide-react"
-import { DocumentMetadata, DocumentStorage } from "../api/knowldege-api"
-import { PublishPromptDialog } from "../components/publish-prompt-dialog"
-import { areSimilar } from "@/lib/utils/levenshtein"
-import { useToast } from "../hooks/use-toast"
+import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { Download, FileText, Trash2, Zap, FileType, FileSpreadsheet, File, FileCode, Search, Plus } from 'lucide-react';
+
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { areSimilar } from '@/lib/utils/levenshtein';
+
+import { DocumentMetadata, DocumentStorage } from '../api/knowldege-api';
+import { PublishPromptDialog } from '../components/publish-prompt-dialog';
+import { useToast } from '../hooks/use-toast';
 
 // Helper function to get the appropriate icon based on file type
 const getFileIcon = (fileType: string) => {
   switch (fileType.toLowerCase()) {
-    case 'pdf':
-      return <FileText className="h-5 w-5 text-red-600" />;
-    case 'docx':
-    case 'doc':
-      return <FileType className="h-5 w-5 text-blue-600" />;
-    case 'csv':
-    case 'xlsx':
-    case 'xls':
-      return <FileSpreadsheet className="h-5 w-5 text-green-600" />;
-    case 'txt':
-      return <File className="h-5 w-5 text-slate-600" />;
-    case 'html':
-    case 'json':
-    case 'xml':
-      return <FileCode className="h-5 w-5 text-purple-600" />;
-    default:
-      return <FileText className="h-5 w-5 text-amber-600" />;
+  case 'pdf':
+    return <FileText className="h-5 w-5 text-red-600" />;
+  case 'docx':
+  case 'doc':
+    return <FileType className="h-5 w-5 text-blue-600" />;
+  case 'csv':
+  case 'xlsx':
+  case 'xls':
+    return <FileSpreadsheet className="h-5 w-5 text-green-600" />;
+  case 'txt':
+    return <File className="h-5 w-5 text-slate-600" />;
+  case 'html':
+  case 'json':
+  case 'xml':
+    return <FileCode className="h-5 w-5 text-purple-600" />;
+  default:
+    return <FileText className="h-5 w-5 text-amber-600" />;
   }
 };
 
@@ -38,6 +40,7 @@ const getFileIcon = (fileType: string) => {
 const formatFileSize = (bytes: number): string => {
   if (bytes < 1024) return bytes + ' B';
   if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+
   return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
 };
 
@@ -48,19 +51,20 @@ const formatDate = (dateString: string): string => {
   const diffTime = Math.abs(now.getTime() - date.getTime());
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   
-  if (diffDays === 1) return "1 day ago";
+  if (diffDays === 1) return '1 day ago';
   if (diffDays < 7) return `${diffDays} days ago`;
   if (diffDays < 30) return `${Math.floor(diffDays / 7)} week${Math.floor(diffDays / 7) > 1 ? 's' : ''} ago`;
+
   return date.toLocaleDateString();
 };
 
 export function DocumentLibrary() {
-  const [isPublishOpen, setIsPublishOpen] = useState(false)
-  const [selectedDocument, setSelectedDocument] = useState<DocumentMetadata | null>(null)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [filteredDocuments, setFilteredDocuments] = useState<DocumentMetadata[]>([])
-  const [documents, setDocuments] = useState<DocumentMetadata[]>([])
-  const { toast } = useToast()
+  const [isPublishOpen, setIsPublishOpen] = useState(false);
+  const [selectedDocument, setSelectedDocument] = useState<DocumentMetadata | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filteredDocuments, setFilteredDocuments] = useState<DocumentMetadata[]>([]);
+  const [documents, setDocuments] = useState<DocumentMetadata[]>([]);
+  const { toast } = useToast();
 
   // Load documents from storage when component mounts
   useEffect(() => {
@@ -84,11 +88,13 @@ export function DocumentLibrary() {
   useEffect(() => {
     if (!searchQuery.trim()) {
       setFilteredDocuments(documents);
+
       return;
     }
 
     const filtered = documents.filter(doc => {
       const searchLower = searchQuery.toLowerCase();
+
       return (
         areSimilar(doc.title, searchQuery) ||
         (doc.description && doc.description.toLowerCase().includes(searchLower)) ||
@@ -105,9 +111,9 @@ export function DocumentLibrary() {
   };
 
   const handlePublish = (document: DocumentMetadata) => {
-    setSelectedDocument(document)
-    setIsPublishOpen(true)
-  }
+    setSelectedDocument(document);
+    setIsPublishOpen(true);
+  };
 
   const handleDownload = (document: DocumentMetadata) => {
     try {
@@ -144,17 +150,17 @@ export function DocumentLibrary() {
       }, 0);
       
       toast({
-        title: "Download started",
-        description: `${document.title} is being downloaded.`
+        title: 'Download started',
+        description: `${document.title} is being downloaded.`,
       });
     } catch (error) {
-      console.error("Error downloading document:", error);
+      console.error('Error downloading document:', error);
       toast({
-        title: "Download failed",
-        description: "Failed to download the document. Please try again."
+        title: 'Download failed',
+        description: 'Failed to download the document. Please try again.',
       });
     }
-  }
+  };
   
   const handleDelete = (document: DocumentMetadata) => {
     if (confirm(`Are you sure you want to delete "${document.title}"?`)) {
@@ -165,17 +171,17 @@ export function DocumentLibrary() {
         setFilteredDocuments(prev => prev.filter(doc => doc.id !== document.id));
         
         toast({
-          title: "Document deleted",
-          description: `${document.title} has been removed from your knowledge base.`
+          title: 'Document deleted',
+          description: `${document.title} has been removed from your knowledge base.`,
         });
       } else {
         toast({
-          title: "Deletion failed",
-          description: "Failed to delete the document. Please try again."
+          title: 'Deletion failed',
+          description: 'Failed to delete the document. Please try again.',
         });
       }
     }
-  }
+  };
 
   return (
     <div>
@@ -207,7 +213,7 @@ export function DocumentLibrary() {
               <p className="text-sm text-muted-foreground mb-4">
                 Try adjusting your search query or upload a new document
               </p>
-              <Button variant="outline" onClick={() => setSearchQuery("")}>
+              <Button variant="outline" onClick={() => setSearchQuery('')}>
                 Clear Search
               </Button>
             </>
@@ -239,7 +245,7 @@ export function DocumentLibrary() {
             </thead>
             <tbody>
               {filteredDocuments.map((doc, index) => (
-                <tr key={doc.id} className={index !== filteredDocuments.length - 1 ? "border-b" : ""}>
+                <tr key={doc.id} className={index !== filteredDocuments.length - 1 ? 'border-b' : ''}>
                   <td className="py-3 px-4">
                     <div className="flex items-center gap-3">
                       <div className="rounded-md bg-blue-50 p-2">
@@ -300,5 +306,5 @@ export function DocumentLibrary() {
         />
       )}
     </div>
-  )
+  );
 }

@@ -19,20 +19,20 @@ export default function SentimentAnalysis({ data }) {
   
   // Sample positive topics from call transcripts
   const positiveTopics = [
-    "Product quality",
-    "Customer service",
-    "Ease of use",
-    "Value for money",
-    "Quick resolution"
+    'Product quality',
+    'Customer service',
+    'Ease of use',
+    'Value for money',
+    'Quick resolution',
   ];
   
   // Sample negative topics from call transcripts
   const negativeTopics = [
-    "Billing issues",
-    "Long wait times",
-    "Technical problems",
-    "Confusing interface",
-    "Missing features"
+    'Billing issues',
+    'Long wait times',
+    'Technical problems',
+    'Confusing interface',
+    'Missing features',
   ];
   
   return (

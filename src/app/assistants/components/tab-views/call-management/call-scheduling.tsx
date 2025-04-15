@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Calendar, Clock, Search, Users, ChevronLeft, ChevronRight, X, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+
 import DaySelector from './components/day-selector';
 import MonthCalendar from './components/month-calendar';
 import ScheduleList from './components/schedule-list';
@@ -61,7 +62,7 @@ export default function CallScheduling() {
   // State for selected date range
   const [dateRange, setDateRange] = useState({
     start: new Date(),
-    end: new Date()
+    end: new Date(),
   });
   
   // State for month view
@@ -73,7 +74,7 @@ export default function CallScheduling() {
     time: '09:00',
     days: ['mon', 'wed', 'fri'],
     dateRange: null, // For specific date selections
-    isActive: true
+    isActive: true,
   });
   
   // State for showing contact search popup
@@ -96,10 +97,10 @@ export default function CallScheduling() {
       days: [], 
       dateRange: { 
         start: new Date(new Date().setDate(new Date().getDate() + 2)), 
-        end: new Date(new Date().setDate(new Date().getDate() + 2)) 
+        end: new Date(new Date().setDate(new Date().getDate() + 2)), 
       }, 
-      isActive: true 
-    }
+      isActive: true, 
+    },
   ]);
   
   // Contact list options with colors
@@ -108,7 +109,7 @@ export default function CallScheduling() {
     { id: 'leads', name: 'Leads', color: '#60a5fa', count: 89 },
     { id: 'subscribers', name: 'Subscribers', color: '#c084fc', count: 273 },
     { id: 'partners', name: 'Partners', color: '#f97316', count: 42 },
-    { id: 'inactive', name: 'Inactive Users', color: '#94a3b8', count: 118 }
+    { id: 'inactive', name: 'Inactive Users', color: '#94a3b8', count: 118 },
   ];
   
   // Individual contacts for search
@@ -124,7 +125,7 @@ export default function CallScheduling() {
   const handleFormChange = (field: keyof ScheduleForm, value: any) => {
     setScheduleForm(prev => ({
       ...prev,
-      [field]: value
+      [field]: value,
     }));
   };
   
@@ -142,7 +143,7 @@ export default function CallScheduling() {
       
       return {
         ...prev,
-        days
+        days,
       };
     });
   };
@@ -154,14 +155,14 @@ export default function CallScheduling() {
         ...prev,
         contactList: contact.id,
         contactName: undefined,
-        contactEmail: undefined
+        contactEmail: undefined,
       }));
     } else {
       setScheduleForm(prev => ({
         ...prev,
         contactList: 'individual',
         contactName: contact.name,
-        contactEmail: contact.email
+        contactEmail: contact.email,
       }));
     }
     
@@ -179,7 +180,7 @@ export default function CallScheduling() {
       time: scheduleForm.time,
       days: scheduleForm.days,
       dateRange: scheduleForm.dateRange,
-      isActive: scheduleForm.isActive
+      isActive: scheduleForm.isActive,
     };
     
     setSchedules(prev => [...prev, newSchedule]);
@@ -194,14 +195,14 @@ export default function CallScheduling() {
       time: '09:00',
       days: ['mon', 'wed', 'fri'],
       dateRange: null,
-      isActive: true
+      isActive: true,
     });
   };
   
   // Function to toggle schedule active state
   const toggleScheduleActive = (id: number) => {
     setSchedules(prev => prev.map(schedule => 
-      schedule.id === id ? {...schedule, isActive: !schedule.isActive} : schedule
+      schedule.id === id ? { ...schedule, isActive: !schedule.isActive } : schedule,
     ));
   };
   
@@ -230,14 +231,15 @@ export default function CallScheduling() {
     if (schedule.contactList === 'individual') {
       return {
         name: schedule.contactName,
-        color: '#f43f5e' // Pink for individuals
+        color: '#f43f5e', // Pink for individuals
       };
     }
     
     const contactList = contactLists.find(c => c.id === schedule.contactList);
+
     return {
       name: contactList?.name || 'Unknown',
-      color: contactList?.color || '#9ca3af'
+      color: contactList?.color || '#9ca3af',
     };
   };
   

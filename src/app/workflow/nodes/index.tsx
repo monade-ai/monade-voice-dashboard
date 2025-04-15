@@ -1,4 +1,5 @@
 import { NodeTypes } from 'reactflow';
+
 import { StartNode } from './start-node';
 import { FlowNode } from './flow-node';
 import { EndNode } from './end-node';
@@ -15,7 +16,7 @@ export function registerNodes(): NodeTypes {
     flowNode: FlowNode,
     endNode: EndNode,
     functionNode: FunctionNode,
-    mergeNode: MergeNode
+    mergeNode: MergeNode,
   };
 }
 

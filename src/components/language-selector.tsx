@@ -1,5 +1,7 @@
 'use client';
 
+import { Globe } from 'lucide-react';
+
 import { useLocale } from '@/i18n/useLocale';
 import { localeNames, Locale } from '@/i18n/config';
 import {
@@ -9,7 +11,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
-import { Globe } from 'lucide-react';
 
 export function LanguageSelector() {
   const { locale, changeLocale } = useLocale();

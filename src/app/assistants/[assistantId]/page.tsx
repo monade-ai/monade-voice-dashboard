@@ -1,9 +1,10 @@
 'use client';
 
 import React from 'react';
+
 import AssistantTabs from '../components/assistant-tabs';
-import  CostDisplay  from '../components/cost-display';
-import  AssistantDualButton  from '../components/assistant-dual-button';
+import CostDisplay from '../components/cost-display';
+import AssistantDualButton from '../components/assistant-dual-button';
 
 interface AssistantPageProps {
   params: {

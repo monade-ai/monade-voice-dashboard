@@ -1,9 +1,11 @@
-"use client";
+'use client';
 
 import React, { useState } from 'react';
+
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
+
 import { useContactsContext } from '../contexts/contacts-context';
 
 interface CreateContactListDialogProps {
@@ -19,7 +21,7 @@ const CreateContactListDialog: React.FC<CreateContactListDialogProps> = ({
   initialName = '',
   initialDescription = '',
   isEditing = false,
-  onClose
+  onClose,
 }) => {
   const { createContactList } = useContactsContext();
   const [name, setName] = useState(initialName);
@@ -33,6 +35,7 @@ const CreateContactListDialog: React.FC<CreateContactListDialogProps> = ({
     // Validate name
     if (!name.trim()) {
       setNameError('Name is required');
+
       return;
     }
     

@@ -1,14 +1,16 @@
-"use client"
+'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { CheckCircle2, X, Loader2, AlertTriangle, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { ScrollArea } from '@/components/ui/scroll-area';
+
 import { useContactsContext } from '../contexts/contacts-context';
 
 interface CrmProvider {
@@ -34,7 +36,7 @@ interface ContactImportDialogProps {
 const ContactImportDialog: React.FC<ContactImportDialogProps> = ({
   isOpen,
   onClose,
-  onImportComplete
+  onImportComplete,
 }) => {
   const { selectedList, addContactsToList } = useContactsContext();
   
@@ -46,7 +48,7 @@ const ContactImportDialog: React.FC<ContactImportDialogProps> = ({
   const [availableLists, setAvailableLists] = useState<CrmList[]>([]);
   const [selectedLists, setSelectedLists] = useState<Set<string>>(new Set());
   const [importComplete, setImportComplete] = useState(false);
-  const [importStats, setImportStats] = useState<{total: number, successful: number}>({total: 0, successful: 0});
+  const [importStats, setImportStats] = useState<{total: number, successful: number}>({ total: 0, successful: 0 });
   const [errorMessage, setErrorMessage] = useState('');
   
   // Mock CRM providers with icon paths and descriptions
@@ -56,28 +58,28 @@ const ContactImportDialog: React.FC<ContactImportDialogProps> = ({
       name: 'HubSpot', 
       icon: '/hubspot-logo.svg', 
       connected: false,
-      description: 'Connect to HubSpot to import contacts, companies, and deals directly into your contact lists.'
+      description: 'Connect to HubSpot to import contacts, companies, and deals directly into your contact lists.',
     },
     { 
       id: 'ghl', 
       name: 'Go High Level', 
       icon: '/ghl-logo.svg', 
       connected: false,
-      description: 'Import contacts from Go High Level to streamline your marketing and sales workflows.'
+      description: 'Import contacts from Go High Level to streamline your marketing and sales workflows.',
     },
     { 
       id: 'salesforce', 
       name: 'Salesforce', 
       icon: '/salesforce-logo.svg', 
       connected: false,
-      description: 'Connect your Salesforce account to sync contacts, leads and opportunities.'
+      description: 'Connect your Salesforce account to sync contacts, leads and opportunities.',
     },
     { 
       id: 'mailchimp', 
       name: 'Mailchimp', 
       icon: '/mailchimp-logo.svg', 
       connected: false,
-      description: 'Import subscribers and audience segments from your Mailchimp lists.'
+      description: 'Import subscribers and audience segments from your Mailchimp lists.',
     },
   ];
 
@@ -89,7 +91,7 @@ const ContactImportDialog: React.FC<ContactImportDialogProps> = ({
       setAvailableLists([]);
       setSelectedLists(new Set());
       setImportComplete(false);
-      setImportStats({total: 0, successful: 0});
+      setImportStats({ total: 0, successful: 0 });
       setErrorMessage('');
     }
   }, [isOpen]);
@@ -114,6 +116,7 @@ const ContactImportDialog: React.FC<ContactImportDialogProps> = ({
         setConnectionStatus('failed');
         setErrorMessage('Could not connect to the CRM provider. Please try again.');
         setIsConnecting(false);
+
         return;
       }
       
@@ -166,7 +169,7 @@ const ContactImportDialog: React.FC<ContactImportDialogProps> = ({
             phone: `+1${Math.floor(1000000000 + Math.random() * 9000000000)}`,
             source: list.name,
             email: `contact${index + 1}@example.com`,
-            company: `Company ${Math.floor(Math.random() * 100)}`
+            company: `Company ${Math.floor(Math.random() * 100)}`,
           }));
         });
         
@@ -176,7 +179,7 @@ const ContactImportDialog: React.FC<ContactImportDialogProps> = ({
         setImportComplete(true);
         setImportStats({
           total: importedContacts.length,
-          successful: addedContacts.length
+          successful: addedContacts.length,
         });
         
         if (onImportComplete) {
@@ -335,8 +338,8 @@ const ContactImportDialog: React.FC<ContactImportDialogProps> = ({
                             className={`
                               flex items-center justify-between p-3 rounded-md cursor-pointer border
                               ${selectedLists.has(list.id) 
-                                ? 'border-primary bg-primary/5' 
-                                : 'border-muted-foreground/20 hover:border-muted-foreground/40'}
+                            ? 'border-primary bg-primary/5' 
+                            : 'border-muted-foreground/20 hover:border-muted-foreground/40'}
                             `}
                             onClick={() => toggleListSelection(list.id)}
                           >
@@ -347,8 +350,8 @@ const ContactImportDialog: React.FC<ContactImportDialogProps> = ({
                             <div className={`
                               h-5 w-5 rounded-full border flex items-center justify-center
                               ${selectedLists.has(list.id) 
-                                ? 'bg-primary border-primary text-white' 
-                                : 'border-muted-foreground/50'}
+                            ? 'bg-primary border-primary text-white' 
+                            : 'border-muted-foreground/50'}
                             `}>
                               {selectedLists.has(list.id) && (
                                 <CheckCircle2 className="h-4 w-4" />

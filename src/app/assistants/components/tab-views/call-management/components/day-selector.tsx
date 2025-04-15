@@ -13,7 +13,7 @@ export default function DaySelector({ selectedDays, onDayToggle }) {
     { id: 'wed', label: 'W', fullName: 'Wednesday' },
     { id: 'thu', label: 'T', fullName: 'Thursday' },
     { id: 'fri', label: 'F', fullName: 'Friday' },
-    { id: 'sat', label: 'S', fullName: 'Saturday' }
+    { id: 'sat', label: 'S', fullName: 'Saturday' },
   ];
   
   return (

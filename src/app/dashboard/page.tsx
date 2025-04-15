@@ -5,6 +5,8 @@
 import React, { useState, useEffect, useMemo, useCallback, Suspense } from 'react';
 import { format, subDays } from 'date-fns';
 import dynamic from 'next/dynamic';
+import { RefreshCw } from 'lucide-react';
+
 import { useTranslations } from '@/i18n/translations-context';
 
 // Static imports for essential components
@@ -16,37 +18,37 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { RefreshCw } from 'lucide-react';
+import { formatCurrency, formatDuration, formatNumber } from '@/lib/utils';
+
 import { SectionHeader } from '../../components/section-header';
 
 // Dynamic imports with lazy loading
 const MetricsCard = dynamic(() => import('./components/metrics-card').then(mod => ({ default: mod.MetricsCard })), {
-  loading: () => <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm h-[200px] animate-pulse" />
+  loading: () => <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm h-[200px] animate-pulse" />,
 });
 
 const LineChart = dynamic(() => import('./components/line-chart').then(mod => ({ default: mod.LineChart })), {
   ssr: false,
-  loading: () => <div className="h-64 bg-gray-100 animate-pulse rounded" />
+  loading: () => <div className="h-64 bg-gray-100 animate-pulse rounded" />,
 });
 
 const BarChart = dynamic(() => import('./components/bar-chart').then(mod => ({ default: mod.BarChart })), {
   ssr: false,
-  loading: () => <div className="h-64 bg-gray-100 animate-pulse rounded" />
+  loading: () => <div className="h-64 bg-gray-100 animate-pulse rounded" />,
 });
 
 const DateRangePicker = dynamic(() => import('./components/date-range-picker').then(mod => ({ default: mod.DateRangePicker })), {
-  loading: () => <div className="h-10 w-48 bg-gray-100 animate-pulse rounded" />
+  loading: () => <div className="h-10 w-48 bg-gray-100 animate-pulse rounded" />,
 });
 
 const FailedCallsList = dynamic(() => import('./components/failed-calls-list').then(mod => ({ default: mod.FailedCallsList })), {
-  loading: () => <div className="h-64 bg-gray-100 animate-pulse rounded" />
+  loading: () => <div className="h-64 bg-gray-100 animate-pulse rounded" />,
 });
 
 // Data hook
 import { useDashboardData } from '../hooks/use-dashboard-data';
 
 // Utils
-import { formatCurrency, formatDuration, formatNumber } from '@/lib/utils';
 
 export default function DashboardPage() {
   const { t } = useTranslations();
@@ -76,6 +78,7 @@ export default function DashboardPage() {
       if (parts.length === 3) {
         return `${parts[2]}-${parts[0]}-${parts[1]}`;
       }
+
       return d;
     });
   }, [dateRange]);
@@ -93,13 +96,13 @@ export default function DashboardPage() {
     analysis,
     failedCalls,
     concurrentCalls,
-    refreshData
+    refreshData,
   } = useDashboardData({
     dateFrom,
     dateTo,
     groupBy: groupBy as 'day' | 'week' | 'month',
     assistantId: assistantFilter !== 'all' ? assistantFilter : undefined,
-    useMockData: true // Set to false to use real API
+    useMockData: true, // Set to false to use real API
   });
 
   // Function to handle date range picker changes - memoized callback

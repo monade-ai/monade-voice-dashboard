@@ -25,7 +25,7 @@ export default function MonthCalendar({ month, schedules, selectedRange, onDateS
         date,
         isCurrentMonth: false,
         isSelected: isDateInRange(date, selectedRange),
-        hasSchedule: hasScheduleOnDate(date, schedules)
+        hasSchedule: hasScheduleOnDate(date, schedules),
       });
     }
     
@@ -36,7 +36,7 @@ export default function MonthCalendar({ month, schedules, selectedRange, onDateS
         date,
         isCurrentMonth: true,
         isSelected: isDateInRange(date, selectedRange),
-        hasSchedule: hasScheduleOnDate(date, schedules)
+        hasSchedule: hasScheduleOnDate(date, schedules),
       });
     }
     
@@ -48,7 +48,7 @@ export default function MonthCalendar({ month, schedules, selectedRange, onDateS
         date,
         isCurrentMonth: false,
         isSelected: isDateInRange(date, selectedRange),
-        hasSchedule: hasScheduleOnDate(date, schedules)
+        hasSchedule: hasScheduleOnDate(date, schedules),
       });
     }
     
@@ -69,6 +69,7 @@ export default function MonthCalendar({ month, schedules, selectedRange, onDateS
     }
     
     const endTime = new Date(range.end.getFullYear(), range.end.getMonth(), range.end.getDate()).getTime();
+
     return dateTime >= startTime && dateTime <= endTime;
   }
   
@@ -101,7 +102,7 @@ export default function MonthCalendar({ month, schedules, selectedRange, onDateS
       // Start a new selection
       onDateSelect({
         start: day.date,
-        end: null
+        end: null,
       });
     } else {
       // Complete the selection
@@ -109,12 +110,12 @@ export default function MonthCalendar({ month, schedules, selectedRange, onDateS
       if (day.date < selectedRange.start) {
         onDateSelect({
           start: day.date,
-          end: selectedRange.start
+          end: selectedRange.start,
         });
       } else {
         onDateSelect({
           start: selectedRange.start,
-          end: day.date
+          end: day.date,
         });
       }
     }
@@ -164,10 +165,10 @@ export default function MonthCalendar({ month, schedules, selectedRange, onDateS
                       : selectedRange?.start && selectedRange?.end && 
                         day.date.getTime() > selectedRange.start.getTime() && 
                         day.date.getTime() < selectedRange.end.getTime() 
-                          ? 'text-gray-800 hover:bg-amber-200' 
-                          : day.isCurrentMonth 
-                            ? 'hover:bg-gray-100' 
-                            : 'hover:bg-gray-50'
+                        ? 'text-gray-800 hover:bg-amber-200' 
+                        : day.isCurrentMonth 
+                          ? 'hover:bg-gray-100' 
+                          : 'hover:bg-gray-50'
                   }`}
                 >
                   {/* Background for dates in range but not start/end */}
@@ -187,7 +188,7 @@ export default function MonthCalendar({ month, schedules, selectedRange, onDateS
                         selectedRange?.end && 
                         new Date(day.date.getFullYear(), day.date.getMonth(), day.date.getDate()).getTime() === 
                         new Date(selectedRange.end.getFullYear(), selectedRange.end.getMonth(), selectedRange.end.getDate()).getTime() ? 'bg-amber-600 rounded-r-full' : 
-                        'bg-amber-500'} ${(selectedRange?.start && selectedRange?.end && 
+                          'bg-amber-500'} ${(selectedRange?.start && selectedRange?.end && 
                         new Date(day.date.getFullYear(), day.date.getMonth(), day.date.getDate()).getTime() > 
                         new Date(selectedRange.start.getFullYear(), selectedRange.start.getMonth(), selectedRange.start.getDate()).getTime() && 
                         new Date(day.date.getFullYear(), day.date.getMonth(), day.date.getDate()).getTime() < 

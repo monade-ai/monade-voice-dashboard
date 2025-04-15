@@ -1,6 +1,9 @@
 import { useState } from 'react';
-import { FunctionDefinition } from '../store/workflow-store';
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+
+import { FunctionDefinition } from '../store/workflow-store';
+
 import { JsonEditor } from './json-editor';
 
 interface FunctionEditorProps {
@@ -21,9 +24,9 @@ export function FunctionEditor({ function: funcDef, onChange }: FunctionEditorPr
       description: 'Function description',
       parameters: {
         type: 'object',
-        properties: {}
-      }
-    }
+        properties: {},
+      },
+    },
   };
   
   // Function to validate the function structure

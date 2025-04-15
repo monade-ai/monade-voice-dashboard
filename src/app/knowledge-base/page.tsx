@@ -1,11 +1,13 @@
-'use client'
-import type { Metadata } from "next"
-import Link from "next/link"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { FileText, MessageSquare, PlusCircle, Upload } from "lucide-react"
-import { PromptCarousel } from "./components/prompt-carousel"
-import { DocumentCarousel } from "./components/document-carousel"
+'use client';
+import type { Metadata } from 'next';
+import Link from 'next/link';
+import { FileText, MessageSquare, PlusCircle, Upload } from 'lucide-react';
+
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useTranslations } from '@/i18n/translations-context';
+
+import { PromptCarousel } from './components/prompt-carousel';
+import { DocumentCarousel } from './components/document-carousel';
 
 // export const metadata: Metadata = {
 //   title: "Knowledge Base & Prompt Management",
@@ -14,6 +16,7 @@ import { useTranslations } from '@/i18n/translations-context';
 
 export default function HomePage() {
   const { t } = useTranslations();
+
   return (
     <div className="container mx-auto py-10 px-4 space-y-10">
       <div className="text-center space-y-3 max-w-2xl mx-auto">
@@ -82,5 +85,5 @@ export default function HomePage() {
         </Tabs>
       </div>
     </div>
-  )
+  );
 }

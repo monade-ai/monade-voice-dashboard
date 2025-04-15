@@ -1,5 +1,6 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { FileText, MessageSquare, Users, Zap } from "lucide-react"
+import { FileText, MessageSquare, Users, Zap } from 'lucide-react';
+
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 export function KnowledgeBaseStats() {
   return (
@@ -45,5 +46,5 @@ export function KnowledgeBaseStats() {
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }

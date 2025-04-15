@@ -14,6 +14,7 @@ export default function TimeOfDayChart({ data }) {
   const formatHour = (hour) => {
     const h = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
     const period = hour >= 12 ? 'PM' : 'AM';
+
     return `${h}${period}`;
   };
   
@@ -84,8 +85,8 @@ export default function TimeOfDayChart({ data }) {
             <motion.div 
               className={`w-6 h-12 rounded-md border border-gray-300 mt-2 mb-1 relative group cursor-pointer ${
                 hourData.rate > 0.7 ? 'bg-blue-500/20 border-blue-400' : 
-                hourData.rate > 0.4 ? 'bg-blue-400/20 border-blue-300' : 
-                'bg-blue-300/20 border-blue-200'
+                  hourData.rate > 0.4 ? 'bg-blue-400/20 border-blue-300' : 
+                    'bg-blue-300/20 border-blue-200'
               }`}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -97,8 +98,8 @@ export default function TimeOfDayChart({ data }) {
                 <motion.div
                   className={`absolute bottom-0 left-0 right-0 rounded-sm ${
                     hourData.rate > 0.7 ? 'bg-blue-600' : 
-                    hourData.rate > 0.4 ? 'bg-blue-500' : 
-                    'bg-blue-400'
+                      hourData.rate > 0.4 ? 'bg-blue-500' : 
+                        'bg-blue-400'
                   }`}
                   initial={{ height: 0 }}
                   animate={{ height: `${hourData.rate * 100}%` }}

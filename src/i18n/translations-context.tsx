@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useContext, ReactNode, useState, useEffect } from 'react';
+
 import { Locale, defaultLocale } from './config';
 import enMessages from './messages/en.json';
 import hiMessages from './messages/hi.json';
@@ -52,6 +53,7 @@ export function TranslationsProvider({ children }: { children: ReactNode }) {
     for (const segment of path) {
       if (!value[segment]) {
         console.warn(`Translation key not found: ${key}`);
+
         return key;
       }
       value = value[segment];
@@ -79,5 +81,6 @@ export function useTranslations() {
   if (context === undefined) {
     throw new Error('useTranslations must be used within a TranslationsProvider');
   }
+
   return context;
 }

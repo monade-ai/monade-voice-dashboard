@@ -1,33 +1,34 @@
-import Link from "next/link"
-import { Button } from "@/components/ui/button"
-import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Edit, Trash2 } from "lucide-react"
+import Link from 'next/link';
+import { Edit, Trash2 } from 'lucide-react';
+
+import { Button } from '@/components/ui/button';
+import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 
 export function RecentPrompts() {
   const prompts = [
     {
-      id: "1",
-      title: "Customer Support Assistant",
-      description: "Handles common customer inquiries and provides helpful responses",
-      agents: ["Support Bot"],
-      updatedAt: "2 days ago",
+      id: '1',
+      title: 'Customer Support Assistant',
+      description: 'Handles common customer inquiries and provides helpful responses',
+      agents: ['Support Bot'],
+      updatedAt: '2 days ago',
     },
     {
-      id: "2",
-      title: "Product Recommendation Engine",
-      description: "Suggests products based on customer preferences and browsing history",
-      agents: ["Sales Assistant", "Website Bot"],
-      updatedAt: "1 week ago",
+      id: '2',
+      title: 'Product Recommendation Engine',
+      description: 'Suggests products based on customer preferences and browsing history',
+      agents: ['Sales Assistant', 'Website Bot'],
+      updatedAt: '1 week ago',
     },
     {
-      id: "3",
-      title: "Technical Troubleshooting Guide",
-      description: "Walks users through common technical issues and solutions",
-      agents: ["Support Bot"],
-      updatedAt: "3 days ago",
+      id: '3',
+      title: 'Technical Troubleshooting Guide',
+      description: 'Walks users through common technical issues and solutions',
+      agents: ['Support Bot'],
+      updatedAt: '3 days ago',
     },
-  ]
+  ];
 
   return (
     <div className="space-y-4">
@@ -72,5 +73,5 @@ export function RecentPrompts() {
         </Button>
       </div>
     </div>
-  )
+  );
 }

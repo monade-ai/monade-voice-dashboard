@@ -1,6 +1,6 @@
 // src/app/knowledge-base/api/prompt-editor-integration.ts
 
-import { updateSystemPrompt } from "./knowldege-api"
+import { updateSystemPrompt } from './knowldege-api';
 
 /**
  * Interface for prompt data
@@ -34,6 +34,7 @@ export class PromptManager {
       return JSON.parse(promptsJson) as PromptData[];
     } catch (error) {
       console.error('Error parsing prompts from storage:', error);
+
       return [];
     }
   }
@@ -59,6 +60,7 @@ export class PromptManager {
     }
     
     localStorage.setItem(this.STORAGE_KEY, JSON.stringify(prompts));
+
     return prompt;
   }
 
@@ -67,6 +69,7 @@ export class PromptManager {
    */
   static getPromptById(id: string): PromptData | null {
     const prompts = this.getAllPrompts();
+
     return prompts.find(p => p.id === id) || null;
   }
 
@@ -82,6 +85,7 @@ export class PromptManager {
     }
     
     localStorage.setItem(this.STORAGE_KEY, JSON.stringify(filtered));
+
     return true;
   }
 

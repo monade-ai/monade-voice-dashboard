@@ -1,5 +1,6 @@
 import { memo } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
+
 import { formatActions } from '../utils/helpers';
 import { Message, Action, PipecatNode } from '../store/workflow-store';
 
@@ -12,7 +13,7 @@ export const BaseNode = memo(({
   id, 
   type, 
   sourcePosition = Position.Bottom, 
-  targetPosition = Position.Top 
+  targetPosition = Position.Top, 
 }: NodeProps & { 
   sourcePosition?: Position; 
   targetPosition?: Position;
@@ -22,12 +23,12 @@ export const BaseNode = memo(({
   // Colors for different node types
   const getBackgroundColor = () => {
     switch (type) {
-      case 'startNode': return 'bg-green-400';
-      case 'flowNode': return 'bg-blue-400';
-      case 'endNode': return 'bg-red-400';
-      case 'functionNode': return data.properties.isNodeFunction ? 'bg-orange-400' : 'bg-purple-400';
-      case 'mergeNode': return 'bg-gray-400';
-      default: return 'bg-slate-400';
+    case 'startNode': return 'bg-green-400';
+    case 'flowNode': return 'bg-blue-400';
+    case 'endNode': return 'bg-red-400';
+    case 'functionNode': return data.properties.isNodeFunction ? 'bg-orange-400' : 'bg-purple-400';
+    case 'mergeNode': return 'bg-gray-400';
+    default: return 'bg-slate-400';
     }
   };
 
@@ -68,12 +69,12 @@ export const BaseNode = memo(({
       <div className="text-white text-sm overflow-y-auto max-h-60">
         {/* Role Messages */}
         {properties.role_messages?.map((msg: Message, i: number) => 
-          renderMessage(msg, 'Role Message', i)
+          renderMessage(msg, 'Role Message', i),
         )}
         
         {/* Task Messages */}
         {properties.task_messages?.map((msg: Message, i: number) => 
-          renderMessage(msg, 'Task Message', i)
+          renderMessage(msg, 'Task Message', i),
         )}
         
         {/* Pre-actions */}

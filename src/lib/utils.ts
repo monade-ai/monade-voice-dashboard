@@ -1,7 +1,7 @@
 // app/lib/utils.ts
 
-import { type ClassValue, clsx } from "clsx";
-import { twMerge } from "tailwind-merge";
+import { type ClassValue, clsx } from 'clsx';
+import { twMerge } from 'tailwind-merge';
 
 /**
  * Combines class names using clsx and tailwind-merge
@@ -18,7 +18,7 @@ export function formatCurrency(value: number): string {
     style: 'currency',
     currency: 'INR',
     minimumFractionDigits: 2,
-    maximumFractionDigits: 2
+    maximumFractionDigits: 2,
   }).format(value);
 }
 
@@ -48,6 +48,7 @@ export function formatDuration(minutes: number): string {
  */
 export function truncateText(text: string, maxLength: number): string {
   if (text.length <= maxLength) return text;
+
   return `${text.substring(0, maxLength)}...`;
 }
 
@@ -63,7 +64,7 @@ export function getColorByIndex(index: number): string {
     '#f97316', // orange-500
     '#f43f5e', // rose-500
     '#84cc16', // lime-500
-    '#a855f7'  // purple-500
+    '#a855f7', // purple-500
   ];
   
   return colors[index % colors.length];

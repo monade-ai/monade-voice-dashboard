@@ -16,13 +16,13 @@ export default function ContactSearchPopup({ contactLists, individuals, onSelect
   
   // Filter contacts/lists based on search term
   const filteredLists = contactLists.filter(list => 
-    list.name.toLowerCase().includes(searchTerm.toLowerCase())
+    list.name.toLowerCase().includes(searchTerm.toLowerCase()),
   );
   
   const filteredIndividuals = individuals.filter(contact => 
     contact.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     contact.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (contact.company && contact.company.toLowerCase().includes(searchTerm.toLowerCase()))
+    (contact.company && contact.company.toLowerCase().includes(searchTerm.toLowerCase())),
   );
   
   // Focus the search input when the popup opens
@@ -41,6 +41,7 @@ export default function ContactSearchPopup({ contactLists, individuals, onSelect
     };
     
     window.addEventListener('keydown', handleKeyDown);
+
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };

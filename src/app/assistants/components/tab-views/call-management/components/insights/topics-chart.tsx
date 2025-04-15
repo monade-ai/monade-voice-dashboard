@@ -17,7 +17,7 @@ export default function TopicsChart({ data }) {
     const grouped = {
       positive: data.topics.filter(t => t.sentiment === 'positive'),
       neutral: data.topics.filter(t => t.sentiment === 'neutral'),
-      negative: data.topics.filter(t => t.sentiment === 'negative')
+      negative: data.topics.filter(t => t.sentiment === 'negative'),
     };
     
     // Sort each group by count in descending order
@@ -31,18 +31,18 @@ export default function TopicsChart({ data }) {
   // Get icon for sentiment
   const getSentimentIcon = (sentiment) => {
     switch (sentiment) {
-      case 'positive': return ThumbsUp;
-      case 'negative': return ThumbsDown;
-      default: return Minus;
+    case 'positive': return ThumbsUp;
+    case 'negative': return ThumbsDown;
+    default: return Minus;
     }
   };
   
   // Get color for sentiment
   const getSentimentColor = (sentiment) => {
     switch (sentiment) {
-      case 'positive': return 'green';
-      case 'negative': return 'red';
-      default: return 'gray';
+    case 'positive': return 'green';
+    case 'negative': return 'red';
+    default: return 'gray';
     }
   };
   
@@ -51,7 +51,7 @@ export default function TopicsChart({ data }) {
     'Product features': ['interface', 'functionality', 'design', 'performance', 'speed'],
     'Pricing questions': ['cost', 'subscription', 'discount', 'value', 'plan'],
     'Technical support': ['error', 'bug', 'troubleshoot', 'connection', 'setup'],
-    'Billing issues': ['charge', 'invoice', 'payment', 'refund', 'subscription']
+    'Billing issues': ['charge', 'invoice', 'payment', 'refund', 'subscription'],
   };
   
   return (
@@ -131,7 +131,7 @@ export default function TopicsChart({ data }) {
                   left: `${left}%`,
                   fontSize: `${fontSize}px`,
                   transform: `rotate(${rotation}deg)`,
-                  zIndex: Math.floor(topic.count / 10)
+                  zIndex: Math.floor(topic.count / 10),
                 }}
                 initial={{ opacity: 0, scale: 0 }}
                 animate={{ opacity: 1, scale: 1 }}
@@ -180,7 +180,7 @@ export default function TopicsChart({ data }) {
               
               <div className="mt-3 text-xs text-gray-500">
                 {sentiment === 'positive' ? 'Positive customer sentiment' : 
-                 sentiment === 'negative' ? 'Needs attention' : 'Neutral context'}
+                  sentiment === 'negative' ? 'Needs attention' : 'Neutral context'}
               </div>
             </motion.div>
           );

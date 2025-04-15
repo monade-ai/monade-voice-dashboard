@@ -1,8 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent } from '@/components/ui/card';
-import { CallAssistantDialog } from './call-assistant-dialog';
 import { 
   Plus, 
   Search, 
@@ -17,20 +13,27 @@ import {
   Edit,
   Copy,
   Phone,
-  X
+  X,
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
   DropdownMenuItem, 
   DropdownMenuTrigger,
-  DropdownMenuSeparator
+  DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
-import { motion, AnimatePresence } from 'framer-motion';
-import { useContactsContext } from '../contexts/contacts-context';
+import { Card, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { initiateExotelCall } from '@/lib/services/exotel-service';
 import { useTranslations } from '@/i18n/translations-context';
+
+import { useContactsContext } from '../contexts/contacts-context';
+
+import { CallAssistantDialog } from './call-assistant-dialog';
 
 interface PhoneAssistant {
   id: string;
@@ -41,7 +44,7 @@ interface PhoneAssistant {
 const MOCK_PHONE_ASSISTANTS: PhoneAssistant[] = [
   { id: '1', name: 'Sales Assistant' },
   { id: '2', name: 'Support Assistant' },
-  { id: '3', name: 'Customer Service Assistant' }
+  { id: '3', name: 'Customer Service Assistant' },
 ];
 
 interface ContactListViewProps {
@@ -55,7 +58,7 @@ const ContactListView: React.FC<ContactListViewProps> = ({
   onCreateList,
   onUploadContacts,
   onImportContacts,
-  onCreateContact
+  onCreateContact,
 }) => {
   // Move the hook call inside the component
   const { t } = useTranslations();
@@ -71,7 +74,7 @@ const ContactListView: React.FC<ContactListViewProps> = ({
     removeContactList,
     removeContactFromList,
     searchInCurrentList,
-    clearSearch
+    clearSearch,
   } = useContactsContext();
   
   const [currentPage, setCurrentPage] = useState(1);
@@ -91,6 +94,7 @@ const ContactListView: React.FC<ContactListViewProps> = ({
   useEffect(() => {
     if (!activeCall) {
       setCallDuration(0);
+
       return;
     }
     
@@ -122,12 +126,12 @@ const ContactListView: React.FC<ContactListViewProps> = ({
   // Get current page contacts
   const currentContacts = selectedList 
     ? (searchQuery 
-        ? searchResults 
-        : (contacts[selectedList.id] || [])
-      ).slice(
-        (currentPage - 1) * itemsPerPage,
-        currentPage * itemsPerPage
-      )
+      ? searchResults 
+      : (contacts[selectedList.id] || [])
+    ).slice(
+      (currentPage - 1) * itemsPerPage,
+      currentPage * itemsPerPage,
+    )
     : [];
 
   // Handle search input
@@ -140,7 +144,7 @@ const ContactListView: React.FC<ContactListViewProps> = ({
     return new Intl.DateTimeFormat('en-US', {
       month: 'short',
       day: 'numeric',
-      year: 'numeric'
+      year: 'numeric',
     }).format(date);
   };
 
@@ -245,7 +249,7 @@ const ContactListView: React.FC<ContactListViewProps> = ({
                       initial={newListCreated && index === contactLists.length - 1 ? { scale: 0.9, opacity: 0 } : { scale: 1, opacity: 1 }}
                       animate={{ scale: 1, opacity: 1 }}
                       exit={{ scale: 0.9, opacity: 0 }}
-                      transition={{ type: "spring", duration: 0.5 }}
+                      transition={{ type: 'spring', duration: 0.5 }}
                       layout
                     >
                       <Card 
@@ -553,7 +557,7 @@ const ContactListView: React.FC<ContactListViewProps> = ({
                             return (
                               <Button
                                 key={pageNum}
-                                variant={currentPage === pageNum ? "default" : "outline"}
+                                variant={currentPage === pageNum ? 'default' : 'outline'}
                                 size="sm"
                                 onClick={() => setCurrentPage(pageNum)}
                                 className="w-9"
@@ -635,14 +639,14 @@ const ContactListView: React.FC<ContactListViewProps> = ({
             try {
               const response = await initiateExotelCall({
                 phone_number: phoneNumber,
-                callback_url: "http://my.exotel.com/calllive1/exoml/start_voice/918357"
+                callback_url: 'http://my.exotel.com/calllive1/exoml/start_voice/918357',
               });
 
               clearInterval(timer);
               setCallStatus('connecting');
           
-                setCallStatus('connected');
-                setIsCallInitiating(false);
+              setCallStatus('connected');
+              setIsCallInitiating(false);
               
             } catch (error) {
               clearInterval(timer);

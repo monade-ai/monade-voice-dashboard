@@ -1,9 +1,10 @@
 'use client';
 
 import React from 'react';
+import { Phone, MessageSquare } from 'lucide-react';
+
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Phone, MessageSquare } from 'lucide-react';
 
 interface Assistant {
   id: string;
@@ -29,14 +30,14 @@ export function AssistantCard({ assistant }: AssistantCardProps) {
 
   const getStatusColor = (status: Assistant['status']) => {
     switch (status) {
-      case 'active':
-        return 'bg-green-900/20 border-green-800 text-green-400';
-      case 'inactive':
-        return 'bg-gray-900/20 border-gray-800 text-gray-400';
-      case 'error':
-        return 'bg-red-900/20 border-red-800 text-red-400';
-      default:
-        return 'bg-gray-900/20 border-gray-800 text-gray-400';
+    case 'active':
+      return 'bg-green-900/20 border-green-800 text-green-400';
+    case 'inactive':
+      return 'bg-gray-900/20 border-gray-800 text-gray-400';
+    case 'error':
+      return 'bg-red-900/20 border-red-800 text-red-400';
+    default:
+      return 'bg-gray-900/20 border-gray-800 text-gray-400';
     }
   };
 

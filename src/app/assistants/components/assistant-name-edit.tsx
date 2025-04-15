@@ -1,11 +1,13 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Assistant, useAssistants } from '../../hooks/use-assistants-context';
-import { Input } from '@/components/ui/input';
 import { Check, X, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
+
+import { Input } from '@/components/ui/input';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+
+import { Assistant, useAssistants } from '../../hooks/use-assistants-context';
 
 interface AssistantNameEditProps {
   assistant: Assistant;
@@ -20,7 +22,7 @@ export default function AssistantNameEdit({
   isEditing, 
   onSave, 
   onCancel,
-  showEditButton = false
+  showEditButton = false,
 }: AssistantNameEditProps) {
   const { updateAssistant } = useAssistants();
   const [name, setName] = useState(assistant.name);
@@ -45,20 +47,24 @@ export default function AssistantNameEdit({
   const validateName = (name: string): boolean => {
     if (!name.trim()) {
       setError('Name cannot be empty');
+
       return false;
     }
     
     if (name.trim().length < 3) {
       setError('Name must be at least 3 characters');
+
       return false;
     }
     
     if (name.trim().length > 50) {
       setError('Name must be less than 50 characters');
+
       return false;
     }
     
     setError('');
+
     return true;
   };
 

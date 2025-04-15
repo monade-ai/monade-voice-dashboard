@@ -1,6 +1,7 @@
 'use client';
 
 import { InfoIcon } from 'lucide-react';
+
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface CostDisplayProps {
@@ -16,7 +17,7 @@ export default function CostDisplay({
   totalCost, 
   label = 'Cost', 
   showInfo = true,
-  infoText = 'Estimated cost per minute of usage'
+  infoText = 'Estimated cost per minute of usage',
 }: CostDisplayProps) {
   return (
     <div className="relative w-full p-4 bg-white rounded-lg border border-gray-100">

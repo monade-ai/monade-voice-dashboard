@@ -20,7 +20,7 @@ interface UsePhoneAssistantReturn {
 
 export function usePhoneAssistant({
   assistantId,
-  assistantName
+  assistantName,
 }: UsePhoneAssistantProps): UsePhoneAssistantReturn {
   const [callStatus, setCallStatus] = useState<'idle' | 'initiating' | 'connecting' | 'connected' | 'failed' | 'completed'>('idle');
   const [remainingTime, setRemainingTime] = useState(15);
@@ -30,6 +30,7 @@ export function usePhoneAssistant({
   const startCall = useCallback(async (phoneNumber: string) => {
     if (!phoneNumber) {
       setError(new Error('Phone number is required'));
+
       return;
     }
 
@@ -49,7 +50,7 @@ export function usePhoneAssistant({
       const mockResponse = {
         success: true,
         callId: `call-${Date.now()}`,
-        status: 'connecting'
+        status: 'connecting',
       };
       
       if (mockResponse.success) {
@@ -89,6 +90,6 @@ export function usePhoneAssistant({
     remainingTime,
     startCall,
     endCall,
-    error
+    error,
   };
 }

@@ -15,7 +15,7 @@ export default function CallQualityMetrics({ data }) {
       value: data.audioClarity,
       icon: Volume2,
       color: 'blue',
-      description: 'Voice clarity and absence of background noise'
+      description: 'Voice clarity and absence of background noise',
     },
     {
       id: 'responseTime',
@@ -23,7 +23,7 @@ export default function CallQualityMetrics({ data }) {
       value: data.responseTime,
       icon: Clock,
       color: 'green',
-      description: 'Time taken to respond to customer queries'
+      description: 'Time taken to respond to customer queries',
     },
     {
       id: 'accuracyRate',
@@ -31,7 +31,7 @@ export default function CallQualityMetrics({ data }) {
       value: data.accuracyRate,
       icon: Check,
       color: 'purple',
-      description: 'Correctness of information provided'
+      description: 'Correctness of information provided',
     },
     {
       id: 'naturalConversation',
@@ -39,8 +39,8 @@ export default function CallQualityMetrics({ data }) {
       value: data.naturalConversation,
       icon: MessageSquare,
       color: 'amber',
-      description: 'How natural the conversation flow feels'
-    }
+      description: 'How natural the conversation flow feels',
+    },
   ];
   
   // Sample technical details
@@ -49,7 +49,7 @@ export default function CallQualityMetrics({ data }) {
     { name: 'Packet Loss', value: '0.3%', trend: 'down', isGood: true },
     { name: 'Bandwidth Usage', value: '86kb/s', trend: 'stable', isGood: true },
     { name: 'Background Noise', value: '-42dB', trend: 'down', isGood: true },
-    { name: 'Voice Clarity', value: '96%', trend: 'up', isGood: true }
+    { name: 'Voice Clarity', value: '96%', trend: 'up', isGood: true },
   ];
   
   return (
@@ -131,7 +131,7 @@ export default function CallQualityMetrics({ data }) {
                             bottom: `${currentValue}%`, 
                             left: '50%',
                             marginLeft: -6,
-                            zIndex: 10
+                            zIndex: 10,
                           }}
                           initial={{ opacity: 0, scale: 0 }}
                           animate={{ opacity: 1, scale: 1 }}

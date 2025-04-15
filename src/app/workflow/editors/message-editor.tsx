@@ -1,5 +1,7 @@
-import { Message } from '../store/workflow-store';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+
+import { Message } from '../store/workflow-store';
+
 import { JsonEditor } from './json-editor';
 
 interface MessageEditorProps {
@@ -24,7 +26,7 @@ export function MessageEditor({ title, description, messages, onChange }: Messag
       typeof message === 'object' && 
       message !== null &&
       typeof message.role === 'string' && 
-      typeof message.content === 'string'
+      typeof message.content === 'string',
     );
   };
 
