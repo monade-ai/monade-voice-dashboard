@@ -25,7 +25,7 @@ const contactSchema = z.object({
   name: z.string().min(1, "Name is required"),
   phone: z.string()
     .min(1, "Phone number is required")
-    .refine(validatePhoneNumber, "Phone number must include country code (e.g., +11234567890)")
+    .refine(validatePhoneNumber, "Phone number must include country code (e.g., +91234567890)")
 });
 
 const CreateContact: React.FC<CreateContactProps> = ({ onCancel, onSuccess }) => {

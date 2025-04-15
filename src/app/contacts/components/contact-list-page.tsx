@@ -45,12 +45,12 @@ const ContactListPage: React.FC = () => {
   const mockInitialContacts = {
     'list-1': [
       { id: 'contact-1', name: 'John Smith', phone: '+11234567890' },
-      { id: 'contact-2', name: 'Sarah Johnson', phone: '+11234567891' },
+      { id: 'contact-2', name: 'Amol Derick Soans', phone: '+917795957544' },
       { id: 'contact-3', name: 'Michael Brown', phone: '+11234567892' }
     ],
     'list-2': [
       { id: 'contact-4', name: 'David Wilson', phone: '+11234567893' },
-      { id: 'contact-5', name: 'Emma Davis', phone: '+11234567894' }
+      { id: 'contact-5', name: 'Pintu', phone: '+919939539712' }
     ]
   };
 

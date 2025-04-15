@@ -20,7 +20,7 @@ export async function updateSystemPrompt(base64Content: string): Promise<any> {
       };
       console.log("Payload preview:", JSON.stringify(payload).substring(0, 100) + "...");
       
-      const response = await fetch('https://a0f5-122-171-20-156.ngrok-free.app/update_system_prompt', {
+      const response = await fetch('https://039f-2405-201-d003-d814-fc48-8886-8dad-ad9.ngrok-free.app/update_system_prompt', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

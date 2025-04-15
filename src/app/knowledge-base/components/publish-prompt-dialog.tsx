@@ -179,7 +179,7 @@ export function PublishPromptDialog({
       // The API expects a prompt_base64 field with the base64 string
       // Make sure we're sending exactly in the expected format
       console.log("Sending base64 content to API - first 50 chars:", base64Content.substring(0, 50));
-      const response = await fetch('https://a0f5-122-171-20-156.ngrok-free.app/update_system_prompt', {
+      const response = await fetch('https://039f-2405-201-d003-d814-fc48-8886-8dad-ad9.ngrok-free.app/update_system_prompt', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
