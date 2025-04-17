@@ -7,7 +7,7 @@ import { useContactsContext } from '../contexts/contacts-context';
 import { Contact } from '@/app/hooks/use-contacts';
 import { Label } from '@/components/ui/label';
 import { z } from 'zod';
-import { useTranslation } from 'react-i18next';
+import { useTranslations } from '@/i18n/translations-context';
 
 interface CreateContactProps {
   onCancel: () => void;
