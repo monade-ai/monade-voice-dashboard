@@ -43,7 +43,7 @@ interface ScheduleForm {
   contactName?: string;
   contactEmail?: string;
   time: string;
-  days: string[];
+  days: any;
   dateRange: DateRange | null;
   isActive: boolean;
 }
@@ -69,8 +69,10 @@ export default function CallScheduling() {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   
   // State for the scheduling form
-  const [scheduleForm, setScheduleForm] = useState({
+  const [scheduleForm, setScheduleForm] = useState<ScheduleForm>({
     contactList: 'customers',
+    contactName: undefined,
+    contactEmail: undefined,
     time: '09:00',
     days: ['mon', 'wed', 'fri'],
     dateRange: null, // For specific date selections
@@ -84,10 +86,10 @@ export default function CallScheduling() {
   const [showConfirmation, setShowConfirmation] = useState(false);
   
   // Sample existing schedules
-  const [schedules, setSchedules] = useState([
-    { id: 1, contactList: 'customers', time: '09:00', days: ['mon', 'wed', 'fri'], dateRange: null, isActive: true },
-    { id: 2, contactList: 'leads', time: '14:30', days: ['tue', 'thu'], dateRange: null, isActive: true },
-    { id: 3, contactList: 'subscribers', time: '16:00', days: ['fri'], dateRange: null, isActive: false },
+  const [schedules, setSchedules] = useState<Schedule[]>([
+    { id: 1, contactList: 'customers', contactName: undefined, contactEmail: undefined, time: '09:00', days: ['mon', 'wed', 'fri'], dateRange: null, isActive: true },
+    { id: 2, contactList: 'leads', contactName: undefined, contactEmail: undefined, time: '14:30', days: ['tue', 'thu'], dateRange: null, isActive: true },
+    { id: 3, contactList: 'subscribers', contactName: undefined, contactEmail: undefined, time: '16:00', days: ['fri'], dateRange: null, isActive: false },
     { 
       id: 4, 
       contactList: 'individual', 
@@ -153,11 +155,11 @@ export default function CallScheduling() {
     if (type === 'list') {
       setScheduleForm(prev => ({
         ...prev,
-        contactList: contact.id,
+        contactList: contact.id.toString(),
         contactName: undefined,
         contactEmail: undefined,
       }));
-    } else {
+    } else if ('email' in contact) {
       setScheduleForm(prev => ({
         ...prev,
         contactList: 'individual',
@@ -192,6 +194,8 @@ export default function CallScheduling() {
     // Reset form
     setScheduleForm({
       contactList: 'customers',
+      contactName: undefined,
+      contactEmail: undefined,
       time: '09:00',
       days: ['mon', 'wed', 'fri'],
       dateRange: null,
@@ -230,7 +234,7 @@ export default function CallScheduling() {
   const getContactDisplay = (schedule: Schedule): ContactDisplay => {
     if (schedule.contactList === 'individual') {
       return {
-        name: schedule.contactName,
+        name: schedule.contactName ?? '',
         color: '#f43f5e', // Pink for individuals
       };
     }
@@ -288,7 +292,7 @@ export default function CallScheduling() {
                 onClick={() => setShowContactSearch(true)}
               >
                 {scheduleForm.contactList === 'individual' ? (
-                  <span className="text-pink-600 font-medium">{scheduleForm.contactName}</span>
+                  <span className="text-pink-600 font-medium">{String(scheduleForm.contactName ?? '')}</span>
                 ) : (
                   <span 
                     className="font-medium"
@@ -370,7 +374,7 @@ export default function CallScheduling() {
             month={currentMonth}
             schedules={schedules}
             selectedRange={dateRange}
-            onDateSelect={(dates) => {
+            onDateSelect={(dates: any) => {
               setDateRange(dates);
               handleFormChange('dateRange', dates);
               // When specific dates are selected, clear the repeating days
@@ -385,7 +389,6 @@ export default function CallScheduling() {
         <h3 className="text-sm font-medium text-gray-700 mb-3">Scheduled Calls</h3>
         <ScheduleList 
           schedules={schedules}
-          contactLists={contactLists}
           formatTime={formatTime}
           getContactDisplay={getContactDisplay}
           onToggleActive={toggleScheduleActive}

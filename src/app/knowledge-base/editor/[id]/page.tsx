@@ -11,14 +11,8 @@ export const metadata: Metadata = {
   description: 'Edit an existing prompt for your AI agents',
 };
 
-interface EditorPageProps {
-  params: {
-    id: string
-  }
-}
-
-export default function EditorPage({ params }: EditorPageProps) {
-  const { id } = params;
+export default async function EditorPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   
   return (
     <div className="container mx-auto py-10 px-4 max-w-4xl">

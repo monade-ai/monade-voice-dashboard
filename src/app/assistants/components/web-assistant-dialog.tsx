@@ -166,7 +166,7 @@ export function WebAssistantDialog({
           await client.disconnect();
           setMessages([]);
           setIsListening(false);
-          setAudioData([]);
+          setAudioData(null);
           setError(null);
         } catch (err) {
           console.error('Disconnection error:', err);

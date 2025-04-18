@@ -137,15 +137,15 @@ export function DocumentLibrary() {
       
       // Create download link
       const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
+      const a = window.document.createElement('a');
       a.href = url;
       a.download = document.title;
-      document.body.appendChild(a);
+      window.document.body.appendChild(a);
       a.click();
       
       // Cleanup
       setTimeout(() => {
-        document.body.removeChild(a);
+        window.document.body.removeChild(a);
         URL.revokeObjectURL(url);
       }, 0);
       

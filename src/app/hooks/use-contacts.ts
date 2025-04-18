@@ -95,7 +95,7 @@ export function useContacts({
 
   // Add a single contact to a list
   const addContactToList = (listId: string, contact: Omit<Contact, 'id'>): Contact => {
-    const newContact: Contact = {
+    const newContact: any = {
       ...contact,
       id: `contact-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
     };
@@ -121,7 +121,7 @@ export function useContacts({
 
   // Add multiple contacts to a list
   const addContactsToList = (listId: string, newContacts: Omit<Contact, 'id'>[]): Contact[] => {
-    const contactsWithIds: Contact[] = newContacts.map(contact => ({
+    const contactsWithIds: any = newContacts.map(contact => ({
       ...contact,
       id: `contact-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
     }));

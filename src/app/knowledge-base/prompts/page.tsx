@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 
-import { PromptLibrary } from '@/components/prompt-library';
+import { PromptLibrary } from '../components/prompt-library';
 
 export const metadata: Metadata = {
   title: 'Prompt Library | Knowledge Base & Prompt Management',

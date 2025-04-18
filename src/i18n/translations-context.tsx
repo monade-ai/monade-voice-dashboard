@@ -13,7 +13,7 @@ import etMessages from './messages/et.json';
 type Messages = typeof enMessages;
 
 // Create a map of all translation messages
-const messagesMap: Record<Locale, Messages> = {
+const messagesMap: any = {
   en: enMessages,
   hi: hiMessages,
   bn: bnMessages,

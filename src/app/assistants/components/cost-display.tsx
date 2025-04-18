@@ -6,7 +6,6 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 
 interface CostDisplayProps {
   costPerMinute: number;
-  totalCost: number;
   label?: string;
   showInfo?: boolean;
   infoText?: string;
@@ -14,7 +13,6 @@ interface CostDisplayProps {
 
 export default function CostDisplay({ 
   costPerMinute,
-  totalCost, 
   label = 'Cost', 
   showInfo = true,
   infoText = 'Estimated cost per minute of usage',

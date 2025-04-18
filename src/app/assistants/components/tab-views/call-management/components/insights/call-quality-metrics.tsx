@@ -6,7 +6,7 @@ import { motion } from 'framer-motion';
 /**
  * Component to display call quality metrics
  */
-export default function CallQualityMetrics({ data }) {
+export default function CallQualityMetrics({ data }: { data: any }) {
   // Quality metrics with icons and descriptions
   const metrics = [
     {

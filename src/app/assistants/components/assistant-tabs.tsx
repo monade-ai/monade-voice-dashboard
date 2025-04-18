@@ -49,7 +49,7 @@ export default function AssistantTabs() {
     <div className="flex flex-col space-y-6">
       {/* Metrics display (Cost and Latency) */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <CostDisplay costPerMinute={currentAssistant.costPerMin || 0.11} totalCost={currentAssistant.totalCost || 0} />
+        <CostDisplay costPerMinute={currentAssistant.costPerMin || 0.11} />
         
         <div className="relative w-full p-4 bg-white rounded-lg border border-gray-100">
           <div className="flex items-center justify-between mb-2">

@@ -117,6 +117,7 @@ export function createFlowFromConfig(flowConfig: any): { nodes: PipecatNode[], e
           position: { x: 0, y: 0 }, // Will be set by the layout algorithm
           data: {
             properties: {
+              task_messages: [],
               function: { ...funcConfig.function },
               isNodeFunction: false, // Will be updated when edges are created
             },
@@ -172,7 +173,7 @@ export function createFlowFromConfig(flowConfig: any): { nodes: PipecatNode[], e
               },
               label: `Merge to ${targetName}`,
               nodeType: 'mergeNode',
-              inputCount: functions.length,
+             
             },
           };
           

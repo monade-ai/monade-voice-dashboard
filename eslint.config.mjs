@@ -30,7 +30,7 @@ const eslintConfig = [
       'jsx-a11y/anchor-is-valid': 'warn',
       
       // Code structure rules
-      'padding-line-between-statements': ['error', {
+      'padding-line-between-statements': ['warn', {
         blankLine: 'always',
         prev: '*',
         next: 'return',

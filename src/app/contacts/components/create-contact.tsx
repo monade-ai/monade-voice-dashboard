@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { z } from 'zod';
-import { useTranslation } from 'react-i18next';
+import { useTranslations } from '@/i18n/translations-context';
 
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -32,7 +32,7 @@ const contactSchema = z.object({
 });
 
 const CreateContact: React.FC<CreateContactProps> = ({ onCancel, onSuccess }) => {
-  const { t } = useTranslation();
+  const { t } = useTranslations();
   const { selectedList, addContactToList } = useContactsContext();
   
   // Form state
