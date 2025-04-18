@@ -1,17 +1,17 @@
-"use client";
+'use client';
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
-import { FcGoogle } from "react-icons/fc";
-import { AiOutlineMail, AiOutlineLock } from "react-icons/ai";
-import Image from "next/image";
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { FcGoogle } from 'react-icons/fc';
+import { AiOutlineMail, AiOutlineLock } from 'react-icons/ai';
+import Image from 'next/image';
 
 export default function SignupPage() {
   const router = useRouter();
   const supabase = createClientComponentClient();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -19,7 +19,7 @@ export default function SignupPage() {
     const checkUserSession = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        router.push("/dashboard"); 
+        router.push('/dashboard'); 
       }
     };
   
@@ -38,7 +38,7 @@ export default function SignupPage() {
     if (error) {
       setError(error.message);
     } else {
-      router.push("/dashboard"); 
+      router.push('/dashboard'); 
     }
   };
 
@@ -47,7 +47,7 @@ export default function SignupPage() {
     setError(null);
   
     const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
+      provider: 'google',
       options: {
         redirectTo: `${window.location.origin}/auth/callback`, 
       },
@@ -75,7 +75,7 @@ export default function SignupPage() {
           className="flex items-center justify-center w-80 bg-white border border-gray-300 text-black font-semibold py-2 rounded shadow-md hover:bg-gray-100 mb-3"
         >
           <FcGoogle className="w-5 h-5 mr-2" />
-          {loading ? "Signing up..." : "Sign Up with Google"}
+          {loading ? 'Signing up...' : 'Sign Up with Google'}
         </button>
 
         <div className="w-80 text-center text-gray-500 my-2">OR</div>
@@ -109,14 +109,14 @@ export default function SignupPage() {
             disabled={loading}
             className="w-full bg-green-600 text-white font-semibold py-2 rounded hover:bg-green-700"
           >
-            {loading ? "Signing up..." : "Sign Up"}
+            {loading ? 'Signing up...' : 'Sign Up'}
           </button>
         </form>
 
         {/* Redirect to Login */}
         <div className="text-center mt-4">
           <p className="text-gray-600">
-            Already have an account?{" "}
+            Already have an account?{' '}
             <a href="/auth/login" className="text-blue-600"><u>Sign In</u></a>
           </p>
         </div>
@@ -127,13 +127,13 @@ export default function SignupPage() {
       {/* Right Side - Image */}
       <div className="hidden md:flex w-1/2 items-center justify-center bg-blue-600 text-white p-6 relative">
         <Image
-            src="/side_image.png" 
-            alt="Illustration"
-            width={500}  
-            height={500}
-            className="w-3/4"
+          src="/side_image.png" 
+          alt="Illustration"
+          width={500}  
+          height={500}
+          className="w-3/4"
         />
-    </div>
+      </div>
     </div>
   );
 }

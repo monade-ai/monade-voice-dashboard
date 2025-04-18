@@ -1,15 +1,17 @@
-import type { Metadata } from "next"
-import Link from "next/link"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Home, Search, Upload } from "lucide-react"
-import { DocumentLibrary } from "../components/document-library"
+import type { Metadata } from 'next';
+import Link from 'next/link';
+import { Home, Search, Upload } from 'lucide-react';
+
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+
+import { DocumentLibrary } from '../components/document-library';
 
 export const metadata: Metadata = {
-  title: "Document Library | Knowledge Base & Prompt Management",
-  description: "Browse and manage your knowledge base documents",
-}
+  title: 'Document Library | Knowledge Base & Prompt Management',
+  description: 'Browse and manage your knowledge base documents',
+};
 
 export default function DocumentsPage() {
   return (
@@ -45,5 +47,5 @@ export default function DocumentsPage() {
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }

@@ -1,5 +1,6 @@
 import { memo } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
+
 import { BaseNode } from './base-node';
 
 /**
@@ -9,7 +10,7 @@ export const EndNode = memo((props: NodeProps) => {
   const nodeData = {
     ...props.data,
     sourceHandle: null,
-    targetHandle: 'in'
+    targetHandle: 'in',
   };
   
   return (

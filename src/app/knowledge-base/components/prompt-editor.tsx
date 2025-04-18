@@ -1,20 +1,15 @@
-"use client"
+'use client';
 
-import { useState, useCallback, useEffect } from "react"
-import { useEditor, EditorContent, BubbleMenu } from "@tiptap/react"
-import StarterKit from "@tiptap/starter-kit"
-import Placeholder from "@tiptap/extension-placeholder"
-import Underline from "@tiptap/extension-underline"
-import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight"
-import { common, createLowlight } from "lowlight"
-const lowlight = createLowlight(common)
-import Link from "@tiptap/extension-link"
-import { Markdown } from "tiptap-markdown"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardHeader } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { useState, useCallback, useEffect } from 'react';
+import { useEditor, EditorContent, BubbleMenu } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
+import Placeholder from '@tiptap/extension-placeholder';
+import Underline from '@tiptap/extension-underline';
+import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
+import { common, createLowlight } from 'lowlight';
+const lowlight = createLowlight(common);
+import Link from '@tiptap/extension-link';
+import { Markdown } from 'tiptap-markdown';
 import { 
   Bold, 
   Italic, 
@@ -38,38 +33,45 @@ import {
   Check,
   X,
   Strikethrough,
-  Loader2
-} from "lucide-react"
-import { PublishPromptDialog } from "../components/publish-prompt-dialog"
-import { Separator } from "@/components/ui/separator"
+  Loader2,
+} from 'lucide-react';
+import { v4 as uuidv4 } from 'uuid';
+
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Separator } from '@/components/ui/separator';
 import { 
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger, 
-} from "@/components/ui/tooltip"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { PromptData, PromptManager } from "../api/prompt-editor-integration"
-import { v4 as uuidv4 } from "uuid"
-import { useToast } from "../hooks/use-toast"
+} from '@/components/ui/tooltip';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+
+import { PublishPromptDialog } from '../components/publish-prompt-dialog';
+import { PromptData, PromptManager } from '../api/prompt-editor-integration';
+import { useToast } from '../hooks/use-toast';
 
 interface PromptEditorProps {
   promptId?: string;
 }
 
 export function PromptEditor({ promptId }: PromptEditorProps) {
-  const [isPublishOpen, setIsPublishOpen] = useState(false)
-  const [promptTitle, setPromptTitle] = useState("")
-  const [promptDescription, setPromptDescription] = useState("")
-  const [isAIEnhancing, setIsAIEnhancing] = useState(false)
-  const [isMarkdownVisible, setIsMarkdownVisible] = useState(false)
-  const [markdownContent, setMarkdownContent] = useState("")
-  const [linkUrl, setLinkUrl] = useState("")
-  const [linkPopoverOpen, setLinkPopoverOpen] = useState(false)
-  const [isLoading, setIsLoading] = useState(promptId ? true : false)
-  const [isSaving, setIsSaving] = useState(false)
-  const [currentPrompt, setCurrentPrompt] = useState<PromptData | null>(null)
-  const { toast } = useToast()
+  const [isPublishOpen, setIsPublishOpen] = useState(false);
+  const [promptTitle, setPromptTitle] = useState('');
+  const [promptDescription, setPromptDescription] = useState('');
+  const [isAIEnhancing, setIsAIEnhancing] = useState(false);
+  const [isMarkdownVisible, setIsMarkdownVisible] = useState(false);
+  const [markdownContent, setMarkdownContent] = useState('');
+  const [linkUrl, setLinkUrl] = useState('');
+  const [linkPopoverOpen, setLinkPopoverOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(promptId ? true : false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [currentPrompt, setCurrentPrompt] = useState<PromptData | null>(null);
+  const { toast } = useToast();
   
   const editor = useEditor({
     extensions: [
@@ -79,7 +81,7 @@ export function PromptEditor({ promptId }: PromptEditorProps) {
         },
       }),
       Placeholder.configure({
-        placeholder: "Write your prompt here...",
+        placeholder: 'Write your prompt here...',
       }),
       Underline,
       CodeBlockLowlight.configure({
@@ -94,10 +96,10 @@ export function PromptEditor({ promptId }: PromptEditorProps) {
         transformPastedText: true,
       }),
     ],
-    content: "",
+    content: '',
     editorProps: {
       attributes: {
-        class: "min-h-[300px] p-4 border rounded-md focus:outline-none prose prose-sm max-w-none",
+        class: 'min-h-[300px] p-4 border rounded-md focus:outline-none prose prose-sm max-w-none',
       },
     },
     onUpdate: ({ editor }) => {
@@ -105,7 +107,7 @@ export function PromptEditor({ promptId }: PromptEditorProps) {
       const markdown = editor.storage.markdown.getMarkdown();
       setMarkdownContent(markdown);
     },
-  })
+  });
 
   // Load prompt data if promptId is provided
   useEffect(() => {
@@ -119,33 +121,33 @@ export function PromptEditor({ promptId }: PromptEditorProps) {
         if (savedPrompt) {
           // Existing prompt found in storage
           setPromptTitle(savedPrompt.title);
-          setPromptDescription(savedPrompt.description || "");
+          setPromptDescription(savedPrompt.description || '');
           editor.commands.setContent(savedPrompt.content);
           setCurrentPrompt(savedPrompt);
         } else {
           // If not in storage, check sample prompts by id
           const samplePrompts = [
             {
-              id: "1",
-              title: "Customer Support Assistant",
-              description: "Handles common customer inquiries and provides helpful responses",
-              content: "# Customer Support Assistant\n\nYou are a helpful customer support assistant. Your goal is to provide clear, concise answers to customer questions and resolve their issues efficiently.\n\n## Guidelines\n\n- Be polite and professional at all times\n- Ask clarifying questions when needed\n- Provide step-by-step instructions for technical issues\n- Offer alternative solutions when possible",
+              id: '1',
+              title: 'Customer Support Assistant',
+              description: 'Handles common customer inquiries and provides helpful responses',
+              content: '# Customer Support Assistant\n\nYou are a helpful customer support assistant. Your goal is to provide clear, concise answers to customer questions and resolve their issues efficiently.\n\n## Guidelines\n\n- Be polite and professional at all times\n- Ask clarifying questions when needed\n- Provide step-by-step instructions for technical issues\n- Offer alternative solutions when possible',
               createdAt: new Date().toISOString(),
               updatedAt: new Date().toISOString(),
             },
             {
-              id: "2",
-              title: "Product Recommendation Engine",
-              description: "Suggests products based on customer preferences and browsing history",
-              content: "# Product Recommendation Engine\n\nYou are a product recommendation assistant. Your goal is to help customers find products that match their needs and preferences.\n\n## Guidelines\n\n- Ask about customer preferences and requirements\n- Consider budget constraints\n- Highlight key features and benefits\n- Compare similar products when relevant",
+              id: '2',
+              title: 'Product Recommendation Engine',
+              description: 'Suggests products based on customer preferences and browsing history',
+              content: '# Product Recommendation Engine\n\nYou are a product recommendation assistant. Your goal is to help customers find products that match their needs and preferences.\n\n## Guidelines\n\n- Ask about customer preferences and requirements\n- Consider budget constraints\n- Highlight key features and benefits\n- Compare similar products when relevant',
               createdAt: new Date().toISOString(),
               updatedAt: new Date().toISOString(),
             },
             {
-              id: "3",
-              title: "Technical Troubleshooting Guide",
-              description: "Walks users through common technical issues and solutions",
-              content: "# Technical Troubleshooting Guide\n\nYou are a technical support specialist. Your goal is to help users diagnose and resolve technical issues with our products.\n\n## Guidelines\n\n- Start with basic troubleshooting steps\n- Ask for error messages and system information\n- Provide clear, step-by-step instructions\n- Escalate complex issues when necessary",
+              id: '3',
+              title: 'Technical Troubleshooting Guide',
+              description: 'Walks users through common technical issues and solutions',
+              content: '# Technical Troubleshooting Guide\n\nYou are a technical support specialist. Your goal is to help users diagnose and resolve technical issues with our products.\n\n## Guidelines\n\n- Start with basic troubleshooting steps\n- Ask for error messages and system information\n- Provide clear, step-by-step instructions\n- Escalate complex issues when necessary',
               createdAt: new Date().toISOString(),
               updatedAt: new Date().toISOString(),
             },
@@ -164,17 +166,17 @@ export function PromptEditor({ promptId }: PromptEditorProps) {
           } else {
             // Neither found - create new
             toast({
-              title: "Prompt not found",
-              description: "Creating a new prompt instead."
+              title: 'Prompt not found',
+              description: 'Creating a new prompt instead.',
             });
             
             // Create a new empty prompt with this ID
             const newPrompt: PromptData = {
               id: promptId,
-              title: "New Prompt",
-              content: "# Write your prompt here\n\nThis is a new prompt template. Replace this text with your instructions for the AI assistant.",
+              title: 'New Prompt',
+              content: '# Write your prompt here\n\nThis is a new prompt template. Replace this text with your instructions for the AI assistant.',
               createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString()
+              updatedAt: new Date().toISOString(),
             };
             
             setPromptTitle(newPrompt.title);
@@ -186,10 +188,10 @@ export function PromptEditor({ promptId }: PromptEditorProps) {
           }
         }
       } catch (error) {
-        console.error("Error loading prompt:", error);
+        console.error('Error loading prompt:', error);
         toast({
-          title: "Error loading prompt",
-          description: "There was an error loading the prompt data."
+          title: 'Error loading prompt',
+          description: 'There was an error loading the prompt data.',
         });
       } finally {
         setIsLoading(false);
@@ -203,10 +205,10 @@ export function PromptEditor({ promptId }: PromptEditorProps) {
       // Create a new prompt with a unique ID
       const newPrompt: PromptData = {
         id: uuidv4(),
-        title: "New Prompt",
-        content: "# Write your prompt here\n\nThis is a new prompt template. Replace this text with your instructions for the AI assistant.",
+        title: 'New Prompt',
+        content: '# Write your prompt here\n\nThis is a new prompt template. Replace this text with your instructions for the AI assistant.',
         createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+        updatedAt: new Date().toISOString(),
       };
       
       setPromptTitle(newPrompt.title);
@@ -226,7 +228,7 @@ export function PromptEditor({ promptId }: PromptEditorProps) {
       const currentContent = editor.getHTML();
       
       // Enhance with some additional text
-      const enhancedText = " [AI enhanced this prompt with additional context and examples to improve clarity and effectiveness] ";
+      const enhancedText = ' [AI enhanced this prompt with additional context and examples to improve clarity and effectiveness] ';
       
       // Insert at cursor position or at the end
       editor.commands.insertContent(enhancedText);
@@ -234,11 +236,11 @@ export function PromptEditor({ promptId }: PromptEditorProps) {
       setIsAIEnhancing(false);
       
       toast({
-        title: "AI Enhancement Complete",
-        description: "Your prompt has been enhanced with additional context."
+        title: 'AI Enhancement Complete',
+        description: 'Your prompt has been enhanced with additional context.',
       });
     }, 1500);
-  }
+  };
 
   const handleUploadFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!editor || !e.target.files || !e.target.files[0]) return;
@@ -261,38 +263,38 @@ export function PromptEditor({ promptId }: PromptEditorProps) {
       }
       
       // Update the title if it's still the default
-      if (promptTitle === "New Prompt") {
+      if (promptTitle === 'New Prompt') {
         // Remove file extension for the title
-        const titleWithoutExtension = file.name.replace(/\.[^/.]+$/, "");
+        const titleWithoutExtension = file.name.replace(/\.[^/.]+$/, '');
         setPromptTitle(titleWithoutExtension);
       }
       
       toast({
-        title: "File loaded",
-        description: `${file.name} has been loaded into the editor.`
+        title: 'File loaded',
+        description: `${file.name} has been loaded into the editor.`,
       });
     };
 
     reader.readAsText(file);
-  }
+  };
 
   const downloadMarkdown = useCallback(() => {
     if (!editor) return;
     
     const markdown = editor.storage.markdown.getMarkdown();
-    const blob = new Blob([markdown], { type: "text/markdown" });
+    const blob = new Blob([markdown], { type: 'text/markdown' });
     const url = URL.createObjectURL(blob);
     
-    const a = document.createElement("a");
+    const a = document.createElement('a');
     a.href = url;
-    a.download = `${promptTitle || "prompt"}.md`;
+    a.download = `${promptTitle || 'prompt'}.md`;
     a.click();
     
     URL.revokeObjectURL(url);
     
     toast({
-      title: "Download started",
-      description: `${promptTitle || "prompt"}.md is being downloaded.`
+      title: 'Download started',
+      description: `${promptTitle || 'prompt'}.md is being downloaded.`,
     });
   }, [editor, promptTitle, toast]);
 
@@ -321,7 +323,7 @@ export function PromptEditor({ promptId }: PromptEditorProps) {
         .run();
     }
     
-    setLinkUrl("");
+    setLinkUrl('');
     setLinkPopoverOpen(false);
   }, [editor, linkUrl]);
 
@@ -340,7 +342,7 @@ export function PromptEditor({ promptId }: PromptEditorProps) {
         title: promptTitle,
         description: promptDescription,
         content: content,
-        updatedAt: new Date().toISOString()
+        updatedAt: new Date().toISOString(),
       };
       
       // Save to storage
@@ -350,14 +352,14 @@ export function PromptEditor({ promptId }: PromptEditorProps) {
       setCurrentPrompt(updatedPrompt);
       
       toast({
-        title: "Prompt saved",
-        description: "Your prompt has been saved successfully."
+        title: 'Prompt saved',
+        description: 'Your prompt has been saved successfully.',
       });
     } catch (error) {
-      console.error("Error saving prompt:", error);
+      console.error('Error saving prompt:', error);
       toast({
-        title: "Save failed",
-        description: "There was an error saving your prompt."
+        title: 'Save failed',
+        description: 'There was an error saving your prompt.',
       });
     } finally {
       setIsSaving(false);
@@ -421,7 +423,7 @@ export function PromptEditor({ promptId }: PromptEditorProps) {
                             variant="ghost"
                             size="icon"
                             onClick={() => editor?.chain().focus().toggleBold().run()}
-                            className={editor?.isActive("bold") ? "bg-muted" : ""}
+                            className={editor?.isActive('bold') ? 'bg-muted' : ''}
                           >
                             <Bold className="h-4 w-4" />
                           </Button>
@@ -435,7 +437,7 @@ export function PromptEditor({ promptId }: PromptEditorProps) {
                             variant="ghost"
                             size="icon"
                             onClick={() => editor?.chain().focus().toggleItalic().run()}
-                            className={editor?.isActive("italic") ? "bg-muted" : ""}
+                            className={editor?.isActive('italic') ? 'bg-muted' : ''}
                           >
                             <Italic className="h-4 w-4" />
                           </Button>
@@ -449,7 +451,7 @@ export function PromptEditor({ promptId }: PromptEditorProps) {
                             variant="ghost"
                             size="icon"
                             onClick={() => editor?.chain().focus().toggleUnderline().run()}
-                            className={editor?.isActive("underline") ? "bg-muted" : ""}
+                            className={editor?.isActive('underline') ? 'bg-muted' : ''}
                           >
                             <UnderlineIcon className="h-4 w-4" />
                           </Button>
@@ -463,7 +465,7 @@ export function PromptEditor({ promptId }: PromptEditorProps) {
                             variant="ghost"
                             size="icon"
                             onClick={() => editor?.chain().focus().toggleStrike().run()}
-                            className={editor?.isActive("strike") ? "bg-muted" : ""}
+                            className={editor?.isActive('strike') ? 'bg-muted' : ''}
                           >
                             <Strikethrough className="h-4 w-4" />
                           </Button>
@@ -482,7 +484,7 @@ export function PromptEditor({ promptId }: PromptEditorProps) {
                             variant="ghost"
                             size="sm"
                             onClick={() => editor?.chain().focus().toggleHeading({ level: 1 }).run()}
-                            className={editor?.isActive("heading", { level: 1 }) ? "bg-muted" : ""}
+                            className={editor?.isActive('heading', { level: 1 }) ? 'bg-muted' : ''}
                           >
                             H1
                           </Button>
@@ -496,7 +498,7 @@ export function PromptEditor({ promptId }: PromptEditorProps) {
                             variant="ghost"
                             size="sm"
                             onClick={() => editor?.chain().focus().toggleHeading({ level: 2 }).run()}
-                            className={editor?.isActive("heading", { level: 2 }) ? "bg-muted" : ""}
+                            className={editor?.isActive('heading', { level: 2 }) ? 'bg-muted' : ''}
                           >
                             H2
                           </Button>
@@ -510,7 +512,7 @@ export function PromptEditor({ promptId }: PromptEditorProps) {
                             variant="ghost"
                             size="sm"
                             onClick={() => editor?.chain().focus().toggleHeading({ level: 3 }).run()}
-                            className={editor?.isActive("heading", { level: 3 }) ? "bg-muted" : ""}
+                            className={editor?.isActive('heading', { level: 3 }) ? 'bg-muted' : ''}
                           >
                             H3
                           </Button>
@@ -529,7 +531,7 @@ export function PromptEditor({ promptId }: PromptEditorProps) {
                             variant="ghost"
                             size="icon"
                             onClick={() => editor?.chain().focus().toggleBulletList().run()}
-                            className={editor?.isActive("bulletList") ? "bg-muted" : ""}
+                            className={editor?.isActive('bulletList') ? 'bg-muted' : ''}
                           >
                             <List className="h-4 w-4" />
                           </Button>
@@ -543,7 +545,7 @@ export function PromptEditor({ promptId }: PromptEditorProps) {
                             variant="ghost"
                             size="icon"
                             onClick={() => editor?.chain().focus().toggleOrderedList().run()}
-                            className={editor?.isActive("orderedList") ? "bg-muted" : ""}
+                            className={editor?.isActive('orderedList') ? 'bg-muted' : ''}
                           >
                             <ListOrdered className="h-4 w-4" />
                           </Button>
@@ -562,7 +564,7 @@ export function PromptEditor({ promptId }: PromptEditorProps) {
                             variant="ghost"
                             size="icon"
                             onClick={() => editor?.chain().focus().toggleBlockquote().run()}
-                            className={editor?.isActive("blockquote") ? "bg-muted" : ""}
+                            className={editor?.isActive('blockquote') ? 'bg-muted' : ''}
                           >
                             <Quote className="h-4 w-4" />
                           </Button>
@@ -576,7 +578,7 @@ export function PromptEditor({ promptId }: PromptEditorProps) {
                             variant="ghost"
                             size="icon"
                             onClick={() => editor?.chain().focus().toggleCodeBlock().run()}
-                            className={editor?.isActive("codeBlock") ? "bg-muted" : ""}
+                            className={editor?.isActive('codeBlock') ? 'bg-muted' : ''}
                           >
                             <CodeSquare className="h-4 w-4" />
                           </Button>
@@ -590,7 +592,7 @@ export function PromptEditor({ promptId }: PromptEditorProps) {
                             variant="ghost"
                             size="icon"
                             onClick={() => editor?.chain().focus().toggleCode().run()}
-                            className={editor?.isActive("code") ? "bg-muted" : ""}
+                            className={editor?.isActive('code') ? 'bg-muted' : ''}
                           >
                             <Code className="h-4 w-4" />
                           </Button>
@@ -611,7 +613,7 @@ export function PromptEditor({ promptId }: PromptEditorProps) {
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  className={editor?.isActive("link") ? "bg-muted" : ""}
+                                  className={editor?.isActive('link') ? 'bg-muted' : ''}
                                 >
                                   <LinkIcon className="h-4 w-4" />
                                 </Button>
@@ -772,7 +774,7 @@ export function PromptEditor({ promptId }: PromptEditorProps) {
                 <Button
                   variant="outline"
                   className="mt-4"
-                  onClick={() => document.getElementById("prompt-file-upload")?.click()}
+                  onClick={() => document.getElementById('prompt-file-upload')?.click()}
                 >
                   Select File
                 </Button>
@@ -795,7 +797,7 @@ export function PromptEditor({ promptId }: PromptEditorProps) {
                 </div>
                 
                 <div className="border rounded-md p-4 bg-gray-50 min-h-[300px] font-mono text-sm whitespace-pre-wrap overflow-auto">
-                  {markdownContent || "*No content yet*"}
+                  {markdownContent || '*No content yet*'}
                 </div>
               </div>
             </TabsContent>
@@ -838,9 +840,9 @@ export function PromptEditor({ promptId }: PromptEditorProps) {
         promptTitle={promptTitle}
         documentContent={currentPrompt ? {
           title: currentPrompt.title,
-          markdown: currentPrompt.content
+          markdown: currentPrompt.content,
         } : null}
       />
     </div>
-  )
+  );
 }

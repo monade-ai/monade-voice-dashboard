@@ -10,7 +10,7 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
-  Cell
+  Cell,
 } from 'recharts';
 
 interface BarChartProps {
@@ -31,7 +31,7 @@ export const BarChart = memo(function BarChart({
   color,
   formatY,
   formatX,
-  showLegend = false
+  showLegend = false,
 }: BarChartProps) {
   // Memoize the formatted data to prevent recalculation on every render
   const formattedData = useMemo(() => {
@@ -40,7 +40,7 @@ export const BarChart = memo(function BarChart({
       // Format date if it's a string date
       [xKey]: typeof item[xKey] === 'string' && item[xKey].includes('-') 
         ? new Date(item[xKey]) 
-        : item[xKey]
+        : item[xKey],
     }));
   }, [data, xKey]);
 
@@ -49,6 +49,7 @@ export const BarChart = memo(function BarChart({
     if (Array.isArray(yKey)) {
       return yKey.map((key, index) => {
         const barColor = Array.isArray(color) ? color[index % color.length] : color;
+
         return (
           <Bar 
             key={key} 
@@ -69,6 +70,7 @@ export const BarChart = memo(function BarChart({
             const barColor = Array.isArray(color) 
               ? color[index % color.length] 
               : color;
+
             return <Cell key={`cell-${index}`} fill={barColor} />;
           })}
         </Bar>
@@ -104,7 +106,7 @@ export const BarChart = memo(function BarChart({
             backgroundColor: 'white', 
             borderRadius: '6px',
             border: '1px solid #e5e7eb',
-            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
           }}
         />
         

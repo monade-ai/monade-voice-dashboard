@@ -1,21 +1,19 @@
-'use client';
+import React, { use } from 'react';
+import AssistantLayoutClient from './AssistantLayoutClient';
 
-import React from 'react';
+export type AssistantParams = Promise<{ assistantId: string }>;
 
-interface AssistantLayoutProps {
+export default function AssistantLayout({
+  children,
+  params,
+}: {
   children: React.ReactNode;
-  params: {
-    assistantId: string;
-  };
-}
-
-export default function AssistantLayout({ children, params }: AssistantLayoutProps) {
+  params: AssistantParams;
+}) {
+  const { assistantId } = use(params);
   return (
-    <div className="container mx-auto">
-      {/* Layout wrapper for assistant pages */}
-      <div className="min-h-screen bg-gray-50">
-        {children}
-      </div>
-    </div>
+    <AssistantLayoutClient assistantId={assistantId}>
+      {children}
+    </AssistantLayoutClient>
   );
 }

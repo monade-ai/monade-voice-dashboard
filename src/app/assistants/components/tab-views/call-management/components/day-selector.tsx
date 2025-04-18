@@ -2,10 +2,17 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 
+type DayId = 'sun' | 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat';
+
+interface DaySelectorProps {
+  selectedDays: any;
+  onDayToggle: (day: any) => void;
+}
+
 /**
  * Android-style day selector component with circular toggles
  */
-export default function DaySelector({ selectedDays, onDayToggle }) {
+export default function DaySelector({ selectedDays, onDayToggle }: DaySelectorProps) {
   const weekDays = [
     { id: 'sun', label: 'S', fullName: 'Sunday' },
     { id: 'mon', label: 'M', fullName: 'Monday' },
@@ -13,7 +20,7 @@ export default function DaySelector({ selectedDays, onDayToggle }) {
     { id: 'wed', label: 'W', fullName: 'Wednesday' },
     { id: 'thu', label: 'T', fullName: 'Thursday' },
     { id: 'fri', label: 'F', fullName: 'Friday' },
-    { id: 'sat', label: 'S', fullName: 'Saturday' }
+    { id: 'sat', label: 'S', fullName: 'Saturday' },
   ];
   
   return (

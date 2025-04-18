@@ -10,14 +10,17 @@ import {
   Volume2,
   Trash2,
   Calendar,
-  BarChart3
+  BarChart3,
 } from 'lucide-react';
+
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
+
 import { useAssistants } from '../../hooks/use-assistants-context';
+import DeleteConfirmationModal from '../delete-confirmation-modal';
+
 import CostDisplay from './cost-display';
 import ModelTab from './tab-views/model-tab';
-import { Button } from '@/components/ui/button';
-import DeleteConfirmationModal from '../delete-confirmation-modal';
 
 // Import the new components for call management
 import CallScheduling from './tab-views/call-management/call-scheduling';
@@ -46,7 +49,7 @@ export default function AssistantTabs() {
     <div className="flex flex-col space-y-6">
       {/* Metrics display (Cost and Latency) */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <CostDisplay costPerMinute={currentAssistant.costPerMin || 0.11} totalCost={currentAssistant.totalCost || 0} />
+        <CostDisplay costPerMinute={currentAssistant.costPerMin || 0.11} />
         
         <div className="relative w-full p-4 bg-white rounded-lg border border-gray-100">
           <div className="flex items-center justify-between mb-2">

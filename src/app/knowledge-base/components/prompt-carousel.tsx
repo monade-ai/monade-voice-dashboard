@@ -1,98 +1,101 @@
-"use client"
+'use client';
 
-import { useState, useRef, useEffect } from "react"
-import Link from "next/link"
-import { useTranslations } from "@/i18n/translations-context"
-import { Button } from "@/components/ui/button"
-import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { ChevronLeft, ChevronRight, Edit, Trash2, Zap } from "lucide-react"
-import { cn } from "@/lib/utils"
-import { PublishPromptDialog } from "../components/publish-prompt-dialog"
-import { Badge } from "@/components/ui/badge"
+import { useState, useRef, useEffect } from 'react';
+import Link from 'next/link';
+import { ChevronLeft, ChevronRight, Edit, Trash2, Zap } from 'lucide-react';
+
+import { useTranslations } from '@/i18n/translations-context';
+import { Button } from '@/components/ui/button';
+import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { cn } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge';
+
+import { PublishPromptDialog } from '../components/publish-prompt-dialog';
 
 export function PromptCarousel() {
   const { t } = useTranslations();
-  const [currentIndex, setCurrentIndex] = useState(0)
-  const [isPublishOpen, setIsPublishOpen] = useState(false)
-  const [selectedPrompt, setSelectedPrompt] = useState<any>(null)
-  const containerRef = useRef<HTMLDivElement>(null)
-  const [visibleCards, setVisibleCards] = useState(3)
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [isPublishOpen, setIsPublishOpen] = useState(false);
+  const [selectedPrompt, setSelectedPrompt] = useState<any>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [visibleCards, setVisibleCards] = useState(3);
   const [prompts, setPrompts] = useState([
     
     {
-      id: "1",
-      title: t("promptCarousel.customerSupportAssistant"),
-      description: t("promptCarousel.handlesCommonCustomerInquiries"),
-      agents: [t("promptCarousel.supportBot")],
-      updatedAt: "2 days ago",
+      id: '1',
+      title: t('promptCarousel.customerSupportAssistant'),
+      description: t('promptCarousel.handlesCommonCustomerInquiries'),
+      agents: [t('promptCarousel.supportBot')],
+      updatedAt: '2 days ago',
     },
     {
-      id: "2",
-      title: t("promptCarousel.productRecommendationEngine"),
-      description: t("promptCarousel.suggestsProductsBasedOnCustomer"),
-      agents: [t("promptCarousel.salesAssistant"), t("promptCarousel.websiteBot")],
-      updatedAt: "1 week ago",
+      id: '2',
+      title: t('promptCarousel.productRecommendationEngine'),
+      description: t('promptCarousel.suggestsProductsBasedOnCustomer'),
+      agents: [t('promptCarousel.salesAssistant'), t('promptCarousel.websiteBot')],
+      updatedAt: '1 week ago',
     },
     {
-      id: "3",
-      title: t("promptCarousel.technicalTroubleshootingGuide"),
-      description: t("promptCarousel.walksUsersThroughCommonTechnical"),
-      agents: [t("promptCarousel.supportBot")],
-      updatedAt: "3 days ago",
+      id: '3',
+      title: t('promptCarousel.technicalTroubleshootingGuide'),
+      description: t('promptCarousel.walksUsersThroughCommonTechnical'),
+      agents: [t('promptCarousel.supportBot')],
+      updatedAt: '3 days ago',
     },
     {
-      id: "4",
-      title: t("promptCarousel.onboardingSequence"),
-      description: t("promptCarousel.guidesNewUsersThroughProduct"),
-      agents: [t("promptCarousel.websiteBot")],
-      updatedAt: "5 days ago",
+      id: '4',
+      title: t('promptCarousel.onboardingSequence'),
+      description: t('promptCarousel.guidesNewUsersThroughProduct'),
+      agents: [t('promptCarousel.websiteBot')],
+      updatedAt: '5 days ago',
     },
     {
-      id: "5",
-      title: t("promptCarousel.featureAnnouncement"),
-      description: t("promptCarousel.introducesUsersToNewProduct"),
+      id: '5',
+      title: t('promptCarousel.featureAnnouncement'),
+      description: t('promptCarousel.introducesUsersToNewProduct'),
       agents: [],
-      updatedAt: "1 day ago",
-    }
-  ])
+      updatedAt: '1 day ago',
+    },
+  ]);
   
   const handleDelete = (promptId: string) => {
     // Remove the prompt from the prompts array
     const updatedPrompts = prompts.filter(prompt => prompt.id !== promptId);
     setPrompts(updatedPrompts);
-  }
+  };
   
   useEffect(() => {
 
     const updateVisibleCards = () => {
       if (window.innerWidth < 640) {
-        setVisibleCards(1)
+        setVisibleCards(1);
       } else if (window.innerWidth < 1024) {
-        setVisibleCards(2)
+        setVisibleCards(2);
       } else {
-        setVisibleCards(3)
+        setVisibleCards(3);
       }
-    }
+    };
 
-    updateVisibleCards()
-    window.addEventListener("resize", updateVisibleCards)
-    return () => window.removeEventListener("resize", updateVisibleCards)
-  }, [])
+    updateVisibleCards();
+    window.addEventListener('resize', updateVisibleCards);
 
-  const maxIndex = Math.max(0, prompts.length - visibleCards)
+    return () => window.removeEventListener('resize', updateVisibleCards);
+  }, []);
+
+  const maxIndex = Math.max(0, prompts.length - visibleCards);
 
   const handlePrev = () => {
-    setCurrentIndex((prev) => Math.max(0, prev - 1))
-  }
+    setCurrentIndex((prev) => Math.max(0, prev - 1));
+  };
 
   const handleNext = () => {
-    setCurrentIndex((prev) => Math.min(maxIndex, prev + 1))
-  }
+    setCurrentIndex((prev) => Math.min(maxIndex, prev + 1));
+  };
 
   const handlePublish = (prompt: any) => {
-    setSelectedPrompt(prompt)
-    setIsPublishOpen(true)
-  }
+    setSelectedPrompt(prompt);
+    setIsPublishOpen(true);
+  };
 
   return (
     <div className="relative">
@@ -103,7 +106,7 @@ export function PromptCarousel() {
           style={{ transform: `translateX(-${currentIndex * (100 / visibleCards)}%)` }}
         >
           {prompts.map((prompt) => (
-            <div key={prompt.id} className={cn("px-2 transition-opacity duration-300", `w-full sm:w-1/2 lg:w-1/3`)}>
+            <div key={prompt.id} className={cn('px-2 transition-opacity duration-300', 'w-full sm:w-1/2 lg:w-1/3')}>
               <Card className="h-full transform transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
                 <CardHeader className="pb-2">
                   <div>
@@ -132,7 +135,7 @@ export function PromptCarousel() {
                   </div>
                 </CardHeader>
                 <CardFooter className="flex justify-between border-t h-[44px] py-2 mt-1">
-                  <div className="text-[10px] text-muted-foreground">{t("promptCarousel.updated")} {prompt.updatedAt}</div>
+                  <div className="text-[10px] text-muted-foreground">{t('promptCarousel.updated')} {prompt.updatedAt}</div>
                   <div className="flex gap-1">
                     <Button
                       variant="ghost"
@@ -175,15 +178,15 @@ export function PromptCarousel() {
           onClick={handlePrev}
           disabled={currentIndex === 0}
           className={cn(
-            "rounded-full transition-opacity",
-            currentIndex === 0 ? "opacity-50 cursor-not-allowed" : "hover:bg-amber-50",
+            'rounded-full transition-opacity',
+            currentIndex === 0 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-amber-50',
           )}
         >
           <ChevronLeft className="h-5 w-5" />
         </Button>
 
         <Button variant="outline" asChild className="rounded-full px-6">
-          <Link href="/knowledge-base/prompts">{t("promptCarousel.viewAllPrompts")}</Link>
+          <Link href="/knowledge-base/prompts">{t('promptCarousel.viewAllPrompts')}</Link>
         </Button>
 
         <Button
@@ -192,8 +195,8 @@ export function PromptCarousel() {
           onClick={handleNext}
           disabled={currentIndex >= maxIndex}
           className={cn(
-            "rounded-full transition-opacity",
-            currentIndex >= maxIndex ? "opacity-50 cursor-not-allowed" : "hover:bg-amber-50",
+            'rounded-full transition-opacity',
+            currentIndex >= maxIndex ? 'opacity-50 cursor-not-allowed' : 'hover:bg-amber-50',
           )}
         >
           <ChevronRight className="h-5 w-5" />
@@ -204,5 +207,5 @@ export function PromptCarousel() {
         <PublishPromptDialog open={isPublishOpen} onOpenChange={setIsPublishOpen} promptTitle={selectedPrompt.title} />
       )}
     </div>
-  )
+  );
 }

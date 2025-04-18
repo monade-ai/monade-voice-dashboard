@@ -1,13 +1,16 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Upload, X, AlertTriangle, FileSpreadsheet, Download, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useContactsContext } from '../contexts/contacts-context';
 import Papa from 'papaparse';
+
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
+
+import { useContactsContext } from '../contexts/contacts-context';
+
 // Sample data to show in the preview
 const sampleData = [
   { name: 'John Doe', phone: '+11234567890' },
@@ -24,7 +27,7 @@ interface ContactUploadDialogProps {
 const ContactUploadDialog: React.FC<ContactUploadDialogProps> = ({
   isOpen,
   onClose,
-  onUploadComplete
+  onUploadComplete,
 }) => {
   const { selectedList, addContactsToList } = useContactsContext();
   
@@ -79,17 +82,17 @@ const ContactUploadDialog: React.FC<ContactUploadDialogProps> = ({
   
         // Pre-select name and phone headers if they exist
         const newSelectedHeaders = new Set<string>();
-        if (fileHeaders.includes("name")) newSelectedHeaders.add("name");
-        if (fileHeaders.includes("phone")) newSelectedHeaders.add("phone");
+        if (fileHeaders.includes('name')) newSelectedHeaders.add('name');
+        if (fileHeaders.includes('phone')) newSelectedHeaders.add('phone');
   
         setSelectedHeaders(newSelectedHeaders);
         setParsedData(results.data);
-        setUploadStatus("success");
+        setUploadStatus('success');
       },
       error: (error) => {
         setErrorMessage(`Error parsing file: ${error.message}`);
         setUploadStatus('error');
-      }
+      },
     });
   };
 
@@ -116,6 +119,7 @@ const ContactUploadDialog: React.FC<ContactUploadDialogProps> = ({
   
   const validatePhoneNumber = (phone: string): boolean => {
     const normalizedPhone = normalizePhoneNumber(phone);
+
     // Validate for international format with a country code (e.g., +916760625387)
     return /^\+[1-9]\d{1,14}$/.test(normalizedPhone);
   };
@@ -126,7 +130,7 @@ const ContactUploadDialog: React.FC<ContactUploadDialogProps> = ({
   
     // Trim header names to avoid whitespace issues
     const processedData = parsedData.map(row => {
-      console.log("Before Mapping - Row:", row);
+      console.log('Before Mapping - Row:', row);
       
       const newRow: Record<string, any> = {};
       
@@ -135,19 +139,19 @@ const ContactUploadDialog: React.FC<ContactUploadDialogProps> = ({
     
         // 🔥 Ensure row keys are also trimmed
         const matchingKey = Object.keys(row).find(
-          key => key.trim().toLowerCase() === trimmedHeader.toLowerCase()
+          key => key.trim().toLowerCase() === trimmedHeader.toLowerCase(),
         );
     
         if (matchingKey) {
           newRow[trimmedHeader] = row[matchingKey]; // Use the correct key
         }
     
-        console.log("After Mapping - NewRow:", newRow);
+        console.log('After Mapping - NewRow:', newRow);
       });
     
       return newRow;
     }).filter(row => {
-      console.log("Filtered Row:", row); // Debugging output
+      console.log('Filtered Row:', row); // Debugging output
     
       // Ensure both name and phone exist and phone is valid
       return row.name && row.phone && validatePhoneNumber(row.phone);
@@ -155,8 +159,9 @@ const ContactUploadDialog: React.FC<ContactUploadDialogProps> = ({
   
     if (processedData.length === 0) {
       setErrorMessage(
-        "No valid contacts found. Ensure phone numbers include country code (e.g., +11234567890)"
+        'No valid contacts found. Ensure phone numbers include country code (e.g., +11234567890)',
       );
+
       return;
     }
   
@@ -180,8 +185,8 @@ const ContactUploadDialog: React.FC<ContactUploadDialogProps> = ({
   // Download sample file
   const downloadSample = () => {
     const csvContent = Papa.unparse({
-      fields: ["name", "phone"],
-      data: sampleData
+      fields: ['name', 'phone'],
+      data: sampleData,
     });
     
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -250,7 +255,7 @@ const ContactUploadDialog: React.FC<ContactUploadDialogProps> = ({
                           key={i}
                           initial={{ opacity: 1 }}
                           animate={{ opacity: 1 - (i * 0.3) }}
-                          className={i === sampleData.length - 1 ? "opacity-30" : ""}
+                          className={i === sampleData.length - 1 ? 'opacity-30' : ''}
                         >
                           <td className="p-2 border-t">{row.name}</td>
                           <td className="p-2 border-t">{row.phone}</td>
@@ -338,7 +343,7 @@ const ContactUploadDialog: React.FC<ContactUploadDialogProps> = ({
                         {headers.map(header => (
                           <Badge
                             key={header}
-                            variant={selectedHeaders.has(header) ? "default" : "outline"}
+                            variant={selectedHeaders.has(header) ? 'default' : 'outline'}
                             className={`cursor-pointer ${
                               selectedHeaders.has(header) 
                                 ? 'bg-primary' 

@@ -26,7 +26,7 @@ export function levenshteinDistance(str1: string, str2: string): number {
         dp[i][j] = Math.min(
           dp[i - 1][j] + 1, // deletion
           dp[i][j - 1] + 1, // insertion
-          dp[i - 1][j - 1] + 1 // substitution
+          dp[i - 1][j - 1] + 1, // substitution
         );
       }
     }
@@ -44,5 +44,6 @@ export function levenshteinDistance(str1: string, str2: string): number {
  */
 export function areSimilar(str1: string, str2: string, threshold: number = 3): boolean {
   const distance = levenshteinDistance(str1.toLowerCase(), str2.toLowerCase());
+
   return distance <= threshold;
 }

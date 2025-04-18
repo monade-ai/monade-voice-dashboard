@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { Mic, MicOff, Loader2 } from 'lucide-react';
+
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -43,6 +44,7 @@ export function AIVoiceInput({
     // If we're not active, try to activate
     if (!isActive) {
       onChange(true);
+
       return;
     }
     
@@ -66,35 +68,35 @@ export function AIVoiceInput({
     // Loading state when active but not yet ready
     if (isActive && !isRecording) {
       return {
-        variant: "outline" as const,
+        variant: 'outline' as const,
         icon: <Loader2 className="h-4 w-4 animate-spin" />,
-        className: "bg-slate-100 hover:bg-slate-200 border-slate-200"
+        className: 'bg-slate-100 hover:bg-slate-200 border-slate-200',
       };
     }
     
     // Recording state
     if (isRecording) {
       return {
-        variant: "destructive" as const,
+        variant: 'destructive' as const,
         icon: <MicOff className="h-4 w-4" />,
         className: `bg-red-500 hover:bg-red-600 ${
-          isAnimating && demoMode ? "ring-4 ring-red-200" : ""
-        }`
+          isAnimating && demoMode ? 'ring-4 ring-red-200' : ''
+        }`,
       };
     }
     
     // Default state
     return {
-      variant: "default" as const,
+      variant: 'default' as const,
       icon: <Mic className="h-4 w-4" />,
-      className: "bg-amber-500 hover:bg-amber-600"
+      className: 'bg-amber-500 hover:bg-amber-600',
     };
   };
 
   const { variant, icon, className: buttonClassName } = getButtonAppearance();
 
   return (
-    <div className={cn("relative", className)}>
+    <div className={cn('relative', className)}>
       <Button
         variant={variant}
         size="icon"

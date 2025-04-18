@@ -1,11 +1,13 @@
 'use client';
 
 import { useState } from 'react';
+import { AlertTriangle } from 'lucide-react';
+
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+
 import { useAssistants } from '../hooks/use-assistants-context';
-import { AlertTriangle } from 'lucide-react';
 
 interface DeleteConfirmationModalProps {
   isOpen: boolean;
@@ -20,11 +22,13 @@ export default function DeleteConfirmationModal({ isOpen, onClose }: DeleteConfi
   const handleDelete = () => {
     if (!currentAssistant) {
       onClose();
+
       return;
     }
 
     if (confirmationText !== currentAssistant.name) {
       setError(`Please enter the assistant name "${currentAssistant.name}" to confirm deletion`);
+
       return;
     }
 

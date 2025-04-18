@@ -2,6 +2,7 @@
 import React, { useState, useEffect, FC } from 'react';
 import { BarChart3, Zap, Calendar, Users, Clock, ThumbsUp, ThumbsDown, Volume2, MessageSquare, Mic, Headphones, Phone, PhoneOff, ArrowUp, ArrowDown, Filter } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+
 import SentimentAnalysis from './components/insights/sentiment-analysis';
 import DisconnectReasons from './components/insights/disconnect-reasons';
 import CallQualityMetrics from './components/insights/call-quality-metrics';
@@ -140,7 +141,7 @@ const CallInsights: FC = () => {
     { id: 'sentiment', label: 'Call Sentiment', icon: ThumbsUp, color: 'amber' },
     { id: 'disconnect', label: 'Disconnect Reasons', icon: PhoneOff, color: 'red' },
     { id: 'quality', label: 'Call Quality', icon: Volume2, color: 'blue' },
-    { id: 'topics', label: 'Common Topics', icon: MessageSquare, color: 'amber' }
+    { id: 'topics', label: 'Common Topics', icon: MessageSquare, color: 'amber' },
   ]);
   
   // State for selected insight (expanded view)
@@ -163,7 +164,7 @@ const CallInsights: FC = () => {
     { hour: 18, rate: 0.7, volume: 30 },
     { hour: 19, rate: 0.5, volume: 20 },
     { hour: 20, rate: 0.4, volume: 15 },
-    { hour: 21, rate: 0.3, volume: 8 }
+    { hour: 21, rate: 0.3, volume: 8 },
   ];
   
   // Sample sentiment data
@@ -178,8 +179,8 @@ const CallInsights: FC = () => {
       { date: '2023-04-04', positive: 58, neutral: 30, negative: 12 },
       { date: '2023-04-05', positive: 63, neutral: 27, negative: 10 },
       { date: '2023-04-06', positive: 66, neutral: 24, negative: 10 },
-      { date: '2023-04-07', positive: 68, neutral: 22, negative: 10 }
-    ]
+      { date: '2023-04-07', positive: 68, neutral: 22, negative: 10 },
+    ],
   };
   
   // Sample disconnect reasons data
@@ -190,8 +191,8 @@ const CallInsights: FC = () => {
       { reason: 'Call transferred', count: 32, percentage: 25 },
       { reason: 'Issue resolved', count: 26, percentage: 20.3 },
       { reason: 'Technical error', count: 12, percentage: 9.4 },
-      { reason: 'Schedule follow-up', count: 10, percentage: 7.8 }
-    ]
+      { reason: 'Schedule follow-up', count: 10, percentage: 7.8 },
+    ],
   };
   
   // Sample call quality metrics
@@ -207,8 +208,8 @@ const CallInsights: FC = () => {
       { date: '2023-04-04', audioClarity: 86, responseTime: 91, accuracyRate: 93, naturalConversation: 84 },
       { date: '2023-04-05', audioClarity: 86, responseTime: 91, accuracyRate: 94, naturalConversation: 85 },
       { date: '2023-04-06', audioClarity: 87, responseTime: 92, accuracyRate: 94, naturalConversation: 85 },
-      { date: '2023-04-07', audioClarity: 87, responseTime: 92, accuracyRate: 94, naturalConversation: 85 }
-    ]
+      { date: '2023-04-07', audioClarity: 87, responseTime: 92, accuracyRate: 94, naturalConversation: 85 },
+    ],
   };
   
   // Sample topics data
@@ -221,15 +222,15 @@ const CallInsights: FC = () => {
       { topic: 'Upgrade options', count: 38, sentiment: 'positive' },
       { topic: 'Account setup', count: 32, sentiment: 'neutral' },
       { topic: 'Cancellation', count: 28, sentiment: 'negative' },
-      { topic: 'Positive feedback', count: 24, sentiment: 'positive' }
-    ]
+      { topic: 'Positive feedback', count: 24, sentiment: 'positive' },
+    ],
   };
   
   // Time filter options
   const timeFilterOptions = [
     { id: '7days', label: 'Last 7 days' },
     { id: '30days', label: 'Last 30 days' },
-    { id: '90days', label: 'Last 90 days' }
+    { id: '90days', label: 'Last 90 days' },
   ];
   
   // Toggle insight selection
@@ -251,7 +252,7 @@ const CallInsights: FC = () => {
     
     return {
       time: `${hour}:00 ${period}`,
-      rate: Math.round(bestHourData.rate * 100)
+      rate: Math.round(bestHourData.rate * 100),
     };
   };
   
@@ -259,7 +260,7 @@ const CallInsights: FC = () => {
   const getRecommendedDays = () => {
     return {
       days: 'Tue - Thu',
-      improvement: '15%'
+      improvement: '15%',
     };
   };
   
@@ -267,7 +268,7 @@ const CallInsights: FC = () => {
   const getContactListInsights = () => {
     return [
       { list: 'Leads', bestTime: 'mornings' },
-      { list: 'Customers', bestTime: 'afternoons' }
+      { list: 'Customers', bestTime: 'afternoons' },
     ];
   };
   
@@ -473,8 +474,8 @@ const CallInsights: FC = () => {
                             <span 
                               className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
                                 topic.sentiment === 'positive' ? 'bg-green-100 text-green-700 border border-green-200' :
-                                topic.sentiment === 'neutral' ? 'bg-gray-100 text-gray-700 border border-gray-200' :
-                                'bg-red-100 text-red-700 border border-red-200'
+                                  topic.sentiment === 'neutral' ? 'bg-gray-100 text-gray-700 border border-gray-200' :
+                                    'bg-red-100 text-red-700 border border-red-200'
                               }`}
                             >
                               {topic.count}
@@ -498,6 +499,6 @@ const CallInsights: FC = () => {
       </div>
     </div>
   );
-}
+};
 
-export default CallInsights
+export default CallInsights;

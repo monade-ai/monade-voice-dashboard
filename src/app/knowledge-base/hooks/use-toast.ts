@@ -1,6 +1,6 @@
-"use client"
+'use client';
 
-import { toast as sonnerToast } from "sonner"
+import { toast as sonnerToast } from 'sonner';
 
 type ToastProps = {
   title?: string
@@ -18,14 +18,14 @@ function toast(props: ToastProps) {
       label: props.action.label,
       onClick: props.action.onClick,
     } : undefined,
-  })
+  });
 }
 
 function useToast() {
   return {
     toast,
     dismiss: sonnerToast.dismiss,
-  }
+  };
 }
 
-export { useToast, toast }
+export { useToast, toast };

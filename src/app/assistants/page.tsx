@@ -1,10 +1,13 @@
 'use client';
 
 import { Suspense } from 'react';
+
+import { Card } from '@/components/ui/card';
+
 import { AssistantsProvider } from '../hooks/use-assistants-context';
+
 import AssistantsHeader from './components/assistants-header';
 import AssistantTabs from './components/assistant-tabs';
-import { Card } from '@/components/ui/card';
 
 export default function AssistantsPage() {
   return (

@@ -1,17 +1,17 @@
-"use client";
+'use client';
 
-import { useRouter } from "next/navigation";
-import { useState, useEffect } from "react";
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
-import { FcGoogle } from "react-icons/fc";
-import { FaEnvelope, FaLock } from "react-icons/fa";
-import Image from "next/image";
+import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { FcGoogle } from 'react-icons/fc';
+import { FaEnvelope, FaLock } from 'react-icons/fa';
+import Image from 'next/image';
 
 export default function LoginPage() {
   const router = useRouter();
   const supabase = createClientComponentClient();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -20,12 +20,13 @@ export default function LoginPage() {
       const { data, error } = await supabase.auth.getSession();
       
       if (error) {
-        console.error("Error fetching session:", error);
+        console.error('Error fetching session:', error);
+
         return;
       }
   
       if (data?.session?.user) {
-        router.push("/dashboard"); 
+        router.push('/dashboard'); 
       }
     };
   
@@ -41,10 +42,11 @@ export default function LoginPage() {
     if (error) {
       setError(error.message);
       setLoading(false);
+
       return;
     }
 
-    router.push("/dashboard");
+    router.push('/dashboard');
   };
 
   const handleGoogleLogin = async () => {
@@ -52,7 +54,7 @@ export default function LoginPage() {
     setError(null);
   
     const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
+      provider: 'google',
       options: {
         redirectTo: `${window.location.origin}/auth/callback`, 
       },
@@ -81,7 +83,7 @@ export default function LoginPage() {
           className="flex items-center justify-center w-80 bg-white border border-gray-300 text-black font-semibold py-2 rounded-full shadow-md hover:bg-gray-100 mb-3"
         >
           <FcGoogle className="w-5 h-5 mr-2" />
-          {loading ? "Signing in..." : "Continue with Google"}
+          {loading ? 'Signing in...' : 'Continue with Google'}
         </button>
 
         <div className="w-80 text-center text-gray-500 my-2">OR</div>
@@ -116,13 +118,13 @@ export default function LoginPage() {
           disabled={loading}
           className="w-80 bg-blue-600 text-white font-semibold py-2 rounded-full hover:bg-blue-700"
         >
-          {loading ? "Logging in..." : "Sign In"}
+          {loading ? 'Logging in...' : 'Sign In'}
         </button>
 
         {/* Footer Links */}
         <div className="text-center mt-4">
           <p className="text-gray-600">
-            Don't have an account?{" "}
+            Don't have an account?{' '}
             <a href="/auth/signup" className="text-blue-600">
               <u>Sign up Now</u>
             </a>
@@ -136,11 +138,11 @@ export default function LoginPage() {
       {/* Right Section (Illustration) */}
       <div className="hidden md:flex w-1/2 items-center justify-center bg-blue-600 text-white p-6 relative">
         <Image
-            src="/side_image.png" 
-            alt="Illustration"
-            width={500}  
-            height={500}
-            className="w-3/4"
+          src="/side_image.png" 
+          alt="Illustration"
+          width={500}  
+          height={500}
+          className="w-3/4"
         />
       </div>
     </div>

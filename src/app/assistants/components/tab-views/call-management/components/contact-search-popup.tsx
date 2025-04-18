@@ -3,26 +3,57 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Search, X, Users, User } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
+interface ContactList {
+  id: string;
+  name: string;
+  color: string;
+  count: number;
+}
+
+interface IndividualContact {
+  id: number;
+  name: string;
+  email: string;
+  company?: string;
+}
+
+interface ContactSearchPopupProps {
+  contactLists: ContactList[];
+  individuals: IndividualContact[];
+  onSelect: (type: 'list' | 'individual', contact: ContactList | IndividualContact) => void;
+  onClose: () => void;
+}
+
+interface ContactListsSectionProps {
+  lists: ContactList[];
+  onSelect: (list: ContactList) => void;
+}
+
+interface IndividualContactsSectionProps {
+  contacts: IndividualContact[];
+  onSelect: (contact: IndividualContact) => void;
+}
+
 /**
  * Popup component for searching and selecting contacts or contact lists
  */
-export default function ContactSearchPopup({ contactLists, individuals, onSelect, onClose }) {
+export default function ContactSearchPopup({ contactLists, individuals, onSelect, onClose }: ContactSearchPopupProps) {
   // State for search term
   const [searchTerm, setSearchTerm] = useState('');
   // State for active tab
   const [activeTab, setActiveTab] = useState('lists');
   // Reference for the search input
-  const searchInputRef = useRef(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   
   // Filter contacts/lists based on search term
   const filteredLists = contactLists.filter(list => 
-    list.name.toLowerCase().includes(searchTerm.toLowerCase())
+    list.name.toLowerCase().includes(searchTerm.toLowerCase()),
   );
   
   const filteredIndividuals = individuals.filter(contact => 
     contact.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     contact.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (contact.company && contact.company.toLowerCase().includes(searchTerm.toLowerCase()))
+    (contact.company && contact.company.toLowerCase().includes(searchTerm.toLowerCase())),
   );
   
   // Focus the search input when the popup opens
@@ -34,13 +65,14 @@ export default function ContactSearchPopup({ contactLists, individuals, onSelect
   
   // Close popup when Escape key is pressed
   useEffect(() => {
-    const handleKeyDown = (event) => {
+    const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         onClose();
       }
     };
     
     window.addEventListener('keydown', handleKeyDown);
+
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
@@ -140,7 +172,7 @@ export default function ContactSearchPopup({ contactLists, individuals, onSelect
 }
 
 // Component for displaying contact lists
-function ContactListsSection({ lists, onSelect }) {
+function ContactListsSection({ lists, onSelect }: ContactListsSectionProps) {
   if (lists.length === 0) {
     return (
       <div className="text-center py-4 text-gray-500">
@@ -185,7 +217,7 @@ function ContactListsSection({ lists, onSelect }) {
 }
 
 // Component for displaying individual contacts
-function IndividualContactsSection({ contacts, onSelect }) {
+function IndividualContactsSection({ contacts, onSelect }: IndividualContactsSectionProps) {
   if (contacts.length === 0) {
     return (
       <div className="text-center py-4 text-gray-500">

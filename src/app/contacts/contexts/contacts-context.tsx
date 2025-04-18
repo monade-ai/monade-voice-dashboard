@@ -1,4 +1,5 @@
 import React, { createContext, useContext, ReactNode } from 'react';
+
 import { useContacts,Contact,ContactList } from '@/app/hooks/use-contacts';
 
 // Define the context type
@@ -34,7 +35,7 @@ interface ContactsProviderProps {
 export const ContactsProvider: React.FC<ContactsProviderProps> = ({
   children,
   initialLists,
-  initialContacts
+  initialContacts,
 }) => {
   const contactsData = useContacts({ initialLists, initialContacts });
   
@@ -54,4 +55,4 @@ export const useContactsContext = () => {
   }
   
   return context;
-}
+};

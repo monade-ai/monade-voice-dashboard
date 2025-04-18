@@ -10,7 +10,7 @@ export default function ScheduleList({
   formatTime, 
   getContactDisplay, 
   onToggleActive, 
-  onDelete 
+  onDelete, 
 }) {
   // Function to get day labels for display
   const getDayLabels = (days) => {
@@ -40,15 +40,16 @@ export default function ScheduleList({
     const formatOptions = { month: 'short', day: 'numeric' };
     
     if (start.toDateString() === end.toDateString()) {
-      return start.toLocaleDateString('en-US', formatOptions);
+      return start.toLocaleDateString('en-US', { month: 'short' as const, day: 'numeric' as const });
     }
     
-    return `${start.toLocaleDateString('en-US', formatOptions)} - ${end.toLocaleDateString('en-US', formatOptions)}`;
+    return `${start.toLocaleDateString('en-US', { month: 'short' as const, day: 'numeric' as const })} - ${end.toLocaleDateString('en-US', { month: 'short' as const, day: 'numeric' as const })}`;
   };
   
   // Sort schedules: active first, then by time
   const sortedSchedules = [...schedules].sort((a, b) => {
     if (a.isActive !== b.isActive) return b.isActive ? 1 : -1;
+
     return a.time.localeCompare(b.time);
   });
   

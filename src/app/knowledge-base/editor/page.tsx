@@ -1,13 +1,15 @@
-import type { Metadata } from "next"
-import Link from "next/link"
-import { Button } from "@/components/ui/button"
-import { Home } from "lucide-react"
-import { PromptEditor } from "../components/prompt-editor"
+import type { Metadata } from 'next';
+import Link from 'next/link';
+import { Home } from 'lucide-react';
+
+import { Button } from '@/components/ui/button';
+
+import { PromptEditor } from '../components/prompt-editor';
 
 export const metadata: Metadata = {
-  title: "Prompt Editor | Knowledge Base & Prompt Management",
-  description: "Create and edit custom prompts for your AI agents",
-}
+  title: 'Prompt Editor | Knowledge Base & Prompt Management',
+  description: 'Create and edit custom prompts for your AI agents',
+};
 
 export default function EditorPage() {
   return (
@@ -25,5 +27,5 @@ export default function EditorPage() {
 
       <PromptEditor />
     </div>
-  )
+  );
 }

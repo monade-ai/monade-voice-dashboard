@@ -13,6 +13,7 @@ export default function DisconnectReasons({ data }) {
     if (reason.includes('resolved')) return CheckCircle;
     if (reason.includes('error')) return AlertTriangle;
     if (reason.includes('follow-up')) return FileText;
+
     return PhoneOff;
   };
   
@@ -23,6 +24,7 @@ export default function DisconnectReasons({ data }) {
     if (reason.includes('resolved')) return 'green';
     if (reason.includes('error')) return 'amber';
     if (reason.includes('follow-up')) return 'purple';
+
     return 'gray';
   };
   
@@ -30,25 +32,25 @@ export default function DisconnectReasons({ data }) {
   const recommendations = [
     {
       id: 1,
-      title: "Reduce hang-up rate",
-      description: "Enhance initial call engagement to reduce customer hang-up rate by 10%",
-      metric: "37.5% of calls",
-      priority: "High"
+      title: 'Reduce hang-up rate',
+      description: 'Enhance initial call engagement to reduce customer hang-up rate by 10%',
+      metric: '37.5% of calls',
+      priority: 'High',
     },
     {
       id: 2,
-      title: "Improve technical reliability",
-      description: "Address common technical issues causing call disconnections",
-      metric: "9.4% of calls",
-      priority: "Medium"
+      title: 'Improve technical reliability',
+      description: 'Address common technical issues causing call disconnections',
+      metric: '9.4% of calls',
+      priority: 'Medium',
     },
     {
       id: 3,
-      title: "Optimize call transfers",
-      description: "Improve hand-off process for transferred calls",
-      metric: "25% of calls",
-      priority: "Medium"
-    }
+      title: 'Optimize call transfers',
+      description: 'Improve hand-off process for transferred calls',
+      metric: '25% of calls',
+      priority: 'Medium',
+    },
   ];
   
   return (
@@ -202,8 +204,8 @@ export default function DisconnectReasons({ data }) {
             <div className="flex items-start">
               <div className={`rounded-full p-2 ${
                 recommendation.priority === 'High' ? 'bg-red-100 text-red-600' :
-                recommendation.priority === 'Medium' ? 'bg-amber-100 text-amber-600' :
-                'bg-blue-100 text-blue-600'
+                  recommendation.priority === 'Medium' ? 'bg-amber-100 text-amber-600' :
+                    'bg-blue-100 text-blue-600'
               } mr-3`}>
                 {recommendation.priority === 'High' ? (
                   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -221,8 +223,8 @@ export default function DisconnectReasons({ data }) {
                   <h5 className="text-sm font-medium text-gray-800">{recommendation.title}</h5>
                   <span className={`text-xs px-2 py-0.5 rounded-full ${
                     recommendation.priority === 'High' ? 'bg-red-100 text-red-600' :
-                    recommendation.priority === 'Medium' ? 'bg-amber-100 text-amber-600' :
-                    'bg-blue-100 text-blue-600'
+                      recommendation.priority === 'Medium' ? 'bg-amber-100 text-amber-600' :
+                        'bg-blue-100 text-blue-600'
                   }`}>
                     {recommendation.priority} Priority
                   </span>

@@ -131,6 +131,7 @@ export function useWebSocketMicrophone({
   const startRecording = useCallback(async () => {
     if (!isConnected) {
       setError(new Error('Cannot start recording: WebSocket not connected'));
+
       return;
     }
 
@@ -166,7 +167,7 @@ export function useWebSocketMicrophone({
               console.debug('Sending audio data:', audioDataCopy.length, 'samples');
               socketRef.current.send(JSON.stringify({
                 type: 'audio',
-                data: Array.from(audioDataCopy.slice(0, 100)) // Send truncated data for performance
+                data: Array.from(audioDataCopy.slice(0, 100)), // Send truncated data for performance
               }));
             } catch (err) {
               console.error('Error sending audio data:', err);
@@ -233,6 +234,6 @@ export function useWebSocketMicrophone({
     disconnect,
     startRecording,
     stopRecording,
-    error
+    error,
   };
 }

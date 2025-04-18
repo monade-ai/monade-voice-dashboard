@@ -37,7 +37,7 @@ yarn-error.log*
 # vercel
 .vercel
 
-# memory bank
+# memory-bank
 /memory-bank/
 
 # typescript

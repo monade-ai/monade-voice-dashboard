@@ -2,6 +2,8 @@
 
 import React, { useState, useCallback, useMemo } from 'react';
 import { CalendarIcon, ChevronDownIcon } from 'lucide-react';
+import { format, subDays } from 'date-fns';
+
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import {
@@ -17,7 +19,6 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { format, subDays } from 'date-fns';
 
 interface DashboardHeaderProps {
   title: string;
@@ -55,18 +56,19 @@ export function DashboardHeader({
       const startDate = new Date(
         parseInt(startParts[2]), 
         parseInt(startParts[0]) - 1, 
-        parseInt(startParts[1])
+        parseInt(startParts[1]),
       );
       
       const endDate = new Date(
         parseInt(endParts[2]), 
         parseInt(endParts[0]) - 1, 
-        parseInt(endParts[1])
+        parseInt(endParts[1]),
       );
       
       return [startDate, endDate];
     } catch (error) {
-      console.error("Error parsing date range:", error);
+      console.error('Error parsing date range:', error);
+
       return [new Date(), new Date()];
     }
   }, [dateRange]);

@@ -10,23 +10,23 @@ export interface Schedule {
     isActive: boolean;
   }
   
-  export interface DateRange {
+export interface DateRange {
     start: Date;
     end: Date | null;
   }
   
-  export interface ContactList {
+export interface ContactList {
     id: string;
     name: string;
     color: string;
     count: number;
   }
   
-  export interface Contact {
+export interface Contact {
     id: number;
     name: string;
     email: string;
     company?: string;
   }
   
-  // Define other types here...
+// Define other types here...

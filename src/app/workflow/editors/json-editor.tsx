@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
+import { AlertCircle, Check } from 'lucide-react';
+
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Check } from 'lucide-react';
 
 interface JsonEditorProps {
   value: any;
@@ -23,7 +24,7 @@ export function JsonEditor({
   validator = () => true,
   title,
   description,
-  minHeight = '150px'
+  minHeight = '150px',
 }: JsonEditorProps) {
   const [text, setText] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -43,15 +44,18 @@ export function JsonEditor({
       if (validator(parsed)) {
         setIsValid(true);
         setError(null);
+
         return parsed;
       } else {
         setIsValid(false);
         setError('Invalid JSON structure');
+
         return null;
       }
     } catch (err) {
       setIsValid(false);
       setError(err instanceof Error ? err.message : 'Invalid JSON');
+
       return null;
     }
   };

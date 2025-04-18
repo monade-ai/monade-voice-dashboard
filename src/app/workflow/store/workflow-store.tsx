@@ -10,6 +10,7 @@ import {
   applyNodeChanges,
   MarkerType,
 } from 'reactflow';
+
 import { generateFlowConfig } from '../utils/export';
 import { createFlowFromConfig } from '../utils/import';
 
@@ -141,10 +142,11 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
             ...node,
             data: {
               ...node.data,
-              properties: properties
-            }
+              properties: properties,
+            },
           };
         }
+
         return node;
       }),
     }));
@@ -155,7 +157,7 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
     set({
       nodes: [],
       edges: [],
-      selectedNode: null
+      selectedNode: null,
     });
   },
 
@@ -166,7 +168,7 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
       set({
         nodes: nodes as PipecatNode[],
         edges,
-        selectedNode: null
+        selectedNode: null,
       });
     } catch (error) {
       console.error('Error importing flow:', error);
@@ -177,10 +179,12 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
   exportFlow: () => {
     try {
       const { nodes, edges } = get();
+
       return generateFlowConfig(nodes, edges);
     } catch (error) {
       console.error('Error exporting flow:', error);
+
       return null;
     }
-  }
+  },
 }));

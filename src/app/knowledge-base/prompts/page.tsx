@@ -1,15 +1,17 @@
-import type { Metadata } from "next"
-import Link from "next/link"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Home, PlusCircle, Search } from "lucide-react"
-import { PromptLibrary } from "../components/prompt-library"
+import type { Metadata } from 'next';
+import Link from 'next/link';
+import { Home, PlusCircle, Search } from 'lucide-react';
+
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+
+import { PromptLibrary } from '../components/prompt-library';
 
 export const metadata: Metadata = {
-  title: "Prompt Library | Knowledge Base & Prompt Management",
-  description: "Browse and manage your custom prompts",
-}
+  title: 'Prompt Library | Knowledge Base & Prompt Management',
+  description: 'Browse and manage your custom prompts',
+};
 
 export default function PromptsPage() {
   return (
@@ -45,5 +47,5 @@ export default function PromptsPage() {
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }

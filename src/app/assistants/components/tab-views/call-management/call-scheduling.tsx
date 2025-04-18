@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Calendar, Clock, Search, Users, ChevronLeft, ChevronRight, X, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+
 import DaySelector from './components/day-selector';
 import MonthCalendar from './components/month-calendar';
 import ScheduleList from './components/schedule-list';
@@ -42,7 +43,7 @@ interface ScheduleForm {
   contactName?: string;
   contactEmail?: string;
   time: string;
-  days: string[];
+  days: any;
   dateRange: DateRange | null;
   isActive: boolean;
 }
@@ -61,19 +62,21 @@ export default function CallScheduling() {
   // State for selected date range
   const [dateRange, setDateRange] = useState({
     start: new Date(),
-    end: new Date()
+    end: new Date(),
   });
   
   // State for month view
   const [currentMonth, setCurrentMonth] = useState(new Date());
   
   // State for the scheduling form
-  const [scheduleForm, setScheduleForm] = useState({
+  const [scheduleForm, setScheduleForm] = useState<ScheduleForm>({
     contactList: 'customers',
+    contactName: undefined,
+    contactEmail: undefined,
     time: '09:00',
     days: ['mon', 'wed', 'fri'],
     dateRange: null, // For specific date selections
-    isActive: true
+    isActive: true,
   });
   
   // State for showing contact search popup
@@ -83,10 +86,10 @@ export default function CallScheduling() {
   const [showConfirmation, setShowConfirmation] = useState(false);
   
   // Sample existing schedules
-  const [schedules, setSchedules] = useState([
-    { id: 1, contactList: 'customers', time: '09:00', days: ['mon', 'wed', 'fri'], dateRange: null, isActive: true },
-    { id: 2, contactList: 'leads', time: '14:30', days: ['tue', 'thu'], dateRange: null, isActive: true },
-    { id: 3, contactList: 'subscribers', time: '16:00', days: ['fri'], dateRange: null, isActive: false },
+  const [schedules, setSchedules] = useState<Schedule[]>([
+    { id: 1, contactList: 'customers', contactName: undefined, contactEmail: undefined, time: '09:00', days: ['mon', 'wed', 'fri'], dateRange: null, isActive: true },
+    { id: 2, contactList: 'leads', contactName: undefined, contactEmail: undefined, time: '14:30', days: ['tue', 'thu'], dateRange: null, isActive: true },
+    { id: 3, contactList: 'subscribers', contactName: undefined, contactEmail: undefined, time: '16:00', days: ['fri'], dateRange: null, isActive: false },
     { 
       id: 4, 
       contactList: 'individual', 
@@ -96,10 +99,10 @@ export default function CallScheduling() {
       days: [], 
       dateRange: { 
         start: new Date(new Date().setDate(new Date().getDate() + 2)), 
-        end: new Date(new Date().setDate(new Date().getDate() + 2)) 
+        end: new Date(new Date().setDate(new Date().getDate() + 2)), 
       }, 
-      isActive: true 
-    }
+      isActive: true, 
+    },
   ]);
   
   // Contact list options with colors
@@ -108,7 +111,7 @@ export default function CallScheduling() {
     { id: 'leads', name: 'Leads', color: '#60a5fa', count: 89 },
     { id: 'subscribers', name: 'Subscribers', color: '#c084fc', count: 273 },
     { id: 'partners', name: 'Partners', color: '#f97316', count: 42 },
-    { id: 'inactive', name: 'Inactive Users', color: '#94a3b8', count: 118 }
+    { id: 'inactive', name: 'Inactive Users', color: '#94a3b8', count: 118 },
   ];
   
   // Individual contacts for search
@@ -124,7 +127,7 @@ export default function CallScheduling() {
   const handleFormChange = (field: keyof ScheduleForm, value: any) => {
     setScheduleForm(prev => ({
       ...prev,
-      [field]: value
+      [field]: value,
     }));
   };
   
@@ -142,7 +145,7 @@ export default function CallScheduling() {
       
       return {
         ...prev,
-        days
+        days,
       };
     });
   };
@@ -152,16 +155,16 @@ export default function CallScheduling() {
     if (type === 'list') {
       setScheduleForm(prev => ({
         ...prev,
-        contactList: contact.id,
+        contactList: contact.id.toString(),
         contactName: undefined,
-        contactEmail: undefined
+        contactEmail: undefined,
       }));
-    } else {
+    } else if ('email' in contact) {
       setScheduleForm(prev => ({
         ...prev,
         contactList: 'individual',
         contactName: contact.name,
-        contactEmail: contact.email
+        contactEmail: contact.email,
       }));
     }
     
@@ -179,7 +182,7 @@ export default function CallScheduling() {
       time: scheduleForm.time,
       days: scheduleForm.days,
       dateRange: scheduleForm.dateRange,
-      isActive: scheduleForm.isActive
+      isActive: scheduleForm.isActive,
     };
     
     setSchedules(prev => [...prev, newSchedule]);
@@ -191,17 +194,19 @@ export default function CallScheduling() {
     // Reset form
     setScheduleForm({
       contactList: 'customers',
+      contactName: undefined,
+      contactEmail: undefined,
       time: '09:00',
       days: ['mon', 'wed', 'fri'],
       dateRange: null,
-      isActive: true
+      isActive: true,
     });
   };
   
   // Function to toggle schedule active state
   const toggleScheduleActive = (id: number) => {
     setSchedules(prev => prev.map(schedule => 
-      schedule.id === id ? {...schedule, isActive: !schedule.isActive} : schedule
+      schedule.id === id ? { ...schedule, isActive: !schedule.isActive } : schedule,
     ));
   };
   
@@ -229,15 +234,16 @@ export default function CallScheduling() {
   const getContactDisplay = (schedule: Schedule): ContactDisplay => {
     if (schedule.contactList === 'individual') {
       return {
-        name: schedule.contactName,
-        color: '#f43f5e' // Pink for individuals
+        name: schedule.contactName ?? '',
+        color: '#f43f5e', // Pink for individuals
       };
     }
     
     const contactList = contactLists.find(c => c.id === schedule.contactList);
+
     return {
       name: contactList?.name || 'Unknown',
-      color: contactList?.color || '#9ca3af'
+      color: contactList?.color || '#9ca3af',
     };
   };
   
@@ -286,7 +292,7 @@ export default function CallScheduling() {
                 onClick={() => setShowContactSearch(true)}
               >
                 {scheduleForm.contactList === 'individual' ? (
-                  <span className="text-pink-600 font-medium">{scheduleForm.contactName}</span>
+                  <span className="text-pink-600 font-medium">{String(scheduleForm.contactName ?? '')}</span>
                 ) : (
                   <span 
                     className="font-medium"
@@ -368,7 +374,7 @@ export default function CallScheduling() {
             month={currentMonth}
             schedules={schedules}
             selectedRange={dateRange}
-            onDateSelect={(dates) => {
+            onDateSelect={(dates: any) => {
               setDateRange(dates);
               handleFormChange('dateRange', dates);
               // When specific dates are selected, clear the repeating days
@@ -383,7 +389,6 @@ export default function CallScheduling() {
         <h3 className="text-sm font-medium text-gray-700 mb-3">Scheduled Calls</h3>
         <ScheduleList 
           schedules={schedules}
-          contactLists={contactLists}
           formatTime={formatTime}
           getContactDisplay={getContactDisplay}
           onToggleActive={toggleScheduleActive}

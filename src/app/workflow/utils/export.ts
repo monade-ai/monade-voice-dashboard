@@ -1,4 +1,5 @@
 import { Edge } from 'reactflow';
+
 import { PipecatNode } from '../store/workflow-store';
 
 /**
@@ -10,13 +11,13 @@ import { PipecatNode } from '../store/workflow-store';
  */
 export function generateFlowConfig(nodes: PipecatNode[], edges: Edge[]) {
   if (nodes.length === 0) {
-    throw new Error("No nodes found in the graph");
+    throw new Error('No nodes found in the graph');
   }
 
   // Find the start node
   const startNode = nodes.find((node) => node.type === 'startNode');
   if (!startNode) {
-    throw new Error("No start node found in the flow");
+    throw new Error('No start node found in the flow');
   }
 
   /**
@@ -36,8 +37,8 @@ export function generateFlowConfig(nodes: PipecatNode[], edges: Edge[]) {
         // Create base function configuration
         const functionData = targetNode.data.properties.function;
         const funcConfig = {
-          type: "function",
-          function: { ...functionData }
+          type: 'function',
+          function: { ...functionData },
         };
 
         // Find where this function connects to (if anywhere)
@@ -85,11 +86,11 @@ export function generateFlowConfig(nodes: PipecatNode[], edges: Edge[]) {
         // Add all functions with their transition to the final target
         connectedFunctions.forEach(funcNode => {
           const funcConfig = {
-            type: "function",
+            type: 'function',
             function: {
               ...funcNode.data.properties.function,
-              transition_to: finalNode.data.label
-            }
+              transition_to: finalNode.data.label,
+            },
           };
 
           functions.push(funcConfig);
@@ -103,7 +104,7 @@ export function generateFlowConfig(nodes: PipecatNode[], edges: Edge[]) {
   // Build the flow configuration using the start node's title as initial_node
   const flowConfig = {
     initial_node: startNode.data.label,
-    nodes: {} as Record<string, any>
+    nodes: {} as Record<string, any>,
   };
 
   // Process all nodes (except function and merge nodes which are handled differently)
@@ -115,7 +116,7 @@ export function generateFlowConfig(nodes: PipecatNode[], edges: Edge[]) {
     // Create node configuration
     const nodeConfig: Record<string, any> = {
       task_messages: node.data.properties.task_messages,
-      functions: findConnectedFunctions(node)
+      functions: findConnectedFunctions(node),
     };
 
     // Add role_messages if present (only on start nodes)

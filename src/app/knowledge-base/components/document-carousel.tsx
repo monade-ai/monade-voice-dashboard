@@ -1,10 +1,7 @@
-"use client"
+'use client';
 
-import { useState, useRef, useEffect } from "react"
-import Link from "next/link"
-import { useTranslations } from "@/i18n/translations-context"
-import { Button } from "@/components/ui/button"
-import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { useState, useRef, useEffect } from 'react';
+import Link from 'next/link';
 import { 
   ChevronLeft, 
   ChevronRight, 
@@ -15,33 +12,38 @@ import {
   File, 
   FileCode,
   Trash2, 
-  Zap
-} from "lucide-react"
-import { cn } from "@/lib/utils"
-import { PublishPromptDialog } from "../components/publish-prompt-dialog"
-import { DocumentMetadata, DocumentStorage } from "../api/knowldege-api"
-import { useToast } from "../hooks/use-toast"
+  Zap,
+} from 'lucide-react';
+
+import { useTranslations } from '@/i18n/translations-context';
+import { Button } from '@/components/ui/button';
+import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { cn } from '@/lib/utils';
+
+import { PublishPromptDialog } from '../components/publish-prompt-dialog';
+import { DocumentMetadata, DocumentStorage } from '../api/knowldege-api';
+import { useToast } from '../hooks/use-toast';
 
 // Helper function to get the appropriate icon based on file type
 const getFileIcon = (fileType: string) => {
   switch(fileType.toLowerCase()) {
-    case 'pdf':
-      return <FileText className="h-5 w-5 text-red-600" />;
-    case 'docx':
-    case 'doc':
-      return <FileType className="h-5 w-5 text-blue-600" />;
-    case 'csv':
-    case 'xlsx':
-    case 'xls':
-      return <FileSpreadsheet className="h-5 w-5 text-green-600" />;
-    case 'txt':
-      return <File className="h-5 w-5 text-slate-600" />;
-    case 'html':
-    case 'json':
-    case 'xml':
-      return <FileCode className="h-5 w-5 text-purple-600" />;
-    default:
-      return <FileText className="h-5 w-5 text-amber-600" />;
+  case 'pdf':
+    return <FileText className="h-5 w-5 text-red-600" />;
+  case 'docx':
+  case 'doc':
+    return <FileType className="h-5 w-5 text-blue-600" />;
+  case 'csv':
+  case 'xlsx':
+  case 'xls':
+    return <FileSpreadsheet className="h-5 w-5 text-green-600" />;
+  case 'txt':
+    return <File className="h-5 w-5 text-slate-600" />;
+  case 'html':
+  case 'json':
+  case 'xml':
+    return <FileCode className="h-5 w-5 text-purple-600" />;
+  default:
+    return <FileText className="h-5 w-5 text-amber-600" />;
   }
 };
 
@@ -49,6 +51,7 @@ const getFileIcon = (fileType: string) => {
 const formatFileSize = (bytes: number): string => {
   if (bytes < 1024) return bytes + ' B';
   if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+
   return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
 };
 
@@ -59,21 +62,22 @@ const formatDate = (dateString: string): string => {
   const diffTime = Math.abs(now.getTime() - date.getTime());
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   
-  if (diffDays === 1) return "1 day ago";
+  if (diffDays === 1) return '1 day ago';
   if (diffDays < 7) return `${diffDays} days ago`;
   if (diffDays < 30) return `${Math.floor(diffDays / 7)} week${Math.floor(diffDays / 7) > 1 ? 's' : ''} ago`;
+
   return date.toLocaleDateString();
 };
 
 export function DocumentCarousel() {
   const { t } = useTranslations();
-  const [currentIndex, setCurrentIndex] = useState(0)
-  const [isPublishOpen, setIsPublishOpen] = useState(false)
-  const [selectedDocument, setSelectedDocument] = useState<DocumentMetadata | null>(null)
-  const containerRef = useRef<HTMLDivElement>(null)
-  const [visibleCards, setVisibleCards] = useState(3)
-  const [documents, setDocuments] = useState<DocumentMetadata[]>([])
-  const { toast } = useToast()
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [isPublishOpen, setIsPublishOpen] = useState(false);
+  const [selectedDocument, setSelectedDocument] = useState<DocumentMetadata | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [visibleCards, setVisibleCards] = useState(3);
+  const [documents, setDocuments] = useState<DocumentMetadata[]>([]);
+  const { toast } = useToast();
 
   // Load documents from storage on mount
   useEffect(() => {
@@ -95,33 +99,34 @@ export function DocumentCarousel() {
   useEffect(() => {
     const updateVisibleCards = () => {
       if (window.innerWidth < 640) {
-        setVisibleCards(1)
+        setVisibleCards(1);
       } else if (window.innerWidth < 1024) {
-        setVisibleCards(2)
+        setVisibleCards(2);
       } else {
-        setVisibleCards(3)
+        setVisibleCards(3);
       }
-    }
+    };
 
-    updateVisibleCards()
-    window.addEventListener("resize", updateVisibleCards)
-    return () => window.removeEventListener("resize", updateVisibleCards)
-  }, [])
+    updateVisibleCards();
+    window.addEventListener('resize', updateVisibleCards);
 
-  const maxIndex = Math.max(0, documents.length - visibleCards)
+    return () => window.removeEventListener('resize', updateVisibleCards);
+  }, []);
+
+  const maxIndex = Math.max(0, documents.length - visibleCards);
 
   const handlePrev = () => {
-    setCurrentIndex((prev) => Math.max(0, prev - 1))
-  }
+    setCurrentIndex((prev) => Math.max(0, prev - 1));
+  };
 
   const handleNext = () => {
-    setCurrentIndex((prev) => Math.min(maxIndex, prev + 1))
-  }
+    setCurrentIndex((prev) => Math.min(maxIndex, prev + 1));
+  };
 
   const handlePublish = (document: DocumentMetadata) => {
-    setSelectedDocument(document)
-    setIsPublishOpen(true)
-  }
+    setSelectedDocument(document);
+    setIsPublishOpen(true);
+  };
   
   const handleDownload = (document: DocumentMetadata) => {
     try {
@@ -145,30 +150,30 @@ export function DocumentCarousel() {
       
       // Create download link
       const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
+      const a = window.document.createElement('a');
       a.href = url;
       a.download = document.title;
-      document.body.appendChild(a);
+      window.document.body.appendChild(a);
       a.click();
       
       // Cleanup
       setTimeout(() => {
-        document.body.removeChild(a);
+        window.document.body.removeChild(a);
         URL.revokeObjectURL(url);
       }, 0);
       
       toast({
-        title: "Download started",
-        description: `${document.title} is being downloaded.`
+        title: 'Download started',
+        description: `${document.title} is being downloaded.`,
       });
     } catch (error) {
-      console.error("Error downloading document:", error);
+      console.error('Error downloading document:', error);
       toast({
-        title: "Download failed",
-        description: "Failed to download the document. Please try again."
+        title: 'Download failed',
+        description: 'Failed to download the document. Please try again.',
       });
     }
-  }
+  };
   
   const handleDelete = (document: DocumentMetadata) => {
     if (confirm(`Are you sure you want to delete "${document.title}"?`)) {
@@ -178,17 +183,17 @@ export function DocumentCarousel() {
         setDocuments(prev => prev.filter(doc => doc.id !== document.id));
         
         toast({
-          title: "Document deleted",
-          description: `${document.title} has been removed from your knowledge base.`
+          title: 'Document deleted',
+          description: `${document.title} has been removed from your knowledge base.`,
         });
       } else {
         toast({
-          title: "Deletion failed",
-          description: "Failed to delete the document. Please try again."
+          title: 'Deletion failed',
+          description: 'Failed to delete the document. Please try again.',
         });
       }
     }
-  }
+  };
 
   return (
     <div className="relative">
@@ -212,7 +217,7 @@ export function DocumentCarousel() {
               style={{ transform: `translateX(-${currentIndex * (100 / visibleCards)}%)` }}
             >
               {documents.map((document) => (
-                <div key={document.id} className={cn("px-2 transition-opacity duration-300", `w-full sm:w-1/2 lg:w-1/3`)}>
+                <div key={document.id} className={cn('px-2 transition-opacity duration-300', 'w-full sm:w-1/2 lg:w-1/3')}>
                   <Card className="h-full transform transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
                     <CardHeader className="pb-2">
                       <div className="flex items-start gap-3">
@@ -272,8 +277,8 @@ export function DocumentCarousel() {
               onClick={handlePrev}
               disabled={currentIndex === 0 || documents.length === 0}
               className={cn(
-                "rounded-full transition-opacity",
-                (currentIndex === 0 || documents.length === 0) ? "opacity-50 cursor-not-allowed" : "hover:bg-amber-50",
+                'rounded-full transition-opacity',
+                (currentIndex === 0 || documents.length === 0) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-amber-50',
               )}
             >
               <ChevronLeft className="h-5 w-5" />
@@ -289,8 +294,8 @@ export function DocumentCarousel() {
               onClick={handleNext}
               disabled={currentIndex >= maxIndex || documents.length <= visibleCards}
               className={cn(
-                "rounded-full transition-opacity",
-                (currentIndex >= maxIndex || documents.length <= visibleCards) ? "opacity-50 cursor-not-allowed" : "hover:bg-amber-50",
+                'rounded-full transition-opacity',
+                (currentIndex >= maxIndex || documents.length <= visibleCards) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-amber-50',
               )}
             >
               <ChevronRight className="h-5 w-5" />
@@ -307,5 +312,5 @@ export function DocumentCarousel() {
         />
       )}
     </div>
-  )
+  );
 }

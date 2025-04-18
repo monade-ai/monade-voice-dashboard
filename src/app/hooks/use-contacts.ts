@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+
 import { searchContacts } from '../contacts/utils/search';
 
 export interface Contact {
@@ -45,7 +46,7 @@ interface UseContactsReturn {
  */
 export function useContacts({ 
   initialLists = [], 
-  initialContacts = {} 
+  initialContacts = {}, 
 }: UseContactsProps = {}): UseContactsReturn {
   // State
   const [contactLists, setContactLists] = useState<ContactList[]>(initialLists);
@@ -62,13 +63,13 @@ export function useContacts({
       name,
       description,
       count: 0,
-      createdAt: new Date()
+      createdAt: new Date(),
     };
     
     setContactLists(prev => [...prev, newList]);
     setContacts(prev => ({
       ...prev,
-      [newList.id]: []
+      [newList.id]: [],
     }));
     
     return newList;
@@ -80,6 +81,7 @@ export function useContacts({
       setSelectedList(null);
       setSearchResults([]);
       setSearchQuery('');
+
       return;
     }
     
@@ -93,24 +95,25 @@ export function useContacts({
 
   // Add a single contact to a list
   const addContactToList = (listId: string, contact: Omit<Contact, 'id'>): Contact => {
-    const newContact: Contact = {
+    const newContact: any = {
       ...contact,
-      id: `contact-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
+      id: `contact-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
     };
     
     setContacts(prev => {
       const listContacts = [...(prev[listId] || []), newContact];
+
       return {
         ...prev,
-        [listId]: listContacts
+        [listId]: listContacts,
       };
     });
     
     // Update the count in contact list
     setContactLists(prev =>
       prev.map(list =>
-        list.id === listId ? { ...list, count: list.count + 1 } : list
-      )
+        list.id === listId ? { ...list, count: list.count + 1 } : list,
+      ),
     );
     
     return newContact;
@@ -118,24 +121,25 @@ export function useContacts({
 
   // Add multiple contacts to a list
   const addContactsToList = (listId: string, newContacts: Omit<Contact, 'id'>[]): Contact[] => {
-    const contactsWithIds: Contact[] = newContacts.map(contact => ({
+    const contactsWithIds: any = newContacts.map(contact => ({
       ...contact,
-      id: `contact-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
+      id: `contact-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
     }));
     
     setContacts(prev => {
       const listContacts = [...(prev[listId] || []), ...contactsWithIds];
+
       return {
         ...prev,
-        [listId]: listContacts
+        [listId]: listContacts,
       };
     });
     
     // Update the count in contact list
     setContactLists(prev =>
       prev.map(list =>
-        list.id === listId ? { ...list, count: list.count + contactsWithIds.length } : list
-      )
+        list.id === listId ? { ...list, count: list.count + contactsWithIds.length } : list,
+      ),
     );
     
     return contactsWithIds;
@@ -146,17 +150,18 @@ export function useContacts({
     setContacts(prev => {
       const listContacts = prev[listId] || [];
       const updatedContacts = listContacts.filter(contact => contact.id !== contactId);
+
       return {
         ...prev,
-        [listId]: updatedContacts
+        [listId]: updatedContacts,
       };
     });
     
     // Update the count in contact list
     setContactLists(prev =>
       prev.map(list =>
-        list.id === listId ? { ...list, count: Math.max(0, list.count - 1) } : list
-      )
+        list.id === listId ? { ...list, count: Math.max(0, list.count - 1) } : list,
+      ),
     );
     
     // Update search results if applicable
@@ -171,6 +176,7 @@ export function useContacts({
     
     setContacts(prev => {
       const { [listId]: _, ...rest } = prev;
+
       return rest;
     });
     
@@ -187,6 +193,7 @@ export function useContacts({
     
     if (!selectedList || !query.trim()) {
       setSearchResults([]);
+
       return;
     }
     
@@ -239,7 +246,7 @@ export function useContacts({
     removeContactFromList,
     removeContactList,
     searchInCurrentList,
-    clearSearch
+    clearSearch,
   };
 }
 
