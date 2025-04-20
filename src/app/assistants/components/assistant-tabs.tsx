@@ -1,16 +1,16 @@
 'use client';
 
-import { useState, Suspense } from 'react';
+import { useState, Suspense, useRef, useEffect } from 'react';
 import { 
   Bot, 
   Mic, 
   Settings, 
   Terminal, 
-  LineChart, 
   Volume2,
   Trash2,
   Calendar,
   BarChart3,
+  InfoIcon,
 } from 'lucide-react';
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -21,11 +21,100 @@ import DeleteConfirmationModal from '../delete-confirmation-modal';
 
 import CostDisplay from './cost-display';
 import ModelTab from './tab-views/model-tab';
+import AssistantDualButton from './assistant-dual-button';
 
-// Import the new components for call management
 import CallScheduling from './tab-views/call-management/call-scheduling';
 import CallInsights from './tab-views/call-management/call-insights';
-// Placeholder components for other tabs that will be implemented later
+
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+
+// Modern, animated latency card
+function LatencyCard({ latencyMs }: { latencyMs: number }) {
+  // Animate the latency value on change
+  const [displayLatency, setDisplayLatency] = useState(latencyMs);
+  const prevLatency = useRef(latencyMs);
+
+  useEffect(() => {
+    if (latencyMs !== prevLatency.current) {
+      let frame: number;
+      const start = prevLatency.current;
+      const end = latencyMs;
+      const duration = 400;
+      const startTime = performance.now();
+
+      function animate(now: number) {
+        const elapsed = now - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        setDisplayLatency(start + (end - start) * progress);
+        if (progress < 1) {
+          frame = requestAnimationFrame(animate);
+        } else {
+          prevLatency.current = end;
+        }
+      }
+      frame = requestAnimationFrame(animate);
+      return () => cancelAnimationFrame(frame);
+    }
+  }, [latencyMs]);
+
+  // Bar width and color based on latency
+  const barWidth = Math.min(100, Math.max(10, (latencyMs / 3000) * 100));
+  const barColor =
+    latencyMs < 1000
+      ? "from-cyan-400 to-emerald-500"
+      : latencyMs < 2000
+      ? "from-amber-400 to-yellow-500"
+      : "from-fuchsia-500 to-pink-500";
+
+  return (
+    <div className="relative w-full p-4 bg-white rounded-xl border border-gray-100 shadow-md transition-transform duration-200 hover:scale-[1.025] hover:shadow-lg group">
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center space-x-1">
+          <span className="text-gray-700 font-semibold tracking-wide uppercase text-xs">
+            Latency
+          </span>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger>
+                <InfoIcon className="h-4 w-4 text-gray-400 group-hover:text-cyan-500 transition-colors" />
+              </TooltipTrigger>
+              <TooltipContent>
+                <p className="text-sm">Estimated average response latency in milliseconds</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+      </div>
+      <div className="w-full text-center">
+        <div
+          className="font-extrabold text-4xl bg-gradient-to-r from-cyan-500 via-fuchsia-500 to-amber-500 bg-clip-text text-transparent transition-all duration-300"
+          style={{ letterSpacing: "0.01em" }}
+        >
+          ~{Math.round(displayLatency)}
+          <span className="text-lg text-gray-400 font-medium ml-1">ms</span>
+        </div>
+      </div>
+      {/* Animated visual latency indicator */}
+      <div className="mt-4 h-2 w-full bg-gray-100 rounded-full overflow-hidden">
+        <div
+          className={`h-full transition-all duration-500 bg-gradient-to-r ${barColor}`}
+          style={{
+            width: `${barWidth}%`,
+            minWidth: "10%",
+            boxShadow: "0 0 8px 0 rgba(34,211,238,0.18)",
+          }}
+        ></div>
+      </div>
+    </div>
+  );
+}
+
+// Placeholder for tabs not yet implemented
 const PlaceholderTab = ({ title }: { title: string }) => (
   <div className="p-8 text-center text-gray-500">
     <p>{title} tab content will be implemented later</p>
@@ -50,68 +139,78 @@ export default function AssistantTabs() {
       {/* Metrics display (Cost and Latency) */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <CostDisplay costPerMinute={currentAssistant.costPerMin || 0.11} />
-        
-        <div className="relative w-full p-4 bg-white rounded-lg border border-gray-100">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center space-x-1">
-              <span className="text-gray-600">Latency</span>
-              <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-400">
-                <path d="M7.49991 0.876892C3.84222 0.876892 0.877075 3.84204 0.877075 7.49972C0.877075 11.1574 3.84222 14.1226 7.49991 14.1226C11.1576 14.1226 14.1227 11.1574 14.1227 7.49972C14.1227 3.84204 11.1576 0.876892 7.49991 0.876892ZM1.82707 7.49972C1.82707 4.36671 4.36689 1.82689 7.49991 1.82689C10.6329 1.82689 13.1727 4.36671 13.1727 7.49972C13.1727 10.6327 10.6329 13.1726 7.49991 13.1726C4.36689 13.1726 1.82707 10.6327 1.82707 7.49972ZM8.24992 4.49999C8.24992 4.9142 7.91413 5.24999 7.49992 5.24999C7.08571 5.24999 6.74992 4.9142 6.74992 4.49999C6.74992 4.08577 7.08571 3.74999 7.49992 3.74999C7.91413 3.74999 8.24992 4.08577 8.24992 4.49999ZM6.00003 5.99999H6.50003H7.50003C7.77618 5.99999 8.00003 6.22384 8.00003 6.49999V9.89999H8.50003H9.00003V10.9H8.50003H7.50003H6.50003H6.00003V9.89999H6.50003H7.00003V6.99999H6.50003H6.00003V5.99999Z" fill="currentColor" fillRule="evenodd" clipRule="evenodd"></path>
-              </svg>
-            </div>
-          </div>
-          
-          <div className="w-full text-center">
-            <div className="font-mono font-bold text-3xl text-cyan-600">
-              ~{currentAssistant.latencyMs || 1800} <span className="text-lg text-gray-500">ms</span>
-            </div>
-          </div>
-          
-          {/* Visual latency indicator */}
-          <div className="mt-4 h-2 w-full bg-gray-100 rounded-full overflow-hidden">
-            <div className="flex h-full">
-              <div className="bg-fuchsia-400 h-full" style={{ width: '25%' }}></div>
-              <div className="bg-blue-400 h-full" style={{ width: '30%' }}></div>
-              <div className="bg-green-400 h-full" style={{ width: '20%' }}></div>
-              <div className="bg-amber-400 h-full" style={{ width: '25%' }}></div>
-            </div>
-          </div>
-        </div>
+        <LatencyCard latencyMs={currentAssistant.latencyMs || 1800} />
       </div>
 
       {/* Tab navigation */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="flex bg-gray-50 p-1 rounded-md">
-          <TabsTrigger value="model" className="flex-1 data-[state=active]:bg-white data-[state=active]:shadow-sm">
-            <Bot className="h-4 w-4 mr-2" />
-            Model
-          </TabsTrigger>
-          <TabsTrigger value="transcriber" className="flex-1 data-[state=active]:bg-white data-[state=active]:shadow-sm">
-            <Mic className="h-4 w-4 mr-2" />
-            Transcriber
-          </TabsTrigger>
-          <TabsTrigger value="voice" className="flex-1 data-[state=active]:bg-white data-[state=active]:shadow-sm">
-            <Volume2 className="h-4 w-4 mr-2" />
-            Voice
-          </TabsTrigger>
-          <TabsTrigger value="functions" className="flex-1 data-[state=active]:bg-white data-[state=active]:shadow-sm">
-            <Terminal className="h-4 w-4 mr-2" />
-            Functions
-          </TabsTrigger>
-          <TabsTrigger value="advanced" className="flex-1 data-[state=active]:bg-white data-[state=active]:shadow-sm">
-            <Settings className="h-4 w-4 mr-2" />
-            Advanced
-          </TabsTrigger>
-          <TabsTrigger value="scheduling" className="flex-1 data-[state=active]:bg-white data-[state=active]:shadow-sm">
-            <Calendar className="h-4 w-4 mr-2" />
-            Scheduling
-          </TabsTrigger>
-          <TabsTrigger value="insights" className="flex-1 data-[state=active]:bg-white data-[state=active]:shadow-sm">
-            <BarChart3 className="h-4 w-4 mr-2" />
-            Insights
-          </TabsTrigger>
-
-        </TabsList>
+        <div className="relative flex items-center">
+          <TabsList className="flex bg-gray-50 p-1 rounded-full shadow-sm gap-1 relative overflow-x-auto">
+            <TabsTrigger
+              value="model"
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-full transition-all duration-200 font-medium text-gray-600 data-[state=active]:bg-white data-[state=active]:text-cyan-700 data-[state=active]:shadow-lg data-[state=active]:font-semibold hover:bg-gray-100 focus-visible:ring-2 focus-visible:ring-cyan-400"
+            >
+              <Bot className="h-4 w-4" />
+              Model
+            </TabsTrigger>
+            <TabsTrigger
+              value="transcriber"
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-full transition-all duration-200 font-medium text-gray-600 data-[state=active]:bg-white data-[state=active]:text-cyan-700 data-[state=active]:shadow-lg data-[state=active]:font-semibold hover:bg-gray-100 focus-visible:ring-2 focus-visible:ring-cyan-400"
+            >
+              <Mic className="h-4 w-4" />
+              Transcriber
+            </TabsTrigger>
+            <TabsTrigger
+              value="voice"
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-full transition-all duration-200 font-medium text-gray-600 data-[state=active]:bg-white data-[state=active]:text-cyan-700 data-[state=active]:shadow-lg data-[state=active]:font-semibold hover:bg-gray-100 focus-visible:ring-2 focus-visible:ring-cyan-400"
+            >
+              <Volume2 className="h-4 w-4" />
+              Voice
+            </TabsTrigger>
+            <TabsTrigger
+              value="functions"
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-full transition-all duration-200 font-medium text-gray-600 data-[state=active]:bg-white data-[state=active]:text-cyan-700 data-[state=active]:shadow-lg data-[state=active]:font-semibold hover:bg-gray-100 focus-visible:ring-2 focus-visible:ring-cyan-400"
+            >
+              <Terminal className="h-4 w-4" />
+              Functions
+            </TabsTrigger>
+            <TabsTrigger
+              value="advanced"
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-full transition-all duration-200 font-medium text-gray-600 data-[state=active]:bg-white data-[state=active]:text-cyan-700 data-[state=active]:shadow-lg data-[state=active]:font-semibold hover:bg-gray-100 focus-visible:ring-2 focus-visible:ring-cyan-400"
+            >
+              <Settings className="h-4 w-4" />
+              Advanced
+            </TabsTrigger>
+            <TabsTrigger
+              value="scheduling"
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-full transition-all duration-200 font-medium text-gray-600 data-[state=active]:bg-white data-[state=active]:text-cyan-700 data-[state=active]:shadow-lg data-[state=active]:font-semibold hover:bg-gray-100 focus-visible:ring-2 focus-visible:ring-cyan-400"
+            >
+              <Calendar className="h-4 w-4" />
+              Scheduling
+            </TabsTrigger>
+            <TabsTrigger
+              value="insights"
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-full transition-all duration-200 font-medium text-gray-600 data-[state=active]:bg-white data-[state=active]:text-cyan-700 data-[state=active]:shadow-lg data-[state=active]:font-semibold hover:bg-gray-100 focus-visible:ring-2 focus-visible:ring-cyan-400"
+            >
+              <BarChart3 className="h-4 w-4" />
+              Insights
+            </TabsTrigger>
+            {/* Animated active tab indicator */}
+            <span
+              className="absolute left-0 bottom-0 h-1 rounded-full bg-cyan-400 transition-all duration-300"
+              style={{
+                width: `calc(100% / 7)`,
+                transform: `translateX(${['model','transcriber','voice','functions','advanced','scheduling','insights'].indexOf(activeTab) * 100}%)`,
+                opacity: 0.7,
+              }}
+              aria-hidden="true"
+            />
+          </TabsList>
+          {/* Move test call dual button next to tabs */}
+          <div className="ml-4 flex-shrink-0">
+            <AssistantDualButton assistant={currentAssistant} />
+          </div>
+        </div>
 
         {/* Tab contents with Suspense for each tab */}
         <TabsContent value="model" className="mt-6">

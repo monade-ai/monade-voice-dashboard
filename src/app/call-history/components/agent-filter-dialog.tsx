@@ -4,6 +4,7 @@
  */
 
 import React, { useState } from "react";
+import { useAssistants } from "@/app/hooks/use-assistants-context";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Check, Search, User } from "lucide-react";
 import { useTranslations } from "@/i18n/translations-context";
@@ -26,9 +27,13 @@ const AgentFilterDialog: React.FC<AgentFilterDialogProps> = ({
 }) => {
   const { t } = useTranslations();
   const [search, setSearch] = useState("");
+  const { assistants } = useAssistants();
 
-  // Filter agent names by search
-  const filteredAgents = agentNames.filter((name) =>
+  // Use assistant names from global context
+  const assistantNames = assistants.map(a => a.name);
+
+  // Filter assistant names by search
+  const filteredAgents = assistantNames.filter((name) =>
     name.toLowerCase().includes(search.trim().toLowerCase())
   );
 

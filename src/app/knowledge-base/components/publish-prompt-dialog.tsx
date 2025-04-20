@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useAssistants } from '@/app/hooks/use-assistants-context';
 import { Check, Zap, CheckCircle2, Loader2, AlertTriangle } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -54,26 +55,13 @@ export function PublishPromptDialog({
     }
   }, [open, isSuccess]);
 
-  const agents = [
-    {
-      id: 'support-bot',
-      name: 'Support Bot',
-      description: 'Handles customer support inquiries and troubleshooting',
-      active: true,
-    },
-    {
-      id: 'sales-assistant',
-      name: 'Sales Assistant',
-      description: 'Helps with product recommendations and sales inquiries',
-      active: true,
-    },
-    {
-      id: 'website-bot',
-      name: 'Website Bot',
-      description: 'Provides website navigation assistance and general information',
-      active: false,
-    },
-  ];
+  const { assistants } = useAssistants();
+  const agents = assistants.map(a => ({
+    id: a.id,
+    name: a.name,
+    description: a.description || '',
+    active: true,
+  }));
 
   const fileToBase64 = async (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {

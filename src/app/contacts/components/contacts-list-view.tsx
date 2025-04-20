@@ -34,6 +34,7 @@ import { useTranslations } from '@/i18n/translations-context';
 import { useContactsContext } from '../contexts/contacts-context';
 
 import { CallAssistantDialog } from './call-assistant-dialog';
+import { useAssistants } from '@/app/hooks/use-assistants-context';
 
 interface PhoneAssistant {
   id: string;
@@ -62,6 +63,7 @@ const ContactListView: React.FC<ContactListViewProps> = ({
 }) => {
   // Move the hook call inside the component
   const { t } = useTranslations();
+  const { assistants } = useAssistants();
   
   const { 
     contactLists, 
@@ -599,7 +601,7 @@ const ContactListView: React.FC<ContactListViewProps> = ({
                 <p>{selectedContact.name} - {selectedContact.phone}</p>
               </div>
             )}
-            {MOCK_PHONE_ASSISTANTS.map((assistant) => (
+            {assistants.map((assistant) => (
               <Button
                 key={assistant.id}
                 variant="outline"

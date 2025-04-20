@@ -58,9 +58,6 @@ export default function AssistantsHeader() {
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl font-semibold">Assistants</h1>
         
-        {currentAssistant && (
-          <AssistantDualButton assistant={currentAssistant} />
-        )}
       </div>
 
       <div className="flex space-x-2 mb-4">

@@ -114,6 +114,13 @@
         "network": "Network",
         "stability": "Stability"
       }
+    },
+    "agentFilter": {
+      "title": "Filter by Agent",
+      "close": "Close agent filter",
+      "searchPlaceholder": "Search agents",
+      "noAgents": "No agents found.",
+      "button": "Filter by Agent"
     }
   },
   "sidebar": {
