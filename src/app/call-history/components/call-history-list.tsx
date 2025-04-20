@@ -9,6 +9,8 @@ import { CallLog } from "../../../../types/call-management";
 import CallHistoryItem from "./call-history-item";
 import CallDetailsPanel from "./call-details-panel";
 import { useTranslations } from "@/i18n/translations-context";
+import AgentFilterDialog from "./agent-filter-dialog";
+import { User } from "lucide-react";
 
 // Minimal filter options (labels will be translated)
 const STATUS_OPTIONS = [
@@ -69,6 +71,8 @@ const CallHistoryList: React.FC = () => {
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [calls, setCalls] = useState<CallLog[]>([]);
+  const [agentDialogOpen, setAgentDialogOpen] = useState(false);
+  const [selectedAgents, setSelectedAgents] = useState<string[]>([]);
 
   // Simulate API loading
   useEffect(() => {
@@ -80,6 +84,19 @@ const CallHistoryList: React.FC = () => {
     }, 800);
   }, []);
 
+  // Extract unique agent names from all calls (role === "assistant")
+  const agentNames = Array.from(
+    new Set(
+      calls
+        .flatMap((call) =>
+          call.participants
+            .filter((p) => p.role === "assistant")
+            .map((p) => p.name)
+        )
+        .filter(Boolean)
+    )
+  );
+
   // Filter logic
   const filteredCalls = calls.filter((call) => {
     const statusMatch = statusFilter === "all" || call.status === statusFilter;
@@ -89,7 +106,12 @@ const CallHistoryList: React.FC = () => {
       call.participants.some((p) =>
         p.name.toLowerCase().includes(search.trim().toLowerCase())
       );
-    return statusMatch && directionMatch && searchMatch;
+    const agentMatch =
+      selectedAgents.length === 0 ||
+      call.participants.some(
+        (p) => p.role === "assistant" && selectedAgents.includes(p.name)
+      );
+    return statusMatch && directionMatch && searchMatch && agentMatch;
   });
 
   return (
@@ -125,6 +147,27 @@ const CallHistoryList: React.FC = () => {
             </option>
           ))}
         </select>
+        <button
+          className={`flex items-center gap-2 px-3 py-2 rounded border border-input text-sm transition ${
+            selectedAgents.length > 0
+              ? "bg-amber-100 text-amber-900 border-amber-300"
+              : "bg-background text-muted-foreground hover:bg-muted"
+          }`}
+          onClick={() => setAgentDialogOpen(true)}
+          type="button"
+        >
+          <User size={16} />
+          {selectedAgents.length > 0
+            ? selectedAgents.join(", ")
+            : t("callHistory.agentFilter.button")}
+        </button>
+        <AgentFilterDialog
+          open={agentDialogOpen}
+          onClose={() => setAgentDialogOpen(false)}
+          agentNames={agentNames}
+          selectedAgents={selectedAgents}
+          onSelect={setSelectedAgents}
+        />
       </div>
       <div className="w-full h-full flex flex-col gap-2">
         {/* Loading state */}
