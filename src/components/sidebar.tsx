@@ -216,6 +216,12 @@ export function Sidebar() {
 
         <SidebarSection title={t('sidebar.observe')}>
           <NavItem
+            href="/call-history"
+            icon={<PhoneCall size={18} />}
+            label={t('sidebar.callHistory')}
+            isActive={pathname === '/call-history'}
+          />
+          <NavItem
             href="/calls"
             icon={<PhoneCall size={18} />}
             label={t('sidebar.calls')}
