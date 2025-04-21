@@ -1,6 +1,3 @@
-# Docs for the Azure Web Apps Deploy action: https://github.com/Azure/webapps-deploy
-# More GitHub Actions for Azure: https://github.com/Azure/actions
-
 name: Build and deploy Node.js app to Azure Web App - calllive-dashboard
 
 on:
@@ -12,8 +9,9 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    environment: 'production'
     permissions:
-      contents: read #This is required for actions/checkout
+      contents: read
 
     steps:
       - uses: actions/checkout@v4
@@ -23,11 +21,19 @@ jobs:
         with:
           node-version: '20.x'
 
+      - name: Verify Secrets (Debug)
+        run: |
+          echo "NEXT_PUBLIC_SUPABASE_URL exists: ${{ vars.NEXT_PUBLIC_SUPABASE_URL != '' }}"
+          echo "NEXT_PUBLIC_SUPABASE_ANON_KEY exists: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY != '' }}"
+
       - name: npm install, build, and test
         run: |
           npm install --legacy-peer-deps
-          npm run build --if-present
+          npm run build
           npm run test --if-present
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }} 
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
 
       - name: Zip artifact for deployment
         run: zip release.zip ./* -r
