@@ -1,5 +1,6 @@
 import { memo } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
+
 import { FunctionDefinition } from '../store/workflow-store';
 
 /**

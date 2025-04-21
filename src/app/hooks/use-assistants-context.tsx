@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
 // Define the Assistant type
 export interface Assistant {
@@ -56,35 +56,103 @@ const sampleAssistants: Assistant[] = [
   },
 ];
 
-// Provider component
 export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
-  const [assistants, setAssistants] = useState<Assistant[]>(sampleAssistants);
+  const [assistants, setAssistants] = useState<Assistant[]>([]);
   const [currentAssistant, setCurrentAssistant] = useState<Assistant | null>(null);
   const [isCreatingNew, setIsCreatingNew] = useState(false);
 
-  const addAssistant = (assistant: Assistant) => {
-    setAssistants((prev) => [...prev, assistant]);
-  };
+  // Fetch assistants from backend on mount
+  useEffect(() => {
+    const fetchAssistants = async () => {
+      try {
+        const res = await fetch('/api/assistants');
+        if (!res.ok) throw new Error('Failed to fetch assistants');
+        const data = await res.json();
+        // Convert createdAt to Date if needed
+        setAssistants(
+          data.map((a: any) => ({
+            ...a,
+            createdAt: a.createdAt ? new Date(a.createdAt) : new Date(),
+          }))
+        );
+      } catch (err) {
+        // Fallback to sample data if fetch fails
+        setAssistants(sampleAssistants);
+        // Optionally log error
+        // console.error('Error fetching assistants:', err);
+      }
+    };
+    fetchAssistants();
+  }, []);
 
-  const updateAssistant = (id: string, updatedData: Partial<Assistant>) => {
-    setAssistants((prev) =>
-      prev.map((assistant) =>
-        assistant.id === id ? { ...assistant, ...updatedData } : assistant
-      )
-    );
-    
-    // Update current assistant if it's the one being modified
-    if (currentAssistant?.id === id) {
-      setCurrentAssistant((prev) => prev ? { ...prev, ...updatedData } : null);
+  const addAssistant = async (assistant: Assistant) => {
+    try {
+      const res = await fetch('/api/assistants', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(assistant),
+      });
+      if (!res.ok) throw new Error('Failed to add assistant');
+      const saved = await res.json();
+      setAssistants((prev) => [...prev, { ...saved, createdAt: saved.createdAt ? new Date(saved.createdAt) : new Date() }]);
+    } catch (err) {
+      // Fallback: add locally if backend fails
+      setAssistants((prev) => [...prev, assistant]);
+      // Optionally log error
+      // console.error('Error adding assistant:', err);
     }
   };
 
-  const deleteAssistant = (id: string) => {
-    setAssistants((prev) => prev.filter((assistant) => assistant.id !== id));
-    
-    // Clear current assistant if it's the one being deleted
-    if (currentAssistant?.id === id) {
-      setCurrentAssistant(null);
+  const updateAssistant = async (id: string, updatedData: Partial<Assistant>) => {
+    try {
+      const res = await fetch(`/api/assistants/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedData),
+      });
+      if (!res.ok) throw new Error('Failed to update assistant');
+      const updated = await res.json();
+      setAssistants((prev) =>
+        prev.map((assistant) =>
+          assistant.id === id ? { ...assistant, ...updated, createdAt: updated.createdAt ? new Date(updated.createdAt) : new Date() } : assistant,
+        ),
+      );
+      if (currentAssistant?.id === id) {
+        setCurrentAssistant((prev) => prev ? { ...prev, ...updated, createdAt: updated.createdAt ? new Date(updated.createdAt) : new Date() } : null);
+      }
+    } catch (err) {
+      // Fallback: update locally if backend fails
+      setAssistants((prev) =>
+        prev.map((assistant) =>
+          assistant.id === id ? { ...assistant, ...updatedData } : assistant,
+        ),
+      );
+      if (currentAssistant?.id === id) {
+        setCurrentAssistant((prev) => prev ? { ...prev, ...updatedData } : null);
+      }
+      // Optionally log error
+      // console.error('Error updating assistant:', err);
+    }
+  };
+
+  const deleteAssistant = async (id: string) => {
+    try {
+      const res = await fetch(`/api/assistants/${id}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) throw new Error('Failed to delete assistant');
+      setAssistants((prev) => prev.filter((assistant) => assistant.id !== id));
+      if (currentAssistant?.id === id) {
+        setCurrentAssistant(null);
+      }
+    } catch (err) {
+      // Fallback: delete locally if backend fails
+      setAssistants((prev) => prev.filter((assistant) => assistant.id !== id));
+      if (currentAssistant?.id === id) {
+        setCurrentAssistant(null);
+      }
+      // Optionally log error
+      // console.error('Error deleting assistant:', err);
     }
   };
 

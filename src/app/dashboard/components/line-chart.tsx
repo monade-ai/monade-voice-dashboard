@@ -9,7 +9,7 @@ import {
   CartesianGrid,
   Tooltip,
   Legend,
-  ResponsiveContainer
+  ResponsiveContainer,
 } from 'recharts';
 import { format } from 'date-fns';
 
@@ -35,7 +35,7 @@ export const LineChart = memo(function LineChart({
   formatY,
   hideGrid = false,
   hideTicks = false,
-  showLegend = false
+  showLegend = false,
 }: LineChartProps) {
   // Memoize the formatted data to prevent recalculation on every render
   const formattedData = useMemo(() => {
@@ -44,7 +44,7 @@ export const LineChart = memo(function LineChart({
       // Format date if it's a string date
       [xKey]: typeof item[xKey] === 'string' && item[xKey].includes('-') 
         ? new Date(item[xKey]) 
-        : item[xKey]
+        : item[xKey],
     }));
   }, [data, xKey]);
 
@@ -53,6 +53,7 @@ export const LineChart = memo(function LineChart({
     if (Array.isArray(yKey)) {
       return yKey.map((key, index) => {
         const lineColor = Array.isArray(color) ? color[index % color.length] : color;
+
         return (
           <Line
             key={key}
@@ -111,7 +112,7 @@ export const LineChart = memo(function LineChart({
             backgroundColor: 'white', 
             borderRadius: '6px',
             border: '1px solid #e5e7eb',
-            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
           }}
         />
         

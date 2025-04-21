@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
 export default function AuthCallback() {
   const router = useRouter();
@@ -13,11 +13,11 @@ export default function AuthCallback() {
       const { data, error } = await supabase.auth.getUser();
 
       if (error || !data.user) {
-        console.error("Failed to retrieve user:", error?.message);
-        router.replace("/auth/login");
+        console.error('Failed to retrieve user:', error?.message);
+        router.replace('/auth/login');
       } else {
-        console.log("User logged in:", data.user);
-        router.replace("/dashboard");
+        console.log('User logged in:', data.user);
+        router.replace('/dashboard');
       }
     };
 

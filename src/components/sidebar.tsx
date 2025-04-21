@@ -6,7 +6,6 @@ import Image from 'next/image';
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useLogout } from "./utils/logout";
 import { 
   BarChart4, 
   Layers, 
@@ -21,11 +20,14 @@ import {
   ChevronRight,
   Contact2,
   LogOut,
-  Globe
+  Globe,
 } from 'lucide-react';
+
 import { cn } from '@/lib/utils';
 import { useTranslations } from '@/i18n/translations-context';
 import { LanguageSelector } from '@/components/language-selector';
+
+import { useLogout } from './utils/logout';
 
 interface NavItemProps {
   href: string;
@@ -56,7 +58,7 @@ function NavItem({
           'flex items-center p-2 my-1 rounded-md transition-colors group',
           isActive
             ? 'bg-amber-100 text-amber-700'
-            : 'text-gray-600 hover:bg-amber-50 hover:text-amber-700'
+            : 'text-gray-600 hover:bg-amber-50 hover:text-amber-700',
         )}
         onClick={hasChildren ? onClick : undefined}
       >
@@ -213,6 +215,12 @@ export function Sidebar() {
         </SidebarSection>
 
         <SidebarSection title={t('sidebar.observe')}>
+          <NavItem
+            href="/call-history"
+            icon={<PhoneCall size={18} />}
+            label={t('sidebar.callHistory')}
+            isActive={pathname === '/call-history'}
+          />
           <NavItem
             href="/calls"
             icon={<PhoneCall size={18} />}

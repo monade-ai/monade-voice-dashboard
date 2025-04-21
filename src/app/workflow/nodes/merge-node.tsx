@@ -15,7 +15,7 @@ export const MergeNode = memo((props: NodeProps) => {
     for (let i = 0; i < inputCount; i++) {
       // Calculate position along the top edge
       const position = {
-        left: `${((i + 1) / (inputCount + 1)) * 100}%`
+        left: `${((i + 1) / (inputCount + 1)) * 100}%`,
       };
       
       handles.push(
@@ -26,7 +26,7 @@ export const MergeNode = memo((props: NodeProps) => {
           id={`in-${i}`}
           style={position}
           className="w-2 h-2 bg-blue-500 absolute"
-        />
+        />,
       );
     }
     

@@ -3,6 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { format, addDays, subDays } from 'date-fns';
 import { Calendar as CalendarIcon } from 'lucide-react';
+import { DateRange } from 'react-day-picker';
+
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import {
@@ -10,7 +12,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import { DateRange } from 'react-day-picker';
 
 interface DateRangePickerProps {
   dateRange: string;
@@ -25,9 +26,10 @@ export function DateRangePicker({ dateRange, onDateRangeChange }: DateRangePicke
       
       if (!startStr || !endStr) {
         const today = new Date();
+
         return {
           from: subDays(today, 30),
-          to: today
+          to: today,
         };
       }
       
@@ -36,9 +38,10 @@ export function DateRangePicker({ dateRange, onDateRangeChange }: DateRangePicke
       
       if (startParts.length !== 3 || endParts.length !== 3) {
         const today = new Date();
+
         return {
           from: subDays(today, 30),
-          to: today
+          to: today,
         };
       }
       
@@ -46,20 +49,21 @@ export function DateRangePicker({ dateRange, onDateRangeChange }: DateRangePicke
         from: new Date(
           parseInt(startParts[2]), 
           parseInt(startParts[0]) - 1, 
-          parseInt(startParts[1])
+          parseInt(startParts[1]),
         ),
         to: new Date(
           parseInt(endParts[2]), 
           parseInt(endParts[0]) - 1, 
-          parseInt(endParts[1])
-        )
+          parseInt(endParts[1]),
+        ),
       };
     } catch (error) {
-      console.error("Error parsing date range:", error);
+      console.error('Error parsing date range:', error);
       const today = new Date();
+
       return {
         from: subDays(today, 30),
-        to: today
+        to: today,
       };
     }
   };

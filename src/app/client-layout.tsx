@@ -3,10 +3,14 @@
 
 import React from 'react';
 import { usePathname } from 'next/navigation';
-import { Sidebar } from '../components/sidebar';
 import { Toaster } from 'sonner';
-import { PipecatProvider } from './assistants/providers/pipcat-provider';
+
 import { TranslationsProvider } from '@/i18n/translations-context';
+
+import { Sidebar } from '../components/sidebar';
+
+import { PipecatProvider } from './assistants/providers/pipcat-provider';
+
 
 const noSidebarRoutes = [
   '/auth/login',

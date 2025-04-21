@@ -1,11 +1,15 @@
 import { useState, useCallback, useEffect } from 'react';
-import { PipecatNode, useWorkflowStore, NodeProperties } from './store/workflow-store';
+import { Save, X } from 'lucide-react';
+
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
+
+import { PipecatNode, useWorkflowStore, NodeProperties } from './store/workflow-store';
 import { MessageEditor } from './editors/message-editor';
 import { FunctionEditor } from './editors/function-editor';
 import { ActionEditor } from './editors/action-editor';
-import { cn } from '@/lib/utils';
-import { Save, X } from 'lucide-react';
+
+
 
 interface SidePanelProps {
   selectedNode: PipecatNode | null;
@@ -68,6 +72,7 @@ export function SidePanel({ selectedNode, className }: SidePanelProps) {
           const next = new Set(prev);
           next.delete(key);
           setHasUnsavedChanges(next.size > 0);
+
           return next;
         });
       } else {
@@ -76,13 +81,14 @@ export function SidePanel({ selectedNode, className }: SidePanelProps) {
           const next = new Set(prev);
           next.add(key);
           setHasUnsavedChanges(true);
+
           return next;
         });
       }
       
       return {
         ...prev,
-        [key]: value
+        [key]: value,
       };
     });
   }, []);
@@ -97,6 +103,7 @@ export function SidePanel({ selectedNode, className }: SidePanelProps) {
     };
     
     window.addEventListener('keydown', handleKeyDown);
+
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [hasUnsavedChanges, handleSaveAll]);
 
@@ -106,16 +113,18 @@ export function SidePanel({ selectedNode, className }: SidePanelProps) {
       if (hasUnsavedChanges) {
         e.preventDefault();
         e.returnValue = '';
+
         return '';
       }
     };
     
     window.addEventListener('beforeunload', handleBeforeUnload);
+
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [hasUnsavedChanges]);
 
   return (
-    <div className={cn("h-full flex flex-col", className)}>
+    <div className={cn('h-full flex flex-col', className)}>
       {selectedNode && editedProperties ? (
         <div className="flex flex-col h-full">
           <div className="flex justify-between items-center p-4 border-b">

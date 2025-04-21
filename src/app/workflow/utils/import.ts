@@ -1,7 +1,8 @@
 import { Edge, MarkerType } from 'reactflow';
-import { PipecatNode } from '../store/workflow-store';
 import { v4 as uuidv4 } from 'uuid';
 import dagre from 'dagre';
+
+import { PipecatNode } from '../store/workflow-store';
 
 /**
  * Layout constants
@@ -69,8 +70,8 @@ export function createFlowFromConfig(flowConfig: any): { nodes: PipecatNode[], e
           post_actions: nodeConfig.post_actions || [],
         },
         label: nodeId,
-        nodeType
-      }
+        nodeType,
+      },
     };
     
     // Add role_messages if present (start node only)
@@ -84,7 +85,7 @@ export function createFlowFromConfig(flowConfig: any): { nodes: PipecatNode[], e
     g.setNode(newNodeId, { 
       width: NODE_WIDTH, 
       height: NODE_HEIGHT,
-      nodeId: newNodeId 
+      nodeId: newNodeId, 
     });
   });
   
@@ -116,12 +117,13 @@ export function createFlowFromConfig(flowConfig: any): { nodes: PipecatNode[], e
           position: { x: 0, y: 0 }, // Will be set by the layout algorithm
           data: {
             properties: {
+              task_messages: [],
               function: { ...funcConfig.function },
-              isNodeFunction: false // Will be updated when edges are created
+              isNodeFunction: false, // Will be updated when edges are created
             },
             label: funcConfig.function.name,
-            nodeType: 'functionNode'
-          }
+            nodeType: 'functionNode',
+          },
         };
         
         nodes.push(functionNode);
@@ -130,7 +132,7 @@ export function createFlowFromConfig(flowConfig: any): { nodes: PipecatNode[], e
         g.setNode(functionId, { 
           width: NODE_WIDTH, 
           height: 150, // Function nodes are usually smaller
-          nodeId: functionId 
+          nodeId: functionId, 
         });
         
         // Create edge from source to function
@@ -153,7 +155,7 @@ export function createFlowFromConfig(flowConfig: any): { nodes: PipecatNode[], e
         functionNodes[functionId] = {
           node: functionNode,
           sourceId: sourceNodeId,
-          targetName: funcConfig.function.transition_to
+          targetName: funcConfig.function.transition_to,
         };
       });
       
@@ -167,12 +169,12 @@ export function createFlowFromConfig(flowConfig: any): { nodes: PipecatNode[], e
             position: { x: 0, y: 0 },
             data: {
               properties: {
-                task_messages: [{ role: 'system', content: 'Merge node' }]
+                task_messages: [{ role: 'system', content: 'Merge node' }],
               },
               label: `Merge to ${targetName}`,
               nodeType: 'mergeNode',
-              inputCount: functions.length
-            }
+             
+            },
           };
           
           nodes.push(mergeNode);
@@ -181,7 +183,7 @@ export function createFlowFromConfig(flowConfig: any): { nodes: PipecatNode[], e
           g.setNode(mergeId, { 
             width: 140, 
             height: 60 + (functions.length * 20), // Adjust height based on input count
-            nodeId: mergeId 
+            nodeId: mergeId, 
           });
           
           // Create edge from merge to target
@@ -205,6 +207,7 @@ export function createFlowFromConfig(flowConfig: any): { nodes: PipecatNode[], e
             // Find the function node
             const funcNodeId = Object.keys(functionNodes).find(id => {
               const funcNode = functionNodes[id];
+
               return funcNode.sourceId === sourceNodeId && 
                     funcNode.node.data.properties.function.name === func.function.name;
             });
@@ -271,7 +274,7 @@ export function createFlowFromConfig(flowConfig: any): { nodes: PipecatNode[], e
       if (node) {
         node.position = {
           x: dagreNode.x - dagreNode.width / 2,
-          y: dagreNode.y - dagreNode.height / 2
+          y: dagreNode.y - dagreNode.height / 2,
         };
       }
     }

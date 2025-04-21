@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+
 import { Locale, defaultLocale, locales } from './config';
 
 export function useLocale() {

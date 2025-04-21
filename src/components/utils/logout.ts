@@ -1,7 +1,7 @@
 'use client';
 
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
-import { useRouter } from "next/navigation";
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { useRouter } from 'next/navigation';
 
 export function useLogout() {
   const router = useRouter();
@@ -11,10 +11,10 @@ export function useLogout() {
     const { error } = await supabase.auth.signOut();
 
     if (error) {
-      console.error("Logout failed:", error.message);
+      console.error('Logout failed:', error.message);
     } else {
-      console.log("User logged out successfully!");
-      router.replace("/auth/login");
+      console.log('User logged out successfully!');
+      router.replace('/auth/login');
     }
   };
 

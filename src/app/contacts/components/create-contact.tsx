@@ -1,13 +1,14 @@
-"use client"
+'use client';
 
 import React, { useState } from 'react';
+import { z } from 'zod';
+import { useTranslations } from '@/i18n/translations-context';
+
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { useContactsContext } from '../contexts/contacts-context';
 import { Contact } from '@/app/hooks/use-contacts';
 import { Label } from '@/components/ui/label';
-import { z } from 'zod';
-import { useTranslation } from 'react-i18next';
+import { useContactsContext } from '../contexts/contacts-context';
 
 interface CreateContactProps {
   onCancel: () => void;
@@ -17,19 +18,20 @@ interface CreateContactProps {
 // Validate phone number format
 const validatePhoneNumber = (phone: string) => {
   const regex = /^\+[1-9]\d{1,14}$/;
+
   return regex.test(phone);
 };
 
 // Create a schema for form validation
 const contactSchema = z.object({
-  name: z.string().min(1, "Name is required"),
+  name: z.string().min(1, 'Name is required'),
   phone: z.string()
-    .min(1, "Phone number is required")
-    .refine(validatePhoneNumber, "Phone number must include country code (e.g., +11234567890)")
+    .min(1, 'Phone number is required')
+    .refine(validatePhoneNumber, 'Phone number must include country code (e.g., +91234567890)'),
 });
 
 const CreateContact: React.FC<CreateContactProps> = ({ onCancel, onSuccess }) => {
-  const { t } = useTranslation();
+  const { t } = useTranslations();
   const { selectedList, addContactToList } = useContactsContext();
   
   // Form state
@@ -41,6 +43,7 @@ const CreateContact: React.FC<CreateContactProps> = ({ onCancel, onSuccess }) =>
     try {
       contactSchema.parse({ name, phone });
       setErrors({});
+
       return true;
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -52,6 +55,7 @@ const CreateContact: React.FC<CreateContactProps> = ({ onCancel, onSuccess }) =>
         });
         setErrors(formattedErrors);
       }
+
       return false;
     }
   };
@@ -60,7 +64,8 @@ const CreateContact: React.FC<CreateContactProps> = ({ onCancel, onSuccess }) =>
     e.preventDefault();
     
     if (!selectedList) {
-      alert("Please select a contact list first");
+      alert('Please select a contact list first');
+
       return;
     }
     
@@ -89,7 +94,7 @@ const CreateContact: React.FC<CreateContactProps> = ({ onCancel, onSuccess }) =>
             setName(e.target.value);
             setErrors(prev => ({ ...prev, name: undefined }));
           }}
-          className={errors.name ? "border-red-500" : ""}
+          className={errors.name ? 'border-red-500' : ''}
         />
         {errors.name && (
           <p className="text-red-500 text-sm">{errors.name}</p>
@@ -108,7 +113,7 @@ const CreateContact: React.FC<CreateContactProps> = ({ onCancel, onSuccess }) =>
             setPhone(e.target.value);
             setErrors(prev => ({ ...prev, phone: undefined }));
           }}
-          className={errors.phone ? "border-red-500" : ""}
+          className={errors.phone ? 'border-red-500' : ''}
         />
         {errors.phone && (
           <p className="text-red-500 text-sm">{errors.phone}</p>

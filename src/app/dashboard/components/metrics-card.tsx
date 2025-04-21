@@ -1,6 +1,7 @@
 // app/dashboard/components/metrics-card.tsx
 
 import React, { memo } from 'react';
+
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 
@@ -22,8 +23,8 @@ export const MetricsCard = memo(function MetricsCard({
 }: MetricsCardProps) {
   return (
     <Card className={cn(
-      "bg-white border-gray-200 hover:border-amber-300 transition-all shadow-sm",
-      className
+      'bg-white border-gray-200 hover:border-amber-300 transition-all shadow-sm',
+      className,
     )}>
       <CardHeader className="pb-2">
         <CardTitle className="text-sm font-medium text-gray-500">{title}</CardTitle>

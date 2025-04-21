@@ -66,6 +66,63 @@
       "deleteConfirm": "Are you sure you want to delete this contact?"
     }
   },
+  "callHistory": {
+    "filter": {
+      "status": {
+        "all": "All",
+        "completed": "Completed",
+        "missed": "Missed",
+        "failed": "Failed",
+        "ongoing": "Ongoing"
+      },
+      "direction": {
+        "all": "All",
+        "inbound": "Inbound",
+        "outbound": "Outbound"
+      },
+      "searchPlaceholder": "Search by participant"
+    },
+    "loading": "Loading call history...",
+    "empty": "No call history found.",
+    "details": {
+      "title": "Call Details",
+      "close": "Close call details",
+      "tabs": {
+        "transcript": "Transcript",
+        "info": "Info",
+        "logs": "Logs",
+        "telemetry": "Telemetry"
+      },
+      "transcript": {
+        "empty": "No transcript available."
+      },
+      "info": {
+        "participants": "Participants",
+        "status": "Status",
+        "direction": "Direction",
+        "start": "Start",
+        "duration": "Duration",
+        "durationNA": "N/A"
+      },
+      "logs": {
+        "empty": "No logs available."
+      },
+      "telemetry": {
+        "title": "Call Quality",
+        "empty": "No telemetry data.",
+        "speech": "Speech",
+        "network": "Network",
+        "stability": "Stability"
+      }
+    },
+    "agentFilter": {
+      "title": "Filter by Agent",
+      "close": "Close agent filter",
+      "searchPlaceholder": "Search agents",
+      "noAgents": "No agents found.",
+      "button": "Filter by Agent"
+    }
+  },
   "sidebar": {
     "organization": "ORGANIZATION",
     "overview": "Overview",

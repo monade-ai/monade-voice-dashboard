@@ -12,6 +12,7 @@ export function formatActions(actions: Action[]): string {
         return `${action.type}: "${action.text}"`;
       }
       const { type, ...rest } = action;
+
       return `${type}: ${JSON.stringify(rest)}`;
     })
     .join('\n');
@@ -46,6 +47,7 @@ export function deepClone<T>(obj: T): T {
  */
 export function truncateString(str: string, maxLength: number = 100): string {
   if (!str || str.length <= maxLength) return str;
+
   return str.substring(0, maxLength) + '...';
 }
 

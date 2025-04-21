@@ -1,9 +1,10 @@
 'use client';
 
 import React from 'react';
+import { Phone, MessageSquare } from 'lucide-react';
+
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Phone, MessageSquare } from 'lucide-react';
 
 interface Assistant {
   id: string;
@@ -29,14 +30,14 @@ export function AssistantCard({ assistant }: AssistantCardProps) {
 
   const getStatusColor = (status: Assistant['status']) => {
     switch (status) {
-      case 'active':
-        return 'bg-green-900/20 border-green-800 text-green-400';
-      case 'inactive':
-        return 'bg-gray-900/20 border-gray-800 text-gray-400';
-      case 'error':
-        return 'bg-red-900/20 border-red-800 text-red-400';
-      default:
-        return 'bg-gray-900/20 border-gray-800 text-gray-400';
+    case 'active':
+      return 'bg-green-900/20 border-green-800 text-green-400';
+    case 'inactive':
+      return 'bg-gray-900/20 border-gray-800 text-gray-400';
+    case 'error':
+      return 'bg-red-900/20 border-red-800 text-red-400';
+    default:
+      return 'bg-gray-900/20 border-gray-800 text-gray-400';
     }
   };
 
@@ -44,9 +45,26 @@ export function AssistantCard({ assistant }: AssistantCardProps) {
     <Card className="bg-white border-gray-200 hover:border-amber-300 transition-all shadow-sm">
       <CardHeader className="pb-2">
         <div className="flex justify-between items-start">
-          <div>
-            <h3 className="text-lg font-medium text-gray-800">{assistant.name}</h3>
-            <p className="text-sm text-gray-500">{assistant.description}</p>
+          <div className="flex items-center gap-3">
+            {/* Animated gradient circle */}
+            <span
+              className="relative flex-shrink-0 w-10 h-10 rounded-full overflow-hidden transition-transform duration-300 group-hover:scale-105 group-focus:scale-105"
+              aria-hidden="true"
+            >
+              <span
+                className="absolute inset-0 animate-gradient-spin"
+                style={{
+                  background: "conic-gradient(from 0deg, #fbbf24, #06b6d4, #a78bfa, #fbbf24)",
+                  filter: "blur(2px)",
+                  opacity: 0.8,
+                }}
+              />
+              <span className="absolute inset-1 rounded-full bg-white/80" />
+            </span>
+            <div>
+              <h3 className="text-lg font-medium text-gray-800">{assistant.name}</h3>
+              <p className="text-sm text-gray-500">{assistant.description}</p>
+            </div>
           </div>
           <div className={`rounded-md border px-2 py-1 ${getStatusColor(assistant.status)}`}>
             <span className="text-xs font-medium capitalize">{assistant.status}</span>

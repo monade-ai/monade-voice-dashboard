@@ -2,13 +2,18 @@
 
 import { useState } from 'react';
 import { Search, Plus } from 'lucide-react';
-import { useAssistants } from '../../hooks/use-assistants-context';
+import { v4 as uuidv4 } from 'uuid';
+
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { v4 as uuidv4 } from 'uuid';
+import { Badge } from '@/components/ui/badge';
+
+import { useAssistants } from '../../hooks/use-assistants-context';
+
+
 import AssistantDualButton from './assistant-dual-button';
 import AssistantNameEdit from './assistant-name-edit';
-import { Badge } from '@/components/ui/badge';
+
 
 export default function AssistantsHeader() {
   const { 
@@ -18,7 +23,7 @@ export default function AssistantsHeader() {
     addAssistant,
     updateAssistant,
     isCreatingNew,
-    setIsCreatingNew 
+    setIsCreatingNew, 
   } = useAssistants();
   
   const [searchTerm, setSearchTerm] = useState('');
@@ -26,7 +31,7 @@ export default function AssistantsHeader() {
 
   // Filter assistants based on search term
   const filteredAssistants = assistants.filter(
-    assistant => assistant.name.toLowerCase().includes(searchTerm.toLowerCase())
+    assistant => assistant.name.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
   const handleCreateAssistant = () => {
@@ -53,9 +58,6 @@ export default function AssistantsHeader() {
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl font-semibold">Assistants</h1>
         
-        {currentAssistant && (
-          <AssistantDualButton assistant={currentAssistant} />
-        )}
       </div>
 
       <div className="flex space-x-2 mb-4">
