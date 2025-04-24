@@ -64,6 +64,8 @@ const ContactListView: React.FC<ContactListViewProps> = ({
   // Move the hook call inside the component
   const { t } = useTranslations();
   const { assistants } = useAssistants();
+  // Debug: Log assistants loaded for call dialog
+  console.log('[Contacts] Loaded assistants for call dialog:', assistants);
   
   const { 
     contactLists, 
@@ -607,6 +609,7 @@ const ContactListView: React.FC<ContactListViewProps> = ({
                 variant="outline"
                 className="justify-start"
                 onClick={() => {
+                  console.log('[Contacts] Assistant selected for call:', assistant, 'Contact:', selectedContact);
                   setSelectedAssistant(assistant);
                 }}
               >
@@ -633,7 +636,8 @@ const ContactListView: React.FC<ContactListViewProps> = ({
           onCall={async (phoneNumber) => {
             setIsCallInitiating(true);
             setCallStatus('initiating');
-            
+            console.log('[Contacts] Initiating Exotel call for phone:', phoneNumber, 'Assistant:', selectedAssistant, 'Contact:', selectedContact);
+            debugger;
             const timer = setInterval(() => {
               setRemainingTime((prev) => prev > 1 ? prev - 1 : 1);
             }, 1000);
@@ -641,8 +645,9 @@ const ContactListView: React.FC<ContactListViewProps> = ({
             try {
               const response = await initiateExotelCall({
                 phone_number: phoneNumber,
-                callback_url: 'http://my.exotel.com/calllive1/exoml/start_voice/918357',
+                callback_url: process.env.NEXT_PUBLIC_EXOTEL_CALLBACK_URL || 'http://my.exotel.com/calllive1/exoml/start_voice/918357',
               });
+              console.log('[Contacts] Exotel call response:', response);
 
               clearInterval(timer);
               setCallStatus('connecting');
@@ -654,7 +659,8 @@ const ContactListView: React.FC<ContactListViewProps> = ({
               clearInterval(timer);
               setCallStatus('failed');
               setIsCallInitiating(false);
-              console.error('Failed to initiate call:', error);
+              console.error('[Contacts] Failed to initiate call:', error);
+              debugger;
             }
           }}
           isCallInitiating={isCallInitiating}

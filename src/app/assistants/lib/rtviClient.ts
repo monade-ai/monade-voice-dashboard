@@ -15,21 +15,28 @@ export function getClient() {
     }
 
     // Initialize Daily transport
-    const transport = new DailyTransport();
+    try {
+      const transport = new DailyTransport();
+      
+      if (!transport) throw new Error('Failed to initialize DailyTransport');
 
-    client = new RTVIClient({
-      transport,
-      params: {
-        baseUrl: process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000',
-        endpoints: {
-          connect: '/connect',
+      client = new RTVIClient({
+        transport,
+        params: {
+          baseUrl: process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000',
+          endpoints: {
+            connect: '/connect',
+          },
+          // Pass the Daily room URL through the connect params
+          dailyUrl: process.env.NEXT_PUBLIC_DAILY_ROOM_URL,
         },
-        // Pass the Daily room URL through the connect params
-        dailyUrl: process.env.NEXT_PUBLIC_DAILY_ROOM_URL,
-      },
-      enableMic: true,
-      enableCam: false,
-    });
+        enableMic: true,
+        enableCam: false,
+      });
+    } catch (error) {
+      console.error('Failed to initialize Daily transport:', error);
+      return null;
+    }
 
     // Add client event listeners for debugging
     client.on('error', (error) => {
@@ -42,4 +49,4 @@ export function getClient() {
   }
   
   return client;
-} 
+}

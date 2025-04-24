@@ -1,6 +1,7 @@
 import React, { createContext, useContext, ReactNode } from 'react';
 
-import { useContacts,Contact,ContactList } from '@/app/hooks/use-contacts';
+import { useContacts, Contact, ContactList } from '@/app/hooks/use-contacts';
+import { useAssistants, Assistant } from '@/app/hooks/use-assistants-context';
 
 // Define the context type
 interface ContactsContextType {
@@ -10,6 +11,8 @@ interface ContactsContextType {
   isLoading: boolean;
   searchResults: Contact[];
   searchQuery: string;
+  assistants: Assistant[];
+  assistantPhoneNumbers: string[];
   
   // Actions
   createContactList: (name: string, description?: string) => ContactList;
@@ -38,9 +41,17 @@ export const ContactsProvider: React.FC<ContactsProviderProps> = ({
   initialContacts,
 }) => {
   const contactsData = useContacts({ initialLists, initialContacts });
-  
+  const { assistants } = useAssistants();
+  const assistantPhoneNumbers = assistants
+    .map((a) => a.phoneNumber)
+    .filter((p): p is string => !!p);
+
   return (
-    <ContactsContext.Provider value={contactsData}>
+    <ContactsContext.Provider value={{
+      ...contactsData,
+      assistants,
+      assistantPhoneNumbers,
+    }}>
       {children}
     </ContactsContext.Provider>
   );

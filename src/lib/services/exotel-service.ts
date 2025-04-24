@@ -4,17 +4,27 @@ interface ExotelCallParams {
 }
 
 export async function initiateExotelCall(params: ExotelCallParams): Promise<Response> {
-  const response = await fetch('/api/exotel/call', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(params),
-  });
+  console.log('[ExotelService] initiateExotelCall called with params:', params);
+  try {
+    const response = await fetch('/api/exotel/call', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(params),
+    });
 
-  if (!response.ok) {
-    throw new Error('Failed to initiate call');
+    console.log('[ExotelService] Exotel API response:', response);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[ExotelService] Failed to initiate call. Status:', response.status, 'Error:', errorText);
+      throw new Error('Failed to initiate call');
+    }
+
+    return response;
+  } catch (err) {
+    console.error('[ExotelService] Exception in initiateExotelCall:', err);
+    throw err;
   }
-
-  return response;
 }

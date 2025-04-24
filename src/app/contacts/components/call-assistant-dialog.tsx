@@ -44,6 +44,8 @@ export function CallAssistantDialog({
 }: CallAssistantDialogProps) {
   useEffect(() => {
     if (isOpen && callStatus === 'idle') {
+      console.log('[CallAssistantDialog] onCall triggered for phone:', phoneNumber, 'Assistant:', assistant);
+      debugger;
       onCall(phoneNumber);
     }
   }, [isOpen, callStatus, phoneNumber, onCall]);

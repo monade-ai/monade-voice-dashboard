@@ -72,6 +72,13 @@ export default function ModelTab() {
   const [provider, setProvider] = useState(currentAssistant?.provider || 'openai');
   const [model, setModel] = useState(currentAssistant?.model || 'tts-1');
   const [voice, setVoice] = useState(currentAssistant?.voice || 'alloy');
+  const [phoneNumber, setPhoneNumber] = useState(currentAssistant?.phoneNumber || '');
+
+  const handlePhoneNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setPhoneNumber(value);
+    updateAssistant(currentAssistant?.id || '', { phoneNumber: value });
+  };
 
   // Get available models for selected provider
   const availableModels = modelsByProvider[provider as keyof typeof modelsByProvider] || [];
@@ -109,6 +116,27 @@ export default function ModelTab() {
 
   return (
     <div className="space-y-8">
+      {/* Phone Number Section */}
+      <div className="border rounded-lg p-6 bg-gray-50">
+        <h3 className="text-lg font-medium mb-2">Phone Number</h3>
+        <p className="text-sm text-gray-600 mb-6">
+          Enter the phone number to associate with this assistant. This will be used for knowledge base mapping and call functionality.
+        </p>
+        <div className="space-y-2">
+          <label htmlFor="assistant-phone-number" className="text-sm font-medium">
+            Phone Number
+          </label>
+          <input
+            id="assistant-phone-number"
+            type="tel"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-400"
+            placeholder="e.g. +1234567890"
+            value={phoneNumber}
+            onChange={handlePhoneNumberChange}
+          />
+        </div>
+      </div>
+
       {/* Voice Configuration Section */}
       <div className="border rounded-lg p-6 bg-gray-50">
         <h3 className="text-lg font-medium mb-2">Voice Configuration</h3>

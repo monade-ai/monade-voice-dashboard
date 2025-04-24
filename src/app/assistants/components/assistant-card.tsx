@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 
 interface Assistant {
   id: string;
+  phoneNumber?: string;
   name: string;
   description: string;
   model: string;

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useAssistants } from '@/app/hooks/use-assistants-context';
 import Link from 'next/link';
 import { Download, FileText, Trash2, Zap, FileType, FileSpreadsheet, File, FileCode, Search, Plus } from 'lucide-react';
 
@@ -59,6 +60,9 @@ const formatDate = (dateString: string): string => {
 };
 
 export function DocumentLibrary() {
+  const { assistants } = useAssistants();
+  const assistantPhoneNumbers = assistants.map(a => a.phoneNumber).filter((p): p is string => !!p);
+
   const [isPublishOpen, setIsPublishOpen] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState<DocumentMetadata | null>(null);
   const [searchQuery, setSearchQuery] = useState('');

@@ -20,6 +20,7 @@ interface AssistantDualButtonProps {
 
 interface Assistant {
   id: string;
+  phoneNumber?: string;
   name: string;
 }
 
