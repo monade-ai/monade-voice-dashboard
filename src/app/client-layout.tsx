@@ -10,6 +10,7 @@ import { TranslationsProvider } from '@/i18n/translations-context';
 import { Sidebar } from '../components/sidebar';
 
 import { PipecatProvider } from './assistants/providers/pipcat-provider';
+import { AssistantsProvider } from './hooks/use-assistants-context';
 
 
 const noSidebarRoutes = [
@@ -34,7 +35,9 @@ export default function ClientLayout({
         <Toaster richColors position="bottom-center" />
         {!hideSidebar && <Sidebar />}
         <main className="flex-1 overflow-auto bg-[#f8f5f0] text-gray-800">
-          <PipecatProvider>{children}</PipecatProvider>
+          <AssistantsProvider>
+            <PipecatProvider>{children}</PipecatProvider>
+          </AssistantsProvider>
         </main>
       </div>
     </TranslationsProvider>
