@@ -99,7 +99,7 @@ export function PromptEditor({ promptId }: PromptEditorProps) {
     content: '',
     editorProps: {
       attributes: {
-        class: 'min-h-[300px] p-4 border rounded-md focus:outline-none prose prose-sm max-w-none',
+        class: 'min-h-[300px] p-4 border border-muted/60 rounded-md focus:outline-none prose prose-sm max-w-none bg-background/80',
       },
     },
     onUpdate: ({ editor }) => {
@@ -374,18 +374,18 @@ export function PromptEditor({ promptId }: PromptEditorProps) {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-amber-500 mr-2" />
-        <span>Loading prompt...</span>
+        <Loader2 className="h-8 w-8 animate-spin text-primary mr-2" />
+        <span className="text-foreground/80">Loading prompt...</span>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      <Card className="border-2 shadow-lg overflow-hidden">
-        <CardHeader className="bg-gradient-to-r from-purple-50 to-indigo-50 border-b">
+      <Card className="border border-border/60 shadow-sm overflow-hidden">
+        <CardHeader className="bg-muted/30 border-b">
           <div className="space-y-2">
-            <Label htmlFor="prompt-title" className="text-lg font-medium">
+            <Label htmlFor="prompt-title" className="text-lg font-medium text-foreground/90">
               Prompt Title
             </Label>
             <Input
@@ -393,26 +393,26 @@ export function PromptEditor({ promptId }: PromptEditorProps) {
               placeholder="Enter a title for this prompt"
               value={promptTitle}
               onChange={(e) => setPromptTitle(e.target.value)}
-              className="bg-white/80 border-2 focus-visible:ring-purple-400"
+              className="bg-background border focus-visible:ring-primary/50 focus-visible:border-primary/50"
             />
           </div>
         </CardHeader>
         <CardContent className="p-0">
           <Tabs defaultValue="editor" className="w-full">
-            <TabsList className="w-full rounded-none border-b">
-              <TabsTrigger value="editor" className="flex-1 py-3 data-[state=active]:bg-white">
+            <TabsList className="w-full rounded-none border-b bg-muted/20">
+              <TabsTrigger value="editor" className="flex-1 py-3 data-[state=active]:bg-background data-[state=active]:text-foreground/90 data-[state=active]:border-b-2 data-[state=active]:border-primary/70 text-muted-foreground/80">
                 Rich Text Editor
               </TabsTrigger>
-              <TabsTrigger value="upload" className="flex-1 py-3 data-[state=active]:bg-white">
+              <TabsTrigger value="upload" className="flex-1 py-3 data-[state=active]:bg-background data-[state=active]:text-foreground/90 data-[state=active]:border-b-2 data-[state=active]:border-primary/70 text-muted-foreground/80">
                 Upload Document
               </TabsTrigger>
-              <TabsTrigger value="markdown-preview" className="flex-1 py-3 data-[state=active]:bg-white">
+              <TabsTrigger value="markdown-preview" className="flex-1 py-3 data-[state=active]:bg-background data-[state=active]:text-foreground/90 data-[state=active]:border-b-2 data-[state=active]:border-primary/70 text-muted-foreground/80">
                 Markdown Preview
               </TabsTrigger>
             </TabsList>
 
             <TabsContent value="editor" className="p-0 focus-visible:outline-none focus-visible:ring-0">
-              <div className="border-b p-3 bg-white">
+              <div className="border-b p-3 bg-background">
                 <div className="flex flex-wrap gap-1 mb-2">
                   <TooltipProvider>
                     {/* Text Formatting */}
@@ -423,7 +423,7 @@ export function PromptEditor({ promptId }: PromptEditorProps) {
                             variant="ghost"
                             size="icon"
                             onClick={() => editor?.chain().focus().toggleBold().run()}
-                            className={editor?.isActive('bold') ? 'bg-muted' : ''}
+                            className={editor?.isActive('bold') ? 'bg-primary/10 text-primary' : 'text-muted-foreground/80 hover:text-foreground hover:bg-muted/30'}
                           >
                             <Bold className="h-4 w-4" />
                           </Button>
@@ -437,7 +437,7 @@ export function PromptEditor({ promptId }: PromptEditorProps) {
                             variant="ghost"
                             size="icon"
                             onClick={() => editor?.chain().focus().toggleItalic().run()}
-                            className={editor?.isActive('italic') ? 'bg-muted' : ''}
+                            className={editor?.isActive('italic') ? 'bg-primary/10 text-primary' : 'text-muted-foreground/80 hover:text-foreground hover:bg-muted/30'}
                           >
                             <Italic className="h-4 w-4" />
                           </Button>
@@ -451,7 +451,7 @@ export function PromptEditor({ promptId }: PromptEditorProps) {
                             variant="ghost"
                             size="icon"
                             onClick={() => editor?.chain().focus().toggleUnderline().run()}
-                            className={editor?.isActive('underline') ? 'bg-muted' : ''}
+                            className={editor?.isActive('underline') ? 'bg-primary/10 text-primary' : 'text-muted-foreground/80 hover:text-foreground hover:bg-muted/30'}
                           >
                             <UnderlineIcon className="h-4 w-4" />
                           </Button>
@@ -465,7 +465,7 @@ export function PromptEditor({ promptId }: PromptEditorProps) {
                             variant="ghost"
                             size="icon"
                             onClick={() => editor?.chain().focus().toggleStrike().run()}
-                            className={editor?.isActive('strike') ? 'bg-muted' : ''}
+                            className={editor?.isActive('strike') ? 'bg-primary/10 text-primary' : 'text-muted-foreground/80 hover:text-foreground hover:bg-muted/30'}
                           >
                             <Strikethrough className="h-4 w-4" />
                           </Button>
@@ -484,7 +484,7 @@ export function PromptEditor({ promptId }: PromptEditorProps) {
                             variant="ghost"
                             size="sm"
                             onClick={() => editor?.chain().focus().toggleHeading({ level: 1 }).run()}
-                            className={editor?.isActive('heading', { level: 1 }) ? 'bg-muted' : ''}
+                            className={editor?.isActive('heading', { level: 1 }) ? 'bg-primary/10 text-primary' : 'text-muted-foreground/80 hover:text-foreground hover:bg-muted/30'}
                           >
                             H1
                           </Button>
@@ -498,7 +498,7 @@ export function PromptEditor({ promptId }: PromptEditorProps) {
                             variant="ghost"
                             size="sm"
                             onClick={() => editor?.chain().focus().toggleHeading({ level: 2 }).run()}
-                            className={editor?.isActive('heading', { level: 2 }) ? 'bg-muted' : ''}
+                            className={editor?.isActive('heading', { level: 2 }) ? 'bg-primary/10 text-primary' : 'text-muted-foreground/80 hover:text-foreground hover:bg-muted/30'}
                           >
                             H2
                           </Button>
@@ -512,7 +512,7 @@ export function PromptEditor({ promptId }: PromptEditorProps) {
                             variant="ghost"
                             size="sm"
                             onClick={() => editor?.chain().focus().toggleHeading({ level: 3 }).run()}
-                            className={editor?.isActive('heading', { level: 3 }) ? 'bg-muted' : ''}
+                            className={editor?.isActive('heading', { level: 3 }) ? 'bg-primary/10 text-primary' : 'text-muted-foreground/80 hover:text-foreground hover:bg-muted/30'}
                           >
                             H3
                           </Button>
@@ -531,7 +531,7 @@ export function PromptEditor({ promptId }: PromptEditorProps) {
                             variant="ghost"
                             size="icon"
                             onClick={() => editor?.chain().focus().toggleBulletList().run()}
-                            className={editor?.isActive('bulletList') ? 'bg-muted' : ''}
+                            className={editor?.isActive('bulletList') ? 'bg-primary/10 text-primary' : 'text-muted-foreground/80 hover:text-foreground hover:bg-muted/30'}
                           >
                             <List className="h-4 w-4" />
                           </Button>
@@ -545,7 +545,7 @@ export function PromptEditor({ promptId }: PromptEditorProps) {
                             variant="ghost"
                             size="icon"
                             onClick={() => editor?.chain().focus().toggleOrderedList().run()}
-                            className={editor?.isActive('orderedList') ? 'bg-muted' : ''}
+                            className={editor?.isActive('orderedList') ? 'bg-primary/10 text-primary' : 'text-muted-foreground/80 hover:text-foreground hover:bg-muted/30'}
                           >
                             <ListOrdered className="h-4 w-4" />
                           </Button>
@@ -564,7 +564,7 @@ export function PromptEditor({ promptId }: PromptEditorProps) {
                             variant="ghost"
                             size="icon"
                             onClick={() => editor?.chain().focus().toggleBlockquote().run()}
-                            className={editor?.isActive('blockquote') ? 'bg-muted' : ''}
+                            className={editor?.isActive('blockquote') ? 'bg-primary/10 text-primary' : 'text-muted-foreground/80 hover:text-foreground hover:bg-muted/30'}
                           >
                             <Quote className="h-4 w-4" />
                           </Button>
@@ -578,7 +578,7 @@ export function PromptEditor({ promptId }: PromptEditorProps) {
                             variant="ghost"
                             size="icon"
                             onClick={() => editor?.chain().focus().toggleCodeBlock().run()}
-                            className={editor?.isActive('codeBlock') ? 'bg-muted' : ''}
+                            className={editor?.isActive('codeBlock') ? 'bg-primary/10 text-primary' : 'text-muted-foreground/80 hover:text-foreground hover:bg-muted/30'}
                           >
                             <CodeSquare className="h-4 w-4" />
                           </Button>
@@ -592,7 +592,7 @@ export function PromptEditor({ promptId }: PromptEditorProps) {
                             variant="ghost"
                             size="icon"
                             onClick={() => editor?.chain().focus().toggleCode().run()}
-                            className={editor?.isActive('code') ? 'bg-muted' : ''}
+                            className={editor?.isActive('code') ? 'bg-primary/10 text-primary' : 'text-muted-foreground/80 hover:text-foreground hover:bg-muted/30'}
                           >
                             <Code className="h-4 w-4" />
                           </Button>
@@ -613,7 +613,7 @@ export function PromptEditor({ promptId }: PromptEditorProps) {
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  className={editor?.isActive('link') ? 'bg-muted' : ''}
+                                  className={editor?.isActive('link') ? 'bg-primary/10 text-primary' : 'text-muted-foreground/80 hover:text-foreground hover:bg-muted/30'}
                                 >
                                   <LinkIcon className="h-4 w-4" />
                                 </Button>
@@ -622,21 +622,22 @@ export function PromptEditor({ promptId }: PromptEditorProps) {
                             <TooltipContent>Insert Link</TooltipContent>
                           </Tooltip>
                         </TooltipProvider>
-                        <PopoverContent className="w-80">
+                        <PopoverContent className="w-80 border border-border/60 shadow-sm">
                           <div className="flex flex-col space-y-2">
-                            <Label htmlFor="link-url">URL</Label>
+                            <Label htmlFor="link-url" className="text-foreground/90">URL</Label>
                             <div className="flex space-x-2">
                               <Input 
                                 id="link-url"
                                 placeholder="https://example.com" 
                                 value={linkUrl}
                                 onChange={(e) => setLinkUrl(e.target.value)}
+                                className="border-muted/60 focus-visible:ring-primary/50 focus-visible:border-primary/50"
                               />
                               <Button
                                 size="icon"
                                 variant="ghost"
                                 onClick={setLink}
-                                className="text-green-600"
+                                className="text-[#43B02A] hover:bg-[#43B02A]/10 hover:text-[#43B02A] transition-colors duration-150"
                               >
                                 <Check className="h-4 w-4" />
                               </Button>
@@ -644,7 +645,7 @@ export function PromptEditor({ promptId }: PromptEditorProps) {
                                 size="icon"
                                 variant="ghost"
                                 onClick={() => setLinkPopoverOpen(false)}
-                                className="text-red-600"
+                                className="text-[#E11900] hover:bg-[#E11900]/10 hover:text-[#E11900] transition-colors duration-150"
                               >
                                 <X className="h-4 w-4" />
                               </Button>
@@ -757,81 +758,137 @@ export function PromptEditor({ promptId }: PromptEditorProps) {
               </div>
             </TabsContent>
 
-            <TabsContent value="upload" className="p-6 focus-visible:outline-none focus-visible:ring-0 bg-white">
-              <div className="border-2 border-dashed rounded-lg p-8 text-center transition-all duration-300 hover:border-primary/50 hover:bg-primary/5">
-                <FileUp className="mx-auto h-10 w-10 text-muted-foreground" />
-                <h3 className="mt-2 text-lg font-semibold">Upload Document as Prompt</h3>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Upload a text file to use as your prompt template (.txt, .md, .docx)
-                </p>
-                <Input
-                  id="prompt-file-upload"
-                  type="file"
-                  className="hidden"
-                  accept=".txt,.md,.docx"
-                  onChange={handleUploadFile}
-                />
-                <Button
-                  variant="outline"
-                  className="mt-4"
-                  onClick={() => document.getElementById('prompt-file-upload')?.click()}
-                >
-                  Select File
-                </Button>
-              </div>
+            <TabsContent value="upload" className="p-0 focus-visible:outline-none focus-visible:ring-0">
+                <div className="p-6 flex flex-col items-center justify-center bg-background">
+                  <div className="mb-4 text-center">
+                    <h3 className="text-lg font-medium text-foreground/90">Upload a Prompt Document</h3>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Import an existing prompt from a Markdown (.md) file
+                    </p>
+                  </div>
+                  
+                  <div className="w-full max-w-sm">
+                    <Label htmlFor="file-upload" className="block text-sm font-medium mb-2 text-foreground/90">
+                      Select File
+                    </Label>
+                    <Input
+                      id="file-upload"
+                      type="file"
+                      accept=".md,.txt"
+                      onChange={handleUploadFile}
+                      className="cursor-pointer border-muted/60 focus-visible:ring-primary/50 focus-visible:border-primary/50"
+                    />
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Supported formats: Markdown (.md), Text (.txt)
+                    </p>
+                  </div>
+                </div>
             </TabsContent>
             
-            <TabsContent value="markdown-preview" className="focus-visible:outline-none focus-visible:ring-0">
-              <div className="p-4 bg-white flex flex-col gap-3">
-                <div className="flex justify-between items-center">
-                  <h3 className="text-lg font-medium">Markdown Preview</h3>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={downloadMarkdown}
-                    className="gap-1"
-                  >
-                    <Save className="h-3.5 w-3.5" />
-                    Download Markdown
-                  </Button>
+            <TabsContent value="markdown-preview" className="p-0 focus-visible:outline-none focus-visible:ring-0">
+                <div className="p-4 border-b bg-background">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-medium text-foreground/90">Markdown Preview</h3>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setIsMarkdownVisible(!isMarkdownVisible)}
+                      className="text-xs text-muted-foreground hover:text-foreground transition-colors duration-150"
+                    >
+                      {isMarkdownVisible ? (
+                        <>
+                          <Eye className="h-3.5 w-3.5 mr-1 text-primary/80" />
+                          Hide Raw Markdown
+                        </>
+                      ) : (
+                        <>
+                          <EyeOff className="h-3.5 w-3.5 mr-1 text-primary/80" />
+                          Show Raw Markdown
+                        </>
+                      )}
+                    </Button>
+                  </div>
                 </div>
                 
-                <div className="border rounded-md p-4 bg-gray-50 min-h-[300px] font-mono text-sm whitespace-pre-wrap overflow-auto">
-                  {markdownContent || '*No content yet*'}
-                </div>
-              </div>
+                {isMarkdownVisible ? (
+                  <div className="p-4 font-mono text-sm whitespace-pre-wrap bg-muted/20 border-b">
+                    {markdownContent}
+                  </div>
+                ) : (
+                  <div className="p-4 prose prose-sm max-w-none bg-background">
+                    <div dangerouslySetInnerHTML={{ __html: editor?.getHTML() || '' }} />
+                  </div>
+                )}
             </TabsContent>
           </Tabs>
         </CardContent>
       </Card>
 
-      <div className="flex justify-end gap-2">
-        <Button 
-          variant="outline" 
-          className="gap-2 px-4 py-2 rounded-full"
-          onClick={handleSavePrompt}
-          disabled={isSaving}
-        >
-          {isSaving ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Saving...
-            </>
-          ) : (
-            <>
-              <Save className="h-4 w-4" />
-              Save Draft
-            </>
-          )}
-        </Button>
-        <Button
-          onClick={handlePublish}
-          className="gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700"
-          disabled={isSaving || isAIEnhancing}
-        >
-          <Zap className="h-4 w-4" />
-          Publish Prompt
-        </Button>
+      <div className="flex justify-between mt-6 space-x-2">
+        <div className="flex space-x-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleAIAssist}
+            disabled={isAIEnhancing || !editor}
+            className="flex items-center border-muted/70 text-foreground/90 hover:bg-muted/30 hover:text-foreground transition-colors duration-150"
+          >
+            {isAIEnhancing ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin text-primary" />
+                Enhancing...
+              </>
+            ) : (
+              <>
+                <Sparkles className="mr-2 h-4 w-4 text-primary/80" />
+                AI Assist
+              </>
+            )}
+          </Button>
+          
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={downloadMarkdown}
+            disabled={!editor}
+            className="flex items-center border-muted/70 text-foreground/90 hover:bg-muted/30 hover:text-foreground transition-colors duration-150"
+          >
+            <FileUp className="mr-2 h-4 w-4 text-primary/80" />
+            Export
+          </Button>
+        </div>
+        
+        <div className="flex space-x-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleSavePrompt}
+            disabled={isSaving || !editor}
+            className="flex items-center border-muted/70 text-foreground/90 hover:bg-muted/30 hover:text-foreground transition-colors duration-150"
+          >
+            {isSaving ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin text-primary" />
+                Saving...
+              </>
+            ) : (
+              <>
+                <Save className="mr-2 h-4 w-4 text-primary/80" />
+                Save
+              </>
+            )}
+          </Button>
+          
+          <Button
+            size="sm"
+            onClick={handlePublish}
+            disabled={!currentPrompt}
+            className="flex items-center bg-primary text-primary-foreground hover:bg-primary/90 transition-all duration-150"
+          >
+            <Zap className="mr-2 h-4 w-4" />
+            Publish
+          </Button>
+        </div>
       </div>
 
       <PublishPromptDialog 
@@ -839,8 +896,8 @@ export function PromptEditor({ promptId }: PromptEditorProps) {
         onOpenChange={setIsPublishOpen} 
         promptTitle={promptTitle}
         documentContent={currentPrompt ? {
-          title: currentPrompt.title,
-          markdown: currentPrompt.content,
+          title: promptTitle,
+          markdown: markdownContent,
         } : null}
       />
     </div>
