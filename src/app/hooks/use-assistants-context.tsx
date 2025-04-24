@@ -69,10 +69,25 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
   const [currentAssistant, setCurrentAssistant] = useState<Assistant | null>(null);
   const [isCreatingNew, setIsCreatingNew] = useState(false);
 
-  // Fetch assistants from backend on mount
-  const fetchAssistants = async () => {
+  // In-memory cache for assistants (module-level, survives re-renders)
+  const assistantsCacheRef = typeof window !== "undefined" ? (window as any).__assistantsCacheRef || ((window as any).__assistantsCacheRef = { data: null, timestamp: 0 }) : { data: null, timestamp: 0 };
+
+  // Fetch assistants from backend, with cache
+  const fetchAssistants = async (force = false) => {
+    // 5 min cache expiry (optional, can be adjusted)
+    const CACHE_TTL = 5 * 60 * 1000;
+    const now = Date.now();
+
+    if (!force && assistantsCacheRef.data && (now - assistantsCacheRef.timestamp < CACHE_TTL)) {
+      setAssistants(assistantsCacheRef.data);
+      console.log('[AssistantsContext] Using cached assistants');
+      return;
+    }
+
+    console.log('[AssistantsContext] fetchAssistants called. API base URL:', ASSISTANTS_API_BASE_URL, 'force:', force);
     try {
       const res = await fetch(ASSISTANTS_API_BASE_URL);
+      console.log('[AssistantsContext] API response status:', res.status);
       if (!res.ok) throw new Error('Failed to fetch assistants');
       const data = await res.json();
       console.log('[Assistants] GET', ASSISTANTS_API_BASE_URL, 'Raw fetched:', data);
@@ -82,16 +97,20 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
       }));
       console.log('[Assistants] Processed list:', processed);
       setAssistants(processed);
+      assistantsCacheRef.data = processed;
+      assistantsCacheRef.timestamp = now;
     } catch (err) {
       // Fallback to sample data if fetch fails
       setAssistants(sampleAssistants);
-      // Optionally log error
-      // console.error('Error fetching assistants:', err);
+      assistantsCacheRef.data = sampleAssistants;
+      assistantsCacheRef.timestamp = now;
+      console.error('[AssistantsContext] Error fetching assistants:', err);
     }
   };
 
   useEffect(() => {
     fetchAssistants();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const addAssistant = async (assistant: Omit<Assistant, 'id' | 'createdAt'>) => {
@@ -102,8 +121,8 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
         body: JSON.stringify(assistant),
       });
       if (!res.ok) throw new Error('Failed to add assistant');
-      // After successful creation, re-fetch the assistants list
-      await fetchAssistants();
+      // After successful creation, re-fetch the assistants list (force refresh)
+      await fetchAssistants(true);
     } catch (err) {
       // Fallback: add locally if backend fails, but mark as unsynced (no id)
       setAssistants((prev) => [
@@ -114,6 +133,15 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
           createdAt: new Date(),
         } as Assistant,
       ]);
+      assistantsCacheRef.data = [
+        ...(assistantsCacheRef.data || []),
+        {
+          ...assistant,
+          id: `local-${Date.now()}`,
+          createdAt: new Date(),
+        } as Assistant,
+      ];
+      assistantsCacheRef.timestamp = Date.now();
       // Optionally log error
       // console.error('Error adding assistant:', err);
     }
@@ -141,8 +169,8 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
         console.error('[Assistants] PATCH failed', res.status, errorText);
         throw new Error('Failed to update assistant');
       }
-      // After successful update, re-fetch the assistants list
-      await fetchAssistants();
+      // After successful update, re-fetch the assistants list (force refresh)
+      await fetchAssistants(true);
     } catch (err) {
       // Fallback: update locally if backend fails
       setAssistants((prev) =>
@@ -150,6 +178,12 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
           assistant.id === id ? { ...assistant, ...updatedData } : assistant,
         ),
       );
+      if (assistantsCacheRef.data) {
+        assistantsCacheRef.data = assistantsCacheRef.data.map((assistant: Assistant) =>
+          assistant.id === id ? { ...assistant, ...updatedData } : assistant,
+        );
+        assistantsCacheRef.timestamp = Date.now();
+      }
       if (currentAssistant?.id === id) {
         setCurrentAssistant((prev) => prev ? { ...prev, ...updatedData } : null);
       }
@@ -163,6 +197,10 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
     if (id.startsWith('local-')) {
       // Optionally show a warning or error in the UI
       setAssistants((prev) => prev.filter((assistant) => assistant.id !== id));
+      if (assistantsCacheRef.data) {
+        assistantsCacheRef.data = assistantsCacheRef.data.filter((assistant: Assistant) => assistant.id !== id);
+        assistantsCacheRef.timestamp = Date.now();
+      }
       if (currentAssistant?.id === id) {
         setCurrentAssistant(null);
       }
@@ -176,14 +214,18 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
         }
       );
       if (!res.ok) throw new Error('Failed to delete assistant');
-      // After successful delete, re-fetch the assistants list
-      await fetchAssistants();
+      // After successful delete, re-fetch the assistants list (force refresh)
+      await fetchAssistants(true);
       if (currentAssistant?.id === id) {
         setCurrentAssistant(null);
       }
     } catch (err) {
       // Fallback: delete locally if backend fails
       setAssistants((prev) => prev.filter((assistant) => assistant.id !== id));
+      if (assistantsCacheRef.data) {
+        assistantsCacheRef.data = assistantsCacheRef.data.filter((assistant: Assistant) => assistant.id !== id);
+        assistantsCacheRef.timestamp = Date.now();
+      }
       if (currentAssistant?.id === id) {
         setCurrentAssistant(null);
       }

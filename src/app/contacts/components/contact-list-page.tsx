@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button';
 import { Contact } from '@/app/hooks/use-contacts';
 
 import { ContactsProvider } from '../contexts/contacts-context';
-import { AssistantsProvider } from '@/app/hooks/use-assistants-context';
 
 import ContactListView from './contacts-list-view';
 import ContactUploadDialog from './contact-upload-dialog';
@@ -75,73 +74,71 @@ const ContactListPage: React.FC = () => {
       initialLists={mockInitialLists} 
       initialContacts={mockInitialContacts}
     >
-      <AssistantsProvider>
-        <div className="container mx-auto py-6 max-w-7xl">
-          <ContactListView 
-            onCreateList={() => setShowCreateListDialog(true)}
-            onUploadContacts={() => setShowUploadDialog(true)}
-            onImportContacts={() => setShowImportDialog(true)}
-            onCreateContact={() => setShowCreateContactDialog(true)}
-          />
+      <div className="container mx-auto py-6 max-w-7xl">
+        <ContactListView 
+          onCreateList={() => setShowCreateListDialog(true)}
+          onUploadContacts={() => setShowUploadDialog(true)}
+          onImportContacts={() => setShowImportDialog(true)}
+          onCreateContact={() => setShowCreateContactDialog(true)}
+        />
 
-          {/* Create Contact List Dialog */}
-          <Dialog open={showCreateListDialog} onOpenChange={setShowCreateListDialog}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>{t('contacts.create_list.title')}</DialogTitle>
-                <DialogDescription>
-                  {t('contacts.create_list.description')}
-                </DialogDescription>
-              </DialogHeader>
+        {/* Create Contact List Dialog */}
+        <Dialog open={showCreateListDialog} onOpenChange={setShowCreateListDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{t('contacts.create_list.title')}</DialogTitle>
+              <DialogDescription>
+                {t('contacts.create_list.description')}
+              </DialogDescription>
+            </DialogHeader>
+            
+            <CreateContactListDialog 
+              onSubmit={(name, description) => {
               
-              <CreateContactListDialog 
-                onSubmit={(name, description) => {
-                
-                }}
-                onClose={() => setShowCreateListDialog(false)}
-              />
-            </DialogContent>
-          </Dialog>
-
-          {/* Upload Contacts Dialog */}
-          {showUploadDialog && (
-            <ContactUploadDialog
-              isOpen={showUploadDialog}
-              onClose={() => setShowUploadDialog(false)}
-              onUploadComplete={handleUploadComplete}
+              }}
+              onClose={() => setShowCreateListDialog(false)}
             />
-          )}
+          </DialogContent>
+        </Dialog>
 
-          {/* Import from CRM Dialog */}
-          <ContactImportDialog
-            isOpen={showImportDialog}
-            onClose={() => setShowImportDialog(false)}
-            onImportComplete={(contacts) => {
-              // We don't need to handle import here as it's handled by the dialog
-              setShowImportDialog(false);
-            }}
+        {/* Upload Contacts Dialog */}
+        {showUploadDialog && (
+          <ContactUploadDialog
+            isOpen={showUploadDialog}
+            onClose={() => setShowUploadDialog(false)}
+            onUploadComplete={handleUploadComplete}
           />
+        )}
 
-          {/* Create Contact Dialog */}
-          <Dialog open={showCreateContactDialog} onOpenChange={setShowCreateContactDialog}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>{t('contacts.add_contact.title')}</DialogTitle>
-                <DialogDescription>
-                  {t('contacts.add_contact.description')}
-                </DialogDescription>
-              </DialogHeader>
-              
-              <CreateContact
-                onCancel={() => setShowCreateContactDialog(false)}
-                onSuccess={(contact) => {
-                  setShowCreateContactDialog(false);
-                }}
-              />
-            </DialogContent>
-          </Dialog>
-        </div>
-      </AssistantsProvider>
+        {/* Import from CRM Dialog */}
+        <ContactImportDialog
+          isOpen={showImportDialog}
+          onClose={() => setShowImportDialog(false)}
+          onImportComplete={(contacts) => {
+            // We don't need to handle import here as it's handled by the dialog
+            setShowImportDialog(false);
+          }}
+        />
+
+        {/* Create Contact Dialog */}
+        <Dialog open={showCreateContactDialog} onOpenChange={setShowCreateContactDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{t('contacts.add_contact.title')}</DialogTitle>
+              <DialogDescription>
+                {t('contacts.add_contact.description')}
+              </DialogDescription>
+            </DialogHeader>
+            
+            <CreateContact
+              onCancel={() => setShowCreateContactDialog(false)}
+              onSuccess={(contact) => {
+                setShowCreateContactDialog(false);
+              }}
+            />
+          </DialogContent>
+        </Dialog>
+      </div>
     </ContactsProvider>
   );
 };

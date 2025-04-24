@@ -56,6 +56,7 @@ export function PublishPromptDialog({
   }, [open, isSuccess]);
 
   const { assistants } = useAssistants();
+  console.log('[PublishPromptDialog] assistants from context:', assistants);
   const agents = assistants.map(a => ({
     id: a.id,
     name: a.name,
