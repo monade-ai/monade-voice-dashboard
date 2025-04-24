@@ -43,7 +43,7 @@ export function DocumentUploader() {
       // Auto-upload when files are dropped
       if (newFiles.length > 0) {
         setDocumentTitle(newFiles[0].name);
-        simulateUpload(newFiles[0]);
+        handleFileUpload(newFiles[0]);
       }
     }
   };
@@ -56,7 +56,7 @@ export function DocumentUploader() {
       // Auto-upload when files are selected
       if (newFiles.length > 0) {
         setDocumentTitle(newFiles[0].name);
-        simulateUpload(newFiles[0]);
+        handleFileUpload(newFiles[0]);
       }
     }
   };
@@ -79,7 +79,12 @@ export function DocumentUploader() {
     });
   };
 
-  const simulateUpload = async (file: File) => {
+  /**
+   * Processes the selected file, converts it to base64, 
+   * and uploads it using the DocumentStorage API.
+   * @param file The file to upload.
+   */
+  const handleFileUpload = async (file: File) => {
     setIsUploading(true);
     try {
       const base64 = await fileToBase64(file);
@@ -95,9 +100,9 @@ export function DocumentUploader() {
         uploadedAt: new Date().toISOString(),
       };
 
-      // Save to storage
-      DocumentStorage.saveDocument(documentMetadata);
-      
+      // Save document using the API wrapper
+      await DocumentStorage.saveDocument(documentMetadata);
+
       toast({
         title: 'Document uploaded',
         description: `${file.name} has been added to your knowledge base.`,
@@ -145,13 +150,12 @@ export function DocumentUploader() {
       <div className="space-y-2">
         <Label>Upload Document</Label>
         <div
-          className={`border-2 border-dashed rounded-lg p-8 text-center transition-all duration-300 ${
-            isDragging
-              ? 'border-primary bg-primary/5'
-              : uploadComplete
-                ? 'border-green-500 bg-green-50'
-                : 'border-muted-foreground/20 hover:border-primary/50 hover:bg-primary/5'
-          }`}
+          className={`border-2 border-dashed rounded-lg p-8 text-center transition-all duration-300 ${isDragging
+            ? 'border-primary bg-primary/5'
+            : uploadComplete
+              ? 'border-green-500 bg-green-50'
+              : 'border-muted-foreground/20 hover:border-primary/50 hover:bg-primary/5'
+            }`}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
