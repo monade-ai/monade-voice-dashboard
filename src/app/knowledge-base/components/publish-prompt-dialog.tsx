@@ -229,68 +229,78 @@ export function PublishPromptDialog({
         }
       }}
     >
-      <DialogContent className="sm:max-w-[425px] overflow-hidden">
+      <DialogContent className="sm:max-w-[425px] overflow-hidden p-5 shadow-sm border border-border/60">
         {isSuccess ? (
-          <div className="py-8 flex flex-col items-center justify-center text-center">
-            <div className="rounded-full bg-green-100 p-4 mb-4">
-              <CheckCircle2 className="h-10 w-10 text-green-600" />
+          <div className="py-6 flex flex-col items-center justify-center text-center">
+            <div className="rounded-full bg-[#43B02A]/5 p-3.5 mb-4 ring-1 ring-[#43B02A]/20">
+              <CheckCircle2 className="h-8 w-8 text-[#43B02A]" />
             </div>
-            <DialogTitle className="text-xl text-green-700">Published Successfully!</DialogTitle>
-            <DialogDescription className="mt-2">
+            <DialogTitle className="text-lg font-medium text-[#43B02A]">Published Successfully!</DialogTitle>
+            <DialogDescription className="mt-1.5 text-sm text-foreground/80">
               "{promptTitle}" has been connected to the selected agent
             </DialogDescription>
           </div>
         ) : (
           <>
-            <DialogHeader>
-              <DialogTitle>Publish Document</DialogTitle>
-              <DialogDescription>Connect this document to an AI agent to use it in conversations.</DialogDescription>
+            <DialogHeader className="pb-1">
+              <DialogTitle className="text-lg font-medium">Publish Document</DialogTitle>
+              <DialogDescription className="text-sm text-foreground/70 mt-1">Connect this document to an AI agent to use it in conversations.</DialogDescription>
             </DialogHeader>
             
             {error && (
-              <div className="bg-red-50 border border-red-200 rounded-md p-3 text-red-800 text-sm flex items-center gap-2 mb-3">
-                <AlertTriangle className="h-4 w-4 text-red-500" />
-                {error}
+              <div className="bg-[#E11900]/5 border border-[#E11900]/20 rounded-md p-2.5 text-[#E11900] text-xs flex items-center gap-2 mb-3 ring-1 ring-[#E11900]/10">
+                <AlertTriangle className="h-3.5 w-3.5 text-[#E11900]/90" />
+                <span className="leading-tight">{error}</span>
               </div>
             )}
             
             <div className="py-4">
               <div className="space-y-2">
-                <Label>Select Agent</Label>
-                <RadioGroup value={selectedAgent || ''} onValueChange={setSelectedAgent} className="space-y-3">
-                  {agents.map((agent) => (
-                    <div
-                      key={agent.id}
-                      className={`flex items-center space-x-2 rounded-md border-2 p-3 transition-all duration-200 ${
-                        selectedAgent === agent.id
-                          ? 'border-primary bg-primary/5 shadow-sm'
-                          : 'hover:border-primary/30 hover:bg-primary/5'
-                      }`}
-                    >
-                      <RadioGroupItem value={agent.id} id={agent.id} />
-                      <Label htmlFor={agent.id} className="flex-1 cursor-pointer">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <div
-                              className={`rounded-full p-1 ${selectedAgent === agent.id ? 'bg-primary/10' : 'bg-muted'}`}
-                            >
-                              <Zap
-                                className={`h-4 w-4 ${selectedAgent === agent.id ? 'text-primary' : 'text-muted-foreground'}`}
-                              />
+                <Label className="text-sm font-medium text-foreground/90 mb-1.5 inline-block">Select Agent</Label>
+                <div className="max-h-[240px] overflow-y-auto pr-1.5 custom-scrollbar rounded-md">
+                  <RadioGroup value={selectedAgent || ''} onValueChange={setSelectedAgent} className="space-y-2">
+                    {agents.map((agent) => (
+                      <div
+                        key={agent.id}
+                        className={`flex items-center space-x-3 rounded-lg border transition-all duration-150 ${
+                          selectedAgent === agent.id
+                            ? 'border-primary/50 bg-primary/3 ring-1 ring-primary/20'
+                            : 'border-muted/60 hover:border-primary/30 hover:bg-muted/30'
+                        } p-2.5`}
+                      >
+                        <RadioGroupItem 
+                          value={agent.id} 
+                          id={agent.id} 
+                          className="mt-0.5"
+                        />
+                        <Label htmlFor={agent.id} className="flex-1 cursor-pointer">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2.5">
+                              <div
+                                className={`rounded-full p-1.5 ${selectedAgent === agent.id ? 'bg-primary/10' : 'bg-muted/70'} transition-colors duration-150`}
+                              >
+                                <Zap
+                                  className={`h-3.5 w-3.5 ${selectedAgent === agent.id ? 'text-primary' : 'text-muted-foreground/80'}`}
+                                />
+                              </div>
+                              <span className={`font-medium ${selectedAgent === agent.id ? 'text-primary' : 'text-foreground/90'}`}>
+                                {agent.name}
+                              </span>
                             </div>
-                            <span className="font-medium">{agent.name}</span>
+                            {agent.active && (
+                              <span className="flex items-center text-xs text-[#43B02A] bg-[#43B02A]/5 px-2 py-0.5 rounded-full ml-2">
+                                <Check className="mr-0.5 h-2.5 w-2.5" /> 
+                              </span>
+                            )}
                           </div>
-                          {agent.active && (
-                            <span className="flex items-center text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded-full">
-                              <Check className="mr-1 h-3 w-3" /> Active
-                            </span>
+                          {agent.description && (
+                            <p className="text-xs text-muted-foreground/80 mt-1 line-clamp-2">{agent.description}</p>
                           )}
-                        </div>
-                        <p className="text-sm text-muted-foreground mt-1">{agent.description}</p>
-                      </Label>
-                    </div>
-                  ))}
-                </RadioGroup>
+                        </Label>
+                      </div>
+                    ))}
+                  </RadioGroup>
+                </div>
               </div>
             </div>
             <DialogFooter>
@@ -298,22 +308,24 @@ export function PublishPromptDialog({
                 variant="outline"
                 onClick={() => onOpenChange(false)}
                 disabled={isPublishing}
-                className="rounded-full"
+                className="rounded-md border-muted/70 text-foreground/90 hover:bg-muted/30 hover:text-foreground transition-colors duration-150"
+                size="sm"
               >
                 Cancel
               </Button>
               <Button
                 onClick={handlePublish}
                 disabled={!selectedAgent || isPublishing}
-                className={`rounded-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 ${isPublishing ? 'opacity-80' : ''}`}
+                className={`rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-all duration-150 ${isPublishing ? 'opacity-80' : ''}`}
+                size="sm"
               >
                 {isPublishing ? (
                   <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> 
-                    Publishing...
+                    <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> 
+                    <span>Publishing...</span>
                   </>
                 ) : (
-                  'Publish'
+                  <span>Publish</span>
                 )}
               </Button>
             </DialogFooter>
