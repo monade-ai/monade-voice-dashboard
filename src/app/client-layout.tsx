@@ -11,7 +11,7 @@ import { Sidebar } from '../components/sidebar';
 
 import { PipecatProvider } from './assistants/providers/pipcat-provider';
 import { AssistantsProvider } from './hooks/use-assistants-context';
-
+import { AuthProvider } from '@/lib/auth/AuthProvider';
 
 const noSidebarRoutes = [
   '/auth/login',
@@ -31,15 +31,17 @@ export default function ClientLayout({
 
   return (
     <TranslationsProvider>
-      <div className="flex h-screen">
-        <Toaster richColors position="bottom-center" />
-        {!hideSidebar && <Sidebar />}
-        <main className="flex-1 overflow-auto bg-[#f8f5f0] text-gray-800">
-          <AssistantsProvider>
-            <PipecatProvider>{children}</PipecatProvider>
-          </AssistantsProvider>
-        </main>
-      </div>
+      <AuthProvider>
+        <div className="flex h-screen">
+          <Toaster richColors position="bottom-center" />
+          {!hideSidebar && <Sidebar />}
+          <main className="flex-1 overflow-auto bg-[#f8f5f0] text-gray-800">
+            <AssistantsProvider>
+              <PipecatProvider>{children}</PipecatProvider>
+            </AssistantsProvider>
+          </main>
+        </div>
+      </AuthProvider>
     </TranslationsProvider>
   );
 }

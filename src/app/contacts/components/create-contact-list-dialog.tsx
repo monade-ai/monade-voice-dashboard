@@ -7,6 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 
 import { useContactsContext } from '../contexts/contacts-context';
+import { useAuth } from '@/lib/auth/AuthProvider';
 
 interface CreateContactListDialogProps {
   onSubmit?: (name: string, description?: string) => void;
@@ -24,37 +25,53 @@ const CreateContactListDialog: React.FC<CreateContactListDialogProps> = ({
   onClose,
 }) => {
   const { createContactList } = useContactsContext();
+  const { user, loading } = useAuth();
   const [name, setName] = useState(initialName);
   const [description, setDescription] = useState(initialDescription);
   const [nameError, setNameError] = useState('');
+  const [authError, setAuthError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
+    setAuthError('');
     // Validate name
     if (!name.trim()) {
       setNameError('Name is required');
-
       return;
     }
-    
+
+    if (loading) {
+      setAuthError('Checking authentication...');
+      return;
+    }
+
+    if (!user) {
+      setAuthError('You must be logged in to create a contact list.');
+      return;
+    }
+
     setIsSubmitting(true);
-    
-    // Create the contact list using the context
-    const newList = createContactList(name.trim(), description.trim() || undefined);
-    
-    // Call the onSubmit callback if provided
-    if (onSubmit) {
-      onSubmit(name.trim(), description.trim() || undefined);
+
+    try {
+      const newList = await createContactList(name.trim(), description.trim() || undefined);
+      if (!newList) {
+        setAuthError('Failed to create contact list. Please try again.');
+        setIsSubmitting(false);
+        return;
+      }
+      // Call the onSubmit callback if provided
+      if (onSubmit) {
+        onSubmit(name.trim(), description.trim() || undefined);
+      }
+      // Close the dialog if a close function is provided
+      if (onClose) {
+        onClose();
+      }
+    } finally {
+      setIsSubmitting(false);
     }
-    
-    // Close the dialog if a close function is provided
-    if (onClose) {
-      onClose();
-    }
-    
-    setIsSubmitting(false);
   };
 
   return (
@@ -91,7 +108,10 @@ const CreateContactListDialog: React.FC<CreateContactListDialogProps> = ({
         />
       </div>
       
-      <Button type="submit" className="w-full" disabled={isSubmitting}>
+      {authError && (
+        <p className="text-red-500 text-sm">{authError}</p>
+      )}
+      <Button type="submit" className="w-full" disabled={isSubmitting || loading}>
         {isSubmitting ? 'Creating...' : isEditing ? 'Update' : 'Create'} Contact List
       </Button>
     </form>
