@@ -1,11 +1,11 @@
 'use client';
 
 import { useState, Suspense, useRef, useEffect } from 'react';
-import { 
-  Bot, 
-  Mic, 
-  Settings, 
-  Terminal, 
+import {
+  Bot,
+  Mic,
+  Settings,
+  Terminal,
   Volume2,
   Trash2,
   Calendar,
@@ -68,8 +68,8 @@ function LatencyCard({ latencyMs }: { latencyMs: number }) {
     latencyMs < 1000
       ? "from-cyan-400 to-emerald-500"
       : latencyMs < 2000
-      ? "from-amber-400 to-yellow-500"
-      : "from-fuchsia-500 to-pink-500";
+        ? "from-amber-400 to-yellow-500"
+        : "from-fuchsia-500 to-pink-500";
 
   return (
     <div className="relative w-full p-4 bg-white rounded-xl border border-gray-100 shadow-md transition-transform duration-200 hover:scale-[1.025] hover:shadow-lg group">
@@ -122,9 +122,16 @@ const PlaceholderTab = ({ title }: { title: string }) => (
 );
 
 export default function AssistantTabs() {
-  const { currentAssistant } = useAssistants();
+  const { currentAssistant, saveAssistantUpdates, fetchAssistants, createAssistant } = useAssistants();
   const [activeTab, setActiveTab] = useState('model');
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
+  // Reset unsaved changes flag when assistant changes
+  useEffect(() => {
+    setHasUnsavedChanges(false);
+  }, [currentAssistant?.id]);
 
   if (!currentAssistant) {
     return (
@@ -133,6 +140,93 @@ export default function AssistantTabs() {
       </div>
     );
   }
+
+  // Add console log here to check the state
+  console.log('[AssistantTabs] Checking phone number for save button:', currentAssistant.id, currentAssistant.phoneNumber);
+
+  const isDraft = currentAssistant.id.startsWith('local-');
+
+  // Determine if save should be disabled
+  const isSaveDisabled =
+    isSaving ||
+    isDraft ||
+    !currentAssistant.phoneNumber ||
+    currentAssistant.phoneNumber.trim() === '' ||
+    !hasUnsavedChanges; // Disable if no unsaved changes
+
+  const handleMarkUnsavedChanges = () => {
+    setHasUnsavedChanges(true);
+  };
+
+  const handleSaveChanges = async () => {
+    if (!currentAssistant || isDraft || !currentAssistant.phoneNumber || currentAssistant.phoneNumber.trim() === '' || !hasUnsavedChanges) return;
+
+    setIsSaving(true);
+    try {
+      if (isDraft) {
+        console.warn('Attempted to save changes on a draft assistant. Use publish instead.');
+      } else {
+        // Construct the payload explicitly matching UpdateAssistantData
+        const { id, createdAt, knowledgeBase, ...restOfAssistant } = currentAssistant;
+        const updatePayload /*: UpdateAssistantData */ = {
+          ...restOfAssistant, // Include other updatable fields
+          // Assign the value from knowledgeBase (which should be the ID string) to knowledgeBaseId
+          knowledgeBaseId: knowledgeBase !== undefined ? knowledgeBase : null, // Pass null if undefined
+        };
+
+        // Pass the correctly structured payload
+        await saveAssistantUpdates(currentAssistant.id, updatePayload);
+        setHasUnsavedChanges(false); // Reset flag on successful save
+      }
+    } catch (error) {
+      console.error('Error saving assistant:', error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Function to reset local changes (may need context enhancement for full revert)
+  const handleResetChanges = async () => {
+    // TODO: Ideally, trigger a refetch or revert state in context to last saved state
+    // For now, just reset the flag and potentially refetch assistants
+    // if updateAssistantLocally modified the context state directly.
+    // This might require knowing the original state before edits.
+    if (currentAssistant && !isDraft) {
+      // Example: Refetch all assistants to reset the current one
+      // await fetchAssistants(); // Uncomment if fetchAssistants is available and appropriate
+    }
+    setHasUnsavedChanges(false);
+    console.log('Changes reset (flag only for now).');
+    // If ModelTab holds its own state not derived from context, need a way to reset it too.
+  };
+
+  // Function to publish a draft assistant using createAssistant
+  const handlePublish = async () => {
+    if (!currentAssistant || !isDraft || !currentAssistant.phoneNumber || currentAssistant.phoneNumber.trim() === '') return;
+
+    setIsSaving(true); // Use isSaving state to indicate processing
+    try {
+      // Prepare payload for CreateAssistantData: remove id, createdAt, potentially map knowledgeBase
+      const { id: localId, createdAt, knowledgeBase, ...restOfDraft } = currentAssistant;
+      const createPayload /*: CreateAssistantData */ = {
+        ...restOfDraft,
+        // Ensure knowledgeBaseId is handled correctly - assuming context expects the ID string
+        knowledgeBaseId: knowledgeBase !== undefined ? knowledgeBase : null, // Pass null if undefined
+        // Ensure other required fields for CreateAssistantData are present
+      };
+
+      // Call createAssistant with the local draft ID and the prepared data
+      await createAssistant(localId, createPayload);
+      // Optionally reset flags or navigate after successful publish
+      // fetchAssistants() might be called within createAssistant already
+      setHasUnsavedChanges(false);
+    } catch (error) {
+      console.error('Error publishing assistant:', error);
+      // Handle error state if needed
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   return (
     <div className="flex flex-col space-y-6">
@@ -200,7 +294,7 @@ export default function AssistantTabs() {
               className="absolute left-0 bottom-0 h-1 rounded-full bg-cyan-400 transition-all duration-300"
               style={{
                 width: `calc(100% / 7)`,
-                transform: `translateX(${['model','transcriber','voice','functions','advanced','scheduling','insights'].indexOf(activeTab) * 100}%)`,
+                transform: `translateX(${['model', 'transcriber', 'voice', 'functions', 'advanced', 'scheduling', 'insights'].indexOf(activeTab) * 100}%)`,
                 opacity: 0.7,
               }}
               aria-hidden="true"
@@ -215,58 +309,94 @@ export default function AssistantTabs() {
         {/* Tab contents with Suspense for each tab */}
         <TabsContent value="model" className="mt-6">
           <Suspense fallback={<div className="p-4 text-center">Loading model options...</div>}>
-            <ModelTab />
+            <ModelTab onChangesMade={handleMarkUnsavedChanges} />
           </Suspense>
         </TabsContent>
-        
+
         <TabsContent value="transcriber" className="mt-6">
           <PlaceholderTab title="Transcriber" />
         </TabsContent>
-        
+
         <TabsContent value="voice" className="mt-6">
           <PlaceholderTab title="Voice" />
         </TabsContent>
-        
+
         <TabsContent value="functions" className="mt-6">
           <PlaceholderTab title="Functions" />
         </TabsContent>
-        
+
         <TabsContent value="advanced" className="mt-6">
           <PlaceholderTab title="Advanced" />
         </TabsContent>
-        
+
         <TabsContent value="scheduling" className="mt-6">
           <CallScheduling />
         </TabsContent>
-        
+
         <TabsContent value="insights" className="mt-6">
           <CallInsights />
         </TabsContent>
-        
+
         <TabsContent value="analysis" className="mt-6">
           <PlaceholderTab title="Analysis" />
         </TabsContent>
       </Tabs>
 
-      {/* Publish button */}
-      <div className="flex justify-end space-x-2 pt-4">
-        <Button 
-          variant="outline" 
-          className="border-gray-300"
+      {/* Action Buttons: Delete, Reset, Save */}
+      <div className="flex justify-end space-x-2 pt-4 border-t border-gray-200 mt-6">
+        {/* Delete Button - Enabled for drafts too */}
+        <Button
+          variant="destructive"
+          className="text-red-600 border-red-300 hover:bg-red-50"
           onClick={() => setIsDeleteModalOpen(true)}
+          disabled={isSaving} // Only disable during save
+          title={isDraft ? "Delete this draft assistant" : "Delete this assistant"}
         >
           <Trash2 className="h-4 w-4 mr-2" />
-          Discard
+          Delete Assistant
         </Button>
-        <Button className="bg-amber-500 hover:bg-amber-600 text-white">
-          <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2">
-            <path d="M7.49991 0.876892C3.84222 0.876892 0.877075 3.84204 0.877075 7.49972C0.877075 11.1574 3.84222 14.1226 7.49991 14.1226C11.1576 14.1226 14.1227 11.1574 14.1227 7.49972C14.1227 3.84204 11.1576 0.876892 7.49991 0.876892ZM1.82707 7.49972C1.82707 4.36671 4.36689 1.82689 7.49991 1.82689C10.6329 1.82689 13.1727 4.36671 13.1727 7.49972C13.1727 10.6327 10.6329 13.1726 7.49991 13.1726C4.36689 13.1726 1.82707 10.6327 1.82707 7.49972ZM7.50003 4.49999C7.77618 4.49999 8.00003 4.72383 8.00003 4.99999V7.49999H10.5C10.7762 7.49999 11 7.72383 11 7.99999C11 8.27614 10.7762 8.49999 10.5 8.49999H8.00003V11C8.00003 11.2761 7.77618 11.5 7.50003 11.5C7.22388 11.5 7.00003 11.2761 7.00003 11V8.49999H4.50003C4.22388 8.49999 4.00003 8.27614 4.00003 7.99999C4.00003 7.72383 4.22388 7.49999 4.50003 7.49999H7.00003V4.99999C7.00003 4.72383 7.22388 4.49999 7.50003 4.49999Z" fill="currentColor" fillRule="evenodd" clipRule="evenodd"></path>
-          </svg>
-          Publish
+        {/* Reset Button */}
+        <Button
+          variant="outline"
+          className="border-gray-300"
+          onClick={handleResetChanges}
+          disabled={!hasUnsavedChanges || isSaving || isDraft}
+        >
+          <Trash2 className="h-4 w-4 mr-2" />
+          Reset Changes
         </Button>
-        
+        {/* Conditionally render Save or Publish Button */}
+        {isDraft ? (
+          <Button
+            onClick={handlePublish} // Calls the updated handlePublish
+            disabled={isSaving || !currentAssistant.phoneNumber || currentAssistant.phoneNumber.trim() === ''}
+            className="bg-green-600 hover:bg-green-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+            title={
+              (!currentAssistant.phoneNumber || currentAssistant.phoneNumber.trim() === '')
+                ? "Phone number is required before publishing"
+                : "Publish this draft assistant"
+            }
+          >
+            {isSaving ? 'Publishing...' : 'Publish Assistant'}
+          </Button>
+        ) : (
+          <Button
+            onClick={handleSaveChanges}
+            disabled={isSaveDisabled}
+            className="bg-amber-500 hover:bg-amber-600 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+            title={
+              isDraft ? "(Should not happen - Save button shown for non-drafts)" : // Adjusted title logic slightly
+                (!currentAssistant.phoneNumber || currentAssistant.phoneNumber.trim() === '') ? "Phone number is required before saving changes" :
+                  !hasUnsavedChanges ? "No changes to save" :
+                    "Save changes to this assistant"
+            }
+          >
+            {isSaving ? 'Saving...' : 'Save Changes'}
+          </Button>
+        )}
+
         {/* Delete confirmation modal */}
-        <DeleteConfirmationModal 
+        <DeleteConfirmationModal
           isOpen={isDeleteModalOpen}
           onClose={() => setIsDeleteModalOpen(false)}
         />

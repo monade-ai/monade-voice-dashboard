@@ -1,297 +1,221 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useAssistants } from '@/app/hooks/use-assistants-context';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
-import { Download, FileText, Trash2, Zap, FileType, FileSpreadsheet, File, FileCode, Search, Plus } from 'lucide-react';
+import { FileText, Trash2, Search, Plus, AlertCircle } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { areSimilar } from '@/lib/utils/levenshtein';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
-import { DocumentMetadata, DocumentStorage } from '../api/knowldege-api';
-import { PublishPromptDialog } from '../components/publish-prompt-dialog';
 import { useToast } from '../hooks/use-toast';
+import { useKnowledgeBase, KnowledgeBase } from '@/app/hooks/use-knowledge-base';
 
-// Helper function to get the appropriate icon based on file type
-const getFileIcon = (fileType: string) => {
-  switch (fileType.toLowerCase()) {
-  case 'pdf':
-    return <FileText className="h-5 w-5 text-red-600" />;
-  case 'docx':
-  case 'doc':
-    return <FileType className="h-5 w-5 text-blue-600" />;
-  case 'csv':
-  case 'xlsx':
-  case 'xls':
-    return <FileSpreadsheet className="h-5 w-5 text-green-600" />;
-  case 'txt':
-    return <File className="h-5 w-5 text-slate-600" />;
-  case 'html':
-  case 'json':
-  case 'xml':
-    return <FileCode className="h-5 w-5 text-purple-600" />;
-  default:
-    return <FileText className="h-5 w-5 text-amber-600" />;
-  }
-};
-
-// Helper function to format file size
-const formatFileSize = (bytes: number): string => {
-  if (bytes < 1024) return bytes + ' B';
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-
-  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
-};
-
-// Helper function to format date
-const formatDate = (dateString: string): string => {
-  const date = new Date(dateString);
+const formatDate = (date: Date): string => {
   const now = new Date();
   const diffTime = Math.abs(now.getTime() - date.getTime());
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  
+  const diffSeconds = Math.floor(diffTime / 1000);
+  const diffMinutes = Math.floor(diffSeconds / 60);
+  const diffHours = Math.floor(diffMinutes / 60);
+  const diffDays = Math.floor(diffHours / 24);
+
+  if (diffSeconds < 60) return 'just now';
+  if (diffMinutes === 1) return '1 min ago';
+  if (diffMinutes < 60) return `${diffMinutes} mins ago`;
+  if (diffHours === 1) return '1 hr ago';
+  if (diffHours < 24) return `${diffHours} hrs ago`;
   if (diffDays === 1) return '1 day ago';
   if (diffDays < 7) return `${diffDays} days ago`;
-  if (diffDays < 30) return `${Math.floor(diffDays / 7)} week${Math.floor(diffDays / 7) > 1 ? 's' : ''} ago`;
 
   return date.toLocaleDateString();
 };
 
 export function DocumentLibrary() {
-  const { assistants } = useAssistants();
-  const assistantPhoneNumbers = assistants.map(a => a.phoneNumber).filter((p): p is string => !!p);
-
-  const [isPublishOpen, setIsPublishOpen] = useState(false);
-  const [selectedDocument, setSelectedDocument] = useState<DocumentMetadata | null>(null);
+  const { knowledgeBases, isLoading, error, deleteKnowledgeBase } = useKnowledgeBase();
   const [searchQuery, setSearchQuery] = useState('');
-  const [filteredDocuments, setFilteredDocuments] = useState<DocumentMetadata[]>([]);
-  const [documents, setDocuments] = useState<DocumentMetadata[]>([]);
   const { toast } = useToast();
 
-  // Load documents from storage when component mounts
-  useEffect(() => {
-    const loadDocuments = () => {
-      const docs = DocumentStorage.getAllDocuments();
-      setDocuments(docs);
-      setFilteredDocuments(docs);
-    };
-    
-    loadDocuments();
-    
-    // Set up event listener for storage changes
-    window.addEventListener('storage', loadDocuments);
-    
-    return () => {
-      window.removeEventListener('storage', loadDocuments);
-    };
-  }, []);
-
-  // Filter documents based on search query
-  useEffect(() => {
+  const filteredDocuments = useMemo(() => {
     if (!searchQuery.trim()) {
-      setFilteredDocuments(documents);
-
-      return;
+      return knowledgeBases;
     }
+    const searchLower = searchQuery.toLowerCase();
+    return knowledgeBases.filter(kb =>
+      kb.filename.toLowerCase().includes(searchLower) ||
+      kb.id.toLowerCase().includes(searchLower)
+    );
+  }, [searchQuery, knowledgeBases]);
 
-    const filtered = documents.filter(doc => {
-      const searchLower = searchQuery.toLowerCase();
-
-      return (
-        areSimilar(doc.title, searchQuery) ||
-        (doc.description && doc.description.toLowerCase().includes(searchLower)) ||
-        doc.fileType.toLowerCase().includes(searchLower)
-      );
-    });
-
-    setFilteredDocuments(filtered);
-  }, [searchQuery, documents]);
-
-  // Handle search input change
   const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(event.target.value);
   };
 
-  const handlePublish = (document: DocumentMetadata) => {
-    setSelectedDocument(document);
-    setIsPublishOpen(true);
+  const handleDelete = async (document: KnowledgeBase) => {
+    if (confirm(`Are you sure you want to delete "${document.filename}"? This cannot be undone.`)) {
+      await deleteKnowledgeBase(document.id);
+    }
   };
 
-  const handleDownload = (document: DocumentMetadata) => {
-    try {
-      // Convert base64 to blob
-      const byteCharacters = atob(document.content);
-      const byteArrays = [];
-      
-      for (let offset = 0; offset < byteCharacters.length; offset += 1024) {
-        const slice = byteCharacters.slice(offset, offset + 1024);
-        
-        const byteNumbers = new Array(slice.length);
-        for (let i = 0; i < slice.length; i++) {
-          byteNumbers[i] = slice.charCodeAt(i);
-        }
-        
-        const byteArray = new Uint8Array(byteNumbers);
-        byteArrays.push(byteArray);
-      }
-      
-      const blob = new Blob(byteArrays);
-      
-      // Create download link
-      const url = URL.createObjectURL(blob);
-      const a = window.document.createElement('a');
-      a.href = url;
-      a.download = document.title;
-      window.document.body.appendChild(a);
-      a.click();
-      
-      // Cleanup
-      setTimeout(() => {
-        window.document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-      }, 0);
-      
-      toast({
-        title: 'Download started',
-        description: `${document.title} is being downloaded.`,
-      });
-    } catch (error) {
-      console.error('Error downloading document:', error);
-      toast({
-        title: 'Download failed',
-        description: 'Failed to download the document. Please try again.',
-      });
-    }
-  };
-  
-  const handleDelete = (document: DocumentMetadata) => {
-    if (confirm(`Are you sure you want to delete "${document.title}"?`)) {
-      const success = DocumentStorage.deleteDocument(document.id);
-      
-      if (success) {
-        setDocuments(prev => prev.filter(doc => doc.id !== document.id));
-        setFilteredDocuments(prev => prev.filter(doc => doc.id !== document.id));
-        
-        toast({
-          title: 'Document deleted',
-          description: `${document.title} has been removed from your knowledge base.`,
-        });
-      } else {
-        toast({
-          title: 'Deletion failed',
-          description: 'Failed to delete the document. Please try again.',
-        });
-      }
-    }
-  };
+  if (isLoading && knowledgeBases.length === 0) {
+    return (
+      <div>
+        <div className="p-4 flex items-center justify-between">
+          <div className="relative w-full max-w-md">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="search"
+              placeholder="Search documents..."
+              className="pl-10 w-full"
+              value={searchQuery}
+              onChange={handleSearchChange}
+              disabled
+            />
+          </div>
+          <Button asChild className="ml-4" disabled>
+            <Link href="/knowledge-base/upload">
+              <Plus className="mr-2 h-4 w-4" />
+              Upload
+            </Link>
+          </Button>
+        </div>
+        <div className="rounded-md">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b bg-muted/50">
+                <th className="py-3 px-4 text-left font-medium"><Skeleton className="h-4 w-1/2" /></th>
+                <th className="py-3 px-4 text-left font-medium"><Skeleton className="h-4 w-1/4" /></th>
+                <th className="py-3 px-4 text-right font-medium"><Skeleton className="h-4 w-1/4" /></th>
+              </tr>
+            </thead>
+            <tbody>
+              {[...Array(3)].map((_, index) => (
+                <tr key={index} className={index !== 2 ? 'border-b' : ''}>
+                  <td className="py-3 px-4">
+                    <div className="flex items-center gap-3">
+                      <Skeleton className="h-10 w-10 rounded-md" />
+                      <div>
+                        <Skeleton className="h-4 w-48 mb-1" />
+                        <Skeleton className="h-3 w-32" />
+                      </div>
+                    </div>
+                  </td>
+                  <td className="py-3 px-4"><Skeleton className="h-4 w-20" /></td>
+                  <td className="py-3 px-4 text-right">
+                    <div className="flex justify-end gap-3">
+                      <Skeleton className="h-9 w-9 rounded-full" />
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-6">
+        <Alert variant="destructive" className="max-w-2xl mx-auto">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Error Loading Documents</AlertTitle>
+          <AlertDescription>
+            {error} - Please try refreshing the page or contact support.
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
 
   return (
     <div>
-      <div className="p-4 flex items-center justify-between">
+      <div className="p-4 flex items-center justify-between border-b mb-4">
         <div className="relative w-full max-w-md">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             type="search"
-            placeholder="Search documents..."
+            placeholder="Search documents by name or ID..."
             className="pl-10 w-full"
             value={searchQuery}
             onChange={handleSearchChange}
+            disabled={isLoading}
           />
         </div>
-        <Button asChild className="ml-4">
+        <Button asChild className="ml-4 rounded-full" disabled={isLoading}>
           <Link href="/knowledge-base/upload">
             <Plus className="mr-2 h-4 w-4" />
-            Upload
+            Upload Document
           </Link>
         </Button>
       </div>
-      
-      {filteredDocuments.length === 0 && (
+
+      {!isLoading && filteredDocuments.length === 0 && (
         <div className="p-10 text-center">
           {searchQuery ? (
             <>
-              <Search className="mx-auto h-10 w-10 text-muted-foreground mb-4" />
-              <h3 className="text-lg font-medium mb-1">No documents found</h3>
+              <Search className="mx-auto h-10 w-10 text-muted-foreground mb-4 opacity-50" />
+              <h3 className="text-lg font-medium mb-1">No Documents Found</h3>
               <p className="text-sm text-muted-foreground mb-4">
-                Try adjusting your search query or upload a new document
+                Your search for "{searchQuery}" did not match any documents.
               </p>
-              <Button variant="outline" onClick={() => setSearchQuery('')}>
+              <Button variant="outline" onClick={() => setSearchQuery('')} className="rounded-full">
                 Clear Search
               </Button>
             </>
           ) : (
             <>
-              <FileText className="mx-auto h-10 w-10 text-muted-foreground mb-4" />
-              <h3 className="text-lg font-medium mb-2">No documents yet</h3>
+              <FileText className="mx-auto h-10 w-10 text-muted-foreground mb-4 opacity-50" />
+              <h3 className="text-lg font-medium mb-2">No Documents Yet</h3>
               <p className="text-sm text-muted-foreground mb-4">
-                Upload your first document to enhance your AI agents' knowledge
+                Upload your first document to build your knowledge base.
               </p>
-              <Button asChild>
+              <Button asChild className="rounded-full bg-amber-500 hover:bg-amber-600">
                 <Link href="/knowledge-base/upload">Upload Document</Link>
               </Button>
             </>
           )}
         </div>
       )}
-      
+
       {filteredDocuments.length > 0 && (
-        <div className="rounded-md">
-          <table className="w-full">
+        <div className="rounded-md border mx-4">
+          <table className="w-full text-sm">
             <thead>
-              <tr className="border-b bg-muted/50">
-                <th className="py-3 px-4 text-left font-medium">Document</th>
-                <th className="py-3 px-4 text-left font-medium">Size</th>
-                <th className="py-3 px-4 text-left font-medium">Uploaded</th>
-                <th className="py-3 px-4 text-right font-medium">Actions</th>
+              <tr className="border-b bg-muted/50 text-muted-foreground">
+                <th className="py-2 px-4 text-left font-medium">Filename</th>
+                <th className="py-2 px-4 text-left font-medium">Created</th>
+                <th className="py-2 px-4 text-right font-medium">Actions</th>
               </tr>
             </thead>
             <tbody>
               {filteredDocuments.map((doc, index) => (
                 <tr key={doc.id} className={index !== filteredDocuments.length - 1 ? 'border-b' : ''}>
-                  <td className="py-3 px-4">
+                  <td className="py-2 px-4">
                     <div className="flex items-center gap-3">
-                      <div className="rounded-md bg-blue-50 p-2">
-                        {getFileIcon(doc.fileType)}
+                      <div className="rounded-md bg-amber-50 p-2">
+                        <FileText className="h-5 w-5 text-amber-600" />
                       </div>
                       <div>
-                        <div className="font-medium">{doc.title}</div>
-                        <div className="text-sm text-muted-foreground">{doc.description}</div>
+                        <div className="font-medium truncate max-w-xs md:max-w-md lg:max-w-lg" title={doc.filename}>{doc.filename}</div>
+                        <div className="text-xs text-muted-foreground">ID: {doc.id}</div>
                       </div>
                     </div>
                   </td>
-                  <td className="py-3 px-4">
-                    <Badge variant="outline" className="font-normal">
-                      {formatFileSize(doc.fileSize)} • {doc.fileType}
-                    </Badge>
-                  </td>
-                  <td className="py-3 px-4 text-sm text-muted-foreground">{formatDate(doc.uploadedAt)}</td>
-                  <td className="py-3 px-4 text-right">
-                    <div className="flex justify-end gap-3">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handlePublish(doc)}
-                        className="h-9 w-9 rounded-full bg-amber-50 hover:bg-amber-100 shadow-sm hover:shadow transition-all duration-200"
-                      >
-                        <Zap className="h-4 w-4 text-amber-600" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleDownload(doc)}
-                        className="h-9 w-9 rounded-full bg-blue-50 hover:bg-blue-100 shadow-sm hover:shadow transition-all duration-200"
-                      >
-                        <Download className="h-4 w-4 text-blue-600" />
-                      </Button>
+                  <td className="py-2 px-4 text-muted-foreground">{formatDate(doc.createdAt)}</td>
+                  <td className="py-2 px-4 text-right">
+                    <div className="flex justify-end gap-1">
                       <Button
                         variant="ghost"
                         size="icon"
                         onClick={() => handleDelete(doc)}
-                        className="h-9 w-9 rounded-full bg-red-50 hover:bg-red-100 shadow-sm hover:shadow transition-all duration-200"
+                        disabled={isLoading}
+                        className="h-8 w-8 rounded-full bg-red-50 hover:bg-red-100 text-red-600 shadow-sm hover:shadow transition-all duration-200 disabled:opacity-70"
+                        title="Delete Knowledge Base"
                       >
-                        <Trash2 className="h-4 w-4 text-red-600" />
+                        <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
                   </td>
@@ -300,14 +224,6 @@ export function DocumentLibrary() {
             </tbody>
           </table>
         </div>
-      )}
-
-      {selectedDocument && (
-        <PublishPromptDialog
-          open={isPublishOpen}
-          onOpenChange={setIsPublishOpen}
-          promptTitle={selectedDocument.title}
-        />
       )}
     </div>
   );

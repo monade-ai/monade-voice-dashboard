@@ -1,27 +1,22 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { v4 as uuidv4 } from 'uuid';
 import { FileUp, X, Check, Loader2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 
-import { PublishPromptDialog } from '../components/publish-prompt-dialog';
-import { DocumentMetadata, DocumentStorage } from '../api/knowldege-api';
 import { useToast } from '../hooks/use-toast';
+import { useKnowledgeBase } from '@/app/hooks/use-knowledge-base';
 
 export function DocumentUploader() {
-  const [files, setFiles] = useState<File[]>([]);
+  const [file, setFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [uploadComplete, setUploadComplete] = useState(false);
-  const [documentTitle, setDocumentTitle] = useState('');
-  const [documentDescription, setDocumentDescription] = useState('');
-  const [isPublishOpen, setIsPublishOpen] = useState(false);
   const { toast } = useToast();
+  const { createKnowledgeBase } = useKnowledgeBase();
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -32,37 +27,81 @@ export function DocumentUploader() {
     setIsDragging(false);
   };
 
+  const processAndUploadFile = useCallback(async (selectedFile: File) => {
+    if (!selectedFile) return;
+
+    setIsProcessing(true);
+    setUploadComplete(false);
+
+    try {
+      const base64Content = await fileToBase64(selectedFile);
+
+      console.log('[DocumentUploader] base64Content generated:', base64Content ? base64Content.substring(0, 50) + '...' : '(falsy)');
+
+      const payload = {
+        kb_file_base64: base64Content,
+        filename: selectedFile.name,
+      };
+      console.log('[DocumentUploader] Payload for createKnowledgeBase:', payload);
+
+      const success = await createKnowledgeBase(payload);
+
+      console.log("Success:", success);
+
+      if (success) {
+        setUploadComplete(true);
+        setFile(selectedFile);
+        toast({
+          title: 'Upload Initiated',
+          description: `"${selectedFile.name}" processing started successfully.`,
+        });
+      } else {
+        setFile(null);
+        toast({
+          title: 'Upload Failed',
+          description: `Processing failed for "${selectedFile.name}". Check console or previous errors for details.`,
+        });
+      }
+    } catch (error) {
+      console.error('Failed to process or upload file:', error);
+      toast({
+        title: 'Component Error',
+        description: 'An error occurred within the uploader component during file processing.',
+      });
+      setFile(null);
+    } finally {
+      setIsProcessing(false);
+    }
+  }, [createKnowledgeBase, toast]);
+
   const handleDrop = (e: React.DragEvent) => {
+    console.log('[DocumentUploader] handleDrop triggered');
     e.preventDefault();
     setIsDragging(false);
 
-    if (e.dataTransfer.files) {
-      const newFiles = Array.from(e.dataTransfer.files);
-      setFiles((prev) => [...prev, ...newFiles]);
-
-      // Auto-upload when files are dropped
-      if (newFiles.length > 0) {
-        setDocumentTitle(newFiles[0].name);
-        handleFileUpload(newFiles[0]);
-      }
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const droppedFile = e.dataTransfer.files[0];
+      setFile(droppedFile);
+      console.log('[DocumentUploader] Calling processAndUploadFile from handleDrop');
+      processAndUploadFile(droppedFile);
     }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const newFiles = Array.from(e.target.files);
-      setFiles((prev) => [...prev, ...newFiles]);
-
-      // Auto-upload when files are selected
-      if (newFiles.length > 0) {
-        setDocumentTitle(newFiles[0].name);
-        handleFileUpload(newFiles[0]);
-      }
+    console.log('[DocumentUploader] handleFileChange triggered');
+    if (e.target.files && e.target.files.length > 0) {
+      const selectedFile = e.target.files[0];
+      setFile(selectedFile);
+      console.log('[DocumentUploader] Calling processAndUploadFile from handleFileChange');
+      processAndUploadFile(selectedFile);
     }
   };
 
-  const removeFile = (index: number) => {
-    setFiles((prev) => prev.filter((_, i) => i !== index));
+  const removeFile = () => {
+    setFile(null);
+    setUploadComplete(false);
+    const fileInput = document.getElementById('file-upload') as HTMLInputElement;
+    if (fileInput) fileInput.value = '';
   };
 
   const fileToBase64 = (file: File): Promise<string> => {
@@ -70,83 +109,21 @@ export function DocumentUploader() {
       const reader = new FileReader();
       reader.readAsDataURL(file);
       reader.onload = () => {
-        // Extract the base64 part from the data URL
-        const base64 = reader.result as string;
-        const base64Content = base64.split(',')[1];
+        const rawResult = reader.result as string;
+        console.log('[DocumentUploader] fileToBase64 rawResult:', rawResult ? rawResult.substring(0, 100) + '...' : '(falsy)');
+        const base64Content = rawResult.includes(',') ? rawResult.split(',')[1] : rawResult;
+        console.log('[DocumentUploader] fileToBase64 processed base64Content:', base64Content ? base64Content.substring(0, 50) + '...' : '(falsy)');
         resolve(base64Content);
       };
-      reader.onerror = error => reject(error);
-    });
-  };
-
-  /**
-   * Processes the selected file, converts it to base64, 
-   * and uploads it using the DocumentStorage API.
-   * @param file The file to upload.
-   */
-  const handleFileUpload = async (file: File) => {
-    setIsUploading(true);
-    try {
-      const base64 = await fileToBase64(file);
-
-      // Create document metadata
-      const documentMetadata: DocumentMetadata = {
-        id: uuidv4(),
-        title: documentTitle || file.name,
-        description: documentDescription,
-        fileType: file.type.split('/')[1]?.toUpperCase() || 'UNKNOWN',
-        fileSize: file.size,
-        content: base64,
-        uploadedAt: new Date().toISOString(),
+      reader.onerror = error => {
+        console.error('[DocumentUploader] fileToBase64 FileReader error:', error);
+        reject(error);
       };
-
-      // Save document using the API wrapper
-      await DocumentStorage.saveDocument(documentMetadata);
-
-      toast({
-        title: 'Document uploaded',
-        description: `${file.name} has been added to your knowledge base.`,
-      });
-
-      setUploadComplete(true);
-    } catch (error) {
-      console.error('Failed to process file:', error);
-      toast({
-        title: 'Upload failed',
-        description: 'Failed to process the document. Please try again.',
-      });
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
-  const handlePublish = () => {
-    setIsPublishOpen(true);
+    });
   };
 
   return (
     <div className="space-y-6">
-      <div className="space-y-2">
-        <Label htmlFor="document-title">Document Title</Label>
-        <Input
-          id="document-title"
-          placeholder="Enter a title for this document"
-          value={documentTitle}
-          onChange={(e) => setDocumentTitle(e.target.value)}
-        />
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="document-description">Description (Optional)</Label>
-        <Textarea
-          id="document-description"
-          placeholder="Add a brief description of this document"
-          rows={3}
-          value={documentDescription}
-          onChange={(e) => setDocumentDescription(e.target.value)}
-        />
-      </div>
-
       <div className="space-y-2">
         <Label>Upload Document</Label>
         <div
@@ -160,68 +137,60 @@ export function DocumentUploader() {
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
         >
-          {uploadComplete ? (
+          {isProcessing ? (
+            <div className="flex flex-col items-center">
+              <Loader2 className="h-10 w-10 text-primary animate-spin mb-4" />
+              <h3 className="text-lg font-semibold">Processing...</h3>
+              <p className="mt-1 text-sm text-muted-foreground">Please wait while we process and upload your document</p>
+            </div>
+          ) : uploadComplete && file ? (
             <div className="flex flex-col items-center">
               <div className="rounded-full bg-green-100 p-3 mb-4">
                 <Check className="h-8 w-8 text-green-600" />
               </div>
               <h3 className="text-lg font-semibold text-green-700">Upload Complete!</h3>
-              <p className="mt-1 text-sm text-green-600">Your document has been uploaded successfully</p>
-              <Button className="mt-4 bg-green-600 hover:bg-green-700 text-white" onClick={handlePublish}>
-                Publish Document
+              <p className="mt-1 text-sm text-green-600 truncate max-w-xs" title={file.name}>"{file.name}" uploaded successfully.</p>
+              <Button variant="outline" className="mt-4" onClick={removeFile}>
+                Upload Another File
               </Button>
-            </div>
-          ) : isUploading ? (
-            <div className="flex flex-col items-center">
-              <Loader2 className="h-10 w-10 text-primary animate-spin mb-4" />
-              <h3 className="text-lg font-semibold">Uploading...</h3>
-              <p className="mt-1 text-sm text-muted-foreground">Please wait while we process your document</p>
             </div>
           ) : (
             <>
               <FileUp className="mx-auto h-10 w-10 text-muted-foreground" />
-              <h3 className="mt-2 text-lg font-semibold">Drag & Drop Files Here</h3>
-              <p className="mt-1 text-sm text-muted-foreground">Or click to browse your files</p>
-              <Input id="file-upload" type="file" className="hidden" onChange={handleFileChange} multiple />
+              <h3 className="mt-2 text-lg font-semibold">Drag & Drop File Here</h3>
+              <p className="mt-1 text-sm text-muted-foreground">Or click to browse your files (upload one at a time)</p>
+              <Input id="file-upload" type="file" className="hidden" onChange={handleFileChange} accept=".txt,.pdf,.docx,.html,.json,.csv,.md" />
               <Button
                 variant="outline"
                 className="mt-4"
                 onClick={() => document.getElementById('file-upload')?.click()}
                 type="button"
+                disabled={isProcessing}
               >
-                Browse Files
+                Browse File
               </Button>
             </>
           )}
         </div>
       </div>
 
-      {files.length > 0 && !uploadComplete && (
+      {file && !uploadComplete && !isProcessing && (
         <div className="space-y-2">
-          <Label>Selected Files</Label>
+          <Label>Selected File</Label>
           <div className="space-y-2">
-            {files.map((file, index) => (
-              <div key={index} className="flex items-center justify-between rounded-md border p-3">
-                <div className="flex items-center gap-2">
-                  <FileUp className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm font-medium">{file.name}</span>
-                  <span className="text-xs text-muted-foreground">({(file.size / 1024 / 1024).toFixed(2)} MB)</span>
-                </div>
-                <Button variant="ghost" size="icon" onClick={() => removeFile(index)} type="button">
-                  <X className="h-4 w-4" />
-                </Button>
+            <div className="flex items-center justify-between rounded-md border p-3">
+              <div className="flex items-center gap-2 overflow-hidden">
+                <FileUp className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                <span className="text-sm font-medium truncate" title={file.name}>{file.name}</span>
+                <span className="text-xs text-muted-foreground flex-shrink-0">({(file.size / 1024 / 1024).toFixed(2)} MB)</span>
               </div>
-            ))}
+              <Button variant="ghost" size="icon" onClick={removeFile} type="button">
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </div>
       )}
-
-      <PublishPromptDialog
-        open={isPublishOpen}
-        onOpenChange={setIsPublishOpen}
-        promptTitle={documentTitle || files[0]?.name || 'Document'}
-        documentContent={files.length > 0 ? { file: files[0], title: documentTitle } : null}
-      />
     </div>
   );
 }

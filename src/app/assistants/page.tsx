@@ -5,15 +5,17 @@ import { Suspense } from 'react';
 import { Card } from '@/components/ui/card';
 
 import { AssistantsProvider } from '../hooks/use-assistants-context';
+import { KnowledgeBaseProvider } from "../hooks/use-knowledge-base";
 
 import AssistantsHeader from './components/assistants-header';
 import AssistantTabs from './components/assistant-tabs';
 
 export default function AssistantsPage() {
   return (
-    <AssistantsProvider>
-      <div className="flex flex-col h-full">
-        {/* Header with assistant selection */}
+    <KnowledgeBaseProvider>
+      <AssistantsProvider>
+        <div className="flex flex-col h-full">
+          {/* Header with assistant selection */}
         <AssistantsHeader />
         
         {/* Main content area */}
@@ -26,5 +28,6 @@ export default function AssistantsPage() {
         </div>
       </div>
     </AssistantsProvider>
+    </KnowledgeBaseProvider>
   );
 }

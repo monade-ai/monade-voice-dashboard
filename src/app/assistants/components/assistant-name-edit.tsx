@@ -6,8 +6,9 @@ import { toast } from 'sonner';
 
 import { Input } from '@/components/ui/input';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Button } from '@/components/ui/button';
 
-import { Assistant, useAssistants } from '../../hooks/use-assistants-context';
+import { Assistant, useAssistants } from '@/app/hooks/use-assistants-context';
 
 interface AssistantNameEditProps {
   assistant: Assistant;
@@ -17,14 +18,14 @@ interface AssistantNameEditProps {
   showEditButton?: boolean;
 }
 
-export default function AssistantNameEdit({ 
-  assistant, 
-  isEditing, 
-  onSave, 
+export default function AssistantNameEdit({
+  assistant,
+  isEditing,
+  onSave,
   onCancel,
   showEditButton = false,
 }: AssistantNameEditProps) {
-  const { updateAssistant } = useAssistants();
+  const { updateAssistantLocally } = useAssistants();
   const [name, setName] = useState(assistant.name);
   const [error, setError] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
@@ -50,19 +51,19 @@ export default function AssistantNameEdit({
 
       return false;
     }
-    
+
     if (name.trim().length < 3) {
       setError('Name must be at least 3 characters');
 
       return false;
     }
-    
+
     if (name.trim().length > 50) {
       setError('Name must be less than 50 characters');
 
       return false;
     }
-    
+
     setError('');
 
     return true;
@@ -70,18 +71,18 @@ export default function AssistantNameEdit({
 
   const handleSave = () => {
     const trimmedName = name.trim();
-    
+
     if (!validateName(trimmedName)) {
       return;
     }
 
     try {
-      // Update the assistant name in context
-      updateAssistant(assistant.id, { name: trimmedName });
-      
-      // Call the onSave callback
+      // Update the assistant name LOCALLY
+      updateAssistantLocally(assistant.id, { name: trimmedName });
+
+      // Call the onSave callback (which likely just closes the edit state)
       onSave(trimmedName);
-      
+
       // Show success toast
       toast.success('Assistant renamed', {
         description: `"${assistant.name}" renamed to "${trimmedName}"`,
@@ -90,7 +91,7 @@ export default function AssistantNameEdit({
     } catch (err) {
       setError('Failed to update the assistant name');
       console.error('Error updating assistant name:', err);
-      
+
       toast.error('Failed to rename assistant', {
         description: 'Please try again',
         duration: 3000,
@@ -124,7 +125,7 @@ export default function AssistantNameEdit({
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <button 
+                <button
                   onClick={(e) => {
                     e.stopPropagation();
                     onSave(assistant.name); // This triggers the edit mode in parent
@@ -160,7 +161,7 @@ export default function AssistantNameEdit({
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <button 
+                <button
                   onClick={(e) => {
                     e.stopPropagation();
                     handleSave();
@@ -176,11 +177,11 @@ export default function AssistantNameEdit({
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
-          
+
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <button 
+                <button
                   onClick={(e) => {
                     e.stopPropagation();
                     handleCancel();
@@ -197,7 +198,7 @@ export default function AssistantNameEdit({
           </TooltipProvider>
         </div>
       </div>
-      
+
       {error && (
         <div className="text-xs text-red-500 mt-1">{error}</div>
       )}
