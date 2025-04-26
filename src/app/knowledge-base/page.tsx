@@ -8,6 +8,7 @@ import { useTranslations } from '@/i18n/translations-context';
 
 import { PromptCarousel } from './components/prompt-carousel';
 import { DocumentCarousel } from './components/document-carousel';
+import { KnowledgeBaseProvider } from "../hooks/use-knowledge-base";
 
 // export const metadata: Metadata = {
 //   title: "Knowledge Base & Prompt Management",
@@ -18,9 +19,9 @@ export default function HomePage() {
   const { t } = useTranslations();
 
   return (
-    <div className="container mx-auto py-10 px-4 space-y-10">
-      <div className="text-center space-y-3 max-w-2xl mx-auto">
-        <h1 className="text-4xl font-bold tracking-tight text-amber-700">
+      <div className="container mx-auto py-10 px-4 space-y-10">
+        <div className="text-center space-y-3 max-w-2xl mx-auto">
+          <h1 className="text-4xl font-bold tracking-tight text-amber-700">
           {t('knowledgeBase.title')}
         </h1>
         <p className="text-muted-foreground text-lg">
