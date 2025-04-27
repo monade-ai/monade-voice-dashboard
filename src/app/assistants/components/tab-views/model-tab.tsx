@@ -3,6 +3,7 @@
 import { useState } from 'react';
 
 import { useAssistants } from '@/app/hooks/use-assistants-context';
+import { useKnowledgeBase } from '@/app/hooks/use-knowledge-base';
 import {
   Select,
   SelectContent,
@@ -66,52 +67,96 @@ const voicesByProvider = {
   ],
 };
 
-export default function ModelTab() {
-  const { currentAssistant, updateAssistant } = useAssistants();
-  
+// Define the props type including the new handler
+interface ModelTabProps {
+  onChangesMade: () => void;
+}
+
+export default function ModelTab({ onChangesMade }: ModelTabProps) {
+  const { currentAssistant, updateAssistantLocally } = useAssistants();
+  const { knowledgeBases } = useKnowledgeBase();
+
   const [provider, setProvider] = useState(currentAssistant?.provider || 'openai');
   const [model, setModel] = useState(currentAssistant?.model || 'tts-1');
   const [voice, setVoice] = useState(currentAssistant?.voice || 'alloy');
   const [phoneNumber, setPhoneNumber] = useState(currentAssistant?.phoneNumber || '');
+  const [knowledgeBaseId, setKnowledgeBaseId] = useState(currentAssistant?.knowledgeBase || '');
+  const [phoneError, setPhoneError] = useState<string | null>(null);
+
+  // Simple phone number validation (only digits)
+  const validatePhoneNumber = (number: string): boolean => {
+    if (!number) return true; // Allow empty initially
+    const phoneRegex = /^\d+$/; // Only digits, no length limit
+    return phoneRegex.test(number);
+  };
 
   const handlePhoneNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setPhoneNumber(value);
-    updateAssistant(currentAssistant?.id || '', { phoneNumber: value });
+
+    // Validate the number
+    if (value && !validatePhoneNumber(value)) { // Check only if value is not empty
+      setPhoneError('Invalid format. Please enter only numbers.');
+    } else {
+      setPhoneError(null); // Clear error if valid or empty
+    }
+
+    if (currentAssistant) {
+      updateAssistantLocally(currentAssistant.id, { phoneNumber: value });
+      onChangesMade(); // Mark changes
+    }
   };
 
   // Get available models for selected provider
   const availableModels = modelsByProvider[provider as keyof typeof modelsByProvider] || [];
-  
+
   // Get available voices for selected provider
   const availableVoices = voicesByProvider[provider as keyof typeof voicesByProvider] || [];
 
   // Update the assistant when selections change
   const handleProviderChange = (value: string) => {
     setProvider(value);
-    
+
     // Reset model and voice to first options from the new provider
     const firstModel = modelsByProvider[value as keyof typeof modelsByProvider]?.[0]?.value || '';
     const firstVoice = voicesByProvider[value as keyof typeof voicesByProvider]?.[0]?.value || '';
-    
+
     setModel(firstModel);
     setVoice(firstVoice);
-    
-    updateAssistant(currentAssistant?.id || '', {
-      provider: value,
-      model: firstModel,
-      voice: firstVoice,
-    });
+
+    if (currentAssistant) {
+      updateAssistantLocally(currentAssistant.id, {
+        provider: value,
+        model: firstModel,
+        voice: firstVoice,
+      });
+      onChangesMade(); // Mark changes
+    }
   };
 
   const handleModelChange = (value: string) => {
     setModel(value);
-    updateAssistant(currentAssistant?.id || '', { model: value });
+    if (currentAssistant) {
+      updateAssistantLocally(currentAssistant.id, { model: value });
+      onChangesMade(); // Mark changes
+    }
   };
 
   const handleVoiceChange = (value: string) => {
     setVoice(value);
-    updateAssistant(currentAssistant?.id || '', { voice: value });
+    if (currentAssistant) {
+      updateAssistantLocally(currentAssistant.id, { voice: value });
+      onChangesMade(); // Mark changes
+    }
+  };
+
+  // Handler for knowledge base change
+  const handleKnowledgeBaseChange = (value: string) => {
+    setKnowledgeBaseId(value);
+    if (currentAssistant) {
+      updateAssistantLocally(currentAssistant.id, { knowledgeBase: value });
+      onChangesMade(); // Mark changes
+    }
   };
 
   return (
@@ -130,10 +175,41 @@ export default function ModelTab() {
             id="assistant-phone-number"
             type="tel"
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-400"
-            placeholder="e.g. +1234567890"
+            placeholder="e.g. 08047361640"
             value={phoneNumber}
             onChange={handlePhoneNumberChange}
           />
+          {/* Display validation error */}
+          {phoneError && <p className="text-xs text-red-500 mt-1">{phoneError}</p>}
+        </div>
+      </div>
+
+      {/* Knowledge Base Section */}
+      <div className="border rounded-lg p-6 bg-gray-50">
+        <h3 className="text-lg font-medium mb-2">Knowledge Base</h3>
+        <p className="text-sm text-gray-600 mb-6">
+          Select the knowledge base this assistant should use for answering questions.
+        </p>
+        <div className="space-y-2">
+          <label htmlFor="knowledge-base" className="text-sm font-medium">
+            Knowledge Base
+          </label>
+          <Select value={knowledgeBaseId} onValueChange={handleKnowledgeBaseChange}>
+            <SelectTrigger className="w-full bg-white">
+              <SelectValue placeholder={knowledgeBases.length === 0 ? "No KBs found" : "Select knowledge base"} />
+            </SelectTrigger>
+            <SelectContent>
+              {knowledgeBases.length === 0 ? (
+                <SelectItem value="none" disabled>No knowledge bases available</SelectItem>
+              ) : (
+                knowledgeBases.map((kb) => (
+                  <SelectItem key={kb.id} value={kb.id}>
+                    {kb.filename}
+                  </SelectItem>
+                ))
+              )}
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
@@ -141,10 +217,10 @@ export default function ModelTab() {
       <div className="border rounded-lg p-6 bg-gray-50">
         <h3 className="text-lg font-medium mb-2">Voice Configuration</h3>
         <p className="text-sm text-gray-600 mb-6">
-          Choose from the list of voices, or sync your voice library if you aren't able to find your voice in the dropdown. 
+          Choose from the list of voices, or sync your voice library if you aren't able to find your voice in the dropdown.
           If you are still facing any error, you can enable custom voice and add a voice ID manually.
         </p>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Provider Selection */}
           <div className="space-y-2">
@@ -164,7 +240,7 @@ export default function ModelTab() {
               </SelectContent>
             </Select>
           </div>
-          
+
           {/* Voice Selection */}
           <div className="space-y-2">
             <label htmlFor="voice" className="text-sm font-medium">
@@ -185,14 +261,14 @@ export default function ModelTab() {
           </div>
         </div>
       </div>
-      
+
       {/* Model Section */}
       <div className="border rounded-lg p-6 bg-gray-50">
         <h3 className="text-lg font-medium mb-2">Model</h3>
         <p className="text-sm text-gray-600 mb-6">
           This is the model that will be used.
         </p>
-        
+
         <div className="space-y-2">
           <Select value={model} onValueChange={handleModelChange}>
             <SelectTrigger className="w-full bg-white">

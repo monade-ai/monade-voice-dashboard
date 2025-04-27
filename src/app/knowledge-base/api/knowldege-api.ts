@@ -4,6 +4,8 @@
  * API client for knowledge base operations
  */
 
+const KB_SERVICE_BASEURL = process.env.NEXT_PUBLIC_KB_SERVICE_BASEURL;
+
 /**
  * Update system prompt with document content
  * @param base64Content - Base64 encoded content of the document
@@ -79,21 +81,44 @@ export class DocumentStorage {
      * Save a document to storage
      * @param document - Document metadata to save
      */
-  static saveDocument(document: DocumentMetadata): void {
+  static async saveDocument(document: DocumentMetadata): Promise<void> {
+    try {
+      // Upload to cloud service
+      const payload = {
+        kb_text: atob(document.content),
+        filename: document.title || `document_${document.id}.${document.fileType}`
+      };
+
+      const apiUrl = `${KB_SERVICE_BASEURL}/api/upload_kb`;
+      console.log('Attempting to save document to:', apiUrl);
+
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Error saving document: ${response.status} ${response.statusText}`);
+      }
+
+      // Still keep document metadata in localStorage for backward compatibility
     const documents = this.getAllDocuments();
-      
-    // Check if document with same ID exists
     const existingIndex = documents.findIndex(doc => doc.id === document.id);
       
     if (existingIndex >= 0) {
-      // Update existing document
       documents[existingIndex] = document;
     } else {
-      // Add new document
       documents.push(document);
     }
       
-    localStorage.setItem(this.STORAGE_KEY, JSON.stringify(documents));
+      // localStorage.setItem(this.STORAGE_KEY, JSON.stringify(documents));
+    } catch (error) {
+      console.error('Error saving document:', error);
+      throw error;
+    }
   }
   
   /**
@@ -132,7 +157,18 @@ export class DocumentStorage {
      * @param id - Document ID
      * @returns True if document was deleted, false otherwise
      */
-  static deleteDocument(id: string): boolean {
+  static async deleteDocument(id: string): Promise<boolean> {
+    try {
+      // Delete from cloud service
+      const response = await fetch(`${KB_SERVICE_BASEURL}/api/delete_kb/${id}`, {
+        method: 'POST',
+      });
+
+      if (!response.ok) {
+        throw new Error(`Error deleting document: ${response.status} ${response.statusText}`);
+      }
+
+      // Also delete from localStorage
     const documents = this.getAllDocuments();
     const filteredDocuments = documents.filter(doc => doc.id !== id);
       
@@ -141,8 +177,11 @@ export class DocumentStorage {
     }
       
     localStorage.setItem(this.STORAGE_KEY, JSON.stringify(filteredDocuments));
-
     return true;
+    } catch (error) {
+      console.error('Error deleting document:', error);
+      throw error;
+    }
   }
   
   /**

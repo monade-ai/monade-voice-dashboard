@@ -1,53 +1,52 @@
 'use client';
 
 import React from 'react';
-import { Phone, MessageSquare } from 'lucide-react';
+import { Phone, MessageSquare, UploadCloud } from 'lucide-react';
 
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-
-interface Assistant {
-  id: string;
-  phoneNumber?: string;
-  name: string;
-  description: string;
-  model: string;
-  costPerMinute: number;
-  totalCalls: number;
-  status: 'active' | 'inactive' | 'error';
-}
+import { Badge } from '@/components/ui/badge';
+import { useAssistants, Assistant } from '@/app/hooks/use-assistants-context';
 
 interface AssistantCardProps {
   assistant: Assistant;
+  onSelect: (assistant: Assistant) => void;
 }
 
-export function AssistantCard({ assistant }: AssistantCardProps) {
+export function AssistantCard({ assistant, onSelect }: AssistantCardProps) {
+  const { publishAssistant, isCreatingNew } = useAssistants();
+  const [isPublishing, setIsPublishing] = React.useState(false);
+
+  const isDraft = assistant.id.startsWith('local-');
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
-    }).format(amount);
+    }).format(amount || 0);
   };
 
-  const getStatusColor = (status: Assistant['status']) => {
-    switch (status) {
-    case 'active':
-      return 'bg-green-900/20 border-green-800 text-green-400';
-    case 'inactive':
-      return 'bg-gray-900/20 border-gray-800 text-gray-400';
-    case 'error':
-      return 'bg-red-900/20 border-red-800 text-red-400';
-    default:
-      return 'bg-gray-900/20 border-gray-800 text-gray-400';
+  const handlePublish = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!isDraft) return;
+    setIsPublishing(true);
+    try {
+      await publishAssistant(assistant.id);
+    } catch (error) {
+      console.error("Failed to publish assistant:", error);
+    } finally {
+      setIsPublishing(false);
     }
   };
 
   return (
-    <Card className="bg-white border-gray-200 hover:border-amber-300 transition-all shadow-sm">
+    <Card
+      className={`bg-white border border-gray-200 hover:border-amber-300 transition-all shadow-sm cursor-pointer ${isDraft ? 'border-dashed border-amber-500' : ''}`}
+      onClick={() => onSelect(assistant)}
+    >
       <CardHeader className="pb-2">
         <div className="flex justify-between items-start">
           <div className="flex items-center gap-3">
-            {/* Animated gradient circle */}
             <span
               className="relative flex-shrink-0 w-10 h-10 rounded-full overflow-hidden transition-transform duration-300 group-hover:scale-105 group-focus:scale-105"
               aria-hidden="true"
@@ -64,12 +63,18 @@ export function AssistantCard({ assistant }: AssistantCardProps) {
             </span>
             <div>
               <h3 className="text-lg font-medium text-gray-800">{assistant.name}</h3>
-              <p className="text-sm text-gray-500">{assistant.description}</p>
+              <p className="text-sm text-gray-500">{assistant.description || 'No description'}</p>
             </div>
           </div>
-          <div className={`rounded-md border px-2 py-1 ${getStatusColor(assistant.status)}`}>
-            <span className="text-xs font-medium capitalize">{assistant.status}</span>
-          </div>
+          {isDraft ? (
+            <Badge variant="outline" className="border-amber-500 text-amber-600">
+              Draft
+            </Badge>
+          ) : (
+            assistant.provider && (
+              <Badge variant="secondary">{assistant.provider}</Badge>
+            )
+          )}
         </div>
       </CardHeader>
       <CardContent>
@@ -77,39 +82,48 @@ export function AssistantCard({ assistant }: AssistantCardProps) {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <p className="text-sm text-gray-500">Model</p>
-              <p className="text-sm font-medium text-gray-800">{assistant.model}</p>
+              <p className="text-sm font-medium text-gray-800">{assistant.model || 'N/A'}</p>
             </div>
             <div>
               <p className="text-sm text-gray-500">Cost/Min</p>
               <p className="text-sm font-medium text-gray-800">
-                {formatCurrency(assistant.costPerMinute)}
+                {formatCurrency(assistant.costPerMin || 0)}
               </p>
             </div>
           </div>
 
-          <div>
-            <p className="text-sm text-gray-500">Total Calls</p>
-            <p className="text-sm font-medium text-gray-800">{assistant.totalCalls}</p>
-          </div>
-
-          <div className="flex gap-2">
+          {isDraft ? (
             <Button
-              variant="outline"
               size="sm"
-              className="flex-1 border-gray-700 text-amber-600 hover:bg-gray-700"
+              className="w-full bg-amber-500 hover:bg-amber-600 text-white"
+              onClick={handlePublish}
+              disabled={isPublishing}
             >
-              <MessageSquare className="h-4 w-4 mr-2" />
-              Chat
+              <UploadCloud className="h-4 w-4 mr-2" />
+              {isPublishing ? 'Publishing...' : 'Publish'}
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="flex-1 border-gray-700 text-amber-600 hover:bg-gray-700"
-            >
-              <Phone className="h-4 w-4 mr-2" />
-              Talk
-            </Button>
-          </div>
+          ) : (
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-1 border-gray-300 text-gray-700 hover:bg-gray-100"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <MessageSquare className="h-4 w-4 mr-2" />
+                Chat
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-1 border-gray-300 text-gray-700 hover:bg-gray-100"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <Phone className="h-4 w-4 mr-2" />
+                Talk
+              </Button>
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>

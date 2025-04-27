@@ -8,6 +8,7 @@ import { useTranslations } from '@/i18n/translations-context';
 
 import { PromptCarousel } from './components/prompt-carousel';
 import { DocumentCarousel } from './components/document-carousel';
+import { KnowledgeBaseProvider } from "../hooks/use-knowledge-base";
 
 // export const metadata: Metadata = {
 //   title: "Knowledge Base & Prompt Management",
@@ -18,9 +19,9 @@ export default function HomePage() {
   const { t } = useTranslations();
 
   return (
-    <div className="container mx-auto py-10 px-4 space-y-10">
-      <div className="text-center space-y-3 max-w-2xl mx-auto">
-        <h1 className="text-4xl font-bold tracking-tight text-amber-700">
+      <div className="container mx-auto py-10 px-4 space-y-10">
+        <div className="text-center space-y-3 max-w-2xl mx-auto">
+          <h1 className="text-4xl font-bold tracking-tight text-amber-700">
           {t('knowledgeBase.title')}
         </h1>
         <p className="text-muted-foreground text-lg">
@@ -33,10 +34,10 @@ export default function HomePage() {
           <div className="relative overflow-hidden rounded-xl border-2 border-dashed p-8 h-60 flex flex-col items-center justify-center text-center transition-all duration-300 hover:border-amber-500 hover:bg-amber-50 group-hover:shadow-lg">
             <div className="absolute inset-0 bg-gradient-to-br from-amber-50 to-slate-50 opacity-50 transition-opacity duration-300 group-hover:opacity-100" />
             <div className="relative z-10">
-              <div className="rounded-full bg-amber-100 p-4 mx-auto mb-4 transition-transform duration-300 group-hover:scale-110">
+              <div className="flex justify-center gap-4 bg-amber-100 p-4 mx-auto mb-4 transition-transform duration-300 group-hover:scale-110 rounded-full">
                 <Upload className="h-8 w-8 text-amber-600" />
+                <span className="text-2xl text-amber-600 font-semibold">{t('knowledgeBase.uploadDocument.title')}</span>
               </div>
-              <h2 className="text-2xl font-semibold mb-2">{t('knowledgeBase.uploadDocument.title')}</h2>
               <p className="text-muted-foreground">{t('knowledgeBase.uploadDocument.description')}</p>
             </div>
           </div>
@@ -46,10 +47,10 @@ export default function HomePage() {
           <div className="relative overflow-hidden rounded-xl border-2 border-dashed p-8 h-60 flex flex-col items-center justify-center text-center transition-all duration-300 hover:border-amber-500 hover:bg-amber-50 group-hover:shadow-lg">
             <div className="absolute inset-0 bg-gradient-to-br from-amber-50 to-slate-50 opacity-50 transition-opacity duration-300 group-hover:opacity-100" />
             <div className="relative z-10">
-              <div className="rounded-full bg-amber-100 p-4 mx-auto mb-4 transition-transform duration-300 group-hover:scale-110">
+              <div className="flex justify-center gap-4 bg-amber-100 p-4 mx-auto mb-4 transition-transform duration-300 group-hover:scale-110 rounded-full">
                 <PlusCircle className="h-8 w-8 text-amber-600" />
+                <span className="text-2xl text-amber-600 font-semibold">{t('knowledgeBase.createPrompt.title')}</span>
               </div>
-              <h2 className="text-2xl font-semibold mb-2">{t('knowledgeBase.createPrompt.title')}</h2>
               <p className="text-muted-foreground">{t('knowledgeBase.createPrompt.description')}</p>
             </div>
           </div>
