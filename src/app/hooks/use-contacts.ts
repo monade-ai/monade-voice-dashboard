@@ -13,7 +13,7 @@ import {
   removeContactFromList,
   searchContactsApi,
 } from '@/app/contacts/utils/contacts-api';
-import { getAccessToken } from '@/lib/auth/auth';
+import { useAuth } from '@/lib/auth/AuthProvider';
 
 export interface Contact {
   id: string;
@@ -61,6 +61,7 @@ export function useContacts({
   initialLists = [], 
   initialContacts = {}, 
 }: UseContactsProps = {}): UseContactsReturn {
+  const { user, loading } = useAuth();
   const [contactLists, setContactLists] = useState<ContactList[]>(initialLists);
   const [contacts, setContacts] = useState<Record<string, Contact[]>>(initialContacts);
   const [selectedList, setSelectedList] = useState<ContactList | null>(null);
@@ -73,7 +74,10 @@ export function useContacts({
     const fetchData = async () => {
       setIsLoading(true);
       try {
-        const token = await getAccessToken();
+        let token: string | null = null;
+        if (typeof window !== 'undefined') {
+          token = localStorage.getItem('access_token');
+        }
         if (!token) throw new Error('Not authenticated');
         const listsRes = await getContactLists(token);
         const lists: ContactList[] = (listsRes.lists || []).map((l: any) => ({
@@ -112,8 +116,10 @@ export function useContacts({
     setIsLoading(true);
     try {
       console.log('[createContactList] called with:', { name, description });
-      const token = await getAccessToken();
-      console.log('[createContactList] access token:', token);
+      let token: string | null = null;
+      if (typeof window !== 'undefined') {
+        token = localStorage.getItem('access_token');
+      }
       if (!token) throw new Error('Not authenticated');
       const res = await apiCreateContactList(token, name, description);
       console.log('[createContactList] API response:', res);
@@ -155,7 +161,10 @@ export function useContacts({
   const addContactToList = useCallback(async (listId: string, contact: Omit<Contact, 'id'>): Promise<Contact | null> => {
     setIsLoading(true);
     try {
-      const token = await getAccessToken();
+      let token: string | null = null;
+      if (typeof window !== 'undefined') {
+        token = localStorage.getItem('access_token');
+      }
       if (!token) throw new Error('Not authenticated');
       const res = await createContact(token, listId, contact);
       const newContact: Contact = {
@@ -184,7 +193,10 @@ export function useContacts({
   const addContactsToList = useCallback(async (listId: string, newContacts: Omit<Contact, 'id'>[]): Promise<Contact[]> => {
     setIsLoading(true);
     try {
-      const token = await getAccessToken();
+      let token: string | null = null;
+      if (typeof window !== 'undefined') {
+        token = localStorage.getItem('access_token');
+      }
       if (!token) throw new Error('Not authenticated');
       await bulkCreateContacts(token, listId, newContacts);
       // Re-fetch contacts for the list
@@ -215,7 +227,10 @@ export function useContacts({
   const removeContactFromListFn = useCallback(async (listId: string, contactId: string) => {
     setIsLoading(true);
     try {
-      const token = await getAccessToken();
+      let token: string | null = null;
+      if (typeof window !== 'undefined') {
+        token = localStorage.getItem('access_token');
+      }
       if (!token) throw new Error('Not authenticated');
       await removeContactFromList(token, listId, contactId);
       setContacts(prev => {
@@ -245,7 +260,10 @@ export function useContacts({
   const removeContactListFn = useCallback(async (listId: string) => {
     setIsLoading(true);
     try {
-      const token = await getAccessToken();
+      let token: string | null = null;
+      if (typeof window !== 'undefined') {
+        token = localStorage.getItem('access_token');
+      }
       if (!token) throw new Error('Not authenticated');
       await apiDeleteContactList(token, listId);
       setContactLists(prev => prev.filter(list => list.id !== listId));
@@ -274,7 +292,10 @@ export function useContacts({
     }
     setIsLoading(true);
     try {
-      const token = await getAccessToken();
+      let token: string | null = null;
+      if (typeof window !== 'undefined') {
+        token = localStorage.getItem('access_token');
+      }
       if (!token) throw new Error('Not authenticated');
       const results = await searchContactsApi(token, query, selectedList.id);
       setSearchResults(results || []);
