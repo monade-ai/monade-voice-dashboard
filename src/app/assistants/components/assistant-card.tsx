@@ -14,7 +14,7 @@ interface AssistantCardProps {
 }
 
 export function AssistantCard({ assistant, onSelect }: AssistantCardProps) {
-  const { publishAssistant, isCreatingNew } = useAssistants();
+  const { createAssistant } = useAssistants();
   const [isPublishing, setIsPublishing] = React.useState(false);
 
   const isDraft = assistant.id.startsWith('local-');
@@ -31,7 +31,19 @@ export function AssistantCard({ assistant, onSelect }: AssistantCardProps) {
     if (!isDraft) return;
     setIsPublishing(true);
     try {
-      await publishAssistant(assistant.id);
+      // Map assistant fields to CreateAssistantData
+      await createAssistant(assistant.id, {
+        name: assistant.name,
+        phoneNumber: assistant.phoneNumber,
+        description: assistant.description,
+        model: assistant.model,
+        provider: assistant.provider,
+        voice: assistant.voice,
+        costPerMin: assistant.costPerMin,
+        latencyMs: assistant.latencyMs,
+        tags: assistant.tags,
+        knowledgeBaseId: assistant.knowledgeBase ?? undefined,
+      });
     } catch (error) {
       console.error("Failed to publish assistant:", error);
     } finally {

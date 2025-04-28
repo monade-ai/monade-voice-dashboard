@@ -38,7 +38,7 @@ export const KnowledgeBaseContext = createContext<KnowledgeBaseContextType>({
 });
 
 // Define API base URL (can be moved to a config file later)
-const API_BASE_URL = 'http://localhost:4050/api';
+const API_BASE_URL = 'http://localhost:7071/api';
 
 // Helper to parse API errors (can be shared or duplicated)
 const getApiError = async (res: Response): Promise<string> => {

@@ -15,10 +15,10 @@ interface ContactsContextType {
   assistantPhoneNumbers: string[];
   
   // Actions
-  createContactList: (name: string, description?: string) => ContactList;
+  createContactList: (name: string, description?: string) => Promise<ContactList>;
   selectContactList: (listId: string | null) => void;
-  addContactToList: (listId: string, contact: Omit<Contact, 'id'>) => Contact;
-  addContactsToList: (listId: string, contacts: Omit<Contact, 'id'>[]) => Contact[];
+  addContactToList: (listId: string, contact: Omit<Contact, 'id'>) => Promise<Contact>;
+  addContactsToList: (listId: string, contacts: Omit<Contact, 'id'>[]) => Promise<Contact[]>;
   removeContactFromList: (listId: string, contactId: string) => void;
   removeContactList: (listId: string) => void;
   searchInCurrentList: (query: string) => void;

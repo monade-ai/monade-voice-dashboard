@@ -67,7 +67,7 @@ export const AssistantsContext = createContext<AssistantsContextType>({
   saveAssistantUpdates: async () => undefined,
 });
 
-const API_BASE_URL = 'http://localhost:4050/api';
+const API_BASE_URL = 'http://localhost:7071/api';
 const DRAFT_ASSISTANTS_STORAGE_KEY = 'draftAssistants';
 
 // Helper to parse API errors

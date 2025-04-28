@@ -149,53 +149,53 @@ const ContactImportDialog: React.FC<ContactImportDialogProps> = ({
   };
   
   // Import selected lists
-  const handleImport = () => {
+  const handleImport = async () => {
     if (!selectedList || selectedLists.size === 0) return;
-    
+
     setIsImporting(true);
     setErrorMessage('');
-    
-    // Simulate import process
-    setTimeout(() => {
-      try {
-        // Create sample contacts from selected lists
-        const importedContacts = Array.from(selectedLists).flatMap(listId => {
-          const list = availableLists.find(l => l.id === listId);
-          if (!list) return [];
-          
-          // Generate some sample contacts for each list
-          return Array(Math.min(list.count, 5)).fill(0).map((_, index) => ({
-            name: `Contact ${index + 1} from ${list.name}`,
-            phone: `+1${Math.floor(1000000000 + Math.random() * 9000000000)}`,
-            source: list.name,
-            email: `contact${index + 1}@example.com`,
-            company: `Company ${Math.floor(Math.random() * 100)}`,
-          }));
-        });
-        
-        // Add the contacts to the selected list
-        const addedContacts = addContactsToList(selectedList.id, importedContacts);
-        
-        setImportComplete(true);
-        setImportStats({
-          total: importedContacts.length,
-          successful: addedContacts.length,
-        });
-        
-        if (onImportComplete) {
-          onImportComplete(addedContacts);
-        }
-        
-        // Close dialog after a delay to show the success message
-        setTimeout(() => {
-          onClose();
-        }, 2000);
-      } catch (error) {
-        setErrorMessage('An error occurred during import. Please try again.');
-      } finally {
-        setIsImporting(false);
+
+    try {
+      // Simulate import process delay
+      await new Promise((resolve) => setTimeout(resolve, 2500));
+
+      // Create sample contacts from selected lists
+      const importedContacts = Array.from(selectedLists).flatMap(listId => {
+        const list = availableLists.find(l => l.id === listId);
+        if (!list) return [];
+
+        // Generate some sample contacts for each list
+        return Array(Math.min(list.count, 5)).fill(0).map((_, index) => ({
+          name: `Contact ${index + 1} from ${list.name}`,
+          phone: `+1${Math.floor(1000000000 + Math.random() * 9000000000)}`,
+          source: list.name,
+          email: `contact${index + 1}@example.com`,
+          company: `Company ${Math.floor(Math.random() * 100)}`,
+        }));
+      });
+
+      // Add the contacts to the selected list
+      const addedContacts = await addContactsToList(selectedList.id, importedContacts);
+
+      setImportComplete(true);
+      setImportStats({
+        total: importedContacts.length,
+        successful: addedContacts.length,
+      });
+
+      if (onImportComplete) {
+        onImportComplete(addedContacts);
       }
-    }, 2500);
+
+      // Close dialog after a delay to show the success message
+      setTimeout(() => {
+        onClose();
+      }, 2000);
+    } catch (error) {
+      setErrorMessage('An error occurred during import. Please try again.');
+    } finally {
+      setIsImporting(false);
+    }
   };
 
   // Retry connection after failure

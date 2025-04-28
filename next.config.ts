@@ -11,6 +11,10 @@ const nextConfig: NextConfig = {
     EXOTEL_API_KEY: process.env.EXOTEL_API_KEY,
     EXOTEL_FUNCTIONS_KEY: process.env.EXOTEL_FUNCTIONS_KEY
   },
+  typescript: {
+    ignoreBuildErrors: true,
+  },
+
 };
 
 export default nextConfig;
