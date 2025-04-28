@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { supabase } from './supabaseClient';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
 interface AuthContextType {
   user: any;
@@ -16,6 +16,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const supabase = createClientComponentClient();
+
     // Get initial session and try to refresh if missing
     const getSession = async () => {
       setLoading(true);
@@ -39,8 +41,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(session.user ?? null); 
       }
       console.log('[AuthProvider] Auth state changed:', session);
-
-      // setUser(session?.user ?? null); 
     });
 
     return () => {
@@ -49,6 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signOut = async () => {
+    const supabase = createClientComponentClient();
     await supabase.auth.signOut();
     setUser(null);
   };

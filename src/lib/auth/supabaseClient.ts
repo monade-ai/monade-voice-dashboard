@@ -1,3 +1,9 @@
+/**
+ * DEPRECATED FOR AUTH: Do NOT use this client for authentication/session management in Next.js App Router projects.
+ * Use `createClientComponentClient` from `@supabase/auth-helpers-nextjs` everywhere for auth/session.
+ * This file may still be used for non-auth Supabase operations if needed.
+ */
+
 import { createClient } from '@supabase/supabase-js';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
