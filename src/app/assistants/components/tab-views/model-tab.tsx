@@ -214,16 +214,16 @@ export default function ModelTab({ onChangesMade }: ModelTabProps) {
       </div>
 
       {/* Voice Configuration Section */}
-      <div className="border rounded-lg p-6 bg-gray-50">
-        <h3 className="text-lg font-medium mb-2">Voice Configuration</h3>
+      {/* <div className="border rounded-lg p-6 bg-gray-50"> */}
+        {/* <h3 className="text-lg font-medium mb-2">Voice Configuration</h3>
         <p className="text-sm text-gray-600 mb-6">
           Choose from the list of voices, or sync your voice library if you aren't able to find your voice in the dropdown.
           If you are still facing any error, you can enable custom voice and add a voice ID manually.
-        </p>
+        </p> */}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* <div className="grid grid-cols-1 md:grid-cols-2 gap-6"> */}
           {/* Provider Selection */}
-          <div className="space-y-2">
+          {/* <div className="space-y-2">
             <label htmlFor="provider" className="text-sm font-medium">
               Provider
             </label>
@@ -239,10 +239,10 @@ export default function ModelTab({ onChangesMade }: ModelTabProps) {
                 ))}
               </SelectContent>
             </Select>
-          </div>
+          </div> */}
 
           {/* Voice Selection */}
-          <div className="space-y-2">
+          {/* <div className="space-y-2">
             <label htmlFor="voice" className="text-sm font-medium">
               Voice
             </label>
@@ -258,12 +258,12 @@ export default function ModelTab({ onChangesMade }: ModelTabProps) {
                 ))}
               </SelectContent>
             </Select>
-          </div>
-        </div>
-      </div>
+          </div> */}
+        {/* </div> */}
+      {/* </div> */}
 
       {/* Model Section */}
-      <div className="border rounded-lg p-6 bg-gray-50">
+      {/* <div className="border rounded-lg p-6 bg-gray-50">
         <h3 className="text-lg font-medium mb-2">Model</h3>
         <p className="text-sm text-gray-600 mb-6">
           This is the model that will be used.
@@ -283,7 +283,7 @@ export default function ModelTab({ onChangesMade }: ModelTabProps) {
             </SelectContent>
           </Select>
         </div>
-      </div>
+      </div> */}
     </div>
   );
 }

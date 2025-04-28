@@ -5,7 +5,7 @@
  * All requests require a Supabase access token in the Authorization header.
  */
 
-const API_URL = process.env.NEXT_PUBLIC_CONTACTS_API_URL || 'http://localhost:7075/';
+const API_URL = process.env.NEXT_PUBLIC_CONTACTS_API_URL ;
 
 type Contact = {
   id?: string;
