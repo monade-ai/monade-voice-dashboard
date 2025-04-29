@@ -33,12 +33,12 @@ const contactSchema = z.object({
 const CreateContact: React.FC<CreateContactProps> = ({ onCancel, onSuccess }) => {
   const { t } = useTranslations();
   const { selectedList, addContactToList } = useContactsContext();
-  
+
   // Form state
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [errors, setErrors] = useState<{ name?: string; phone?: string }>({});
-  
+
   const validateForm = () => {
     try {
       contactSchema.parse({ name, phone });
@@ -59,27 +59,39 @@ const CreateContact: React.FC<CreateContactProps> = ({ onCancel, onSuccess }) =>
       return false;
     }
   };
-  
-  const handleSubmit = (e: React.FormEvent) => {
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!selectedList) {
       alert('Please select a contact list first');
-
       return;
     }
-    
+
     if (!validateForm()) {
       return;
     }
-    
-    const newContact = addContactToList(selectedList.id, { name, phone });
-    
-    if (onSuccess) {
-      onSuccess(newContact);
+
+    try {
+      // Await the result from the context function (now using localStorage)
+      const newContact = await addContactToList(selectedList.id, { name, phone });
+
+      // Check if contact creation was successful and call onSuccess with the actual contact
+      if (newContact && onSuccess) {
+        onSuccess(newContact);
+      }
+      // Optionally handle the case where newContact is null (creation failed)
+      if (!newContact) {
+        console.error("Failed to create contact in localStorage.");
+        // Maybe show an error message to the user
+        alert('Failed to save contact. Please try again.');
+      }
+    } catch (error) {
+      console.error("Error submitting contact:", error);
+      alert('An error occurred while saving the contact.');
     }
   };
-  
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4 py-4">
       <div className="space-y-2">
@@ -100,7 +112,7 @@ const CreateContact: React.FC<CreateContactProps> = ({ onCancel, onSuccess }) =>
           <p className="text-red-500 text-sm">{errors.name}</p>
         )}
       </div>
-      
+
       <div className="space-y-2">
         <Label htmlFor="phone">
           {t('contacts.labels.phoneNumber')} <span className="text-red-500">*</span>
@@ -122,7 +134,7 @@ const CreateContact: React.FC<CreateContactProps> = ({ onCancel, onSuccess }) =>
           {t('contacts.helperText.phoneNumber')}
         </p>
       </div>
-      
+
       <div className="flex justify-end gap-2 pt-4">
         <Button type="button" variant="outline" onClick={onCancel}>
           {t('common.cancel')}

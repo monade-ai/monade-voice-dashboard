@@ -7,7 +7,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 
 import { useContactsContext } from '../contexts/contacts-context';
-import { useAuth } from '@/lib/auth/AuthProvider';
 
 interface CreateContactListDialogProps {
   onSubmit?: (name: string, description?: string) => void;
@@ -25,7 +24,6 @@ const CreateContactListDialog: React.FC<CreateContactListDialogProps> = ({
   onClose,
 }) => {
   const { createContactList } = useContactsContext();
-  const { user, loading } = useAuth();
   const [name, setName] = useState(initialName);
   const [description, setDescription] = useState(initialDescription);
   const [nameError, setNameError] = useState('');
@@ -39,16 +37,6 @@ const CreateContactListDialog: React.FC<CreateContactListDialogProps> = ({
     // Validate name
     if (!name.trim()) {
       setNameError('Name is required');
-      return;
-    }
-
-    if (loading) {
-      setAuthError('Checking authentication...');
-      return;
-    }
-
-    if (!user) {
-      setAuthError('You must be logged in to create a contact list.');
       return;
     }
 
@@ -94,7 +82,7 @@ const CreateContactListDialog: React.FC<CreateContactListDialogProps> = ({
           <p className="text-red-500 text-sm">{nameError}</p>
         )}
       </div>
-      
+
       <div className="space-y-2">
         <label htmlFor="list-description" className="text-sm font-medium">
           Description <span className="text-muted-foreground">(optional)</span>
@@ -107,11 +95,11 @@ const CreateContactListDialog: React.FC<CreateContactListDialogProps> = ({
           rows={3}
         />
       </div>
-      
+
       {authError && (
         <p className="text-red-500 text-sm">{authError}</p>
       )}
-      <Button type="submit" className="w-full" disabled={isSubmitting || loading}>
+      <Button type="submit" className="w-full" disabled={isSubmitting}>
         {isSubmitting ? 'Creating...' : isEditing ? 'Update' : 'Create'} Contact List
       </Button>
     </form>

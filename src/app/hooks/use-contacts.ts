@@ -1,25 +1,36 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
-  getContactLists,
-  createContactList as apiCreateContactList,
-  getListContacts,
-  createContact,
-  bulkCreateContacts,
-  updateContactList as apiUpdateContactList,
-  deleteContactList as apiDeleteContactList,
-  getContact,
-  updateContact,
-  deleteContact,
-  removeContactFromList,
-  searchContactsApi,
+  // getContactLists,
+  // createContactList as apiCreateContactList,
+  // getListContacts,
+  // createContact,
+  // bulkCreateContacts,
+  // updateContactList as apiUpdateContactList,
+  // deleteContactList as apiDeleteContactList,
+  // getContact,
+  // updateContact,
+  // deleteContact,
+  // removeContactFromList,
+  // searchContactsApi,
+  // --- Import LocalStorage functions ---
+  getContactListsFromStorage,
+  createContactListInStorage,
+  getListContactsFromStorage,
+  createContactInStorage,
+  bulkCreateContactsInStorage,
+  deleteContactListFromStorage,
+  removeContactFromListInStorage,
+  searchContactsInStorage,
 } from '@/app/contacts/utils/contacts-api';
-import { useAuth } from '@/lib/auth/AuthProvider';
+// import { useAuth } from '@/lib/auth/AuthProvider';
 
 export interface Contact {
   id: string;
   name: string;
   phone: string;
-  [key: string]: any;
+  [key: string]: any; // Keep for flexibility, though localStorage might not store complex objects reliably without careful stringification
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
 export interface ContactList {
@@ -46,8 +57,8 @@ interface UseContactsReturn {
   // Actions
   createContactList: (name: string, description?: string) => Promise<ContactList | null>;
   selectContactList: (listId: string | null) => void;
-  addContactToList: (listId: string, contact: Omit<Contact, 'id'>) => Promise<Contact | null>;
-  addContactsToList: (listId: string, contacts: Omit<Contact, 'id'>[]) => Promise<Contact[]>;
+  addContactToList: (listId: string, contact: Omit<Contact, 'id' | 'createdAt' | 'updatedAt'>) => Promise<Contact | null>; // Adjusted type
+  addContactsToList: (listId: string, contacts: Omit<Contact, 'id' | 'createdAt' | 'updatedAt'>[]) => Promise<Contact[]>; // Adjusted type
   removeContactFromList: (listId: string, contactId: string) => Promise<void>;
   removeContactList: (listId: string) => Promise<void>;
   searchInCurrentList: (query: string) => Promise<void>;
@@ -55,53 +66,45 @@ interface UseContactsReturn {
 }
 
 /**
- * API-driven hook to manage contacts and contact lists
+ * localStorage-driven hook to manage contacts and contact lists
  */
-export function useContacts({ 
-  initialLists = [], 
-  initialContacts = {}, 
+export function useContacts({
+  initialLists = [],
+  initialContacts = {},
 }: UseContactsProps = {}): UseContactsReturn {
-  const { user, loading } = useAuth();
+  // const { user, loading } = useAuth(); // Removed Auth dependency
   const [contactLists, setContactLists] = useState<ContactList[]>(initialLists);
   const [contacts, setContacts] = useState<Record<string, Contact[]>>(initialContacts);
   const [selectedList, setSelectedList] = useState<ContactList | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(true); // Start loading initially
   const [searchResults, setSearchResults] = useState<Contact[]>([]);
   const [searchQuery, setSearchQuery] = useState<string>('');
 
-  // Load all contact lists and their contacts on mount
+  // Load all contact lists and their contacts from localStorage on mount
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
       try {
-        let token: string | null = null;
-        if (typeof window !== 'undefined') {
-          token = localStorage.getItem('access_token');
-        }
-        if (!token) throw new Error('Not authenticated');
-        const listsRes = await getContactLists(token);
-        const lists: ContactList[] = (listsRes.lists || []).map((l: any) => ({
-          id: l.id,
-          name: l.name,
-          description: l.description,
-          count: l.contact_count,
-          createdAt: new Date(l.created_at),
-        }));
+        // No token needed for localStorage
+        // if (typeof window === 'undefined') return; // Check handled in storage functions
+        // const token = localStorage.getItem('access_token');
+        // if (!token) throw new Error('Not authenticated');
+
+        const listsRes = await getContactListsFromStorage();
+        const lists: ContactList[] = listsRes.lists || [];
         setContactLists(lists);
 
-        // Fetch contacts for each list
+        // Fetch contacts for each list from storage
         const contactsObj: Record<string, Contact[]> = {};
         for (const list of lists) {
-          const contactsRes = await getListContacts(token, list.id);
-          contactsObj[list.id] = (contactsRes || []).map((c: any) => ({
-            ...c,
-            createdAt: c.created_at ? new Date(c.created_at) : undefined,
-            updatedAt: c.updated_at ? new Date(c.updated_at) : undefined,
-          }));
+          // No token needed
+          const contactsRes = await getListContactsFromStorage(list.id);
+          contactsObj[list.id] = contactsRes || [];
         }
         setContacts(contactsObj);
       } catch (err) {
-        // Optionally handle error
+        console.error('Error loading data from localStorage:', err);
+        // Optionally handle error: clear state or show message
         setContactLists([]);
         setContacts({});
       } finally {
@@ -109,29 +112,20 @@ export function useContacts({
       }
     };
     fetchData();
-  }, []);
+  }, []); // Run only once on mount
 
-  // Create a new contact list
+  // Create a new contact list in storage
   const createContactList = useCallback(async (name: string, description?: string): Promise<ContactList | null> => {
     setIsLoading(true);
     try {
       console.log('[createContactList] called with:', { name, description });
-      let token: string | null = null;
-      if (typeof window !== 'undefined') {
-        token = localStorage.getItem('access_token');
-      }
-      if (!token) throw new Error('Not authenticated');
-      const res = await apiCreateContactList(token, name, description);
-      console.log('[createContactList] API response:', res);
-      const newList: ContactList = {
-        id: res.id,
-        name: res.name,
-        description: res.description,
-        count: res.contact_count || 0,
-        createdAt: new Date(res.created_at),
-      };
+      // No token needed
+      const newList = await createContactListInStorage(name, description);
+      console.log('[createContactList] localStorage response:', newList);
+
+      // Update state
       setContactLists(prev => [...prev, newList]);
-      setContacts(prev => ({ ...prev, [newList.id]: [] }));
+      setContacts(prev => ({ ...prev, [newList.id]: [] })); // Initialize contacts for the new list in state
       return newList;
     } catch (err) {
       console.error('[createContactList] error:', err);
@@ -141,7 +135,7 @@ export function useContacts({
     }
   }, []);
 
-  // Select a contact list
+  // Select a contact list (no change needed, purely state management)
   const selectContactList = useCallback((listId: string | null) => {
     if (!listId) {
       setSelectedList(null);
@@ -157,82 +151,66 @@ export function useContacts({
     }
   }, [contactLists]);
 
-  // Add a single contact to a list
-  const addContactToList = useCallback(async (listId: string, contact: Omit<Contact, 'id'>): Promise<Contact | null> => {
+  // Add a single contact to a list in storage
+  const addContactToList = useCallback(async (listId: string, contact: Omit<Contact, 'id' | 'createdAt' | 'updatedAt'>): Promise<Contact | null> => {
     setIsLoading(true);
     try {
-      let token: string | null = null;
-      if (typeof window !== 'undefined') {
-        token = localStorage.getItem('access_token');
-      }
-      if (!token) throw new Error('Not authenticated');
-      const res = await createContact(token, listId, contact);
-      const newContact: Contact = {
-        ...res,
-        createdAt: res.created_at ? new Date(res.created_at) : undefined,
-        updatedAt: res.updated_at ? new Date(res.updated_at) : undefined,
-      };
+      // No token needed
+      const newContact = await createContactInStorage(listId, contact);
+
+      // Update state (storage function already updated list count)
       setContacts(prev => ({
         ...prev,
         [listId]: [...(prev[listId] || []), newContact],
       }));
-      setContactLists(prev =>
-        prev.map(list =>
-          list.id === listId ? { ...list, count: list.count + 1 } : list,
-        ),
-      );
+      // Fetch updated list count from storage or rely on storage function (simpler)
+      const listsRes = await getContactListsFromStorage();
+      setContactLists(listsRes.lists || []);
+
       return newContact;
     } catch (err) {
+      console.error('[addContactToList] error:', err);
       return null;
     } finally {
       setIsLoading(false);
     }
   }, []);
 
-  // Add multiple contacts to a list (bulk import)
-  const addContactsToList = useCallback(async (listId: string, newContacts: Omit<Contact, 'id'>[]): Promise<Contact[]> => {
+  // Add multiple contacts to a list in storage (bulk import)
+  const addContactsToList = useCallback(async (listId: string, newContactsData: Omit<Contact, 'id' | 'createdAt' | 'updatedAt'>[]): Promise<Contact[]> => {
     setIsLoading(true);
     try {
-      let token: string | null = null;
-      if (typeof window !== 'undefined') {
-        token = localStorage.getItem('access_token');
-      }
-      if (!token) throw new Error('Not authenticated');
-      await bulkCreateContacts(token, listId, newContacts);
-      // Re-fetch contacts for the list
-      const contactsRes = await getListContacts(token, listId);
-      const updatedContacts: Contact[] = (contactsRes || []).map((c: any) => ({
-        ...c,
-        createdAt: c.created_at ? new Date(c.created_at) : undefined,
-        updatedAt: c.updated_at ? new Date(c.updated_at) : undefined,
-      }));
+      // No token needed
+      const createdContacts = await bulkCreateContactsInStorage(listId, newContactsData);
+
+      // Re-fetch contacts for the list from storage to update state
+      const updatedContacts = await getListContactsFromStorage(listId);
       setContacts(prev => ({
         ...prev,
         [listId]: updatedContacts,
       }));
-      setContactLists(prev =>
-        prev.map(list =>
-          list.id === listId ? { ...list, count: updatedContacts.length } : list,
-        ),
-      );
-      return updatedContacts;
+
+      // Fetch updated list count from storage
+      const listsRes = await getContactListsFromStorage();
+      setContactLists(listsRes.lists || []);
+
+      return createdContacts; // Return the contacts that were added
     } catch (err) {
+      console.error('[addContactsToList] error:', err);
       return [];
     } finally {
       setIsLoading(false);
     }
   }, []);
 
-  // Remove a contact from a list
+  // Remove a contact from a list in storage
   const removeContactFromListFn = useCallback(async (listId: string, contactId: string) => {
     setIsLoading(true);
     try {
-      let token: string | null = null;
-      if (typeof window !== 'undefined') {
-        token = localStorage.getItem('access_token');
-      }
-      if (!token) throw new Error('Not authenticated');
-      await removeContactFromList(token, listId, contactId);
+      // No token needed
+      await removeContactFromListInStorage(listId, contactId);
+
+      // Update state
       setContacts(prev => {
         const listContacts = prev[listId] || [];
         const updatedContacts = listContacts.filter(contact => contact.id !== contactId);
@@ -241,49 +219,51 @@ export function useContacts({
           [listId]: updatedContacts,
         };
       });
-      setContactLists(prev =>
-        prev.map(list =>
-          list.id === listId ? { ...list, count: Math.max(0, list.count - 1) } : list,
-        ),
-      );
+      // Fetch updated list count from storage
+      const listsRes = await getContactListsFromStorage();
+      setContactLists(listsRes.lists || []);
+
+      // Update search results if the removed contact was present
       if (searchQuery) {
         setSearchResults(prev => prev.filter(contact => contact.id !== contactId));
       }
     } catch (err) {
+      console.error('[removeContactFromListFn] error:', err);
       // Optionally handle error
     } finally {
       setIsLoading(false);
     }
   }, [searchQuery]);
 
-  // Remove a contact list
+  // Remove a contact list from storage
   const removeContactListFn = useCallback(async (listId: string) => {
     setIsLoading(true);
     try {
-      let token: string | null = null;
-      if (typeof window !== 'undefined') {
-        token = localStorage.getItem('access_token');
-      }
-      if (!token) throw new Error('Not authenticated');
-      await apiDeleteContactList(token, listId);
+      // No token needed
+      await deleteContactListFromStorage(listId);
+
+      // Update state
       setContactLists(prev => prev.filter(list => list.id !== listId));
       setContacts(prev => {
         const { [listId]: _, ...rest } = prev;
         return rest;
       });
+
+      // Clear selection if the deleted list was selected
       if (selectedList?.id === listId) {
         setSelectedList(null);
         setSearchResults([]);
         setSearchQuery('');
       }
     } catch (err) {
+      console.error('[removeContactListFn] error:', err);
       // Optionally handle error
     } finally {
       setIsLoading(false);
     }
   }, [selectedList]);
 
-  // Search contacts in the current list
+  // Search contacts in storage for the current list
   const searchInCurrentList = useCallback(async (query: string) => {
     setSearchQuery(query);
     if (!selectedList || !query.trim()) {
@@ -292,21 +272,18 @@ export function useContacts({
     }
     setIsLoading(true);
     try {
-      let token: string | null = null;
-      if (typeof window !== 'undefined') {
-        token = localStorage.getItem('access_token');
-      }
-      if (!token) throw new Error('Not authenticated');
-      const results = await searchContactsApi(token, query, selectedList.id);
+      // No token needed
+      const results = await searchContactsInStorage(query, selectedList.id);
       setSearchResults(results || []);
-    } catch (err) {
+    } catch (err) { // Although storage functions are Promise-based, catch errors just in case
+      console.error('[searchInCurrentList] error:', err);
       setSearchResults([]);
     } finally {
       setIsLoading(false);
     }
   }, [selectedList]);
 
-  // Clear search
+  // Clear search (no change needed)
   const clearSearch = useCallback(() => {
     setSearchQuery('');
     setSearchResults([]);
