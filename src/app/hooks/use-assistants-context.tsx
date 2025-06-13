@@ -7,6 +7,7 @@ import { v4 as uuidv4 } from 'uuid';
 // Define the Assistant type - Matches API GET response structure & Prisma Schema
 export interface Assistant {
   id: string; // Can be 'local-...' for drafts or UUID for published
+  contact_bucket_id: string | null; // Associated contact bucket
   name: string;
   phoneNumber: string; // Non-optional in DB, but might be empty in draft state initially
   description?: string;
@@ -368,10 +369,6 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
 
       // Remove from local state (or refetch)
       setAssistants((prev) => prev.filter((assistant) => assistant.id !== id));
-      if (assistantsCacheRef.data) {
-        assistantsCacheRef.data = assistantsCacheRef.data.filter((assistant: Assistant) => assistant.id !== id);
-        assistantsCacheRef.timestamp = Date.now();
-      }
       if (currentAssistant?.id === id) {
         setCurrentAssistant(null);
       }

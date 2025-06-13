@@ -4,6 +4,7 @@ import { useState } from 'react';
 
 import { useAssistants } from '@/app/hooks/use-assistants-context';
 import { useKnowledgeBase } from '@/app/hooks/use-knowledge-base';
+import { useContactsContext } from '@/app/contacts/contexts/contacts-context';
 import {
   Select,
   SelectContent,
@@ -75,12 +76,14 @@ interface ModelTabProps {
 export default function ModelTab({ onChangesMade }: ModelTabProps) {
   const { currentAssistant, updateAssistantLocally } = useAssistants();
   const { knowledgeBases } = useKnowledgeBase();
+  const { buckets } = useContactsContext();
 
   const [provider, setProvider] = useState(currentAssistant?.provider || 'openai');
   const [model, setModel] = useState(currentAssistant?.model || 'tts-1');
   const [voice, setVoice] = useState(currentAssistant?.voice || 'alloy');
   const [phoneNumber, setPhoneNumber] = useState(currentAssistant?.phoneNumber || '');
   const [knowledgeBaseId, setKnowledgeBaseId] = useState(currentAssistant?.knowledgeBase || '');
+  const [contactBucketId, setContactBucketId] = useState(currentAssistant?.contact_bucket_id || '');
   const [phoneError, setPhoneError] = useState<string | null>(null);
 
   // Simple phone number validation (only digits)
@@ -205,6 +208,46 @@ export default function ModelTab({ onChangesMade }: ModelTabProps) {
                 knowledgeBases.map((kb) => (
                   <SelectItem key={kb.id} value={kb.id}>
                     {kb.filename}
+                  </SelectItem>
+                ))
+              )}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      {/* Contact Bucket Section */}
+      <div className="border rounded-lg p-6 bg-gray-50">
+        <h3 className="text-lg font-medium mb-2">Contact Bucket</h3>
+        <p className="text-sm text-gray-600 mb-6">
+          Select the contact bucket to associate with this assistant. This will be used for contact-related features.
+        </p>
+        <div className="space-y-2">
+          <label htmlFor="contact-bucket" className="text-sm font-medium">
+            Contact Bucket
+          </label>
+          <Select
+            value={contactBucketId || "none"}
+            onValueChange={(value) => {
+              const bucketId = value === "none" ? null : value;
+              setContactBucketId(bucketId);
+              if (currentAssistant) {
+                updateAssistantLocally(currentAssistant.id, { contact_bucket_id: bucketId });
+                onChangesMade();
+              }
+            }}
+          >
+            <SelectTrigger className="w-full bg-white">
+              <SelectValue placeholder={buckets.length === 0 ? "No buckets found" : "Select contact bucket"} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">None</SelectItem>
+              {buckets.length === 0 ? (
+                <SelectItem value="none" disabled>No buckets available</SelectItem>
+              ) : (
+                buckets.map((bucket) => (
+                  <SelectItem key={bucket.id} value={bucket.id}>
+                    {bucket.name}
                   </SelectItem>
                 ))
               )}
