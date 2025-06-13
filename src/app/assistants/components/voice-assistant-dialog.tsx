@@ -144,7 +144,16 @@ function VoiceModelCard({ model, showInfo, onInfoClick, onSelect }: VoiceModelCa
   const mountRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
+  const cameraRef = useRef<THREE.OrthographicCamera | null>(null);
   const animationRef = useRef<number | null>(null);
+  
+  // Store geometry and material references for reuse
+  const waveGeometryRef = useRef<THREE.BufferGeometry | null>(null);
+  const waveMaterialRef = useRef<THREE.PointsMaterial | null>(null);
+  const wavePointsRef = useRef<THREE.Points | null>(null);
+  const gridGeometryRef = useRef<THREE.BufferGeometry | null>(null);
+  const gridMaterialRef = useRef<THREE.PointsMaterial | null>(null);
+  const gridPointsRef = useRef<THREE.Points | null>(null);
 
   useEffect(() => {
     if (mountRef.current && !rendererRef.current) {
@@ -166,14 +175,37 @@ function VoiceModelCard({ model, showInfo, onInfoClick, onSelect }: VoiceModelCa
     };
   }, [isHovered, showInfo, model.color, selectedVoice]);
 
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+      // Dispose of geometries and materials
+      if (waveGeometryRef.current) waveGeometryRef.current.dispose();
+      if (waveMaterialRef.current) waveMaterialRef.current.dispose();
+      if (gridGeometryRef.current) gridGeometryRef.current.dispose();
+      if (gridMaterialRef.current) gridMaterialRef.current.dispose();
+      if (rendererRef.current) rendererRef.current.dispose();
+    };
+  }, []);
+
   const initThreeJS = () => {
     if (!mountRef.current) return;
+
+    // Ensure element has dimensions
+    const rect = mountRef.current.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) {
+      // Retry initialization after a short delay
+      setTimeout(initThreeJS, 100);
+      return;
+    }
 
     const scene = new THREE.Scene();
     const camera = new THREE.OrthographicCamera(-2, 2, 2, -2, 0.1, 1000);
     const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
     
-    renderer.setSize(mountRef.current.offsetWidth, mountRef.current.offsetHeight);
+    renderer.setSize(rect.width, rect.height);
     renderer.setClearColor(0x000000, 0);
     mountRef.current.appendChild(renderer.domElement);
 
@@ -181,16 +213,32 @@ function VoiceModelCard({ model, showInfo, onInfoClick, onSelect }: VoiceModelCa
 
     sceneRef.current = scene;
     rendererRef.current = renderer;
+    cameraRef.current = camera;
   };
 
-  const createWaveGeometry = (time: number) => {
-    const geometry = new THREE.BufferGeometry();
+  const updateWaveGeometry = (time: number) => {
+    if (!sceneRef.current) return;
+
+    const color = new THREE.Color(model.color);
+
+    // Initialize wave geometry and material if not exists
+    if (!waveGeometryRef.current) {
+      waveGeometryRef.current = new THREE.BufferGeometry();
+      waveMaterialRef.current = new THREE.PointsMaterial({
+        size: 0.02,
+        vertexColors: true,
+        transparent: true,
+        opacity: 0.8,
+        blending: THREE.AdditiveBlending
+      });
+      wavePointsRef.current = new THREE.Points(waveGeometryRef.current, waveMaterialRef.current);
+      sceneRef.current.add(wavePointsRef.current);
+    }
+
+    // Create flowing wave lines
     const vertices = [];
     const colors = [];
     
-    const color = new THREE.Color(model.color);
-    
-    // Create flowing wave lines
     for (let i = 0; i < 100; i++) {
       const x = (i / 50) - 1;
       const y1 = Math.sin(x * 8 + time * 2) * 0.3;
@@ -201,85 +249,89 @@ function VoiceModelCard({ model, showInfo, onInfoClick, onSelect }: VoiceModelCa
       vertices.push(x, y2, 0);
       vertices.push(x, y3, 0);
       
-      const alpha = 0.3 + Math.sin(time + i * 0.1) * 0.2;
-      colors.push(color.r, color.g, color.b, alpha);
-      colors.push(color.r, color.g, color.b, alpha * 0.7);
-      colors.push(color.r, color.g, color.b, alpha * 0.5);
+      // Use RGB only (3 components) instead of RGBA
+      colors.push(color.r, color.g, color.b);
+      colors.push(color.r, color.g, color.b);
+      colors.push(color.r, color.g, color.b);
     }
 
-    geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
-    geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 4));
-    
-    return geometry;
+    // Update existing geometry attributes
+    waveGeometryRef.current.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+    waveGeometryRef.current.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+    waveGeometryRef.current.attributes.position.needsUpdate = true;
+    waveGeometryRef.current.attributes.color.needsUpdate = true;
   };
 
-  const startVisualization = () => {
-    if (!sceneRef.current || !rendererRef.current) return;
+  const updateGridGeometry = (time: number) => {
+    if (!sceneRef.current) return;
 
-    const animate = () => {
-      const time = Date.now() * 0.001;
-      
-      // Clear previous geometry
-      while(sceneRef.current!.children.length > 0) {
-        sceneRef.current!.remove(sceneRef.current!.children[0]);
-      }
+    const color = new THREE.Color(model.color);
 
-      // Add new wave geometry
-      const geometry = createWaveGeometry(time);
-      const material = new THREE.PointsMaterial({
-        size: 0.02,
-        vertexColors: true,
-        transparent: true,
-        blending: THREE.AdditiveBlending
-      });
-      
-      const points = new THREE.Points(geometry, material);
-      sceneRef.current!.add(points);
-
-      // Add subtle grid
-      const gridGeometry = new THREE.BufferGeometry();
-      const gridVertices = [];
-      const gridColors = [];
-      const color = new THREE.Color(model.color);
-      
-      for (let i = -20; i <= 20; i += 2) {
-        for (let j = -20; j <= 20; j += 2) {
-          const x = i * 0.1;
-          const y = j * 0.1;
-          const z = Math.sin(time + x * 2 + y * 2) * 0.05;
-          
-          gridVertices.push(x, y, z);
-          const alpha = 0.1 + Math.sin(time + i + j) * 0.05;
-          gridColors.push(color.r, color.g, color.b, alpha);
-        }
-      }
-      
-      gridGeometry.setAttribute('position', new THREE.Float32BufferAttribute(gridVertices, 3));
-      gridGeometry.setAttribute('color', new THREE.Float32BufferAttribute(gridColors, 4));
-      
-      const gridMaterial = new THREE.PointsMaterial({
+    // Initialize grid geometry and material if not exists
+    if (!gridGeometryRef.current) {
+      gridGeometryRef.current = new THREE.BufferGeometry();
+      gridMaterialRef.current = new THREE.PointsMaterial({
         size: 0.005,
         vertexColors: true,
         transparent: true,
         opacity: 0.3
       });
-      
-      const grid = new THREE.Points(gridGeometry, gridMaterial);
-      sceneRef.current!.add(grid);
+      gridPointsRef.current = new THREE.Points(gridGeometryRef.current, gridMaterialRef.current);
+      sceneRef.current.add(gridPointsRef.current);
+    }
 
-      rendererRef.current!.render(sceneRef.current!, new THREE.OrthographicCamera(-2, 2, 2, -2, 0.1, 1000));
-
-      if (isHovered && !showInfo) {
-        animationRef.current = requestAnimationFrame(animate);
+    // Add subtle grid
+    const gridVertices = [];
+    const gridColors = [];
+    
+    for (let i = -20; i <= 20; i += 2) {
+      for (let j = -20; j <= 20; j += 2) {
+        const x = i * 0.1;
+        const y = j * 0.1;
+        const z = Math.sin(time + x * 2 + y * 2) * 0.05;
+        
+        gridVertices.push(x, y, z);
+        // Use RGB only (3 components)
+        gridColors.push(color.r, color.g, color.b);
       }
+    }
+    
+    // Update existing geometry attributes
+    gridGeometryRef.current.setAttribute('position', new THREE.Float32BufferAttribute(gridVertices, 3));
+    gridGeometryRef.current.setAttribute('color', new THREE.Float32BufferAttribute(gridColors, 3));
+    gridGeometryRef.current.attributes.position.needsUpdate = true;
+    gridGeometryRef.current.attributes.color.needsUpdate = true;
+  };
+
+  const startVisualization = () => {
+    if (!sceneRef.current || !rendererRef.current || !cameraRef.current) return;
+    if (animationRef.current) return; // Already running
+
+    const animate = () => {
+      if (!isHovered || showInfo) {
+        animationRef.current = null;
+        return; // Stop animation
+      }
+
+      const time = Date.now() * 0.001;
+      
+      // Update geometries instead of recreating
+      updateWaveGeometry(time);
+      updateGridGeometry(time);
+
+      // Use stored camera reference
+      rendererRef.current!.render(sceneRef.current!, cameraRef.current!);
+
+      animationRef.current = requestAnimationFrame(animate);
     };
 
-    animate();
+    animationRef.current = requestAnimationFrame(animate);
   };
 
   const stopVisualization = () => {
     if (animationRef.current) {
       cancelAnimationFrame(animationRef.current);
+      animationRef.current = null;
     }
   };
 
