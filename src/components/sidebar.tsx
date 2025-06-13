@@ -28,6 +28,7 @@ import { useTranslations } from '@/i18n/translations-context';
 import { LanguageSelector } from '@/components/language-selector';
 
 import { useLogout } from './utils/logout';
+import { useAuth } from '@/lib/auth/AuthProvider';
 
 interface NavItemProps {
   href: string;
@@ -110,6 +111,7 @@ export function Sidebar() {
   const pathname = usePathname();
   const [expandedSection, setExpandedSection] = useState<string | null>(null);
   const { t } = useTranslations();
+  const { user, loading } = useAuth();
 
   const logout = useLogout();
 
@@ -135,7 +137,9 @@ export function Sidebar() {
           <div className="px-3 py-2">
             <div className="flex items-center space-x-2">
               <div className="w-3 h-3 rounded-full bg-cyan-500"></div>
-              <p className="text-sm text-gray-300 truncate">mynameisgnuhgnahpis...</p>
+              <p className="text-sm text-gray-700 truncate">
+                {loading ? 'Loading...' : user?.email || ''}
+              </p>
             </div>
           </div>
           
@@ -185,12 +189,6 @@ export function Sidebar() {
             isActive={pathname === '/knowledge-base'}
           />
           <NavItem
-            href="/squads"
-            icon={<Users size={18} />}
-            label={t('sidebar.squads')}
-            isActive={pathname === '/squads'}
-          />
-          <NavItem
             href="/provider-keys"
             icon={<Key size={18} />}
             label={t('sidebar.providerKeys')}
@@ -198,21 +196,7 @@ export function Sidebar() {
           />
         </SidebarSection>
 
-        <SidebarSection title={t('sidebar.test')}>
-          <NavItem
-            href="/test"
-            icon={<PhoneCall size={18} />}
-            label={t('sidebar.test')}
-            hasChildren={true}
-            isOpen={expandedSection === 'test'}
-            onClick={() => toggleSection('test')}
-            childItems={[
-              { href: '/test/phone', label: t('sidebar.phone') },
-              { href: '/test/web', label: t('sidebar.web') },
-            ]}
-            isActive={pathname.startsWith('/test')}
-          />
-        </SidebarSection>
+        {/* Removed TEST section */}
 
         <SidebarSection title={t('sidebar.observe')}>
           <NavItem
@@ -220,12 +204,6 @@ export function Sidebar() {
             icon={<PhoneCall size={18} />}
             label={t('sidebar.callHistory')}
             isActive={pathname === '/call-history'}
-          />
-          <NavItem
-            href="/calls"
-            icon={<PhoneCall size={18} />}
-            label={t('sidebar.calls')}
-            isActive={pathname === '/calls'}
           />
         </SidebarSection>
 
@@ -273,12 +251,8 @@ export function Sidebar() {
           {t('sidebar.logout')}
         </button>
         
-        {/* Language Selector */}
+        {/* Language Selector - heading removed, only dropdown shown */}
         <div className="mt-4 pt-4 border-t border-gray-200">
-          <div className="flex items-center text-sm text-gray-500 mb-2 px-2">
-            <Globe size={16} className="mr-2" />
-            {t('sidebar.language')}
-          </div>
           <LanguageSelector />
         </div>
       </div>

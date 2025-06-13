@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { useAssistants } from '../../hooks/use-assistants-context';
 
 import AssistantNameEdit from './assistant-name-edit';
+import { VoiceAssistantDialog } from './voice-assistant-dialog';
 
 export default function AssistantsHeader() {
   const {
@@ -24,32 +25,58 @@ export default function AssistantsHeader() {
   const [searchTerm, setSearchTerm] = useState('');
   const [editingAssistantId, setEditingAssistantId] = useState<string | null>(null);
 
+  // Dialog open state for VoiceAssistantDialog
+  const [dialogOpen, setDialogOpen] = useState(false);
+
   // Filter assistants based on search term
   const filteredAssistants = assistants.filter(
     assistant => assistant.name.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
+  // Open the dialog instead of creating a draft directly
   const handleCreateAssistant = () => {
-    // Define the initial data for the draft
+    setDialogOpen(true);
+  };
+
+  // Handle selection from VoiceAssistantDialog
+  const handleDialogSelect = (modelId: string) => {
+    // Map modelId to price/latency
+    let costPerMin = 0;
+    let latencyMs = 0;
+    let modelName = '';
+    let provider = 'openai'; // default, can be changed if needed
+
+    if (modelId === 'conversational') {
+      costPerMin = 6;
+      latencyMs = 678;
+      modelName = 'Conversational';
+    } else if (modelId === 'professional') {
+      costPerMin = 9;
+      latencyMs = 730;
+      modelName = 'Professional';
+    } else if (modelId === 'creative') {
+      costPerMin = 16;
+      latencyMs = 694;
+      modelName = 'Creative';
+    }
+
     const newDraftData = {
-      name: 'New Assistant',
+      name: `New ${modelName} Assistant`,
       description: '',
-      model: '',
-      provider: 'openai',
+      model: modelId,
+      provider,
       voice: '',
-      costPerMin: 0.1,
-      latencyMs: 1000,
+      costPerMin,
+      latencyMs,
       tags: [],
       phoneNumber: '',
       knowledgeBase: null,
     };
 
-    // Add the draft using the context function
     const createdDraft = addDraftAssistant(newDraftData);
-
-    // Set the new draft as the current assistant
     setCurrentAssistant(createdDraft);
     setEditingAssistantId(createdDraft.id);
+    setDialogOpen(false);
   };
 
   // Handle saving the name edit locally
@@ -93,6 +120,11 @@ export default function AssistantsHeader() {
           <Plus className="h-4 w-4 mr-2" />
           Create Assistant
         </Button>
+        <VoiceAssistantDialog
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+          onSelect={handleDialogSelect}
+        />
       </div>
 
       {/* Horizontal scrolling assistant cards */}

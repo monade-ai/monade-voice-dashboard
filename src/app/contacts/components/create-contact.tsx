@@ -1,146 +1,131 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { z } from 'zod';
 import { useTranslations } from '@/i18n/translations-context';
 
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Contact } from '@/app/hooks/use-contacts';
 import { Label } from '@/components/ui/label';
-import { useContactsContext } from '../contexts/contacts-context';
+import { useContactsContext, Contact } from '../contexts/contacts-context';
 
 interface CreateContactProps {
   onCancel: () => void;
   onSuccess?: (contact: Contact) => void;
 }
 
-// Validate phone number format
-const validatePhoneNumber = (phone: string) => {
-  const regex = /^\+[1-9]\d{1,14}$/;
-
-  return regex.test(phone);
-};
-
-// Create a schema for form validation
-const contactSchema = z.object({
-  name: z.string().min(1, 'Name is required'),
-  phone: z.string()
-    .min(1, 'Phone number is required')
-    .refine(validatePhoneNumber, 'Phone number must include country code (e.g., +91234567890)'),
-});
-
 const CreateContact: React.FC<CreateContactProps> = ({ onCancel, onSuccess }) => {
   const { t } = useTranslations();
-  const { selectedList, addContactToList } = useContactsContext();
+  const { selectedBucket, addContact } = useContactsContext();
 
-  // Form state
-  const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [errors, setErrors] = useState<{ name?: string; phone?: string }>({});
+  const [formData, setFormData] = useState<Record<string, string>>({});
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Reset form when bucket changes
+  useEffect(() => {
+    setFormData({});
+    setErrors({});
+  }, [selectedBucket]);
+
+  const handleInputChange = (field: string, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+    setErrors(prev => ({ ...prev, [field]: '' }));
+  };
 
   const validateForm = () => {
-    try {
-      contactSchema.parse({ name, phone });
-      setErrors({});
-
-      return true;
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        const formattedErrors: { [k: string]: string } = {};
-        error.errors.forEach(err => {
-          if (err.path[0]) {
-            formattedErrors[err.path[0] as string] = err.message;
-          }
-        });
-        setErrors(formattedErrors);
-      }
-
-      return false;
+    if (!selectedBucket) return false;
+    const newErrors: Record<string, string> = {};
+    
+    // Phone number is always required and must be validated
+    const phone = formData.phone_number || '';
+    if (!phone.trim()) {
+      newErrors.phone_number = 'Phone number is required.';
+    } else if (!/^\+[1-9]\d{1,14}$/.test(phone)) {
+      newErrors.phone_number = 'Phone number must include country code (e.g., +1).';
     }
+
+    // Validate other dynamic fields (all required)
+    selectedBucket.fields.forEach(field => {
+      if (!formData[field]?.trim()) {
+        newErrors[field] = `${field} is required.`;
+      }
+    });
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (!selectedList) {
-      alert('Please select a contact list first');
+    if (!selectedBucket || !validateForm()) {
       return;
     }
 
-    if (!validateForm()) {
-      return;
-    }
-
+    setIsSubmitting(true);
     try {
-      // Await the result from the context function (now using localStorage)
-      const newContact = await addContactToList(selectedList.id, { name, phone });
+      const contactData = {
+        phone_number: formData.phone_number,
+        data: { ...formData },
+      };
+      delete contactData.data.phone_number; // Avoid duplicating phone number inside data object
 
-      // Check if contact creation was successful and call onSuccess with the actual contact
-      if (newContact && onSuccess) {
+      const newContact = await addContact(selectedBucket.id, contactData);
+      if (onSuccess) {
         onSuccess(newContact);
       }
-      // Optionally handle the case where newContact is null (creation failed)
-      if (!newContact) {
-        console.error("Failed to create contact in localStorage.");
-        // Maybe show an error message to the user
-        alert('Failed to save contact. Please try again.');
-      }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error submitting contact:", error);
-      alert('An error occurred while saving the contact.');
+      setErrors(prev => ({ ...prev, form: error.message || 'An error occurred.' }));
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
+  if (!selectedBucket) {
+    return <p className="text-center text-muted-foreground">Please select a bucket to add a contact.</p>;
+  }
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4 py-4">
+      {/* Always include phone number input */}
       <div className="space-y-2">
-        <Label htmlFor="name">
-          {t('contacts.labels.name')} <span className="text-red-500">*</span>
+        <Label htmlFor="phone_number">
+          Phone Number <span className="text-red-500">*</span>
         </Label>
         <Input
-          id="name"
-          placeholder={t('contacts.placeholders.name')}
-          value={name}
-          onChange={(e) => {
-            setName(e.target.value);
-            setErrors(prev => ({ ...prev, name: undefined }));
-          }}
-          className={errors.name ? 'border-red-500' : ''}
+          id="phone_number"
+          placeholder="+1234567890"
+          value={formData.phone_number || ''}
+          onChange={(e) => handleInputChange('phone_number', e.target.value)}
+          className={errors.phone_number ? 'border-red-500' : ''}
         />
-        {errors.name && (
-          <p className="text-red-500 text-sm">{errors.name}</p>
-        )}
+        {errors.phone_number && <p className="text-red-500 text-sm">{errors.phone_number}</p>}
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="phone">
-          {t('contacts.labels.phoneNumber')} <span className="text-red-500">*</span>
-        </Label>
-        <Input
-          id="phone"
-          placeholder={t('contacts.placeholders.phoneNumber')}
-          value={phone}
-          onChange={(e) => {
-            setPhone(e.target.value);
-            setErrors(prev => ({ ...prev, phone: undefined }));
-          }}
-          className={errors.phone ? 'border-red-500' : ''}
-        />
-        {errors.phone && (
-          <p className="text-red-500 text-sm">{errors.phone}</p>
-        )}
-        <p className="text-xs text-muted-foreground">
-          {t('contacts.helperText.phoneNumber')}
-        </p>
-      </div>
+      {/* Dynamically render other fields from the bucket */}
+      {selectedBucket.fields.map(field => (
+        <div key={field} className="space-y-2">
+          <Label htmlFor={field} className="capitalize">{field}</Label>
+          <Input
+            id={field}
+            placeholder={`Enter ${field}`}
+            value={formData[field] || ''}
+            onChange={(e) => handleInputChange(field, e.target.value)}
+            className={errors[field] ? 'border-red-500' : ''}
+          />
+          {errors[field] && <p className="text-red-500 text-sm">{errors[field]}</p>}
+        </div>
+      ))}
+
+      {errors.form && <p className="text-red-500 text-sm">{errors.form}</p>}
 
       <div className="flex justify-end gap-2 pt-4">
-        <Button type="button" variant="outline" onClick={onCancel}>
+        <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
           {t('common.cancel')}
         </Button>
-        <Button type="submit">
-          {t('contacts.addContact.title')}
+        <Button type="submit" disabled={isSubmitting}>
+          {isSubmitting ? 'Adding...' : t('contacts.addContact.title')}
         </Button>
       </div>
     </form>
