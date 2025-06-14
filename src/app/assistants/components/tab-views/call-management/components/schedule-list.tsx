@@ -63,7 +63,7 @@ export default function ScheduleList({
     return (
       <>
         {schedules.length === 0 ? (
-          <div className="text-sm text-gray-500 text-center py-8">
+          <div className="text-sm text-[#39594D] text-center py-8">
             No schedules created yet
           </div>
         ) : (
@@ -74,7 +74,7 @@ export default function ScheduleList({
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, x: -100 }}
               layout
-              className={`bg-white border rounded-lg p-3 flex items-center justify-between transition-opacity ${
+              className={`bg-[#F5F6FA] border border-[#E5E5E0] rounded-lg p-3 flex items-center justify-between transition-opacity ${
                 schedule.isActive ? '' : 'opacity-60'
               }`}
               style={{ borderColor: getContactDisplay(schedule).color + '60' }}
@@ -95,13 +95,13 @@ export default function ScheduleList({
                       ? schedule.contactName 
                       : getContactDisplay(schedule).name}
                     {schedule.contactList === 'individual' && (
-                      <span className="ml-2 text-xs font-normal text-gray-500">
+                      <span className="ml-2 text-xs font-normal text-[#39594D]">
                         {schedule.contactEmail}
                       </span>
                     )}
                   </div>
                   
-                  <div className="flex items-center text-xs text-gray-600 space-x-3 mt-1">
+                  <div className="flex items-center text-xs text-[#39594D] space-x-3 mt-1">
                     <div className="flex items-center">
                       <Clock className="h-3 w-3 mr-1" />
                       <span>{formatTime(schedule.time)}</span>
@@ -128,8 +128,8 @@ export default function ScheduleList({
                 <button 
                   className={`rounded-full p-2 ${
                     schedule.isActive 
-                      ? 'bg-green-100 text-green-600 hover:bg-green-200' 
-                      : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                      ? 'bg-[#39594D] text-white hover:bg-[#3A8DFF]' 
+                      : 'bg-[#E5E5E0] text-[#39594D] hover:bg-[#3A8DFF]'
                   }`}
                   onClick={() => onToggleActive(schedule.id)}
                 >
@@ -137,7 +137,7 @@ export default function ScheduleList({
                 </button>
                 
                 <button 
-                  className="rounded-full p-2 bg-red-100 text-red-600 hover:bg-red-200"
+                  className="rounded-full p-2 bg-[#E25D41] text-white hover:bg-[#FF7759]"
                   onClick={() => onDelete(schedule.id)}
                 >
                   <X className="h-4 w-4" />

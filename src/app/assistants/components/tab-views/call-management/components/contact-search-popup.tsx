@@ -90,26 +90,26 @@ export default function ContactSearchPopup({ contactLists, individuals, onSelect
         initial={{ scale: 0.9 }}
         animate={{ scale: 1 }}
         exit={{ scale: 0.9 }}
-        className="bg-white rounded-xl shadow-lg w-full max-w-lg p-5"
+        className="bg-[#F5F6FA] rounded-xl shadow-lg w-full max-w-lg p-5"
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-gray-800">Select Contacts</h3>
+          <h3 className="text-lg font-semibold text-[#181A1B]">Select Contacts</h3>
           <button 
-            className="p-1 rounded-full hover:bg-gray-100"
+            className="p-1 rounded-full hover:bg-[#E5E5E0]"
             onClick={onClose}
           >
-            <X className="h-5 w-5 text-gray-500" />
+            <X className="h-5 w-5 text-[#39594D]" />
           </button>
         </div>
         
         {/* Search input */}
         <div className="relative mb-4">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-[#D18EE2]" />
           <input
             ref={searchInputRef}
             type="text"
-            className="w-full pl-10 pr-4 py-3 rounded-lg border border-gray-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-colors"
+            className="w-full pl-10 pr-4 py-3 rounded-lg border border-[#E5E5E0] focus:border-[#3A8DFF] focus:ring-2 focus:ring-[#3A8DFF] transition-colors"
             placeholder="Search contacts or lists..."
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
@@ -117,12 +117,12 @@ export default function ContactSearchPopup({ contactLists, individuals, onSelect
         </div>
         
         {/* Tabs */}
-        <div className="flex mb-4 border-b">
+        <div className="flex mb-4 border-b border-[#E5E5E0]">
           <button
             className={`px-4 py-2 text-sm font-medium flex items-center ${
               activeTab === 'lists' 
-                ? 'text-blue-600 border-b-2 border-blue-600' 
-                : 'text-gray-600 hover:text-gray-800'
+                ? 'text-[#3A8DFF] border-b-2 border-[#3A8DFF]' 
+                : 'text-[#39594D] hover:text-[#181A1B]'
             }`}
             onClick={() => setActiveTab('lists')}
           >
@@ -132,8 +132,8 @@ export default function ContactSearchPopup({ contactLists, individuals, onSelect
           <button
             className={`px-4 py-2 text-sm font-medium flex items-center ${
               activeTab === 'individuals' 
-                ? 'text-blue-600 border-b-2 border-blue-600' 
-                : 'text-gray-600 hover:text-gray-800'
+                ? 'text-[#3A8DFF] border-b-2 border-[#3A8DFF]' 
+                : 'text-[#39594D] hover:text-[#181A1B]'
             }`}
             onClick={() => setActiveTab('individuals')}
           >
@@ -175,7 +175,7 @@ export default function ContactSearchPopup({ contactLists, individuals, onSelect
 function ContactListsSection({ lists, onSelect }: ContactListsSectionProps) {
   if (lists.length === 0) {
     return (
-      <div className="text-center py-4 text-gray-500">
+      <div className="text-center py-4 text-[#39594D]">
         No matching contact lists found
       </div>
     );
@@ -186,7 +186,7 @@ function ContactListsSection({ lists, onSelect }: ContactListsSectionProps) {
       {lists.map(list => (
         <motion.button
           key={list.id}
-          className="w-full p-3 rounded-lg hover:bg-gray-50 flex items-center justify-between text-left"
+          className="w-full p-3 rounded-lg hover:bg-[#E5E5E0] flex items-center justify-between text-left"
           onClick={() => onSelect(list)}
           whileHover={{ x: 5 }}
           whileTap={{ scale: 0.98 }}
@@ -199,8 +199,8 @@ function ContactListsSection({ lists, onSelect }: ContactListsSectionProps) {
               <Users className="h-5 w-5" />
             </div>
             <div>
-              <div className="font-medium text-gray-800">{list.name}</div>
-              <div className="text-xs text-gray-500">{list.count} contacts</div>
+              <div className="font-medium text-[#181A1B]">{list.name}</div>
+              <div className="text-xs text-[#39594D]">{list.count} contacts</div>
             </div>
           </div>
           
@@ -220,7 +220,7 @@ function ContactListsSection({ lists, onSelect }: ContactListsSectionProps) {
 function IndividualContactsSection({ contacts, onSelect }: IndividualContactsSectionProps) {
   if (contacts.length === 0) {
     return (
-      <div className="text-center py-4 text-gray-500">
+      <div className="text-center py-4 text-[#39594D]">
         No matching contacts found
       </div>
     );
@@ -231,25 +231,25 @@ function IndividualContactsSection({ contacts, onSelect }: IndividualContactsSec
       {contacts.map(contact => (
         <motion.button
           key={contact.id}
-          className="w-full p-3 rounded-lg hover:bg-gray-50 flex items-center justify-between text-left"
+          className="w-full p-3 rounded-lg hover:bg-[#E5E5E0] flex items-center justify-between text-left"
           onClick={() => onSelect(contact)}
           whileHover={{ x: 5 }}
           whileTap={{ scale: 0.98 }}
         >
           <div className="flex items-center">
-            <div className="w-10 h-10 rounded-full bg-pink-100 text-pink-600 flex items-center justify-center mr-3 font-medium">
+            <div className="w-10 h-10 rounded-full bg-[#FF967E] text-[#E25D41] flex items-center justify-center mr-3 font-medium">
               {contact.name.charAt(0)}
             </div>
             <div>
-              <div className="font-medium text-gray-800">{contact.name}</div>
-              <div className="text-xs text-gray-500">
+              <div className="font-medium text-[#181A1B]">{contact.name}</div>
+              <div className="text-xs text-[#39594D]">
                 {contact.email}
-                {contact.company && <span className="ml-2 text-gray-400">• {contact.company}</span>}
+                {contact.company && <span className="ml-2 text-[#D18EE2]">• {contact.company}</span>}
               </div>
             </div>
           </div>
           
-          <div className="px-2 py-1 bg-pink-100 text-pink-600 rounded-full text-xs font-medium">
+          <div className="px-2 py-1 bg-[#FF967E] text-[#E25D41] rounded-full text-xs font-medium">
             Select
           </div>
         </motion.button>

@@ -64,7 +64,7 @@ function LatencyCard({ latencyMs }: { latencyMs: number }) {
 
   // Bar width and color based on latency
   const barWidth = Math.min(100, Math.max(10, (latencyMs / 2000) * 100));
-  const barColor = "from-[#3A8DFF] to-[#FF7759]";
+  const barColor = "bg-[#3A8DFF]";
 
   return (
     <div className="relative w-full p-4 bg-[#F5F6FA] rounded-xl border border-[#E5E5E0] shadow-md transition-transform duration-200 hover:scale-[1.025] hover:shadow-lg group">
@@ -97,7 +97,7 @@ function LatencyCard({ latencyMs }: { latencyMs: number }) {
       {/* Animated visual latency indicator */}
       <div className="mt-4 h-2 w-full bg-[#E5E5E0] rounded-full overflow-hidden">
         <div
-          className={`h-full transition-all duration-500 bg-gradient-to-r ${barColor}`}
+          className={`h-full transition-all duration-500 ${barColor}`}
           style={{
             width: `${barWidth}%`,
             minWidth: "10%",

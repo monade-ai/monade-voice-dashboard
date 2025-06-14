@@ -51,7 +51,7 @@ export default function CostDisplay({
 
   // Bar width and color based on cost
   const barWidth = Math.min(100, Math.max(10, (costPerMinute / 30) * 100));
-  const barColor = "from-[#39594D] to-[#E25D41]";
+  const barColor = "bg-[#39594D]";
 
   return (
     <div className="relative w-full p-4 bg-[#F5F6FA] rounded-xl border border-[#E5E5E0] shadow-md transition-transform duration-200 hover:scale-[1.025] hover:shadow-lg group">
@@ -88,7 +88,7 @@ export default function CostDisplay({
       {/* Animated visual cost indicator */}
       <div className="mt-4 h-2 w-full bg-[#E5E5E0] rounded-full overflow-hidden">
         <div
-          className={`h-full transition-all duration-500 bg-gradient-to-r ${barColor}`}
+          className={`h-full transition-all duration-500 ${barColor}`}
           style={{
             width: `${barWidth}%`,
             minWidth: "10%",

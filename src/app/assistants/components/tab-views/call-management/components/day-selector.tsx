@@ -33,8 +33,8 @@ export default function DaySelector({ selectedDays, onDayToggle }: DaySelectorPr
             key={day.id}
             className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-medium transition-colors relative ${
               isSelected 
-                ? 'text-white' 
-                : 'text-gray-600 border border-gray-200 hover:bg-gray-50'
+                ? 'text-white'
+                : 'text-[#39594D] border border-[#E5E5E0] hover:bg-[#E5E5E0]'
             }`}
             onClick={() => onDayToggle(day.id)}
             whileTap={{ scale: 0.95 }}
@@ -42,7 +42,7 @@ export default function DaySelector({ selectedDays, onDayToggle }: DaySelectorPr
           >
             {isSelected && (
               <motion.div 
-                className="absolute inset-0 bg-amber-600 rounded-full"
+                className="absolute inset-0 bg-[#3A8DFF] rounded-full"
                 layoutId={`selected-day-${day.id}`}
                 transition={{ type: 'spring', stiffness: 300, damping: 30 }}
               />

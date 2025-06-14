@@ -248,7 +248,7 @@ export default function CallScheduling() {
   };
   
   return (
-    <div className="bg-white rounded-lg shadow-sm border h-full overflow-hidden flex flex-col">
+    <div className="bg-[#F5F6FA] rounded-lg shadow-sm border border-[#E5E5E0] h-full overflow-hidden flex flex-col">
       {/* Confirmation Animation */}
       <AnimatePresence>
         {showConfirmation && (
@@ -278,21 +278,21 @@ export default function CallScheduling() {
       </AnimatePresence>
       
       {/* Add schedule form */}
-      <div className="p-4 bg-gradient-to-b from-amber-50 to-white">
+      <div className="p-4 bg-[#F5F6FA]">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-medium text-gray-700">Schedule Automated Calls</h3>
+          <h3 className="text-sm font-medium text-[#181A1B]">Schedule Automated Calls</h3>
         </div>
         <div className="grid grid-cols-3 gap-4">
           {/* Contact Selector */}
           <div>
-            <label className="block text-xs text-gray-500 mb-1">Select Contacts</label>
+            <label className="block text-xs text-[#39594D] mb-1">Select Contacts</label>
             <div className="relative">
               <button
-                className="w-full flex items-center justify-between px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm hover:bg-gray-50"
+                className="w-full flex items-center justify-between px-3 py-2 rounded-lg border border-[#E5E5E0] bg-[#F5F6FA] text-sm hover:bg-[#E5E5E0]"
                 onClick={() => setShowContactSearch(true)}
               >
                 {scheduleForm.contactList === 'individual' ? (
-                  <span className="text-pink-600 font-medium">{String(scheduleForm.contactName ?? '')}</span>
+                  <span className="text-[#E25D41] font-medium">{String(scheduleForm.contactName ?? '')}</span>
                 ) : (
                   <span 
                     className="font-medium"
@@ -301,19 +301,19 @@ export default function CallScheduling() {
                     {contactLists.find(c => c.id === scheduleForm.contactList)?.name}
                   </span>
                 )}
-                <Search className="h-4 w-4 text-gray-400" />
+                <Search className="h-4 w-4 text-[#D18EE2]" />
               </button>
             </div>
           </div>
           
           {/* Time Selector */}
           <div>
-            <label className="block text-xs text-gray-500 mb-1">Time</label>
+            <label className="block text-xs text-[#39594D] mb-1">Time</label>
             <div className="relative">
-              <Clock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Clock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[#D18EE2]" />
               <input
                 type="time"
-                className="w-full pl-10 pr-3 py-2 rounded-lg border border-gray-200 bg-white text-sm"
+                className="w-full pl-10 pr-3 py-2 rounded-lg border border-[#E5E5E0] bg-[#F5F6FA] text-sm text-[#181A1B]"
                 value={scheduleForm.time}
                 onChange={(e) => handleFormChange('time', e.target.value)}
               />
@@ -323,7 +323,7 @@ export default function CallScheduling() {
           {/* Submit Button */}
           <div className="flex items-end">
             <button
-              className="w-full px-4 py-2 rounded-lg bg-amber-600 text-white text-sm hover:bg-amber-700 transition-colors flex items-center justify-center"
+              className="w-full px-4 py-2 rounded-lg bg-[#3A8DFF] text-white text-sm hover:bg-[#39594D] transition-colors flex items-center justify-center"
               onClick={handleCreateSchedule}
             >
               <Calendar className="h-4 w-4 mr-2" />
@@ -334,7 +334,7 @@ export default function CallScheduling() {
         
         {/* Day Selector */}
         <div className="mt-4">
-          <label className="block text-xs text-gray-500 mb-2">Repeat on Days</label>
+          <label className="block text-xs text-[#39594D] mb-2">Repeat on Days</label>
           <div className="flex justify-start">
             <DaySelector 
               selectedDays={scheduleForm.days}
@@ -346,27 +346,27 @@ export default function CallScheduling() {
         {/* Calendar for specific dates */}
         <div className="mt-4">
           <div className="flex items-center justify-between">
-            <label className="block text-xs text-gray-500">Or Select Specific Dates</label>
+            <label className="block text-xs text-[#39594D]">Or Select Specific Dates</label>
             <div className="flex space-x-1">
               <button 
-                className="p-1 rounded-full hover:bg-gray-100"
+                className="p-1 rounded-full hover:bg-[#E5E5E0]"
                 onClick={() => {
                   const prevMonth = new Date(currentMonth);
                   prevMonth.setMonth(prevMonth.getMonth() - 1);
                   setCurrentMonth(prevMonth);
                 }}
               >
-                <ChevronLeft className="h-4 w-4 text-gray-500" />
+                <ChevronLeft className="h-4 w-4 text-[#39594D]" />
               </button>
               <button 
-                className="p-1 rounded-full hover:bg-gray-100"
+                className="p-1 rounded-full hover:bg-[#E5E5E0]"
                 onClick={() => {
                   const nextMonth = new Date(currentMonth);
                   nextMonth.setMonth(nextMonth.getMonth() + 1);
                   setCurrentMonth(nextMonth);
                 }}
               >
-                <ChevronRight className="h-4 w-4 text-gray-500" />
+                <ChevronRight className="h-4 w-4 text-[#39594D]" />
               </button>
             </div>
           </div>
@@ -385,8 +385,8 @@ export default function CallScheduling() {
       </div>
       
       {/* List of schedules */}
-      <div className="flex-1 overflow-auto p-4">
-        <h3 className="text-sm font-medium text-gray-700 mb-3">Scheduled Calls</h3>
+      <div className="flex-1 overflow-auto p-4 bg-[#F5F6FA]">
+        <h3 className="text-sm font-medium text-[#181A1B] mb-3">Scheduled Calls</h3>
         <ScheduleList 
           schedules={schedules}
           formatTime={formatTime}

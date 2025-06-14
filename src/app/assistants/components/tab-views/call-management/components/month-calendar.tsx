@@ -132,15 +132,15 @@ export default function MonthCalendar({ month, schedules, selectedRange, onDateS
   const year = month.getFullYear();
   
   return (
-    <div className="bg-white rounded-lg mt-2 max-w-md mx-auto">
-      <div className="text-center mb-4 font-medium text-xl text-gray-700">
+    <div className="bg-[#F5F6FA] rounded-lg mt-2 max-w-md mx-auto">
+      <div className="text-center mb-4 font-medium text-xl text-[#181A1B]">
         {monthName} {year}
       </div>
       
       {/* Weekday headers */}
       <div className="grid grid-cols-7 mb-1">
         {['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'].map((day, i) => (
-          <div key={i} className="text-xs text-gray-500 text-center py-1">
+          <div key={i} className="text-xs text-[#39594D] text-center py-1">
             {day}
           </div>
         ))}
@@ -154,7 +154,7 @@ export default function MonthCalendar({ month, schedules, selectedRange, onDateS
               <div 
                 key={dayIndex} 
                 className={`relative h-9 flex items-center justify-center ${
-                  !day.isCurrentMonth ? 'text-gray-300' : 'text-gray-700'
+                  !day.isCurrentMonth ? 'text-[#E5E5E0]' : 'text-[#181A1B]'
                 }`}
               >
                 <button
@@ -165,10 +165,10 @@ export default function MonthCalendar({ month, schedules, selectedRange, onDateS
                       : selectedRange?.start && selectedRange?.end && 
                         day.date.getTime() > selectedRange.start.getTime() && 
                         day.date.getTime() < selectedRange.end.getTime() 
-                        ? 'text-gray-800 hover:bg-amber-200' 
+                        ? 'text-[#181A1B] hover:bg-[#FF967E]' 
                         : day.isCurrentMonth 
-                          ? 'hover:bg-gray-100' 
-                          : 'hover:bg-gray-50'
+                          ? 'hover:bg-[#E5E5E0]' 
+                          : 'hover:bg-[#E5E5E0]'
                   }`}
                 >
                   {/* Background for dates in range but not start/end */}
@@ -177,18 +177,18 @@ export default function MonthCalendar({ month, schedules, selectedRange, onDateS
                     new Date(selectedRange.start.getFullYear(), selectedRange.start.getMonth(), selectedRange.start.getDate()).getTime() && 
                     new Date(day.date.getFullYear(), day.date.getMonth(), day.date.getDate()).getTime() < 
                     new Date(selectedRange.end.getFullYear(), selectedRange.end.getMonth(), selectedRange.end.getDate()).getTime() && (
-                    <div className="absolute inset-0 bg-amber-100" />
+                    <div className="absolute inset-0 bg-[#FF967E]" />
                   )}
                   
                   {day.isSelected && (
                     <motion.div 
                       className={`absolute inset-0 ${selectedRange?.start && selectedRange?.end && 
                         new Date(day.date.getFullYear(), day.date.getMonth(), day.date.getDate()).getTime() === 
-                        new Date(selectedRange.start.getFullYear(), selectedRange.start.getMonth(), selectedRange.start.getDate()).getTime() ? 'bg-amber-600 rounded-l-full' : 
+                        new Date(selectedRange.start.getFullYear(), selectedRange.start.getMonth(), selectedRange.start.getDate()).getTime() ? 'bg-[#3A8DFF] rounded-l-full' : 
                         selectedRange?.end && 
                         new Date(day.date.getFullYear(), day.date.getMonth(), day.date.getDate()).getTime() === 
-                        new Date(selectedRange.end.getFullYear(), selectedRange.end.getMonth(), selectedRange.end.getDate()).getTime() ? 'bg-amber-600 rounded-r-full' : 
-                          'bg-amber-500'} ${(selectedRange?.start && selectedRange?.end && 
+                        new Date(selectedRange.end.getFullYear(), selectedRange.end.getMonth(), selectedRange.end.getDate()).getTime() ? 'bg-[#3A8DFF] rounded-r-full' : 
+                          'bg-[#3A8DFF]'} ${(selectedRange?.start && selectedRange?.end && 
                         new Date(day.date.getFullYear(), day.date.getMonth(), day.date.getDate()).getTime() > 
                         new Date(selectedRange.start.getFullYear(), selectedRange.start.getMonth(), selectedRange.start.getDate()).getTime() && 
                         new Date(day.date.getFullYear(), day.date.getMonth(), day.date.getDate()).getTime() < 
@@ -205,7 +205,7 @@ export default function MonthCalendar({ month, schedules, selectedRange, onDateS
                   
                   {/* Schedule indicator dot */}
                   {day.hasSchedule && !day.isSelected && (
-                    <div className="absolute bottom-0 h-1 w-1 bg-amber-500 rounded-full" />
+                    <div className="absolute bottom-0 h-1 w-1 bg-[#3A8DFF] rounded-full" />
                   )}
                 </button>
               </div>
@@ -216,7 +216,7 @@ export default function MonthCalendar({ month, schedules, selectedRange, onDateS
       
       {/* Selected date info */}
       {selectedRange && selectedRange.start && (
-        <div className="mt-4 text-sm text-amber-600 font-medium text-center">
+        <div className="mt-4 text-sm text-[#D18EE2] font-medium text-center">
           {selectedRange.start && selectedRange.end 
             ? `${selectedRange.start.toLocaleDateString()} - ${selectedRange.end.toLocaleDateString()}`
             : `${selectedRange.start.toLocaleDateString()} - Select end date`
