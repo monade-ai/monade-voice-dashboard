@@ -92,17 +92,17 @@ export default function AssistantsHeader({ editingAssistantId, setEditingAssista
   };
 
   return (
-    <div className="border-b bg-white p-4">
+    <div className="border-b border-[var(--border)] bg-[var(--card)] p-4">
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-2xl font-semibold">Assistants</h1>
+        <h1 className="text-2xl font-semibold text-[var(--foreground)]">Assistants</h1>
       </div>
 
       <div className="flex space-x-2 mb-4">
         <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-[var(--muted-foreground)]" />
           <Input
             placeholder="Search Assistants"
-            className="pl-8 bg-gray-50 border-gray-200"
+            className="pl-8 bg-[var(--muted)] border-[var(--border)]"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -110,7 +110,7 @@ export default function AssistantsHeader({ editingAssistantId, setEditingAssista
 
         <Button
           onClick={handleCreateAssistant}
-          className="bg-amber-500 hover:bg-amber-600 text-white"
+          className="bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-[var(--on-primary)]"
         >
           <Plus className="h-4 w-4 mr-2" />
           Create Assistant
@@ -130,12 +130,12 @@ export default function AssistantsHeader({ editingAssistantId, setEditingAssista
             <div
               key={assistant.id}
               className={`relative flex-shrink-0 p-3 rounded-md border transition-colors min-w-[200px] text-left ${currentAssistant?.id === assistant.id
-                ? 'bg-amber-100 border-amber-300'
-                : 'bg-white hover:bg-amber-50 border-gray-200'
+                ? 'bg-[var(--muted)] border-[var(--primary)]'
+                : 'bg-[var(--card)] hover:bg-[var(--muted)] border-[var(--border)]'
                 }`}
             >
               {isDraft && (
-                <Badge variant="outline" className="absolute top-1 right-1 bg-orange-100 text-orange-700 border-orange-300 text-xs px-1 py-0.5">
+                <Badge variant="outline" className="absolute top-1 right-1 bg-[var(--primary)]/10 text-[var(--primary)] border-[var(--primary)] text-xs px-1 py-0.5">
                   Draft
                 </Badge>
               )}
@@ -160,16 +160,16 @@ export default function AssistantsHeader({ editingAssistantId, setEditingAssista
                     onCancel={() => setEditingAssistantId(null)}
                   />
                 </div>
-                <div className="text-sm text-gray-500 truncate pt-1">{assistant.description || 'No description'}</div>
+                <div className="text-sm text-[var(--muted-foreground)] truncate pt-1">{assistant.description || 'No description'}</div>
 
                 <div className="flex flex-wrap gap-1 mt-2">
                   {assistant.tags?.slice(0, 3).map(tag => (
-                    <Badge key={tag} variant="outline" className="bg-amber-50 text-xs py-0 px-1">
+                    <Badge key={tag} variant="outline" className="bg-[var(--muted)] text-xs py-0 px-1">
                       {tag}
                     </Badge>
                   ))}
                   {(assistant.tags?.length || 0) > 3 && (
-                    <Badge variant="outline" className="bg-amber-50 text-xs py-0 px-1">
+                    <Badge variant="outline" className="bg-[var(--muted)] text-xs py-0 px-1">
                       +{(assistant.tags?.length || 0) - 3}
                     </Badge>
                   )}

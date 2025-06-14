@@ -53,7 +53,7 @@ export function AssistantCard({ assistant, onSelect }: AssistantCardProps) {
 
   return (
     <Card
-      className={`bg-white border border-gray-200 hover:border-amber-300 transition-all shadow-sm cursor-pointer ${isDraft ? 'border-dashed border-amber-500' : ''}`}
+      className={`bg-[var(--card)] border border-[var(--border)] hover:border-[var(--primary)] transition-all shadow-sm cursor-pointer ${isDraft ? 'border-dashed border-[var(--primary)]' : ''}`}
       onClick={() => onSelect(assistant)}
     >
       <CardHeader className="pb-2">
@@ -66,20 +66,20 @@ export function AssistantCard({ assistant, onSelect }: AssistantCardProps) {
               <span
                 className="absolute inset-0 animate-gradient-spin"
                 style={{
-                  background: "conic-gradient(from 0deg, #fbbf24, #06b6d4, #a78bfa, #fbbf24)",
+                  background: "conic-gradient(from 0deg, var(--primary), var(--accent), var(--secondary), var(--primary))",
                   filter: "blur(2px)",
                   opacity: 0.8,
                 }}
               />
-              <span className="absolute inset-1 rounded-full bg-white/80" />
+              <span className="absolute inset-1 rounded-full bg-[var(--card)]/80" />
             </span>
             <div>
-              <h3 className="text-lg font-medium text-gray-800">{assistant.name}</h3>
-              <p className="text-sm text-gray-500">{assistant.description || 'No description'}</p>
+              <h3 className="text-lg font-medium text-[var(--foreground)]">{assistant.name}</h3>
+              <p className="text-sm text-[var(--muted-foreground)]">{assistant.description || 'No description'}</p>
             </div>
           </div>
           {isDraft ? (
-            <Badge variant="outline" className="border-amber-500 text-amber-600">
+            <Badge variant="outline" className="border-[var(--primary)] text-[var(--primary)]">
               Draft
             </Badge>
           ) : (
@@ -93,12 +93,12 @@ export function AssistantCard({ assistant, onSelect }: AssistantCardProps) {
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <p className="text-sm text-gray-500">Model</p>
-              <p className="text-sm font-medium text-gray-800">{assistant.model || 'N/A'}</p>
+              <p className="text-sm text-[var(--muted-foreground)]">Model</p>
+              <p className="text-sm font-medium text-[var(--foreground)]">{assistant.model || 'N/A'}</p>
             </div>
             <div>
-              <p className="text-sm text-gray-500">Cost/Min</p>
-              <p className="text-sm font-medium text-gray-800">
+              <p className="text-sm text-[var(--muted-foreground)]">Cost/Min</p>
+              <p className="text-sm font-medium text-[var(--foreground)]">
                 {formatCurrency(assistant.costPerMin || 0)}
               </p>
             </div>
@@ -107,7 +107,7 @@ export function AssistantCard({ assistant, onSelect }: AssistantCardProps) {
           {isDraft ? (
             <Button
               size="sm"
-              className="w-full bg-amber-500 hover:bg-amber-600 text-white"
+              className="w-full bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-[var(--on-primary)]"
               onClick={handlePublish}
               disabled={isPublishing}
             >
@@ -119,7 +119,7 @@ export function AssistantCard({ assistant, onSelect }: AssistantCardProps) {
               <Button
                 variant="outline"
                 size="sm"
-                className="flex-1 border-gray-300 text-gray-700 hover:bg-gray-100"
+                className="flex-1 border-[var(--border)] text-[var(--foreground)] hover:bg-[var(--muted)]"
                 onClick={(e) => e.stopPropagation()}
               >
                 <MessageSquare className="h-4 w-4 mr-2" />
@@ -128,7 +128,7 @@ export function AssistantCard({ assistant, onSelect }: AssistantCardProps) {
               <Button
                 variant="outline"
                 size="sm"
-                className="flex-1 border-gray-300 text-gray-700 hover:bg-gray-100"
+                className="flex-1 border-[var(--border)] text-[var(--foreground)] hover:bg-[var(--muted)]"
                 onClick={(e) => e.stopPropagation()}
               >
                 <Phone className="h-4 w-4 mr-2" />

@@ -28,9 +28,9 @@ export default function AssistantsPage() {
             />
 
             {/* Main content area */}
-            <div className="flex-1 p-4 bg-amber-50">
+            <div className="flex-1 p-4 bg-[var(--background)]">
               <Suspense fallback={<div className="p-8 text-center">Loading assistant details...</div>}>
-                <Card className="bg-white rounded-lg shadow-sm p-6">
+                <Card className="bg-[var(--card)] rounded-lg shadow-sm p-6">
                   <AssistantTabs
                     editingAssistantId={editingAssistantId}
                   />

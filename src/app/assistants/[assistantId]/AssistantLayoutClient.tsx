@@ -11,7 +11,7 @@ export default function AssistantLayoutClient({ children, assistantId }: Assista
   return (
     <div className="container mx-auto">
       {/* Layout wrapper for assistant pages, assistantId: {assistantId} */}
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-[var(--background)]">
         {children}
       </div>
     </div>

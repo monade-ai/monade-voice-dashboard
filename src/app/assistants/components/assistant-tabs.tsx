@@ -63,25 +63,20 @@ function LatencyCard({ latencyMs }: { latencyMs: number }) {
   }, [latencyMs]);
 
   // Bar width and color based on latency
-  const barWidth = Math.min(100, Math.max(10, (latencyMs / 3000) * 100));
-  const barColor =
-    latencyMs < 1000
-      ? "from-cyan-400 to-emerald-500"
-      : latencyMs < 2000
-        ? "from-amber-400 to-yellow-500"
-        : "from-fuchsia-500 to-pink-500";
+  const barWidth = Math.min(100, Math.max(10, (latencyMs / 2000) * 100));
+  const barColor = "from-[#3A8DFF] to-[#FF7759]";
 
   return (
-    <div className="relative w-full p-4 bg-white rounded-xl border border-gray-100 shadow-md transition-transform duration-200 hover:scale-[1.025] hover:shadow-lg group">
+    <div className="relative w-full p-4 bg-[#F5F6FA] rounded-xl border border-[#E5E5E0] shadow-md transition-transform duration-200 hover:scale-[1.025] hover:shadow-lg group">
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center space-x-1">
-          <span className="text-gray-700 font-semibold tracking-wide uppercase text-xs">
+          <span className="text-[#181A1B] font-semibold tracking-wide uppercase text-xs">
             Latency
           </span>
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger>
-                <InfoIcon className="h-4 w-4 text-gray-400 group-hover:text-cyan-500 transition-colors" />
+                <InfoIcon className="h-4 w-4 text-[#D18EE2] group-hover:text-[#FF7759] transition-colors" />
               </TooltipTrigger>
               <TooltipContent>
                 <p className="text-sm">Estimated average response latency in milliseconds</p>
@@ -92,21 +87,21 @@ function LatencyCard({ latencyMs }: { latencyMs: number }) {
       </div>
       <div className="w-full text-center">
         <div
-          className="font-extrabold text-4xl bg-gradient-to-r from-cyan-500 via-fuchsia-500 to-amber-500 bg-clip-text text-transparent transition-all duration-300"
+          className="font-extrabold text-4xl text-[#181A1B] transition-all duration-300"
           style={{ letterSpacing: "0.01em" }}
         >
           ~{Math.round(displayLatency)}
-          <span className="text-lg text-gray-400 font-medium ml-1">ms</span>
+          <span className="text-lg text-[#39594D] font-medium ml-1">ms</span>
         </div>
       </div>
       {/* Animated visual latency indicator */}
-      <div className="mt-4 h-2 w-full bg-gray-100 rounded-full overflow-hidden">
+      <div className="mt-4 h-2 w-full bg-[#E5E5E0] rounded-full overflow-hidden">
         <div
           className={`h-full transition-all duration-500 bg-gradient-to-r ${barColor}`}
           style={{
             width: `${barWidth}%`,
             minWidth: "10%",
-            boxShadow: "0 0 8px 0 rgba(34,211,238,0.18)",
+            boxShadow: "0 0 8px 0 rgba(255,119,89,0.18)",
           }}
         ></div>
       </div>
@@ -250,52 +245,52 @@ export default function AssistantTabs({ editingAssistantId }: AssistantTabsProps
       {/* Tab navigation */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <div className="relative flex items-center">
-          <TabsList className="flex bg-gray-50 p-1 rounded-full shadow-sm gap-1 relative overflow-x-auto">
+          <TabsList className="flex bg-[var(--muted)] p-1 rounded-full shadow-sm gap-1 relative overflow-x-auto">
             <TabsTrigger
               value="model"
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-full transition-all duration-200 font-medium text-gray-600 data-[state=active]:bg-white data-[state=active]:text-cyan-700 data-[state=active]:shadow-lg data-[state=active]:font-semibold hover:bg-gray-100 focus-visible:ring-2 focus-visible:ring-cyan-400"
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-full transition-all duration-200 font-medium text-[var(--muted-foreground)] data-[state=active]:bg-[var(--card)] data-[state=active]:text-[var(--primary)] data-[state=active]:shadow-lg data-[state=active]:font-semibold hover:bg-[var(--muted)] focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
             >
               <Bot className="h-4 w-4" />
               Model
             </TabsTrigger>
             <TabsTrigger
               value="transcriber"
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-full transition-all duration-200 font-medium text-gray-600 data-[state=active]:bg-white data-[state=active]:text-cyan-700 data-[state=active]:shadow-lg data-[state=active]:font-semibold hover:bg-gray-100 focus-visible:ring-2 focus-visible:ring-cyan-400"
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-full transition-all duration-200 font-medium text-[var(--muted-foreground)] data-[state=active]:bg-[var(--card)] data-[state=active]:text-[var(--primary)] data-[state=active]:shadow-lg data-[state=active]:font-semibold hover:bg-[var(--muted)] focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
             >
               <Mic className="h-4 w-4" />
               Transcriber
             </TabsTrigger>
             <TabsTrigger
               value="voice"
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-full transition-all duration-200 font-medium text-gray-600 data-[state=active]:bg-white data-[state=active]:text-cyan-700 data-[state=active]:shadow-lg data-[state=active]:font-semibold hover:bg-gray-100 focus-visible:ring-2 focus-visible:ring-cyan-400"
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-full transition-all duration-200 font-medium text-[var(--muted-foreground)] data-[state=active]:bg-[var(--card)] data-[state=active]:text-[var(--primary)] data-[state=active]:shadow-lg data-[state=active]:font-semibold hover:bg-[var(--muted)] focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
             >
               <Volume2 className="h-4 w-4" />
               Voice
             </TabsTrigger>
             <TabsTrigger
               value="functions"
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-full transition-all duration-200 font-medium text-gray-600 data-[state=active]:bg-white data-[state=active]:text-cyan-700 data-[state=active]:shadow-lg data-[state=active]:font-semibold hover:bg-gray-100 focus-visible:ring-2 focus-visible:ring-cyan-400"
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-full transition-all duration-200 font-medium text-[var(--muted-foreground)] data-[state=active]:bg-[var(--card)] data-[state=active]:text-[var(--primary)] data-[state=active]:shadow-lg data-[state=active]:font-semibold hover:bg-[var(--muted)] focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
             >
               <Terminal className="h-4 w-4" />
               Functions
             </TabsTrigger>
             <TabsTrigger
               value="advanced"
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-full transition-all duration-200 font-medium text-gray-600 data-[state=active]:bg-white data-[state=active]:text-cyan-700 data-[state=active]:shadow-lg data-[state=active]:font-semibold hover:bg-gray-100 focus-visible:ring-2 focus-visible:ring-cyan-400"
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-full transition-all duration-200 font-medium text-[var(--muted-foreground)] data-[state=active]:bg-[var(--card)] data-[state=active]:text-[var(--primary)] data-[state=active]:shadow-lg data-[state=active]:font-semibold hover:bg-[var(--muted)] focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
             >
               <Settings className="h-4 w-4" />
               Advanced
             </TabsTrigger>
             <TabsTrigger
               value="scheduling"
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-full transition-all duration-200 font-medium text-gray-600 data-[state=active]:bg-white data-[state=active]:text-cyan-700 data-[state=active]:shadow-lg data-[state=active]:font-semibold hover:bg-gray-100 focus-visible:ring-2 focus-visible:ring-cyan-400"
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-full transition-all duration-200 font-medium text-[var(--muted-foreground)] data-[state=active]:bg-[var(--card)] data-[state=active]:text-[var(--primary)] data-[state=active]:shadow-lg data-[state=active]:font-semibold hover:bg-[var(--muted)] focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
             >
               <Calendar className="h-4 w-4" />
               Scheduling
             </TabsTrigger>
             <TabsTrigger
               value="insights"
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-full transition-all duration-200 font-medium text-gray-600 data-[state=active]:bg-white data-[state=active]:text-cyan-700 data-[state=active]:shadow-lg data-[state=active]:font-semibold hover:bg-gray-100 focus-visible:ring-2 focus-visible:ring-cyan-400"
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-full transition-all duration-200 font-medium text-[var(--muted-foreground)] data-[state=active]:bg-[var(--card)] data-[state=active]:text-[var(--primary)] data-[state=active]:shadow-lg data-[state=active]:font-semibold hover:bg-[var(--muted)] focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
             >
               <BarChart3 className="h-4 w-4" />
               Insights
@@ -346,11 +341,11 @@ export default function AssistantTabs({ editingAssistantId }: AssistantTabsProps
       </Tabs>
 
       {/* Action Buttons: Delete, Reset, Save */}
-      <div className="flex justify-end space-x-2 pt-4 border-t border-gray-200 mt-6">
+      <div className="flex justify-end space-x-2 pt-4 border-t border-[var(--border)] mt-6">
         {/* Delete Button - Enabled for drafts too */}
         <Button
           variant="destructive"
-          className="text-red-600 border-red-300 hover:bg-red-50"
+          className="text-[var(--destructive)] border-[var(--destructive)] hover:bg-[var(--destructive)]/10"
           onClick={() => setIsDeleteModalOpen(true)}
           disabled={isSaving} // Only disable during save
           title={isDraft ? "Delete this draft assistant" : "Delete this assistant"}
@@ -361,7 +356,7 @@ export default function AssistantTabs({ editingAssistantId }: AssistantTabsProps
         {/* Reset Button */}
         <Button
           variant="outline"
-          className="border-gray-300"
+          className="border-[var(--border)]"
           onClick={handleResetChanges}
           disabled={!hasUnsavedChanges || isSaving || isDraft}
         >
@@ -398,7 +393,7 @@ export default function AssistantTabs({ editingAssistantId }: AssistantTabsProps
           <Button
             onClick={handleSaveChanges}
             disabled={isSaveDisabled}
-            className="bg-amber-500 hover:bg-amber-600 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+            className="bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-[var(--on-primary)] disabled:opacity-50 disabled:cursor-not-allowed"
             title={
               isDraft ? "(Should not happen - Save button shown for non-drafts)" : // Adjusted title logic slightly
                 (!currentAssistant.phoneNumber || currentAssistant.phoneNumber.trim() === '') ? "Phone number is required before saving changes" :

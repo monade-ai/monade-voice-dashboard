@@ -79,7 +79,7 @@ export default function AssistantDualButton({ assistant }: AssistantDualButtonPr
         {/* Primary button with animated content */}
         <Button 
           onClick={handleAction}
-          className="rounded-r-none px-4 bg-amber-500 hover:bg-amber-600 text-white overflow-hidden relative"
+          className="rounded-r-none px-4 bg-amber-500 hover:bg-amber-600 text-[var(--on-primary)] overflow-hidden relative"
         >
           <div className="flex items-center transition-transform duration-300 ease-in-out" 
             style={{ transform: `translateY(${mode === 'chat' ? '0' : '-130%'})` }}>
@@ -96,7 +96,7 @@ export default function AssistantDualButton({ assistant }: AssistantDualButtonPr
         {/* Toggle mode button */}
         <Button 
           onClick={toggleMode}
-          className="rounded-l-none border-l border-amber-600 px-2 bg-amber-500 hover:bg-amber-600 text-white"
+          className="rounded-l-none border-l border-amber-600 px-2 bg-amber-500 hover:bg-amber-600 text-[var(--on-primary)]"
         >
           <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg" 
             className={cn('h-4 w-4 transition-transform duration-300', {
