@@ -10,6 +10,7 @@ interface VoiceOption {
   id: string;
   name: string;
   description: string;
+  avatar: string;
 }
 
 interface VoiceModel {
@@ -34,11 +35,11 @@ const voiceModels: VoiceModel[] = [
     ],
     color: "#3A8DFF",
     voices: [
-      { id: "algieba", name: "Algieba", description: "Warm & Professional" },
-      { id: "aoede", name: "Aoede", description: "Friendly & Approachable" },
-      { id: "autonoe", name: "Autonoe", description: "Calm & Reassuring" },
-      { id: "callirrhoe", name: "Callirrhoe", description: "Energetic & Upbeat" },
-      { id: "charon", name: "Charon", description: "Clear & Articulate" },
+      { id: "algieba", name: "Algieba", description: "Warm & Professional", avatar: "avatars/01.png" },
+      { id: "aoede", name: "Aoede", description: "Friendly & Approachable", avatar: "avatars/02.png" },
+      { id: "autonoe", name: "Autonoe", description: "Calm & Reassuring", avatar: "avatars/04.png" },
+      { id: "callirrhoe", name: "Callirrhoe", description: "Energetic & Upbeat", avatar: "avatars/05.png" },
+      { id: "charon", name: "Charon", description: "Clear & Articulate", avatar: "avatars/06.png" },
     ],
   },
   {
@@ -54,11 +55,11 @@ const voiceModels: VoiceModel[] = [
     ],
     color: "#39594D",
     voices: [
-      { id: "despina", name: "Despina", description: "Executive Authority" },
-      { id: "ennceladus", name: "Ennceladus", description: "Corporate Elegance" },
-      { id: "erinome", name: "Erinome", description: "Technical Expert" },
-      { id: "fenrir", name: "Fenrir", description: "Strategic Advisor" },
-      { id: "iapetus", name: "Iapetus", description: "Industry Leader" },
+      { id: "despina", name: "Despina", description: "Executive Authority", avatar: "avatars/07.png" },
+      { id: "ennceladus", name: "Ennceladus", description: "Corporate Elegance", avatar: "avatars/08.png" },
+      { id: "erinome", name: "Erinome", description: "Technical Expert", avatar: "avatars/09.png" },
+      { id: "fenrir", name: "Fenrir", description: "Strategic Advisor", avatar: "avatars/10.png" },
+      { id: "iapetus", name: "Iapetus", description: "Industry Leader", avatar: "avatars/12.png" },
     ],
   },
   {
@@ -74,12 +75,12 @@ const voiceModels: VoiceModel[] = [
     ],
     color: "#D18EE2",
     voices: [
-      { id: "kore", name: "Kore", description: "Artistic & Expressive" },
-      { id: "leda", name: "Leda", description: "Bold & Dynamic" },
-      { id: "orus", name: "Orus", description: "Mystical & Wise" },
-      { id: "puck", name: "Puck", description: "Flowing & Melodic" },
-      { id: "umbriel", name: "Umbriel", description: "Bright & Energetic" },
-      { id: "zephyr", name: "Zephyr", description: "Bright & Energetic" },
+      { id: "kore", name: "Kore", description: "Artistic & Expressive", avatar: "avatars/13.png" },
+      { id: "leda", name: "Leda", description: "Bold & Dynamic", avatar: "avatars/15.png" },
+      { id: "orus", name: "Orus", description: "Mystical & Wise", avatar: "avatars/19.png" },
+      { id: "puck", name: "Puck", description: "Flowing & Melodic", avatar: "avatars/20.png" },
+      { id: "umbriel", name: "Umbriel", description: "Bright & Energetic", avatar: "avatars/22.png" },
+      { id: "zephyr", name: "Zephyr", description: "Bright & Energetic", avatar: "avatars/24.png" },
     ],
   },
 ];
@@ -103,16 +104,16 @@ export function VoiceAssistantDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[95vw] max-w-[95vw] h-[95vh] bg-white border-[#E5E5E0] p-12 overflow-y-auto">
+      <DialogContent className="w-[75vw] max-w-[75vw] h-[70vh] bg-white border-[#E5E5E0] p-12 overflow-y-auto">
         <div className="relative h-full">
-          <Button
+          {/* <Button
             variant="ghost"
             size="icon"
             className="absolute -top-6 -right-6 text-[#181A1B] hover:bg-[#E5E5E0] z-50"
             onClick={() => onOpenChange(false)}
           >
             <X className="w-6 h-6" />
-          </Button>
+          </Button> */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-12 h-full">
             {voiceModels.map((model) => (
               <VoiceModelCard
@@ -392,14 +393,7 @@ function VoiceModelCard({ model, showInfo, onInfoClick, onSelect }: VoiceModelCa
         </div>
       )}
 
-      <Button
-        variant="ghost"
-        size="icon"
-        className="absolute top-6 right-6 text-[#39594D] hover:bg-white/80 z-30 backdrop-blur-sm"
-        onClick={() => onInfoClick && onInfoClick()}
-      >
-        <Info className="w-5 h-5" />
-      </Button>
+      {/* Info button removed as per UI refactor */}
 
       <div className="relative z-10 p-8 h-full flex flex-col">
         <div className="text-center mb-12">
@@ -476,10 +470,21 @@ function VoiceCarousel({ voices, selectedVoice, onVoiceChange, accentColor }: Vo
                     height: size,
                     opacity,
                     boxShadow: `0 0 0 4px ${accentColor}`,
-                    transform: `scale(1)`,
+                    transform: `scale(0.8)`,
                   }}
                   aria-label={`Select voice ${voice.name}`}
                 >
+                  <img
+                    src={`/${voice.avatar}`}
+                    alt={voice.name}
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "cover",
+                      borderRadius: "9999px",
+                      display: "block",
+                    }}
+                  />
                 </button>
               );
             } else {
@@ -487,15 +492,26 @@ function VoiceCarousel({ voices, selectedVoice, onVoiceChange, accentColor }: Vo
                 <button
                   key={`${voice.id}-${index}`}
                   onClick={() => onVoiceChange(index)}
-                  className="relative transition-all duration-500 ease-out rounded-full overflow-hidden"
+                  className="relative transition-all duration-500 ease-out rounded-full overflow-hidden ring-1 ring-offset-1"
                   style={{
                     width: size,
                     height: size,
                     opacity,
-                    transform: `scale(0.8)`,
+                    transform: `scale(0.6)`,
                   }}
                   aria-label={`Select voice ${voice.name}`}
                 >
+                  <img
+                    src={`/${voice.avatar}`}
+                    alt={voice.name}
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "cover",
+                      borderRadius: "9999px",
+                      display: "block",
+                    }}
+                  />
                 </button>
               );
             }
