@@ -49,7 +49,7 @@ export default function AssistantsHeader({ editingAssistantId, setEditingAssista
     let costPerMin = 0;
     let latencyMs = 0;
     let modelName = '';
-    let provider = 'openai'; // default, can be changed if needed
+    const provider = 'openai'; // default, can be changed if needed
 
     if (modelId === 'conversational') {
       costPerMin = 6;
