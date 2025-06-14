@@ -41,8 +41,8 @@ const CreateContact: React.FC<CreateContactProps> = ({ onCancel, onSuccess }) =>
     const phone = formData.phone_number || '';
     if (!phone.trim()) {
       newErrors.phone_number = 'Phone number is required.';
-    } else if (!/^\+[1-9]\d{1,14}$/.test(phone)) {
-      newErrors.phone_number = 'Phone number must include country code (e.g., +1).';
+    } else if (!/^(\+[1-9]\d{1,14}|0\d{9,14})$/.test(phone)) {
+      newErrors.phone_number = 'Phone number must start with a country code (e.g., +1) or 0 (e.g., 0987654321).';
     }
 
     // Validate other dynamic fields (all required)

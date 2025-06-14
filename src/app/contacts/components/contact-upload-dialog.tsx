@@ -105,9 +105,9 @@ const ContactUploadDialog: React.FC<ContactUploadDialogProps> = ({ isOpen, onClo
   const validateAndPrepareContacts = () => {
     if (!parsedData) return [];
     
-    // Basic phone number validation (must include country code)
+    // Basic phone number validation (must include country code or start with 0)
     const normalizePhone = (phone: string) => phone ? String(phone).replace(/\s+/g, '') : '';
-    const isValidPhone = (phone: string) => /^\+[1-9]\d{1,14}$/.test(normalizePhone(phone));
+    const isValidPhone = (phone: string) => /^(\+[1-9]\d{1,14}|0\d{9,14})$/.test(normalizePhone(phone));
 
     return parsedData.map(row => ({
         phone_number: normalizePhone(row.phone || row.phoneNumber || row.phone_number),
@@ -121,7 +121,7 @@ const ContactUploadDialog: React.FC<ContactUploadDialogProps> = ({ isOpen, onClo
 
     const validContacts = validateAndPrepareContacts();
     if (validContacts.length === 0) {
-      setError('No valid contacts found. Ensure a "phone" column exists and numbers include a country code (e.g., +1).');
+      setError('No valid contacts found. Ensure a "phone" column exists and numbers start with a country code (e.g., +1) or 0 (e.g., 0987654321).');
       setStatus('error');
       return;
     }
