@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 import { useAssistants } from '@/app/hooks/use-assistants-context';
 import { useKnowledgeBase } from '@/app/hooks/use-knowledge-base';
@@ -85,6 +85,16 @@ export default function ModelTab({ onChangesMade }: ModelTabProps) {
   const [knowledgeBaseId, setKnowledgeBaseId] = useState(currentAssistant?.knowledgeBase || '');
   const [contactBucketId, setContactBucketId] = useState(currentAssistant?.contact_bucket_id || '');
   const [phoneError, setPhoneError] = useState<string | null>(null);
+
+  // Synchronize local state with currentAssistant when it changes
+  useEffect(() => {
+    setProvider(currentAssistant?.provider || 'openai');
+    setModel(currentAssistant?.model || 'tts-1');
+    setVoice(currentAssistant?.voice || 'alloy');
+    setPhoneNumber(currentAssistant?.phoneNumber || '');
+    setKnowledgeBaseId(currentAssistant?.knowledgeBase || '');
+    setContactBucketId(currentAssistant?.contact_bucket_id || '');
+  }, [currentAssistant]);
 
   // Simple phone number validation (only digits)
   const validatePhoneNumber = (number: string): boolean => {

@@ -1,6 +1,11 @@
 'use client';
 
 import { useState } from 'react';
+
+interface AssistantsHeaderProps {
+  editingAssistantId: string | null;
+  setEditingAssistantId: (id: string | null) => void;
+}
 import { Search, Plus } from 'lucide-react';
 
 import { Input } from '@/components/ui/input';
@@ -12,7 +17,7 @@ import { useAssistants } from '../../hooks/use-assistants-context';
 import AssistantNameEdit from './assistant-name-edit';
 import { VoiceAssistantDialog } from './voice-assistant-dialog';
 
-export default function AssistantsHeader() {
+export default function AssistantsHeader({ editingAssistantId, setEditingAssistantId }: AssistantsHeaderProps) {
   const {
     assistants,
     currentAssistant,
@@ -23,7 +28,7 @@ export default function AssistantsHeader() {
   } = useAssistants();
 
   const [searchTerm, setSearchTerm] = useState('');
-  const [editingAssistantId, setEditingAssistantId] = useState<string | null>(null);
+  // editingAssistantId and setEditingAssistantId are now props from parent
 
   // Dialog open state for VoiceAssistantDialog
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -71,6 +76,7 @@ export default function AssistantsHeader() {
       tags: [],
       phoneNumber: '',
       knowledgeBase: null,
+      contact_bucket_id: null,
     };
 
     const createdDraft = addDraftAssistant(newDraftData);
@@ -89,17 +95,6 @@ export default function AssistantsHeader() {
     <div className="border-b bg-white p-4">
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl font-semibold">Assistants</h1>
-        <Button
-          variant="outline"
-          className="ml-2 border-gray-300 text-gray-700"
-          onClick={fetchAssistants}
-          title="Refresh assistants list"
-        >
-          <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582M20 20v-5h-.581M5.5 19A9 9 0 1 1 19 5.5l-1.42 1.42" />
-          </svg>
-          Refresh
-        </Button>
       </div>
 
       <div className="flex space-x-2 mb-4">

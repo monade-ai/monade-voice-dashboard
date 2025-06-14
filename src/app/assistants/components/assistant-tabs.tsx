@@ -121,12 +121,17 @@ const PlaceholderTab = ({ title }: { title: string }) => (
   </div>
 );
 
-export default function AssistantTabs() {
-  const { currentAssistant, saveAssistantUpdates, fetchAssistants, createAssistant } = useAssistants();
+interface AssistantTabsProps {
+  editingAssistantId: string | null;
+}
+
+export default function AssistantTabs({ editingAssistantId }: AssistantTabsProps) {
+  const { currentAssistant, saveAssistantUpdates, fetchAssistants, createAssistant, setCurrentAssistant } = useAssistants();
   const [activeTab, setActiveTab] = useState('model');
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [justPublished, setJustPublished] = useState(false);
 
   // Reset unsaved changes flag when assistant changes
   useEffect(() => {
@@ -145,6 +150,7 @@ export default function AssistantTabs() {
   console.log('[AssistantTabs] Checking phone number for save button:', currentAssistant.id, currentAssistant.phoneNumber);
 
   const isDraft = currentAssistant.id.startsWith('local-');
+  const isEditingName = editingAssistantId === currentAssistant.id;
 
   // Determine if save should be disabled
   const isSaveDisabled =
@@ -216,9 +222,14 @@ export default function AssistantTabs() {
       };
 
       // Call createAssistant with the local draft ID and the prepared data
-      await createAssistant(localId, createPayload);
-      // Optionally reset flags or navigate after successful publish
-      // fetchAssistants() might be called within createAssistant already
+      const publishedAssistant = await createAssistant(localId, createPayload);
+      if (publishedAssistant) {
+        setJustPublished(true);
+        setCurrentAssistant(publishedAssistant);
+        setTimeout(() => {
+          setJustPublished(false);
+        }, 1500);
+      }
       setHasUnsavedChanges(false);
     } catch (error) {
       console.error('Error publishing assistant:', error);
@@ -290,15 +301,7 @@ export default function AssistantTabs() {
               Insights
             </TabsTrigger>
             {/* Animated active tab indicator */}
-            <span
-              className="absolute left-0 bottom-0 h-1 rounded-full bg-cyan-400 transition-all duration-300"
-              style={{
-                width: `calc(100% / 7)`,
-                transform: `translateX(${['model', 'transcriber', 'voice', 'functions', 'advanced', 'scheduling', 'insights'].indexOf(activeTab) * 100}%)`,
-                opacity: 0.7,
-              }}
-              aria-hidden="true"
-            />
+            {/* Blue underline removed as per new design */}
           </TabsList>
           {/* Move test call dual button next to tabs */}
           <div className="ml-4 flex-shrink-0">
@@ -367,18 +370,30 @@ export default function AssistantTabs() {
         </Button>
         {/* Conditionally render Save or Publish Button */}
         {isDraft ? (
-          <Button
-            onClick={handlePublish} // Calls the updated handlePublish
-            disabled={isSaving || !currentAssistant.phoneNumber || currentAssistant.phoneNumber.trim() === ''}
-            className="bg-green-600 hover:bg-green-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
-            title={
-              (!currentAssistant.phoneNumber || currentAssistant.phoneNumber.trim() === '')
-                ? "Phone number is required before publishing"
-                : "Publish this draft assistant"
-            }
-          >
-            {isSaving ? 'Publishing...' : 'Publish Assistant'}
-          </Button>
+          justPublished ? (
+            <Button
+              disabled
+              className="bg-green-600 text-white opacity-80 cursor-default"
+              title="Assistant published!"
+            >
+              &#10003; Published!
+            </Button>
+          ) : (
+            <Button
+              onClick={handlePublish}
+              disabled={isSaving || !currentAssistant.phoneNumber || currentAssistant.phoneNumber.trim() === '' || isEditingName}
+              className="bg-green-600 hover:bg-green-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+              title={
+                isEditingName
+                  ? "Finish editing the assistant name before publishing"
+                  : (!currentAssistant.phoneNumber || currentAssistant.phoneNumber.trim() === '')
+                    ? "Phone number is required before publishing"
+                    : "Publish this draft assistant"
+              }
+            >
+              {isSaving ? 'Publishing...' : 'Publish Assistant'}
+            </Button>
+          )
         ) : (
           <Button
             onClick={handleSaveChanges}

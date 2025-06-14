@@ -107,13 +107,22 @@ const saveDrafts = (drafts: Assistant[]) => {
   }
 };
 
+let assistantsCache: Assistant[] | null = null;
+
 export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
   const { toast } = useToast();
   const [assistants, setAssistants] = useState<Assistant[]>([]);
   const [currentAssistant, setCurrentAssistant] = useState<Assistant | null>(null);
 
-  // Combined fetch and merge logic
+  // Combined fetch and merge logic with in-memory cache
   const fetchAssistants = async () => {
+    // Check in-memory cache first
+    if (assistantsCache && assistantsCache.length > 0) {
+      setAssistants(assistantsCache);
+      console.log('[Assistants] Loaded from in-memory cache:', assistantsCache);
+      return;
+    }
+
     let apiAssistants: Assistant[] = [];
     try {
       const res = await fetch(`${API_BASE_URL}/assistants`);
@@ -152,6 +161,9 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
     const combinedAssistants = [...apiAssistants, ...uniqueDrafts];
     // Sort maybe? By createdAt?
     combinedAssistants.sort((a, b) => (b.createdAt?.getTime?.() || 0) - (a.createdAt?.getTime?.() || 0));
+
+    // Populate in-memory cache
+    assistantsCache = combinedAssistants;
 
     console.log('[Assistants] Combined and Sorted list:', combinedAssistants);
     setAssistants(combinedAssistants);
