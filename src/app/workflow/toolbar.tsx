@@ -23,11 +23,14 @@ import {
 import { useWorkflowStore } from './store/workflow-store';
 import { validateFlow } from './utils/validation';
 import { createNodeFromType } from './utils/node-utils';
+import { useHasPermission } from '@/lib/auth/useHasPermission';
 
 /**
  * Toolbar component with flow actions (new, import, export, zoom)
  */
 export function Toolbar() {
+  const canCreateWorkflow = useHasPermission('workflow.create');
+  const canEditWorkflow = useHasPermission('workflow.edit');
   const reactFlowInstance = useReactFlow();
   const { clearGraph, importFlow, exportFlow } = useWorkflowStore();
   const [newFlowDialogOpen, setNewFlowDialogOpen] = useState(false);
@@ -153,7 +156,12 @@ export function Toolbar() {
   return (
     <div className="w-full flex justify-between items-center p-2">
       <div className="space-x-2">
-        <Button onClick={() => setNewFlowDialogOpen(true)} variant="outline" size="sm">
+        <Button
+          onClick={() => setNewFlowDialogOpen(true)}
+          variant="outline"
+          size="sm"
+          disabled={!canCreateWorkflow}
+        >
           <File className="h-4 w-4 mr-1" />
           New
         </Button>
@@ -180,23 +188,23 @@ export function Toolbar() {
         </div>
         
         <div className="inline-flex gap-1 ml-4">
-          <Button onClick={() => addNode('startNode')} variant="outline" size="sm">
+          <Button onClick={() => addNode('startNode')} variant="outline" size="sm" disabled={!canEditWorkflow}>
             <Plus className="h-4 w-4 mr-1" />
             Start
           </Button>
-          <Button onClick={() => addNode('flowNode')} variant="outline" size="sm">
+          <Button onClick={() => addNode('flowNode')} variant="outline" size="sm" disabled={!canEditWorkflow}>
             <Plus className="h-4 w-4 mr-1" />
             Flow
           </Button>
-          <Button onClick={() => addNode('endNode')} variant="outline" size="sm">
+          <Button onClick={() => addNode('endNode')} variant="outline" size="sm" disabled={!canEditWorkflow}>
             <Plus className="h-4 w-4 mr-1" />
             End
           </Button>
-          <Button onClick={() => addNode('functionNode')} variant="outline" size="sm">
+          <Button onClick={() => addNode('functionNode')} variant="outline" size="sm" disabled={!canEditWorkflow}>
             <Plus className="h-4 w-4 mr-1" />
             Function
           </Button>
-          <Button onClick={() => addNode('mergeNode')} variant="outline" size="sm">
+          <Button onClick={() => addNode('mergeNode')} variant="outline" size="sm" disabled={!canEditWorkflow}>
             <Plus className="h-4 w-4 mr-1" />
             Merge
           </Button>

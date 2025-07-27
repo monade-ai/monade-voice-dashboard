@@ -14,6 +14,7 @@ export default function SignupPage() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [orgMode, setOrgMode] = useState(false);
 
   useEffect(() => {
     const checkUserSession = async () => {
@@ -67,6 +68,35 @@ export default function SignupPage() {
       <div className="w-full md:w-1/2 flex flex-col items-center justify-center bg-white px-6">
         <h1 className="text-3xl font-bold mb-4 text-black">Join <span className="text-blue-600">monade.ai!</span></h1>
         <p className="text-gray-600 mb-6">Create your account to get started</p>
+
+        {/* Account Type Pill Toggle */}
+        <div className="flex justify-center mb-4">
+          <div className="flex bg-gray-100 rounded-full p-1 w-80">
+            <button
+              type="button"
+              className={`flex-1 py-2 rounded-full text-sm font-semibold transition-colors ${
+                !orgMode ? 'bg-green-600 text-white shadow' : 'text-gray-700'
+              }`}
+              onClick={() => setOrgMode(false)}
+            >
+              Personal Account
+            </button>
+            <button
+              type="button"
+              className={`flex-1 py-2 rounded-full text-sm font-semibold transition-colors ${
+                orgMode ? 'bg-blue-600 text-white shadow' : 'text-gray-700'
+              }`}
+              onClick={() => setOrgMode(true)}
+            >
+              Org Account
+            </button>
+          </div>
+        </div>
+        {orgMode && (
+          <div className="w-80 text-xs text-blue-700 text-center mb-2">
+            Sign up as an organization owner. This will create a new organization account.
+          </div>
+        )}
 
         {/* Google Signup */}
         <button

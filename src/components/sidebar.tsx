@@ -216,23 +216,29 @@ export function Sidebar() {
           />
         </SidebarSection>
 
-        <SidebarSection title={t('sidebar.orgSettings')}>
-          <NavItem
-            href="/org-settings"
-            icon={<Settings size={18} />}
-            label={t('sidebar.orgSettingsLink')}
-            isActive={pathname === '/org-settings'}
-          />
-        </SidebarSection>
+        {/* Org Settings: Only show for org admins/owners */}
+        {user && user.isOrgAdmin && (
+          <SidebarSection title={t('sidebar.orgSettings')}>
+            <NavItem
+              href="/org/settings"
+              icon={<Settings size={18} />}
+              label={t('sidebar.orgSettingsLink')}
+              isActive={pathname === '/org/settings'}
+            />
+          </SidebarSection>
+        )}
 
-        <SidebarSection title={t('sidebar.accountSettings')}>
-          <NavItem
-            href="/account-settings"
-            icon={<Settings size={18} />}
-            label={t('sidebar.accountSettingsLink')}
-            isActive={pathname === '/account-settings'}
-          />
-        </SidebarSection>
+        {/* Account Settings: Show for all authenticated users */}
+        {user && (
+          <SidebarSection title={t('sidebar.accountSettings')}>
+            <NavItem
+              href="/settings"
+              icon={<Settings size={18} />}
+              label={t('sidebar.accountSettingsLink')}
+              isActive={pathname === '/settings'}
+            />
+          </SidebarSection>
+        )}
       </div>
 
       <div className="mt-auto p-4 border-t border-gray-800">
