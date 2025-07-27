@@ -31,6 +31,7 @@ import { useContactsContext, Bucket, Contact } from '../contexts/contacts-contex
 import CreateBucketDialog from './create-bucket-dialog';
 import ContactUploadDialog from './contact-upload-dialog';
 import CreateContact from './create-contact';
+import { useHasPermission } from '@/lib/auth/useHasPermission';
 
 const ContactListView: React.FC = () => {
   const { t } = useTranslations();
@@ -43,7 +44,14 @@ const ContactListView: React.FC = () => {
     removeBucket,
     removeContact,
   } = useContactsContext();
-  
+
+  // RBAC permissions
+  const canCreateBucket = useHasPermission('contacts.create_bucket');
+  const canDeleteBucket = useHasPermission('contacts.delete_bucket');
+  const canAddContact = useHasPermission('contacts.add_contact');
+  const canBulkUpload = useHasPermission('contacts.bulk_upload');
+  const canDeleteContact = useHasPermission('contacts.delete_contact');
+
   const [isCreateBucketOpen, setCreateBucketOpen] = useState(false);
   const [isUploadOpen, setUploadOpen] = useState(false);
   const [isCreateContactOpen, setCreateContactOpen] = useState(false);
@@ -79,19 +87,23 @@ const ContactListView: React.FC = () => {
       <div className="bg-primary/10 p-6 rounded-full mb-4">
         <Users className="w-12 h-12 text-primary" />
       </div>
-      <h2 className="text-2xl font-bold">Create Your First Contact Bucket</h2>
+      <h2 className="text-2xl font-bold">{t('contacts.empty_buckets_title')}</h2>
       <p className="text-muted-foreground mt-2 mb-6 max-w-md">
-        Buckets help you organize your contacts. Create one manually or upload a CSV to start.
+        {t('contacts.empty_buckets_desc')}
       </p>
       <div className="flex gap-4">
-        <Button size="lg" onClick={() => setCreateBucketOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Create Bucket
-        </Button>
-        <Button size="lg" variant="secondary" onClick={() => handleUploadClick()}>
-          <Upload className="mr-2 h-4 w-4" />
-          Upload CSV
-        </Button>
+        {canCreateBucket && (
+          <Button size="lg" onClick={() => setCreateBucketOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            {t('contacts.create_bucket')}
+          </Button>
+        )}
+        {canBulkUpload && (
+          <Button size="lg" variant="secondary" onClick={() => handleUploadClick()}>
+            <Upload className="mr-2 h-4 w-4" />
+            {t('contacts.upload_csv')}
+          </Button>
+        )}
       </div>
     </div>
   );
@@ -101,19 +113,23 @@ const ContactListView: React.FC = () => {
       <div className="bg-primary/10 p-6 rounded-full mb-4">
         <User className="w-12 h-12 text-primary" />
       </div>
-      <h2 className="text-2xl font-bold">This bucket is empty</h2>
+      <h2 className="text-2xl font-bold">{t('contacts.empty_bucket_title')}</h2>
       <p className="text-muted-foreground mt-2 mb-6 max-w-md">
-        Add your first contact or upload a list.
+        {t('contacts.empty_bucket_desc')}
       </p>
       <div className="flex gap-4">
-        <Button onClick={() => setCreateContactOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Add Contact
-        </Button>
-        <Button variant="secondary" onClick={() => handleUploadClick(selectedBucket || undefined)}>
-          <Upload className="mr-2 h-4 w-4" />
-          Upload to this Bucket
-        </Button>
+        {canAddContact && (
+          <Button onClick={() => setCreateContactOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            {t('contacts.add_contact')}
+          </Button>
+        )}
+        {canBulkUpload && (
+          <Button variant="secondary" onClick={() => handleUploadClick(selectedBucket || undefined)}>
+            <Upload className="mr-2 h-4 w-4" />
+            {t('contacts.upload_to_bucket')}
+          </Button>
+        )}
       </div>
     </div>
   );
@@ -129,14 +145,18 @@ const ContactListView: React.FC = () => {
         </div>
         {buckets.length > 0 && (
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => handleUploadClick()}>
-              <Upload className="mr-2 h-4 w-4" />
-              Upload CSV
-            </Button>
-            <Button onClick={() => setCreateBucketOpen(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              New Bucket
-            </Button>
+            {canBulkUpload && (
+              <Button variant="outline" onClick={() => handleUploadClick()}>
+                <Upload className="mr-2 h-4 w-4" />
+                {t('contacts.upload_csv')}
+              </Button>
+            )}
+            {canCreateBucket && (
+              <Button onClick={() => setCreateBucketOpen(true)}>
+                <Plus className="mr-2 h-4 w-4" />
+                {t('contacts.new_bucket')}
+              </Button>
+            )}
           </div>
         )}
       </div>
@@ -161,24 +181,26 @@ const ContactListView: React.FC = () => {
                   <CardContent className="p-5 flex flex-col h-full">
                     <div className="flex justify-between items-start">
                       <FileSpreadsheet className="h-8 w-8 text-primary mt-1" />
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                          <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-<DropdownMenuItem onClick={(e) => {
-  e.stopPropagation();
-  if (!bucket.id) {
-    console.error('Bucket id is missing for removeBucket:', bucket);
-    alert('Cannot delete this bucket: missing bucket id.');
-    return;
-  }
-  if (confirm(`Delete "${bucket.name}"?`)) removeBucket(bucket.id);
-}}>
-  <Trash2 className="h-4 w-4 mr-2 text-destructive" /> Delete
-</DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                      {canDeleteBucket && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                            <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={(e) => {
+                              e.stopPropagation();
+                              if (!bucket.id) {
+                                console.error('Bucket id is missing for removeBucket:', bucket);
+                                alert('Cannot delete this bucket: missing bucket id.');
+                                return;
+                              }
+                              if (confirm(t('contacts.delete_bucket_confirm'))) removeBucket(bucket.id);
+                            }}>
+                              <Trash2 className="h-4 w-4 mr-2 text-destructive" /> {t('contacts.delete')}
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
                     </div>
                     <h3 className="font-semibold text-lg mt-3">{bucket.name}</h3>
                     <p className="text-muted-foreground text-sm mt-1 flex-grow">{bucket.description}</p>
@@ -198,12 +220,16 @@ const ContactListView: React.FC = () => {
             <Button variant="ghost" onClick={() => selectBucket(null)}>← Back to Buckets</Button>
             <h2 className="text-xl font-semibold">{selectedBucket.name}</h2>
             <div className="flex items-center gap-2">
-              <Button variant="outline" onClick={() => handleUploadClick(selectedBucket)}>
-                <Upload className="mr-2 h-4 w-4" /> Upload
-              </Button>
-              <Button onClick={() => setCreateContactOpen(true)}>
-                <Plus className="mr-2 h-4 w-4" /> Add Contact
-              </Button>
+              {canBulkUpload && (
+                <Button variant="outline" onClick={() => handleUploadClick(selectedBucket)}>
+                  <Upload className="mr-2 h-4 w-4" /> {t('contacts.upload')}
+                </Button>
+              )}
+              {canAddContact && (
+                <Button onClick={() => setCreateContactOpen(true)}>
+                  <Plus className="mr-2 h-4 w-4" /> {t('contacts.add_contact')}
+                </Button>
+              )}
             </div>
           </div>
           
@@ -232,14 +258,18 @@ const ContactListView: React.FC = () => {
                       <td className="p-4">{contact.phone_number}</td>
                       {selectedBucket.fields.map(field => <td key={field} className="p-4">{contact.data[field] || '-'}</td>)}
                       <td className="p-4 text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => { if (confirm('Delete this contact?')) removeContact(selectedBucket.id, contact.phone_number); }}>
-                              <Trash2 className="h-4 w-4 mr-2 text-destructive" /> Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        {canDeleteContact && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => { if (confirm(t('contacts.delete_contact_confirm'))) removeContact(selectedBucket.id, contact.phone_number); }}>
+                                <Trash2 className="h-4 w-4 mr-2 text-destructive" /> {t('contacts.delete')}
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
                       </td>
                     </tr>
                   ))}

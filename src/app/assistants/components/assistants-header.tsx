@@ -16,6 +16,7 @@ import { useAssistants } from '../../hooks/use-assistants-context';
 
 import AssistantNameEdit from './assistant-name-edit';
 import { VoiceAssistantDialog } from './voice-assistant-dialog';
+import { useHasPermission } from '@/lib/auth/useHasPermission';
 
 export default function AssistantsHeader({ editingAssistantId, setEditingAssistantId }: AssistantsHeaderProps) {
   const {
@@ -32,6 +33,9 @@ export default function AssistantsHeader({ editingAssistantId, setEditingAssista
 
   // Dialog open state for VoiceAssistantDialog
   const [dialogOpen, setDialogOpen] = useState(false);
+
+  // RBAC
+  const canCreateAssistant = useHasPermission('assistants.create');
 
   // Filter assistants based on search term
   const filteredAssistants = assistants.filter(
@@ -108,13 +112,15 @@ export default function AssistantsHeader({ editingAssistantId, setEditingAssista
           />
         </div>
 
-        <Button
-          onClick={handleCreateAssistant}
-          className="bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-[var(--on-primary)]"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Create Assistant
-        </Button>
+        {canCreateAssistant && (
+          <Button
+            onClick={handleCreateAssistant}
+            className="bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-[var(--on-primary)]"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Create Assistant
+          </Button>
+        )}
         <VoiceAssistantDialog
           open={dialogOpen}
           onOpenChange={setDialogOpen}

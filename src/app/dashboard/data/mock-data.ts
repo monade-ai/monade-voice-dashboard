@@ -98,7 +98,7 @@ export const costBreakdownData = recentDates.map(date => {
     'LLM': Math.random() * 0.5,
     'STT': Math.random() * 0.3,
     'TTS': Math.random() * 0.4,
-    'callLive.ai': Math.random() * 0.8,
+    'monade.ai': Math.random() * 0.8,
   };
 });
 

@@ -1,16 +1,16 @@
 
-# CallLive Dashboard
+# monade Dashboard
 
-A dashboard for clients and developers to work with CallLive bots, built with Next.js.
+A dashboard for clients and developers to work with monade bots, built with Next.js.
 
 ## Description
 
-The CallLive Dashboard is a web application designed to provide an intuitive interface for managing and interacting with CallLive bots. Built with Next.js, this dashboard offers a seamless experience for both clients and developers, allowing them to configure, monitor, and deploy bots efficiently.
+The monade Dashboard is a web application designed to provide an intuitive interface for managing and interacting with monade bots. Built with Next.js, this dashboard offers a seamless experience for both clients and developers, allowing them to configure, monitor, and deploy bots efficiently.
 
 ## Features
 
 - **User Authentication**: Secure login and registration system.
-- **Bot Management**: Create, update, and delete CallLive bots.
+- **Bot Management**: Create, update, and delete monade bots.
 - **Real-time Monitoring**: View real-time statistics and logs of bot activities.
 - **Customizable Settings**: Configure bot behavior and settings.
 - **Responsive Design**: Accessible on both desktop and mobile devices.
@@ -18,11 +18,11 @@ The CallLive Dashboard is a web application designed to provide an intuitive int
 
 ## Installation
 
-To get started with the CallLive Dashboard, follow these steps:
+To get started with the monade Dashboard, follow these steps:
 
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/CallLive-ai/dashboard.git
+   git clone https://github.com/monade-ai/dashboard.git
    cd dashboard
    ```
 
@@ -43,7 +43,7 @@ To get started with the CallLive Dashboard, follow these steps:
 
 ## Usage
 
-To use the CallLive Dashboard, follow these steps:
+To use the monade Dashboard, follow these steps:
 
 1. **Start the application**:
    ```bash
@@ -57,11 +57,11 @@ To use the CallLive Dashboard, follow these steps:
    Use your credentials to log in or create a new account.
 
 4. **Manage your bots**:
-   Use the dashboard interface to create, update, and monitor your CallLive bots.
+   Use the dashboard interface to create, update, and monitor your monade bots.
 
 ## Contributing
 
-We welcome contributions from the community! If you would like to contribute to the CallLive Dashboard, please follow these steps:
+We welcome contributions from the community! If you would like to contribute to the monade Dashboard, please follow these steps:
 
 1. **Fork the repository**:
    Click the "Fork" button at the top right of this repository's page.
@@ -88,4 +88,4 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 
 ---
 
-This README provides a comprehensive overview of your project, guiding users through installation, usage, and contribution processes. You can customize it further to fit the specific needs and features of your CallLive dashboard.
+This README provides a comprehensive overview of your project, guiding users through installation, usage, and contribution processes. You can customize it further to fit the specific needs and features of your monade dashboard.

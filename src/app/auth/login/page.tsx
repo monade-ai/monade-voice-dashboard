@@ -72,7 +72,7 @@ export default function LoginPage() {
       {/* Left Section */}
       <div className="w-full md:w-1/2 flex flex-col items-center justify-center bg-white px-6">
         <h1 className="text-3xl font-bold mb-4 text-black">
-          Welcome back <span className="text-blue-600">CallLive.ai!</span>
+          Welcome back <span className="text-blue-600">monade.ai!</span>
         </h1>
         <p className="text-gray-600 mb-6">It's great to see you again</p>
 

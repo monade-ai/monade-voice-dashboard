@@ -75,7 +75,7 @@ export interface DocumentMetadata {
    * Class to manage document storage
    */
 export class DocumentStorage {
-  private static STORAGE_KEY = 'calllive_documents';
+  private static STORAGE_KEY = 'monade_documents';
   
   /**
      * Save a document to storage

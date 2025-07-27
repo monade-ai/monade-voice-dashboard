@@ -18,7 +18,7 @@ export interface PromptData {
  * Handles saving and publishing prompts from the prompt editor
  */
 export class PromptManager {
-  private static STORAGE_KEY = 'calllive_prompts';
+  private static STORAGE_KEY = 'monade_prompts';
 
   /**
    * Get all prompts from storage
