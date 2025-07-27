@@ -1,4 +1,4 @@
-name: Build and deploy Node.js app to Azure Web App - calllive-dashboard
+name: Build and deploy Node.js app to Azure Web App - monade-dashboard
 on:
   push:
     branches:
@@ -65,7 +65,7 @@ jobs:
         id: deploy-to-webapp
         uses: azure/webapps-deploy@v3
         with:
-          app-name: 'calllive-dashboard'
+          app-name: 'monade-dashboard'
           slot-name: 'Production'
           package: .
           publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_49C5FAE6300547C788ECE1B1D94A65D6 }}
