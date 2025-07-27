@@ -18,7 +18,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Calllive.ai',
+  title: 'monade.ai',
   description: 'Your AI-powered call assistant',
 };
 

@@ -125,8 +125,8 @@ export function Sidebar() {
         <div className="flex items-center mb-8">
           <div className="ml-2">
             <Image
-              src="/calllive-logo.png"
-              alt="callLive logo"
+              src="/monade-logo.png"
+              alt="monade logo"
               width={140}
               height={50}
             />

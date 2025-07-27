@@ -65,7 +65,7 @@ export default function SignupPage() {
     <div className="flex flex-col md:flex-row h-screen">
       {/* Left Side - Signup Form */}
       <div className="w-full md:w-1/2 flex flex-col items-center justify-center bg-white px-6">
-        <h1 className="text-3xl font-bold mb-4 text-black">Join <span className="text-blue-600">CallLive.ai!</span></h1>
+        <h1 className="text-3xl font-bold mb-4 text-black">Join <span className="text-blue-600">monade.ai!</span></h1>
         <p className="text-gray-600 mb-6">Create your account to get started</p>
 
         {/* Google Signup */}

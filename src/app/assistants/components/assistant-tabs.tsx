@@ -22,6 +22,7 @@ import DeleteConfirmationModal from '../delete-confirmation-modal';
 import CostDisplay from './cost-display';
 import ModelTab from './tab-views/model-tab';
 import AssistantDualButton from './assistant-dual-button';
+import { useHasPermission } from '@/lib/auth/useHasPermission';
 
 import CallScheduling from './tab-views/call-management/call-scheduling';
 import CallInsights from './tab-views/call-management/call-insights';
@@ -132,6 +133,9 @@ export default function AssistantTabs({ editingAssistantId }: AssistantTabsProps
   useEffect(() => {
     setHasUnsavedChanges(false);
   }, [currentAssistant?.id]);
+
+  // RBAC
+  const canDeleteAssistant = useHasPermission('assistants.delete');
 
   if (!currentAssistant) {
     return (
@@ -342,17 +346,19 @@ export default function AssistantTabs({ editingAssistantId }: AssistantTabsProps
 
       {/* Action Buttons: Delete, Reset, Save */}
       <div className="flex justify-end space-x-2 pt-4 border-t border-[var(--border)] mt-6">
-        {/* Delete Button - Enabled for drafts too */}
-        <Button
-          variant="destructive"
-          className="text-[var(--destructive)] border-[var(--destructive)] hover:bg-[var(--destructive)]/10"
-          onClick={() => setIsDeleteModalOpen(true)}
-          disabled={isSaving} // Only disable during save
-          title={isDraft ? "Delete this draft assistant" : "Delete this assistant"}
-        >
-          <Trash2 className="h-4 w-4 mr-2" />
-          Delete Assistant
-        </Button>
+        {/* Delete Button - Only for users with permission */}
+        {canDeleteAssistant && (
+          <Button
+            variant="destructive"
+            className="text-[var(--destructive)] border-[var(--destructive)] hover:bg-[var(--destructive)]/10"
+            onClick={() => setIsDeleteModalOpen(true)}
+            disabled={isSaving} // Only disable during save
+            title={isDraft ? "Delete this draft assistant" : "Delete this assistant"}
+          >
+            <Trash2 className="h-4 w-4 mr-2" />
+            Delete Assistant
+          </Button>
+        )}
         {/* Reset Button */}
         <Button
           variant="outline"

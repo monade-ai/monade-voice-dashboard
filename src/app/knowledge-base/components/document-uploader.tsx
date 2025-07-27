@@ -9,8 +9,10 @@ import { Label } from '@/components/ui/label';
 
 import { useToast } from '../hooks/use-toast';
 import { useKnowledgeBase } from '@/app/hooks/use-knowledge-base';
+import { useHasPermission } from '@/lib/auth/useHasPermission';
 
 export function DocumentUploader() {
+  const canUploadDocument = useHasPermission('knowledgeBase.upload');
   const [file, setFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -124,55 +126,61 @@ export function DocumentUploader() {
 
   return (
     <div className="space-y-6">
-      <div className="space-y-2">
-        <Label>Upload Document</Label>
-        <div
-          className={`border-2 border-dashed rounded-lg p-8 text-center transition-all duration-300 ${isDragging
-            ? 'border-primary bg-primary/5'
-            : uploadComplete
-              ? 'border-green-500 bg-green-50'
-              : 'border-muted-foreground/20 hover:border-primary/50 hover:bg-primary/5'
-            }`}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
-        >
-          {isProcessing ? (
-            <div className="flex flex-col items-center">
-              <Loader2 className="h-10 w-10 text-primary animate-spin mb-4" />
-              <h3 className="text-lg font-semibold">Processing...</h3>
-              <p className="mt-1 text-sm text-muted-foreground">Please wait while we process and upload your document</p>
-            </div>
-          ) : uploadComplete && file ? (
-            <div className="flex flex-col items-center">
-              <div className="rounded-full bg-green-100 p-3 mb-4">
-                <Check className="h-8 w-8 text-green-600" />
+      {canUploadDocument ? (
+        <div className="space-y-2">
+          <Label>Upload Document</Label>
+          <div
+            className={`border-2 border-dashed rounded-lg p-8 text-center transition-all duration-300 ${isDragging
+              ? 'border-primary bg-primary/5'
+              : uploadComplete
+                ? 'border-green-500 bg-green-50'
+                : 'border-muted-foreground/20 hover:border-primary/50 hover:bg-primary/5'
+              }`}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+          >
+            {isProcessing ? (
+              <div className="flex flex-col items-center">
+                <Loader2 className="h-10 w-10 text-primary animate-spin mb-4" />
+                <h3 className="text-lg font-semibold">Processing...</h3>
+                <p className="mt-1 text-sm text-muted-foreground">Please wait while we process and upload your document</p>
               </div>
-              <h3 className="text-lg font-semibold text-green-700">Upload Complete!</h3>
-              <p className="mt-1 text-sm text-green-600 truncate max-w-xs" title={file.name}>"{file.name}" uploaded successfully.</p>
-              <Button variant="outline" className="mt-4" onClick={removeFile}>
-                Upload Another File
-              </Button>
-            </div>
-          ) : (
-            <>
-              <FileUp className="mx-auto h-10 w-10 text-muted-foreground" />
-              <h3 className="mt-2 text-lg font-semibold">Drag & Drop File Here</h3>
-              <p className="mt-1 text-sm text-muted-foreground">Or click to browse your files (upload one at a time)</p>
-              <Input id="file-upload" type="file" className="hidden" onChange={handleFileChange} accept=".txt,.pdf,.docx,.html,.json,.csv,.md" />
-              <Button
-                variant="outline"
-                className="mt-4"
-                onClick={() => document.getElementById('file-upload')?.click()}
-                type="button"
-                disabled={isProcessing}
-              >
-                Browse File
-              </Button>
-            </>
-          )}
+            ) : uploadComplete && file ? (
+              <div className="flex flex-col items-center">
+                <div className="rounded-full bg-green-100 p-3 mb-4">
+                  <Check className="h-8 w-8 text-green-600" />
+                </div>
+                <h3 className="text-lg font-semibold text-green-700">Upload Complete!</h3>
+                <p className="mt-1 text-sm text-green-600 truncate max-w-xs" title={file.name}>"{file.name}" uploaded successfully.</p>
+                <Button variant="outline" className="mt-4" onClick={removeFile}>
+                  Upload Another File
+                </Button>
+              </div>
+            ) : (
+              <>
+                <FileUp className="mx-auto h-10 w-10 text-muted-foreground" />
+                <h3 className="mt-2 text-lg font-semibold">Drag & Drop File Here</h3>
+                <p className="mt-1 text-sm text-muted-foreground">Or click to browse your files (upload one at a time)</p>
+                <Input id="file-upload" type="file" className="hidden" onChange={handleFileChange} accept=".txt,.pdf,.docx,.html,.json,.csv,.md" />
+                <Button
+                  variant="outline"
+                  className="mt-4"
+                  onClick={() => document.getElementById('file-upload')?.click()}
+                  type="button"
+                  disabled={isProcessing}
+                >
+                  Browse File
+                </Button>
+              </>
+            )}
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="p-8 text-center text-muted-foreground border-2 border-dashed rounded-lg">
+          You do not have permission to upload documents.
+        </div>
+      )}
 
       {file && !uploadComplete && !isProcessing && (
         <div className="space-y-2">
