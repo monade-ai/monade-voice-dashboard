@@ -23,15 +23,15 @@ export const MetricsCard = memo(function MetricsCard({
 }: MetricsCardProps) {
   return (
     <Card className={cn(
-      'bg-white border-gray-200 hover:border-amber-300 transition-all shadow-sm',
+      'bg-yellow-400 border-yellow-500 hover:border-yellow-600 transition-all shadow-lg w-full max-w-sm',
       className,
     )}>
       <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium text-gray-500">{title}</CardTitle>
+        <CardTitle className="text-lg font-bold text-yellow-900">{title}</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="text-2xl font-bold text-gray-800 mb-1">{value}</div>
-        {subtitle && <p className="text-xs text-gray-500">{subtitle}</p>}
+        <div className="text-5xl font-bold text-yellow-900 mb-1">{value}</div>
+        {subtitle && <p className="text-sm text-yellow-800">{subtitle}</p>}
         {children && <div className="mt-4 h-[100px]">{children}</div>}
       </CardContent>
     </Card>

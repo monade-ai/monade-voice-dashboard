@@ -13,6 +13,8 @@ import { PipecatProvider } from './assistants/providers/pipcat-provider';
 import { AssistantsProvider } from './hooks/use-assistants-context';
 import { AuthProvider } from '@/lib/auth/AuthProvider';
 
+import { ThemeProvider } from '@/components/theme-provider';
+
 const noSidebarRoutes = [
   '/auth/login',
   '/auth/signup',
@@ -32,15 +34,17 @@ export default function ClientLayout({
   return (
     <TranslationsProvider>
       <AuthProvider>
-        <div className="flex h-screen">
-          <Toaster richColors position="bottom-center" />
-          {!hideSidebar && <Sidebar />}
-          <main className="flex-1 overflow-auto bg-[#f8f5f0] text-gray-800">
-            <AssistantsProvider>
-              <PipecatProvider>{children}</PipecatProvider>
-            </AssistantsProvider>
-          </main>
-        </div>
+        <ThemeProvider>
+          <div className="flex h-screen">
+            <Toaster richColors position="bottom-center" />
+            {!hideSidebar && <Sidebar />}
+            <main className="flex-1 overflow-auto">
+              <AssistantsProvider>
+                <PipecatProvider>{children}</PipecatProvider>
+              </AssistantsProvider>
+            </main>
+          </div>
+        </ThemeProvider>
       </AuthProvider>
     </TranslationsProvider>
   );
