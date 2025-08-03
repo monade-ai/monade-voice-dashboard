@@ -1,11 +1,10 @@
 // app/dashboard/components/dashboard-header.tsx
 
 import React, { useState, useCallback, useMemo } from 'react';
-import { CalendarIcon, ChevronDownIcon } from 'lucide-react';
+import { CalendarIcon } from 'lucide-react';
 import { format, subDays } from 'date-fns';
 
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
 import {
   Select,
   SelectContent,
@@ -42,43 +41,10 @@ export function DashboardHeader({
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [calendarOpen, setCalendarOpen] = useState(false);
 
-  // Parse the current date range - memoized to prevent recalculation on every render
-  const [startDate, endDate] = useMemo(() => {
-    try {
-      const [startStr, endStr] = dateRange.split(' - ');
-      if (!startStr || !endStr) return [new Date(), new Date()];
-      
-      const startParts = startStr.split('/');
-      const endParts = endStr.split('/');
-      
-      if (startParts.length !== 3 || endParts.length !== 3) return [new Date(), new Date()];
-      
-      const startDate = new Date(
-        parseInt(startParts[2]), 
-        parseInt(startParts[0]) - 1, 
-        parseInt(startParts[1]),
-      );
-      
-      const endDate = new Date(
-        parseInt(endParts[2]), 
-        parseInt(endParts[0]) - 1, 
-        parseInt(endParts[1]),
-      );
-      
-      return [startDate, endDate];
-    } catch (error) {
-      console.error('Error parsing date range:', error);
-
-      return [new Date(), new Date()];
-    }
-  }, [dateRange]);
-
-  // Handle calendar date selection - memoized callback to prevent recreation on each render
   const handleCalendarSelect = useCallback((date: Date | undefined) => {
     if (!date) return;
     setDate(date);
     
-    // Create a new date range (7 days)
     const newEndDate = date;
     const newStartDate = subDays(date, 7);
     
@@ -91,7 +57,6 @@ export function DashboardHeader({
     setCalendarOpen(false);
   }, [onDateRangeChange]);
 
-  // Set predefined date ranges - memoized callback
   const setPresetRange = useCallback((days: number) => {
     const end = new Date();
     const start = subDays(end, days);
@@ -105,30 +70,30 @@ export function DashboardHeader({
 
   return (
     <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-      <h1 className="text-2xl font-bold text-amber-700">{title}</h1>
+      <h1 className="text-2xl font-bold text-foreground">{title}</h1>
       
       <div className="flex flex-col md:flex-row gap-2 md:gap-4">
         <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
           <PopoverTrigger asChild>
             <Button
               variant="outline"
-              className="h-10 px-4 py-2 bg-white border-gray-300 text-gray-700 hover:bg-gray-50 justify-start w-full md:w-auto"
+              className="h-10 px-4 py-2 justify-start w-full md:w-auto"
             >
-              <CalendarIcon className="mr-2 h-4 w-4 text-amber-600" />
+              <CalendarIcon className="mr-2 h-4 w-4 text-primary" />
               <span>{dateRange}</span>
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-auto p-0 bg-white" align="end">
-            <div className="p-3 border-b border-gray-200">
+          <PopoverContent className="w-auto p-0" align="end">
+            <div className="p-3 border-b">
               <div className="flex justify-between items-center">
-                <h3 className="font-medium text-gray-700">Select date range</h3>
+                <h3 className="font-medium">Select date range</h3>
               </div>
               <div className="flex mt-2 gap-2">
                 <Button 
                   variant="outline" 
                   size="sm" 
                   onClick={() => setPresetRange(7)}
-                  className="text-xs bg-white"
+                  className="text-xs"
                 >
                   Last 7 days
                 </Button>
@@ -136,7 +101,7 @@ export function DashboardHeader({
                   variant="outline" 
                   size="sm" 
                   onClick={() => setPresetRange(30)}
-                  className="text-xs bg-white"
+                  className="text-xs"
                 >
                   Last 30 days
                 </Button>
@@ -144,7 +109,7 @@ export function DashboardHeader({
                   variant="outline" 
                   size="sm" 
                   onClick={() => setPresetRange(90)}
-                  className="text-xs bg-white"
+                  className="text-xs"
                 >
                   Last 90 days
                 </Button>
@@ -164,10 +129,10 @@ export function DashboardHeader({
           value={groupBy}
           onValueChange={(value) => onGroupByChange && onGroupByChange(value)}
         >
-          <SelectTrigger className="w-32 h-10 bg-white border-gray-300 text-gray-700">
+          <SelectTrigger className="w-32 h-10">
             <SelectValue placeholder="Group by" />
           </SelectTrigger>
-          <SelectContent className="bg-white border-gray-300 text-gray-700">
+          <SelectContent>
             <SelectItem value="day">Day</SelectItem>
             <SelectItem value="week">Week</SelectItem>
             <SelectItem value="month">Month</SelectItem>
@@ -178,10 +143,10 @@ export function DashboardHeader({
           value={assistantFilter}
           onValueChange={(value) => onAssistantFilterChange && onAssistantFilterChange(value)}
         >
-          <SelectTrigger className="w-48 h-10 bg-white border-gray-300 text-gray-700">
+          <SelectTrigger className="w-48 h-10">
             <SelectValue placeholder="Filter by Assistant" />
           </SelectTrigger>
-          <SelectContent className="bg-white border-gray-300 text-gray-700">
+          <SelectContent>
             <SelectItem value="all">All Assistants</SelectItem>
             <SelectItem value="new">New Assistant</SelectItem>
             <SelectItem value="unknown">Unknown Assistant</SelectItem>

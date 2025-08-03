@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { useToast } from '@/app/knowledge-base/hooks/use-toast'; // Assuming toast is needed
+import { useAuth } from '@/lib/auth/AuthProvider';
 
 // Define Knowledge Base type (matches API response)
 export interface KnowledgeBase {
@@ -53,6 +54,7 @@ const getApiError = async (res: Response): Promise<string> => {
 // Knowledge Base Provider Component
 export const KnowledgeBaseProvider = ({ children }: { children: ReactNode }) => {
     const { toast } = useToast();
+    const { currentOrganization } = useAuth();
     const [knowledgeBases, setKnowledgeBases] = useState<KnowledgeBase[]>([]);
     const [isLoading, setIsLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null); // State for error
@@ -62,7 +64,16 @@ export const KnowledgeBaseProvider = ({ children }: { children: ReactNode }) => 
         setIsLoading(true);
         setError(null); // Reset error on fetch
         try {
-            const res = await fetch(`${API_BASE_URL}/knowledge-bases`);
+            const headers: Record<string, string> = {
+                'Content-Type': 'application/json',
+            };
+            
+            // Add organization context if available
+            if (currentOrganization?.id) {
+                headers['X-Organization-ID'] = currentOrganization.id;
+            }
+
+            const res = await fetch(`${API_BASE_URL}/knowledge-bases`, { headers });
             if (!res.ok) {
                 const errorText = await getApiError(res);
                 throw new Error(errorText); // Throw error to be caught below
@@ -96,11 +107,19 @@ export const KnowledgeBaseProvider = ({ children }: { children: ReactNode }) => 
         setError(null); // Reset error
         try {
             console.log('[createKnowledgeBase] Attempting to create KB with payload:', payload);
+            
+            const headers: Record<string, string> = {
+                'Content-Type': 'application/json',
+            };
+            
+            // Add organization context if available
+            if (currentOrganization?.id) {
+                headers['X-Organization-ID'] = currentOrganization.id;
+            }
+
             const res = await fetch(`${API_BASE_URL}/knowledge-bases`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers,
                 body: JSON.stringify(payload),
             });
 
@@ -129,8 +148,18 @@ export const KnowledgeBaseProvider = ({ children }: { children: ReactNode }) => 
         setIsLoading(true); // Indicate loading during deletion
         setError(null); // Reset error
         try {
+            const headers: Record<string, string> = {
+                'Content-Type': 'application/json',
+            };
+            
+            // Add organization context if available
+            if (currentOrganization?.id) {
+                headers['X-Organization-ID'] = currentOrganization.id;
+            }
+
             const res = await fetch(`${API_BASE_URL}/knowledge-bases/${id}`, {
                 method: 'DELETE',
+                headers,
             });
 
             if (!res.ok) {

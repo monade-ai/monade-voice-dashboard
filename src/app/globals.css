@@ -1,17 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-/* 
-  Cohere AI Color Palette Mapping:
-  - Coniferous Green: #39594D
-  - Mushroom Grey: #E5E5E0 (approximate)
-  - Volcanic Black: #181A1B (approximate)
-  - Simulated Coral: #E25D41, #FF7759, #FF967E
-  - Synthetic Quartz: #F5F6FA (approximate)
-  - Acrylic Blue: #3A8DFF (approximate)
-  - Soft Purple/Lilac: #D18EE2
-*/
-
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
@@ -55,102 +44,79 @@
 }
 
 :root {
-  --radius: 0.625rem;
+  --radius: 0.75rem;
 
-  /* Backgrounds and surfaces */
-  --background: #F5F6FA; /* Synthetic Quartz */
-  --card: #FFFFFF; /* White for card surfaces */
-  --popover: #FFFFFF;
+  /* Light Mode Palette */
+  --background: #ffffff;
+  --foreground: #111827;
+  --card: #ffffff;
+  --card-foreground: #111827;
+  --popover: #ffffff;
+  --popover-foreground: #111827;
+  --primary: #facc15; /* Solid Yellow */
+  --primary-foreground: #111827;
+  --secondary: #f3f4f6;
+  --secondary-foreground: #111827;
+  --muted: #f3f4f6;
+  --muted-foreground: #6b7280;
+  --accent: #facc15;
+  --accent-foreground: #111827;
+  --destructive: #ef4444;
+  --border: #e5e7eb;
+  --input: #e5e7eb;
+  --ring: #facc15;
 
-  /* Foregrounds */
-  --foreground: #181A1B; /* Volcanic Black */
-  --card-foreground: #181A1B;
-  --popover-foreground: #181A1B;
+  --chart-1: #facc15;
+  --chart-2: #fbbf24;
+  --chart-3: #f59e0b;
+  --chart-4: #eab308;
+  --chart-5: #d97706;
 
-  /* Primary (Simulated Coral) */
-  --primary: #E25D41; /* Simulated Coral */
-  --primary-foreground: #FFFFFF;
-
-  /* Secondary (Soft Purple/Lilac) */
-  --secondary: #D18EE2;
-  --secondary-foreground: #181A1B;
-
-  /* Muted (Mushroom Grey) */
-  --muted: #E5E5E0;
-  --muted-foreground: #39594D; /* Coniferous Green for contrast */
-
-  /* Accent (Acrylic Blue) */
-  --accent: #3A8DFF;
-  --accent-foreground: #FFFFFF;
-
-  /* Destructive (Bright Coral) */
-  --destructive: #FF7759;
-
-  /* Borders and inputs (Mushroom Grey) */
-  --border: #E5E5E0;
-  --input: #E5E5E0;
-  --ring: #3A8DFF; /* Acrylic Blue for focus ring */
-
-  /* Chart colors (using palette variety) */
-  --chart-1: #E25D41; /* Simulated Coral */
-  --chart-2: #3A8DFF; /* Acrylic Blue */
-  --chart-3: #39594D; /* Coniferous Green */
-  --chart-4: #D18EE2; /* Soft Purple/Lilac */
-  --chart-5: #FF967E; /* Coral variant */
-
-  /* Sidebar (Coniferous Green) */
-  --sidebar: #39594D;
-  --sidebar-foreground: #FFFFFF;
-  --sidebar-primary: #E25D41;
-  --sidebar-primary-foreground: #FFFFFF;
-  --sidebar-accent: #3A8DFF;
-  --sidebar-accent-foreground: #FFFFFF;
-  --sidebar-border: #E5E5E0;
-  --sidebar-ring: #3A8DFF;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #111827;
+  --sidebar-primary: #facc15;
+  --sidebar-primary-foreground: #111827;
+  --sidebar-accent: #facc15;
+  --sidebar-accent-foreground: #111827;
+  --sidebar-border: #e5e7eb;
+  --sidebar-ring: #facc15;
 }
 
 .dark {
-  /* Invert for dark mode, using Volcanic Black and strong accents */
-  --background: #181A1B; /* Volcanic Black */
-  --card: #232627; /* Slightly lighter black */
-  --popover: #232627;
+  /* Dark Mode Palette */
+  --background: #000000;
+  --foreground: #f9fafb;
+  --card: #1a1a1a;
+  --card-foreground: #f9fafb;
+  --popover: #1a1a1a;
+  --popover-foreground: #f9fafb;
+  --primary: #facc15; /* Solid Yellow */
+  --primary-foreground: #000000;
+  --secondary: #2a2a2a;
+  --secondary-foreground: #f9fafb;
+  --muted: #2a2a2a;
+  --muted-foreground: #9ca3af;
+  --accent: #facc15;
+  --accent-foreground: #000000;
+  --destructive: #ef4444;
+  --border: #2a2a2a;
+  --input: #2a2a2a;
+  --ring: #facc15;
 
-  --foreground: #F5F6FA; /* Synthetic Quartz */
-  --card-foreground: #F5F6FA;
-  --popover-foreground: #F5F6FA;
+  --chart-1: #facc15;
+  --chart-2: #fbbf24;
+  --chart-3: #f59e0b;
+  --chart-4: #eab308;
+  --chart-5: #d97706;
 
-  --primary: #FF7759; /* Brighter Simulated Coral */
-  --primary-foreground: #181A1B;
-
-  --secondary: #D18EE2;
-  --secondary-foreground: #181A1B;
-
-  --muted: #232627;
-  --muted-foreground: #D18EE2;
-
-  --accent: #3A8DFF;
-  --accent-foreground: #181A1B;
-
-  --destructive: #E25D41;
-
-  --border: #232627;
-  --input: #232627;
-  --ring: #3A8DFF;
-
-  --chart-1: #FF967E;
-  --chart-2: #3A8DFF;
-  --chart-3: #39594D;
-  --chart-4: #D18EE2;
-  --chart-5: #E25D41;
-
-  --sidebar: #232627;
-  --sidebar-foreground: #F5F6FA;
-  --sidebar-primary: #FF7759;
-  --sidebar-primary-foreground: #181A1B;
-  --sidebar-accent: #3A8DFF;
-  --sidebar-accent-foreground: #181A1B;
-  --sidebar-border: #232627;
-  --sidebar-ring: #3A8DFF;
+  --sidebar: #1a1a1a;
+  --sidebar-foreground: #f9fafb;
+  --sidebar-primary: #facc15;
+  --sidebar-primary-foreground: #000000;
+  --sidebar-accent: #facc15;
+  --sidebar-accent-foreground: #000000;
+  --sidebar-border: #2a2a2a;
+  --sidebar-ring: #facc15;
 }
 
 @layer base {

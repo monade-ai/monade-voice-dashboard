@@ -7,11 +7,23 @@ async function getSupabaseToken() {
   return 'your_supabase_jwt';
 }
 
+function getOrganizationContext(): { organizationId?: string } {
+  // Get organization context from localStorage or auth provider
+  if (typeof window !== 'undefined') {
+    const orgId = localStorage.getItem('current_organization_id');
+    return orgId ? { organizationId: orgId } : {};
+  }
+  return {};
+}
+
 async function fetchWithAuth(url: string, options: RequestInit = {}) {
   const token = await getSupabaseToken();
+  const orgContext = getOrganizationContext();
+  
   const headers = {
     'Content-Type': 'application/json',
     'Authorization': `Bearer ${token}`,
+    ...(orgContext.organizationId && { 'X-Organization-ID': orgContext.organizationId }),
     ...options.headers,
   };
 
@@ -57,25 +69,161 @@ export async function addContact(bucketId: string, contactData: { phone_number: 
 }
 
 export async function addContactsBulk(bucketId: string, contacts: any[]) {
-    const response = await fetch(`${API_BASE_URL}/buckets/${bucketId}/contacts/bulk`, {
+    return fetchWithAuth(`${API_BASE_URL}/buckets/${bucketId}/contacts/bulk`, {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${await getSupabaseToken()}`,
-        },
         body: JSON.stringify(contacts),
     });
-
-    if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'An unknown error occurred');
-    }
-
-    return response.json();
 }
 
 export async function deleteContact(bucketId: string, phoneNumber: string) {
   return fetchWithAuth(`${API_BASE_URL}/buckets/${bucketId}/contacts/${phoneNumber}`, {
     method: 'DELETE',
+  });
+}
+
+// LocalStorage-based functions with organization context
+function getStorageKey(key: string): string {
+  const orgContext = getOrganizationContext();
+  return orgContext.organizationId ? `${key}_${orgContext.organizationId}` : key;
+}
+
+export async function getContactListsFromStorage(): Promise<{ lists: any[] }> {
+  if (typeof window === 'undefined') return { lists: [] };
+  
+  const storageKey = getStorageKey('contact_lists');
+  const stored = localStorage.getItem(storageKey);
+  return stored ? JSON.parse(stored) : { lists: [] };
+}
+
+export async function createContactListInStorage(name: string, description?: string): Promise<any> {
+  if (typeof window === 'undefined') throw new Error('Not in browser environment');
+  
+  const newList = {
+    id: `list_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+    name,
+    description: description || '',
+    count: 0,
+    createdAt: new Date().toISOString(),
+    fields: ['name', 'email'] // default fields
+  };
+  
+  const storageKey = getStorageKey('contact_lists');
+  const existing = await getContactListsFromStorage();
+  const updated = { lists: [...existing.lists, newList] };
+  
+  localStorage.setItem(storageKey, JSON.stringify(updated));
+  return newList;
+}
+
+export async function getListContactsFromStorage(listId: string): Promise<any[]> {
+  if (typeof window === 'undefined') return [];
+  
+  const storageKey = getStorageKey(`contacts_${listId}`);
+  const stored = localStorage.getItem(storageKey);
+  return stored ? JSON.parse(stored) : [];
+}
+
+export async function createContactInStorage(listId: string, contact: any): Promise<any> {
+  if (typeof window === 'undefined') throw new Error('Not in browser environment');
+  
+  const newContact = {
+    id: `contact_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+    ...contact,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+  
+  // Add to contacts list
+  const contactsKey = getStorageKey(`contacts_${listId}`);
+  const existingContacts = await getListContactsFromStorage(listId);
+  const updatedContacts = [...existingContacts, newContact];
+  localStorage.setItem(contactsKey, JSON.stringify(updatedContacts));
+  
+  // Update list count
+  const listsKey = getStorageKey('contact_lists');
+  const listsData = await getContactListsFromStorage();
+  const updatedLists = listsData.lists.map(list => 
+    list.id === listId ? { ...list, count: updatedContacts.length } : list
+  );
+  localStorage.setItem(listsKey, JSON.stringify({ lists: updatedLists }));
+  
+  return newContact;
+}
+
+export async function bulkCreateContactsInStorage(listId: string, contacts: any[]): Promise<any[]> {
+  if (typeof window === 'undefined') throw new Error('Not in browser environment');
+  
+  const newContacts = contacts.map(contact => ({
+    id: `contact_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+    ...contact,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  }));
+  
+  // Add to contacts list
+  const contactsKey = getStorageKey(`contacts_${listId}`);
+  const existingContacts = await getListContactsFromStorage(listId);
+  const updatedContacts = [...existingContacts, ...newContacts];
+  localStorage.setItem(contactsKey, JSON.stringify(updatedContacts));
+  
+  // Update list count
+  const listsKey = getStorageKey('contact_lists');
+  const listsData = await getContactListsFromStorage();
+  const updatedLists = listsData.lists.map(list => 
+    list.id === listId ? { ...list, count: updatedContacts.length } : list
+  );
+  localStorage.setItem(listsKey, JSON.stringify({ lists: updatedLists }));
+  
+  return newContacts;
+}
+
+export async function deleteContactListFromStorage(listId: string): Promise<void> {
+  if (typeof window === 'undefined') throw new Error('Not in browser environment');
+  
+  // Remove contacts
+  const contactsKey = getStorageKey(`contacts_${listId}`);
+  localStorage.removeItem(contactsKey);
+  
+  // Remove from lists
+  const listsKey = getStorageKey('contact_lists');
+  const listsData = await getContactListsFromStorage();
+  const updatedLists = listsData.lists.filter(list => list.id !== listId);
+  localStorage.setItem(listsKey, JSON.stringify({ lists: updatedLists }));
+}
+
+export async function removeContactFromListInStorage(listId: string, contactId: string): Promise<void> {
+  if (typeof window === 'undefined') throw new Error('Not in browser environment');
+  
+  // Remove from contacts list
+  const contactsKey = getStorageKey(`contacts_${listId}`);
+  const existingContacts = await getListContactsFromStorage(listId);
+  const updatedContacts = existingContacts.filter(contact => contact.id !== contactId);
+  localStorage.setItem(contactsKey, JSON.stringify(updatedContacts));
+  
+  // Update list count
+  const listsKey = getStorageKey('contact_lists');
+  const listsData = await getContactListsFromStorage();
+  const updatedLists = listsData.lists.map(list => 
+    list.id === listId ? { ...list, count: updatedContacts.length } : list
+  );
+  localStorage.setItem(listsKey, JSON.stringify({ lists: updatedLists }));
+}
+
+export async function searchContactsInStorage(query: string, listId: string): Promise<any[]> {
+  if (typeof window === 'undefined') return [];
+  
+  const contacts = await getListContactsFromStorage(listId);
+  const lowerQuery = query.toLowerCase();
+  
+  return contacts.filter(contact => {
+    // Search in all contact fields
+    const searchableText = [
+      contact.name,
+      contact.phone,
+      contact.email,
+      ...Object.values(contact.data || {})
+    ].join(' ').toLowerCase();
+    
+    return searchableText.includes(lowerQuery);
   });
 }

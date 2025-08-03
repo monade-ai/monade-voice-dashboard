@@ -9,6 +9,7 @@ import {
   deleteContact as apiDeleteContact,
 } from '@/app/contacts/utils/contacts-api';
 import { useAssistants, Assistant } from '@/app/hooks/use-assistants-context';
+import { useAuth } from '@/lib/auth/AuthProvider';
 
 // Define the new data structures based on the API
 export interface Bucket {
@@ -57,12 +58,20 @@ export const ContactsProvider: React.FC<ContactsProviderProps> = ({ children }) 
   const [selectedBucket, setSelectedBucket] = useState<Bucket | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
+  const { currentOrganization } = useAuth();
   const { assistants } = useAssistants();
   const assistantPhoneNumbers = assistants
     .map((a) => a.phoneNumber)
     .filter((p): p is string => !!p);
 
   const fetchBuckets = useCallback(async () => {
+    // Only fetch if we have an organization context
+    if (!currentOrganization?.id) {
+      setBuckets([]);
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
     try {
       const fetchedBuckets = await getBuckets();
@@ -73,7 +82,7 @@ export const ContactsProvider: React.FC<ContactsProviderProps> = ({ children }) 
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [currentOrganization?.id]);
 
   useEffect(() => {
     fetchBuckets();

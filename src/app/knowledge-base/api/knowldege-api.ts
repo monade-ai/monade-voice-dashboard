@@ -7,6 +7,17 @@
 const KB_SERVICE_BASEURL = process.env.NEXT_PUBLIC_KB_SERVICE_BASEURL;
 
 /**
+ * Get organization context from localStorage or auth provider
+ */
+function getOrganizationContext(): { organizationId?: string } {
+  if (typeof window !== 'undefined') {
+    const orgId = localStorage.getItem('current_organization_id');
+    return orgId ? { organizationId: orgId } : {};
+  }
+  return {};
+}
+
+/**
  * Update system prompt with document content
  * @param base64Content - Base64 encoded content of the document
  * @returns Promise with the response from the API
@@ -21,12 +32,20 @@ export async function updateSystemPrompt(base64Content: string): Promise<any> {
       prompt_base64: base64Content,
     };
     console.log('Payload preview:', JSON.stringify(payload).substring(0, 100) + '...');
+    
+    const orgContext = getOrganizationContext();
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    
+    // Add organization context if available
+    if (orgContext.organizationId) {
+      headers['X-Organization-ID'] = orgContext.organizationId;
+    }
       
     const response = await fetch('https://039f-2405-201-d003-d814-fc48-8886-8dad-ad9.ngrok-free.app/update_system_prompt', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
       body: JSON.stringify(payload),
     });
   
@@ -72,10 +91,15 @@ export interface DocumentMetadata {
   }
   
 /**
-   * Class to manage document storage
+   * Class to manage document storage with organization context
    */
 export class DocumentStorage {
   private static STORAGE_KEY = 'monade_documents';
+  
+  private static getStorageKey(): string {
+    const orgContext = getOrganizationContext();
+    return orgContext.organizationId ? `${this.STORAGE_KEY}_${orgContext.organizationId}` : this.STORAGE_KEY;
+  }
   
   /**
      * Save a document to storage
@@ -92,11 +116,19 @@ export class DocumentStorage {
       const apiUrl = `${KB_SERVICE_BASEURL}/api/upload_kb`;
       console.log('Attempting to save document to:', apiUrl);
 
+      const orgContext = getOrganizationContext();
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      
+      // Add organization context if available
+      if (orgContext.organizationId) {
+        headers['X-Organization-ID'] = orgContext.organizationId;
+      }
+
       const response = await fetch(apiUrl, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
         body: JSON.stringify(payload),
       });
 
@@ -114,7 +146,8 @@ export class DocumentStorage {
       documents.push(document);
     }
       
-      // localStorage.setItem(this.STORAGE_KEY, JSON.stringify(documents));
+      const storageKey = this.getStorageKey();
+      localStorage.setItem(storageKey, JSON.stringify(documents));
     } catch (error) {
       console.error('Error saving document:', error);
       throw error;
@@ -126,7 +159,8 @@ export class DocumentStorage {
      * @returns Array of document metadata
      */
   static getAllDocuments(): DocumentMetadata[] {
-    const documentsJson = localStorage.getItem(this.STORAGE_KEY);
+    const storageKey = this.getStorageKey();
+    const documentsJson = localStorage.getItem(storageKey);
       
     if (!documentsJson) {
       return [];
@@ -159,9 +193,20 @@ export class DocumentStorage {
      */
   static async deleteDocument(id: string): Promise<boolean> {
     try {
+      const orgContext = getOrganizationContext();
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      
+      // Add organization context if available
+      if (orgContext.organizationId) {
+        headers['X-Organization-ID'] = orgContext.organizationId;
+      }
+
       // Delete from cloud service
       const response = await fetch(`${KB_SERVICE_BASEURL}/api/delete_kb/${id}`, {
         method: 'POST',
+        headers,
       });
 
       if (!response.ok) {
@@ -176,7 +221,8 @@ export class DocumentStorage {
       return false; // Document not found
     }
       
-    localStorage.setItem(this.STORAGE_KEY, JSON.stringify(filteredDocuments));
+    const storageKey = this.getStorageKey();
+    localStorage.setItem(storageKey, JSON.stringify(filteredDocuments));
     return true;
     } catch (error) {
       console.error('Error deleting document:', error);
@@ -188,6 +234,7 @@ export class DocumentStorage {
      * Clear all documents from storage
      */
   static clearAllDocuments(): void {
-    localStorage.removeItem(this.STORAGE_KEY);
+    const storageKey = this.getStorageKey();
+    localStorage.removeItem(storageKey);
   }
 }

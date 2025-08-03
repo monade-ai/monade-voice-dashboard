@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 
 import { apiService } from '@/lib/api';
+import { useAuth } from '@/lib/auth/AuthProvider';
 
 // Import mock data for fallback
 import {
@@ -37,6 +38,7 @@ export function useDashboardData({
   assistantId,
   useMockData = true, // Default to mock data for now
 }: DashboardDataOptions) {
+  const { currentOrganization } = useAuth();
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<Error | null>(null);
   
@@ -181,26 +183,32 @@ export function useDashboardData({
           
           setLoading(false);
         } else {
-          // In a real app, you would call your API here
-          // apiService.getDashboardData({ dateFrom, dateTo, groupBy, assistantId })
-          //   .then(data => {
-          //     setMetrics(data.metrics);
-          //     setAnalysis(data.analysis);
-          //     setFailedCalls(data.failedCalls);
-          //     setConcurrentCalls(data.concurrentCalls);
-          //     setLoading(false);
-          //   })
-          //   .catch(err => {
-          //     setError(err);
-          //     setLoading(false);
-          //   });
+          // In a real app, you would call your API here with organization context
+          const apiOptions = { 
+            dateFrom, 
+            dateTo, 
+            groupBy, 
+            assistantId,
+            organizationId: currentOrganization?.id 
+          };
           
-          // For now, just use the mock data
-          setMetrics(processedMockData);
-          setAnalysis(processedAnalysisData);
-          setFailedCalls(filteredFailedCalls);
-          setConcurrentCalls(filteredConcurrentCalls);
-          setLoading(false);
+          Promise.all([
+            apiService.getDashboardMetrics(apiOptions),
+            apiService.getCallAnalysis(apiOptions),
+            apiService.getUnsuccessfulCalls(apiOptions),
+            apiService.getConcurrentCalls(apiOptions)
+          ])
+          .then(([metricsData, analysisData, failedCallsData, concurrentCallsData]) => {
+            setMetrics(metricsData);
+            setAnalysis(analysisData);
+            setFailedCalls(failedCallsData);
+            setConcurrentCalls(concurrentCallsData);
+            setLoading(false);
+          })
+          .catch(err => {
+            setError(err);
+            setLoading(false);
+          });
         }
       } catch (err) {
         setError(err instanceof Error ? err : new Error('Unknown error'));

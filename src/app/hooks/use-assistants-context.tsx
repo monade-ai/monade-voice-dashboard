@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useToast } from '@/app/knowledge-base/hooks/use-toast';
+import { useAuth } from '@/lib/auth/AuthProvider';
 import { v4 as uuidv4 } from 'uuid';
 
 // Define the Assistant type - Matches API GET response structure & Prisma Schema
@@ -71,6 +72,24 @@ export const AssistantsContext = createContext<AssistantsContextType>({
 const API_BASE_URL = process.env.NEXT_PUBLIC_ASSISTANTS_BASEURL || 'http://localhost:7071/api';
 const DRAFT_ASSISTANTS_STORAGE_KEY = 'draftAssistants';
 
+// Helper to get organization-scoped storage key
+const getStorageKey = (organizationId?: string): string => {
+  return organizationId ? `${DRAFT_ASSISTANTS_STORAGE_KEY}_${organizationId}` : DRAFT_ASSISTANTS_STORAGE_KEY;
+};
+
+// Helper to get organization context headers
+const getOrgHeaders = (organizationId?: string): Record<string, string> => {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  
+  if (organizationId) {
+    headers['X-Organization-ID'] = organizationId;
+  }
+  
+  return headers;
+};
+
 // Helper to parse API errors
 const getApiError = async (res: Response): Promise<string> => {
   try {
@@ -81,11 +100,12 @@ const getApiError = async (res: Response): Promise<string> => {
   }
 };
 
-// Helper to load drafts from localStorage
-const loadDrafts = (): Assistant[] => {
+// Helper to load drafts from localStorage with organization context
+const loadDrafts = (organizationId?: string): Assistant[] => {
   if (typeof window === 'undefined') return []; // Guard for SSR
   try {
-    const storedDrafts = localStorage.getItem(DRAFT_ASSISTANTS_STORAGE_KEY);
+    const storageKey = getStorageKey(organizationId);
+    const storedDrafts = localStorage.getItem(storageKey);
     if (storedDrafts) {
       const parsed = JSON.parse(storedDrafts);
       // Ensure dates are parsed correctly
@@ -97,11 +117,12 @@ const loadDrafts = (): Assistant[] => {
   return [];
 };
 
-// Helper to save drafts to localStorage
-const saveDrafts = (drafts: Assistant[]) => {
+// Helper to save drafts to localStorage with organization context
+const saveDrafts = (drafts: Assistant[], organizationId?: string) => {
   if (typeof window === 'undefined') return; // Guard for SSR
   try {
-    localStorage.setItem(DRAFT_ASSISTANTS_STORAGE_KEY, JSON.stringify(drafts));
+    const storageKey = getStorageKey(organizationId);
+    localStorage.setItem(storageKey, JSON.stringify(drafts));
   } catch (error) {
     console.error("Error saving drafts to localStorage:", error);
   }
@@ -111,12 +132,15 @@ let assistantsCache: Assistant[] | null = null;
 
 export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
   const { toast } = useToast();
+  const { currentOrganization } = useAuth();
   const [assistants, setAssistants] = useState<Assistant[]>([]);
   const [currentAssistant, setCurrentAssistant] = useState<Assistant | null>(null);
 
   // Combined fetch and merge logic with in-memory cache
   const fetchAssistants = async () => {
-    // Check in-memory cache first
+    const organizationId = currentOrganization?.id;
+    
+    // Check in-memory cache first (organization-specific)
     if (assistantsCache && assistantsCache.length > 0) {
       setAssistants(assistantsCache);
       console.log('[Assistants] Loaded from in-memory cache:', assistantsCache);
@@ -125,7 +149,8 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
 
     let apiAssistants: Assistant[] = [];
     try {
-      const res = await fetch(`${API_BASE_URL}/assistants`);
+      const headers = getOrgHeaders(organizationId);
+      const res = await fetch(`${API_BASE_URL}/assistants`, { headers });
       if (!res.ok) {
         const errorText = await getApiError(res);
         console.error('Failed to fetch assistants:', errorText);
@@ -149,8 +174,8 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
       // Proceed to load drafts even if API fetch fails
     }
 
-    // Load local drafts
-    const localDrafts = loadDrafts();
+    // Load local drafts with organization context
+    const localDrafts = loadDrafts(organizationId);
     console.log('[Assistants] Loaded Local Drafts:', localDrafts);
 
     // Merge: Combine API assistants and local drafts
@@ -177,6 +202,7 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
 
   // Adds a draft assistant to local state AND localStorage
   const addDraftAssistant = (draftAssistantData: Omit<Assistant, 'id' | 'createdAt'>): Assistant => {
+    const organizationId = currentOrganization?.id;
     const localId = `local-${uuidv4()}`;
     const newDraft: Assistant = {
       ...draftAssistantData,
@@ -191,15 +217,17 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
     const updatedAssistants = [...assistants, newDraft];
     setAssistants(updatedAssistants);
 
-    // Update localStorage with the new list of drafts
+    // Update localStorage with the new list of drafts (organization-scoped)
     const currentDrafts = updatedAssistants.filter(a => a.id.startsWith('local-'));
-    saveDrafts(currentDrafts);
+    saveDrafts(currentDrafts, organizationId);
 
     return newDraft;
   };
 
   // UPDATED: Publishes a draft assistant to the backend
   const createAssistant = async (localId: string, assistantData: CreateAssistantData): Promise<Assistant | undefined> => {
+    const organizationId = currentOrganization?.id;
+    
     // Payload uses data passed in, which should be validated beforehand
     const { knowledgeBaseId, ...restData } = assistantData;
     const payload: any = { ...restData };
@@ -209,9 +237,10 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
 
     console.log('[Assistants] POST /api/assistants (Publishing Draft) Payload:', payload);
     try {
+      const headers = getOrgHeaders(organizationId);
       const res = await fetch(`${API_BASE_URL}/assistants`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(payload),
       });
 
@@ -238,9 +267,9 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
       await fetchAssistants();
 
       // Remove the specific published draft from localStorage
-      const currentDrafts = loadDrafts();
+      const currentDrafts = loadDrafts(organizationId);
       const updatedDrafts = currentDrafts.filter(d => d.id !== localId);
-      saveDrafts(updatedDrafts);
+      saveDrafts(updatedDrafts, organizationId);
 
       return processedAssistant; // Return the published assistant data
 
@@ -254,6 +283,7 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
 
   // Updates assistant state LOCALLY and updates localStorage if it's a draft
   const updateAssistantLocally = (id: string, updatedData: Partial<Assistant>) => {
+    const organizationId = currentOrganization?.id;
     console.log('[Assistants] Update Locally:', id, updatedData);
     let updatedAssistants: Assistant[] | null = null;
 
@@ -269,16 +299,18 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
       setCurrentAssistant((prev) => (prev ? { ...prev, ...updatedData } : null));
     }
 
-    // If it was a draft, update localStorage
+    // If it was a draft, update localStorage with organization context
     if (id.startsWith('local-') && updatedAssistants) {
       const currentDrafts = updatedAssistants.filter(a => a.id.startsWith('local-'));
-      saveDrafts(currentDrafts);
+      saveDrafts(currentDrafts, organizationId);
       console.log('[Assistants] Updated draft in localStorage:', id);
     }
   };
 
   // Saves updates for an EXISTING PUBLISHED assistant to the backend
   const saveAssistantUpdates = async (id: string, updatedData: UpdateAssistantData): Promise<Assistant | undefined> => {
+    const organizationId = currentOrganization?.id;
+    
     if (id.startsWith('local-')) {
       console.error('Attempted to save updates for a draft assistant using saveAssistantUpdates. Use createAssistant (publish) instead.');
       toast({ title: 'Error', description: 'Cannot save changes for a draft. Publish it first.' });
@@ -300,9 +332,10 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
 
     console.log('[Assistants] PATCH /api/assistants/:id', `${API_BASE_URL}/assistants/${id}`, 'Payload:', payload);
     try {
+      const headers = getOrgHeaders(organizationId);
       const res = await fetch(`${API_BASE_URL}/assistants/${id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(payload),
       });
 
@@ -345,15 +378,17 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
 
   // UPDATED: Deletes either a local draft or a published assistant via API
   const deleteAssistant = async (id: string): Promise<boolean> => {
+    const organizationId = currentOrganization?.id;
+    
     // Handle draft deletion locally
     if (id.startsWith('local-')) {
       console.log('[Assistants] Deleting Draft Locally:', id);
       const updatedAssistants = assistants.filter((assistant) => assistant.id !== id);
       setAssistants(updatedAssistants);
 
-      // Remove from localStorage
+      // Remove from localStorage with organization context
       const currentDrafts = updatedAssistants.filter(a => a.id.startsWith('local-'));
-      saveDrafts(currentDrafts);
+      saveDrafts(currentDrafts, organizationId);
 
       toast({ title: 'Success', description: 'Draft discarded.' });
       if (currentAssistant?.id === id) {
@@ -365,8 +400,10 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
     // Handle published assistant deletion via API
     console.log('[Assistants] DELETE /api/assistants/:id', `${API_BASE_URL}/assistants/${id}`);
     try {
+      const headers = getOrgHeaders(organizationId);
       const res = await fetch(`${API_BASE_URL}/assistants/${id}`, {
         method: 'DELETE',
+        headers,
       });
 
       if (!res.ok) {

@@ -4,8 +4,9 @@ import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { FcGoogle } from 'react-icons/fc';
-import { FaEnvelope, FaLock } from 'react-icons/fa';
+import { AiOutlineMail, AiOutlineLock } from 'react-icons/ai';
 import Image from 'next/image';
+import { validateEmail } from '@/types';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -15,39 +16,145 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [orgMode, setOrgMode] = useState(false);
+  const [justSignedOut, setJustSignedOut] = useState(false);
 
   useEffect(() => {
+    let mounted = true;
+    
+    // Check if user just signed out
+    const urlParams = new URLSearchParams(window.location.search);
+    const signedOut = urlParams.get('signedOut');
+    
+    if (signedOut === 'true') {
+      setJustSignedOut(true);
+      // Clean up URL
+      window.history.replaceState({}, '', '/auth/login');
+    }
+    
     const checkUserSession = async () => {
-      const { data, error } = await supabase.auth.getSession();
-      
-      if (error) {
-        console.error('Error fetching session:', error);
-
-        return;
+      // If user just signed out, skip session check for a moment
+      if (signedOut === 'true') {
+        console.log('User just signed out, skipping session check');
+        await new Promise(resolve => setTimeout(resolve, 500));
+      } else {
+        // Add delay to ensure sign out has fully propagated
+        await new Promise(resolve => setTimeout(resolve, 300));
       }
-  
-      if (data?.session?.user) {
-        router.push('/dashboard'); 
+      
+      if (!mounted) return;
+      
+      try {
+        // First check session
+        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) {
+          console.error('Error fetching session:', sessionError);
+          return;
+        }
+        
+        // If no session, stay on login page
+        if (!sessionData?.session?.user) {
+          console.log('No session found, staying on login page');
+          setJustSignedOut(false);
+          return;
+        }
+        
+        // If user just signed out, force clear the session
+        if (justSignedOut || signedOut === 'true') {
+          console.log('User just signed out, clearing any remaining session');
+          await supabase.auth.signOut();
+          setJustSignedOut(false);
+          return;
+        }
+        
+        // Double-check with getUser() to ensure session is actually valid
+        const { data: userData, error: userError } = await supabase.auth.getUser();
+        
+        if (userError) {
+          console.error('Error validating user:', userError);
+          // Clear invalid session
+          await supabase.auth.signOut();
+          return;
+        }
+        
+        if (userData?.user && mounted && !justSignedOut) {
+          console.log('Valid session found, redirecting to dashboard');
+          router.push('/dashboard'); 
+        }
+      } catch (error) {
+        console.error('Session check error:', error);
       }
     };
+
+    // Listen for auth state changes to handle sign out properly
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('Login page auth state change:', event);
+      
+      if (!mounted) return;
+      
+      if (event === 'SIGNED_OUT') {
+        console.log('User signed out, staying on login page');
+        // Clear any form errors when user signs out
+        setError(null);
+        return;
+      }
+      
+      if (event === 'SIGNED_IN' && session?.user) {
+        console.log('User signed in, redirecting to dashboard');
+        // Add small delay to ensure auth state is fully updated
+        setTimeout(() => {
+          if (mounted) {
+            router.push('/dashboard');
+          }
+        }, 100);
+      }
+    });
   
     checkUserSession();
-  }, []);  
 
-  const handleLogin = async () => {
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, [router, supabase]);
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
     setLoading(true);
     setError(null);
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-
-    if (error) {
-      setError(error.message);
+    // Basic validation
+    const emailErrors = validateEmail(email);
+    if (emailErrors.length > 0) {
+      setError(emailErrors[0].message);
       setLoading(false);
-
       return;
     }
 
-    router.push('/dashboard');
+    if (!password) {
+      setError('Password is required');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ 
+        email, 
+        password 
+      });
+
+      if (error) {
+        setError(error.message);
+        return;
+      }
+
+      router.push('/dashboard');
+    } catch (error) {
+      console.error('Login error:', error);
+      setError('An unexpected error occurred');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleGoogleLogin = async () => {
@@ -57,7 +164,10 @@ export default function LoginPage() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`, 
+        redirectTo: `${window.location.origin}/auth/callback`,
+        queryParams: {
+          account_type: orgMode ? 'organization' : 'personal'
+        }
       },
     });
   
@@ -69,111 +179,173 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex flex-col md:flex-row h-screen">
-      {/* Left Section */}
-      <div className="w-full md:w-1/2 flex flex-col items-center justify-center bg-white px-6">
-        <h1 className="text-3xl font-bold mb-4 text-black">
-          Welcome back <span className="text-blue-600">monade.ai!</span>
-        </h1>
-        <p className="text-gray-600 mb-6">It's great to see you again</p>
-
-        {/* Account Type Pill Toggle */}
-        <div className="flex justify-center mb-4">
-          <div className="flex bg-gray-100 rounded-full p-1 w-80">
-            <button
-              type="button"
-              className={`flex-1 py-2 rounded-full text-sm font-semibold transition-colors ${
-                !orgMode ? 'bg-green-600 text-white shadow' : 'text-gray-700'
-              }`}
-              onClick={() => setOrgMode(false)}
-            >
-              Personal Account
-            </button>
-            <button
-              type="button"
-              className={`flex-1 py-2 rounded-full text-sm font-semibold transition-colors ${
-                orgMode ? 'bg-blue-600 text-white shadow' : 'text-gray-700'
-              }`}
-              onClick={() => setOrgMode(true)}
-            >
-              Org Account
-            </button>
+    <div className="min-h-screen flex">
+      {/* Left Side - Login Form */}
+      <div className="flex-1 flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-20 xl:px-24">
+        <div className="mx-auto w-full max-w-sm lg:w-96">
+          {/* Header */}
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold tracking-tight text-gray-900">
+              Welcome back
+            </h1>
+            <p className="mt-2 text-sm text-gray-600">
+              Sign in to your monade.ai account
+            </p>
           </div>
-        </div>
-        {orgMode && (
-          <div className="w-80 text-xs text-blue-700 text-center mb-2">
-            Log in as an organization owner or admin.
+
+          {/* Account Type Toggle */}
+          <div className="mb-6">
+            <div className="flex rounded-lg bg-gray-100 p-1">
+              <button
+                type="button"
+                className={`flex-1 rounded-md py-2 px-3 text-sm font-medium transition-all ${
+                  !orgMode 
+                    ? 'bg-white text-gray-900 shadow-sm' 
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+                onClick={() => setOrgMode(false)}
+              >
+                Personal
+              </button>
+              <button
+                type="button"
+                className={`flex-1 rounded-md py-2 px-3 text-sm font-medium transition-all ${
+                  orgMode 
+                    ? 'bg-white text-gray-900 shadow-sm' 
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+                onClick={() => setOrgMode(true)}
+              >
+                Organization
+              </button>
+            </div>
+            {orgMode && (
+              <p className="mt-2 text-xs text-blue-600">
+                Sign in to your organization account
+              </p>
+            )}
           </div>
-        )}
 
-        {/* Google Login Button */}
-        <button
-          onClick={handleGoogleLogin}
-          disabled={loading}
-          className="flex items-center justify-center w-80 bg-white border border-gray-300 text-black font-semibold py-2 rounded-full shadow-md hover:bg-gray-100 mb-3"
-        >
-          <FcGoogle className="w-5 h-5 mr-2" />
-          {loading ? 'Signing in...' : 'Continue with Google'}
-        </button>
+          {/* Google Login */}
+          <button
+            onClick={handleGoogleLogin}
+            disabled={loading}
+            className="w-full flex justify-center items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <FcGoogle className="w-5 h-5 mr-2" />
+            {loading ? 'Signing in...' : 'Continue with Google'}
+          </button>
 
-        <div className="w-80 text-center text-gray-500 my-2">OR</div>
+          <div className="mt-6">
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-300" />
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-2 bg-white text-gray-500">Or continue with email</span>
+              </div>
+            </div>
+          </div>
 
-        {/* Email Input */}
-        <div className="flex items-center border border-gray-300 rounded-full px-4 py-2 w-80 mb-2">
-          <FaEnvelope className="text-gray-500 mr-3" />
-          <input
-            type="email"
-            placeholder="Enter your email ID"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="w-full outline-none bg-transparent"
-          />
-        </div>
+          {/* Login Form */}
+          <form onSubmit={handleLogin} className="mt-6 space-y-4">
+            {/* Email */}
+            <div>
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+                Email address
+              </label>
+              <div className="mt-1 relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <AiOutlineMail className="h-5 w-5 text-gray-400" />
+                </div>
+                <input
+                  id="email"
+                  name="email"
+                  type="email"
+                  autoComplete="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  placeholder="Enter your email"
+                />
+              </div>
+            </div>
 
-        {/* Password Input */}
-        <div className="flex items-center border border-gray-300 rounded-full px-4 py-2 w-80 mb-4">
-          <FaLock className="text-gray-500 mr-3" />
-          <input
-            type="password"
-            placeholder="Enter your password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="w-full outline-none bg-transparent"
-          />
-        </div>
+            {/* Password */}
+            <div>
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+                Password
+              </label>
+              <div className="mt-1 relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <AiOutlineLock className="h-5 w-5 text-gray-400" />
+                </div>
+                <input
+                  id="password"
+                  name="password"
+                  type="password"
+                  autoComplete="current-password"
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  placeholder="Enter your password"
+                />
+              </div>
+            </div>
 
-        {/* Sign In Button */}
-        <button
-          onClick={handleLogin}
-          disabled={loading}
-          className="w-80 bg-blue-600 text-white font-semibold py-2 rounded-full hover:bg-blue-700"
-        >
-          {loading ? 'Logging in...' : 'Sign In'}
-        </button>
+            {/* Forgot Password Link */}
+            <div className="flex items-center justify-end">
+              <div className="text-sm">
+                <a href="/auth/forgot-password" className="font-medium text-blue-600 hover:text-blue-500">
+                  Forgot your password?
+                </a>
+              </div>
+            </div>
 
-        {/* Footer Links */}
-        <div className="text-center mt-4">
-          <p className="text-gray-600">
-            Don't have an account?{' '}
-            <a href="/auth/signup" className="text-blue-600">
-              <u>Sign up Now</u>
-            </a>
-          </p>
-          <a href="/auth/forgot-password" className="text-blue-500">
-            <u>Forgot Password</u>
-          </a>
+            {/* Error Message */}
+            {error && (
+              <div className="rounded-md bg-red-50 p-4">
+                <div className="text-sm text-red-700">{error}</div>
+              </div>
+            )}
+
+            {/* Submit Button */}
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? 'Signing in...' : 'Sign in'}
+            </button>
+          </form>
+
+          {/* Footer */}
+          <div className="mt-6">
+            <div className="text-center">
+              <span className="text-sm text-gray-600">
+                Don't have an account?{' '}
+                <a href="/auth/signup" className="font-medium text-blue-600 hover:text-blue-500">
+                  Sign up
+                </a>
+              </span>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Right Section (Illustration) */}
-      <div className="hidden md:flex w-1/2 items-center justify-center bg-blue-600 text-white p-6 relative">
-        <Image
-          src="/side_image.png" 
-          alt="Illustration"
-          width={500}  
-          height={500}
-          className="w-3/4"
-        />
+      {/* Right Side - Illustration */}
+      <div className="hidden lg:block relative w-0 flex-1">
+        <div className="absolute inset-0 bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center">
+          <Image
+            src="/side_image.png" 
+            alt="AI Assistant Illustration"
+            width={400}  
+            height={400}
+            className="max-w-md opacity-90"
+          />
+        </div>
       </div>
     </div>
   );

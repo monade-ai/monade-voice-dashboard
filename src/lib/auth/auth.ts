@@ -1,6 +1,11 @@
-import { supabase } from './supabaseClient';
+import { authClientManager } from './AuthClientManager';
+import { configManager } from './ConfigManager';
+
+// Initialize configuration validation
+configManager.resolveConflicts();
 
 export const getUser = async () => {
+  const supabase = authClientManager.getComponentClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -10,21 +15,13 @@ export const getUser = async () => {
 
 /**
  * Returns the current Supabase access token, or null if not authenticated.
- */
-/**
- * Returns the current Supabase access token, or null if not authenticated.
  * Enhanced with detailed logging for debugging session issues.
  */
 export const getAccessToken = async (): Promise<string | null> => {
-  const { data, error } = await supabase.auth.getSession();
-  console.log('[getAccessToken] Supabase session data:', data);
-  console.log('[getAccessToken] Supabase session error:', error);
+  const session = await authClientManager.getCurrentSession();
+  console.log('[getAccessToken] Supabase session data:', session);
 
-  if (error) {
-    console.warn('[getAccessToken] Error fetching session:', error);
-    return null;
-  }
-  if (!data.session) {
+  if (!session) {
     console.warn('[getAccessToken] No session found. User may not be authenticated or session may have expired.');
     // For browser: check if session exists in localStorage
     if (typeof window !== 'undefined') {
@@ -36,9 +33,9 @@ export const getAccessToken = async (): Promise<string | null> => {
     }
     return null;
   }
-  if (!data.session.access_token) {
-    console.warn('[getAccessToken] Session found but access_token is missing:', data.session);
+  if (!session.access_token) {
+    console.warn('[getAccessToken] Session found but access_token is missing:', session);
     return null;
   }
-  return data.session.access_token;
+  return session.access_token;
 };

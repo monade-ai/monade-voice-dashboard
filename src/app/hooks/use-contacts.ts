@@ -22,7 +22,7 @@ import {
   removeContactFromListInStorage,
   searchContactsInStorage,
 } from '@/app/contacts/utils/contacts-api';
-// import { useAuth } from '@/lib/auth/AuthProvider';
+import { useAuth } from '@/lib/auth/AuthProvider';
 
 export interface Contact {
   id: string;
@@ -72,7 +72,7 @@ export function useContacts({
   initialLists = [],
   initialContacts = {},
 }: UseContactsProps = {}): UseContactsReturn {
-  // const { user, loading } = useAuth(); // Removed Auth dependency
+  const { currentOrganization } = useAuth();
   const [contactLists, setContactLists] = useState<ContactList[]>(initialLists);
   const [contacts, setContacts] = useState<Record<string, Contact[]>>(initialContacts);
   const [selectedList, setSelectedList] = useState<ContactList | null>(null);
@@ -80,16 +80,22 @@ export function useContacts({
   const [searchResults, setSearchResults] = useState<Contact[]>([]);
   const [searchQuery, setSearchQuery] = useState<string>('');
 
-  // Load all contact lists and their contacts from localStorage on mount
+  // Load all contact lists and their contacts from localStorage on mount and when organization changes
   useEffect(() => {
     const fetchData = async () => {
+      // Only fetch if we have an organization context
+      if (!currentOrganization?.id) {
+        setContactLists([]);
+        setContacts({});
+        setSelectedList(null);
+        setSearchResults([]);
+        setSearchQuery('');
+        setIsLoading(false);
+        return;
+      }
+
       setIsLoading(true);
       try {
-        // No token needed for localStorage
-        // if (typeof window === 'undefined') return; // Check handled in storage functions
-        // const token = localStorage.getItem('access_token');
-        // if (!token) throw new Error('Not authenticated');
-
         const listsRes = await getContactListsFromStorage();
         const lists: ContactList[] = listsRes.lists || [];
         setContactLists(lists);
@@ -97,7 +103,6 @@ export function useContacts({
         // Fetch contacts for each list from storage
         const contactsObj: Record<string, Contact[]> = {};
         for (const list of lists) {
-          // No token needed
           const contactsRes = await getListContactsFromStorage(list.id);
           contactsObj[list.id] = contactsRes || [];
         }
@@ -112,7 +117,7 @@ export function useContacts({
       }
     };
     fetchData();
-  }, []); // Run only once on mount
+  }, [currentOrganization?.id]); // Refresh when organization changes
 
   // Create a new contact list in storage
   const createContactList = useCallback(async (name: string, description?: string): Promise<ContactList | null> => {
