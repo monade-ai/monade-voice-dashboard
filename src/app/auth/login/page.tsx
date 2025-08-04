@@ -160,6 +160,10 @@ export default function LoginPage() {
   const handleGoogleLogin = async () => {
     setLoading(true);
     setError(null);
+    
+    const redirectUrl = `${window.location.origin}/auth/callback`;
+    console.log('[Login] Starting Google OAuth with redirect:', redirectUrl);
+    console.log('[Login] Current origin:', window.location.origin);
   
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
@@ -171,9 +175,11 @@ export default function LoginPage() {
       },
     });
   
+    console.log('[Login] OAuth response:', { error });
     setLoading(false);
   
     if (error) {
+      console.error('[Login] OAuth error:', error);
       setError(error.message);
     }
   };

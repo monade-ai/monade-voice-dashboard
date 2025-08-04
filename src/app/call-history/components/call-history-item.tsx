@@ -12,11 +12,19 @@ type CallHistoryItemProps = {
   onClick?: (call: CallLog) => void;
 };
 
-const statusColors: Record<string, string> = {
-  completed: "bg-green-100 text-green-700",
-  missed: "bg-yellow-100 text-yellow-700",
-  failed: "bg-red-100 text-red-700",
-  ongoing: "bg-blue-100 text-blue-700",
+const getStatusClass = (status: string) => {
+  switch (status) {
+    case "completed":
+      return "border-green-500 bg-green-500/10 text-green-500";
+    case "missed":
+      return "border-yellow-500 bg-yellow-500/10 text-yellow-500";
+    case "failed":
+      return "border-red-500 bg-red-500/10 text-red-500";
+    case "ongoing":
+      return "border-blue-500 bg-blue-500/10 text-blue-500";
+    default:
+      return "border-gray-500 bg-gray-500/10 text-gray-500";
+  }
 };
 
 const statusIcons: Record<string, React.ReactNode> = {
@@ -64,7 +72,7 @@ const CallHistoryItem: React.FC<CallHistoryItemProps> = ({ call, onClick }) => {
       </div>
       {/* Status Badge */}
       <div
-        className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold ${statusColors[call.status] || "bg-gray-100 text-gray-700"}`}
+        className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold border ${getStatusClass(call.status)}`}
       >
         {statusIcons[call.status]}
         <span className="capitalize">{call.status}</span>

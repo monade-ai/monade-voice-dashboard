@@ -67,13 +67,6 @@ export type SubscriptionStatus = 'active' | 'cancelled' | 'past_due' | 'trialing
 
 export type MemberStatus = 'active' | 'invited' | 'suspended';
 
-// Extended user type that includes organization context
-export interface AuthUser extends UserProfile {
-  organizations: OrganizationMember[];
-  current_organization?: Organization;
-  permissions: Permission[];
-  role?: OrganizationRole; // Role in current organization
-}
 
 // Organization creation and update types
 export interface CreateOrganizationData {

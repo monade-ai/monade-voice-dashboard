@@ -36,6 +36,10 @@ export default function AssistantsHeader({ editingAssistantId, setEditingAssista
 
   // RBAC
   const canCreateAssistant = useHasPermission('assistants.create');
+  
+  // Debug logging
+  console.log('[AssistantsHeader] canCreateAssistant:', canCreateAssistant);
+  console.log('[AssistantsHeader] checking permission: assistants.create');
 
   // Filter assistants based on search term
   const filteredAssistants = assistants.filter(

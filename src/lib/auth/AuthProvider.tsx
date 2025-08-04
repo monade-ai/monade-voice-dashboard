@@ -10,7 +10,7 @@ import {
   Permission,
   ROLE_PERMISSIONS
 } from '@/types';
-import { getUserPermissions } from '@/lib/auth/permissionUtils';
+import { getUserPermissions, getPermissionsForRole } from '@/lib/auth/permissionUtils';
 import { getOrganizationService } from '@/lib/services';
 import { getRoleFromJWT } from './decodeJWT';
 import { configManager } from './ConfigManager';
@@ -35,16 +35,56 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Load user profile and organization data
   const loadUserData = useCallback(async (userId: string) => {
     try {
+      console.log('[AuthProvider] Starting loadUserData for:', userId);
+      
       // Get user profile
-      const { data: profile, error: profileError } = await supabase
-        .from('user_profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
+      console.log('[AuthProvider] Fetching user profile...');
+const { data: initialProfile, error: profileError } = await supabase
+  .from('user_profiles')
+  .select('*')
+  .eq('id', userId)
+  .single();
+let profile = initialProfile;
 
       if (profileError) {
         console.error('[AuthProvider] Error loading user profile:', profileError);
-        return;
+        
+        // If profile doesn't exist, create it
+        if (profileError.code === 'PGRST116') {
+          console.log('[AuthProvider] User profile not found, creating it...');
+          
+          // Get user data from Supabase auth
+          const { data: { user: supabaseUser } } = await supabase.auth.getUser();
+          if (!supabaseUser) {
+            console.error('[AuthProvider] No authenticated user found');
+            return;
+          }
+          
+          // Create user profile
+          const { data: newProfile, error: createError } = await supabase
+            .from('user_profiles')
+            .insert({
+              id: userId,
+              email: supabaseUser.email || '',
+              full_name: supabaseUser.user_metadata?.full_name || supabaseUser.user_metadata?.name || '',
+              avatar_url: supabaseUser.user_metadata?.avatar_url || '',
+              account_type: 'personal'
+            })
+            .select()
+            .single();
+            
+          if (createError) {
+            console.error('[AuthProvider] Error creating user profile:', createError);
+            return;
+          }
+          
+          console.log('[AuthProvider] User profile created:', newProfile);
+          profile = newProfile;
+        } else {
+          return;
+        }
+      } else {
+        console.log('[AuthProvider] User profile loaded:', profile);
       }
 
       // Get user's organizations
@@ -118,7 +158,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setCurrentOrganization(currentOrg);
       setOrganizations(userOrgs);
       setUserRole(currentRole);
-      setPermissions(currentMembership ? getUserPermissions(currentMembership) : []);
+      
+      // Set permissions: organization members get their role permissions, 
+      // personal accounts get default user permissions
+      if (currentMembership) {
+        const memberPermissions = getUserPermissions(currentMembership);
+        console.log('[AuthProvider] Organization member permissions:', memberPermissions);
+        setPermissions(memberPermissions);
+      } else {
+        // For personal accounts, give them default user permissions
+        const defaultPermissions = getPermissionsForRole('member');
+        console.log('[AuthProvider] Personal account permissions:', defaultPermissions);
+        console.log('[AuthProvider] Does it include assistants.create?', defaultPermissions.includes('assistants.create'));
+        setPermissions(defaultPermissions);
+      }
 
     } catch (error) {
       console.error('[AuthProvider] Error loading user data:', error);
@@ -244,13 +297,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Initialize auth state
   useEffect(() => {
     const initializeAuth = async () => {
+      console.log('[AuthProvider] Initializing auth...');
       setLoading(true);
       
       try {
         const { data } = await supabase.auth.getSession();
+        console.log('[AuthProvider] Initial session check:', data.session?.user?.id);
         
         if (data.session?.user) {
+          console.log('[AuthProvider] Loading user data for:', data.session.user.id);
           await loadUserData(data.session.user.id);
+        } else {
+          console.log('[AuthProvider] No session found during initialization');
         }
       } catch (error) {
         console.error('[AuthProvider] Error initializing auth:', error);
@@ -269,6 +327,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (session.access_token) {
           localStorage.setItem('access_token', session.access_token);
         }
+        console.log('[AuthProvider] SIGNED_IN event - loading user data for:', session.user.id);
         await loadUserData(session.user.id);
       } else if (event === 'SIGNED_OUT') {
         console.log('[AuthProvider] SIGNED_OUT event received, clearing all state...');

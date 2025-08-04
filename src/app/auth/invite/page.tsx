@@ -1,15 +1,27 @@
+/**
+ * This page is dynamic and cannot be statically exported.
+ * If you see a prerender/export error, do not use `next export` for this page.
+ * See: https://nextjs.org/docs/messages/prerender-error
+ */
 'use client';
 
-import { useState, useEffect } from 'react';
+export const dynamic = "force-dynamic";
+
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { FcGoogle } from 'react-icons/fc';
-import { AiOutlineMail, AiOutlineLock, AiOutlineUser } from 'react-icons/ai';
+import { AiOutlineMail, AiOutlineLock, AiOutlineUser, AiOutlineCheck, AiOutlineExclamationCircle } from 'react-icons/ai';
+import { HiOutlineOfficeBuilding } from 'react-icons/hi';
 import Image from 'next/image';
 import { getOrganizationService } from '@/lib/services';
 import { validateEmail, validatePassword, validateFullName } from '@/types';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 
-export default function InvitationPage() {
+function InvitationPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = createClientComponentClient();
@@ -198,222 +210,273 @@ export default function InvitationPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading invitation...</p>
-        </div>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100">
+        <Card className="w-full max-w-md">
+          <CardContent className="flex flex-col items-center justify-center py-8">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mb-4"></div>
+            <p className="text-muted-foreground">Loading invitation...</p>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
   if (error && !invitationData) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="max-w-md w-full bg-white rounded-lg shadow-md p-6 text-center">
-          <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-4">
-            <svg className="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </div>
-          <h3 className="text-lg font-medium text-gray-900 mb-2">Invalid Invitation</h3>
-          <p className="text-sm text-gray-500 mb-4">{error}</p>
-          <button
-            onClick={() => router.push('/auth/signup')}
-            className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700"
-          >
-            Sign Up Instead
-          </button>
-        </div>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100">
+        <Card className="w-full max-w-md">
+          <CardContent className="text-center py-8">
+            <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-destructive/10 mb-4">
+              <AiOutlineExclamationCircle className="h-6 w-6 text-destructive" />
+            </div>
+            <CardTitle className="mb-2">Invalid Invitation</CardTitle>
+            <CardDescription className="mb-6">{error}</CardDescription>
+            <Button onClick={() => router.push('/auth/signup')} className="w-full">
+              Sign Up Instead
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex">
       {/* Left Side - Invitation Form */}
       <div className="flex-1 flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-20 xl:px-24">
-        <div className="mx-auto w-full max-w-sm lg:w-96">
-          {/* Header */}
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold tracking-tight text-gray-900">
-              Join {invitationData?.organization?.name}
-            </h1>
-            <p className="mt-2 text-sm text-gray-600">
-              You've been invited by {invitationData?.inviter?.full_name || invitationData?.inviter?.email} 
-              to join as {invitationData?.role}
-            </p>
-          </div>
-
-          {/* Mode Toggle */}
-          <div className="mb-6">
-            <div className="flex rounded-lg bg-gray-100 p-1">
-              <button
-                type="button"
-                className={`flex-1 rounded-md py-2 px-3 text-sm font-medium transition-all ${
-                  mode === 'signin' 
-                    ? 'bg-white text-gray-900 shadow-sm' 
-                    : 'text-gray-500 hover:text-gray-700'
-                }`}
-                onClick={() => setMode('signin')}
-              >
-                Sign In
-              </button>
-              <button
-                type="button"
-                className={`flex-1 rounded-md py-2 px-3 text-sm font-medium transition-all ${
-                  mode === 'signup' 
-                    ? 'bg-white text-gray-900 shadow-sm' 
-                    : 'text-gray-500 hover:text-gray-700'
-                }`}
-                onClick={() => setMode('signup')}
-              >
-                Create Account
-              </button>
-            </div>
-            <p className="mt-2 text-xs text-gray-500">
-              {mode === 'signin' 
-                ? 'Already have an account? Sign in to accept the invitation'
-                : 'New to monade.ai? Create an account to get started'
-              }
-            </p>
-          </div>
-
-          {/* Google Auth */}
-          <button
-            onClick={handleGoogleAuth}
-            disabled={submitting}
-            className="w-full flex justify-center items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <FcGoogle className="w-5 h-5 mr-2" />
-            {submitting ? 'Processing...' : 'Continue with Google'}
-          </button>
-
-          <div className="mt-6">
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-300" />
+        <div className="mx-auto w-full max-w-lg">
+          {/* Invitation Header Card */}
+          <Card className="mb-8">
+            <CardHeader className="text-center">
+              <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-primary/10 mb-4">
+                <HiOutlineOfficeBuilding className="h-8 w-8 text-primary" />
               </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-white text-gray-500">Or continue with email</span>
-              </div>
-            </div>
-          </div>
+              <CardTitle className="text-2xl">
+                Join {invitationData?.organization?.name}
+              </CardTitle>
+              <CardDescription className="text-base">
+                <span className="font-medium">{invitationData?.inviter?.full_name || invitationData?.inviter?.email}</span> 
+                {' '}invited you to join as{' '}
+                <Badge variant="secondary" className="ml-1">
+                  {invitationData?.role}
+                </Badge>
+              </CardDescription>
+            </CardHeader>
+          </Card>
 
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-            {/* Full Name (signup only) */}
-            {mode === 'signup' && (
-              <div>
-                <label htmlFor="fullName" className="block text-sm font-medium text-gray-700">
-                  Full name
-                </label>
-                <div className="mt-1 relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <AiOutlineUser className="h-5 w-5 text-gray-400" />
+          {/* Auth Form Card */}
+          <Card>
+            <CardHeader>
+              {/* Mode Toggle */}
+              <div className="flex rounded-lg bg-muted p-1 mb-4">
+                <Button
+                  type="button"
+                  variant={mode === 'signin' ? 'default' : 'ghost'}
+                  size="sm"
+                  className="flex-1"
+                  onClick={() => setMode('signin')}
+                >
+                  Sign In
+                </Button>
+                <Button
+                  type="button"
+                  variant={mode === 'signup' ? 'default' : 'ghost'}
+                  size="sm"
+                  className="flex-1"
+                  onClick={() => setMode('signup')}
+                >
+                  Create Account
+                </Button>
+              </div>
+              <CardDescription>
+                {mode === 'signin' 
+                  ? 'Already have an account? Sign in to accept the invitation'
+                  : 'New to CallLive? Create an account to get started'
+                }
+              </CardDescription>
+            </CardHeader>
+
+            <CardContent className="space-y-6">
+              {/* Google Auth */}
+              <Button
+                onClick={handleGoogleAuth}
+                disabled={submitting}
+                variant="outline"
+                className="w-full"
+                size="lg"
+              >
+                <FcGoogle className="w-5 h-5 mr-2" />
+                {submitting ? 'Processing...' : 'Continue with Google'}
+              </Button>
+
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t" />
+                </div>
+                <div className="relative flex justify-center text-sm">
+                  <span className="px-2 bg-background text-muted-foreground">Or continue with email</span>
+                </div>
+              </div>
+
+              {/* Form */}
+              <form onSubmit={handleSubmit} className="space-y-4">
+                {/* Full Name (signup only) */}
+                {mode === 'signup' && (
+                  <div className="space-y-2">
+                    <label htmlFor="fullName" className="text-sm font-medium">
+                      Full name
+                    </label>
+                    <div className="relative">
+                      <AiOutlineUser className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        id="fullName"
+                        name="fullName"
+                        type="text"
+                        required
+                        value={fullName}
+                        onChange={(e) => setFullName(e.target.value)}
+                        className="pl-10"
+                        placeholder="Enter your full name"
+                      />
+                    </div>
                   </div>
-                  <input
-                    id="fullName"
-                    name="fullName"
-                    type="text"
-                    required
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                    placeholder="Enter your full name"
-                  />
+                )}
+
+                {/* Email */}
+                <div className="space-y-2">
+                  <label htmlFor="email" className="text-sm font-medium">
+                    Email address
+                  </label>
+                  <div className="relative">
+                    <AiOutlineMail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="email"
+                      name="email"
+                      type="email"
+                      autoComplete="email"
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      disabled={true} // Email is pre-filled from invitation
+                      className="pl-10 bg-muted"
+                      placeholder="Enter your email"
+                    />
+                  </div>
+                  <div className="flex items-center text-xs text-muted-foreground">
+                    <AiOutlineCheck className="h-3 w-3 mr-1 text-green-600" />
+                    Email verified from invitation
+                  </div>
                 </div>
-              </div>
-            )}
 
-            {/* Email */}
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                Email address
-              </label>
-              <div className="mt-1 relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <AiOutlineMail className="h-5 w-5 text-gray-400" />
+                {/* Password */}
+                <div className="space-y-2">
+                  <label htmlFor="password" className="text-sm font-medium">
+                    Password
+                  </label>
+                  <div className="relative">
+                    <AiOutlineLock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="password"
+                      name="password"
+                      type="password"
+                      autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
+                      required
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="pl-10"
+                      placeholder={mode === 'signup' ? 'Create a password' : 'Enter your password'}
+                    />
+                  </div>
+                  {mode === 'signup' && (
+                    <p className="text-xs text-muted-foreground">
+                      Must be at least 8 characters with uppercase, lowercase, and number
+                    </p>
+                  )}
                 </div>
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  autoComplete="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  disabled={true} // Email is pre-filled from invitation
-                  className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md placeholder-gray-400 bg-gray-50 text-gray-500 sm:text-sm"
-                  placeholder="Enter your email"
-                />
-              </div>
-            </div>
 
-            {/* Password */}
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-                Password
-              </label>
-              <div className="mt-1 relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <AiOutlineLock className="h-5 w-5 text-gray-400" />
-                </div>
-                <input
-                  id="password"
-                  name="password"
-                  type="password"
-                  autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                  placeholder={mode === 'signup' ? 'Create a password' : 'Enter your password'}
-                />
-              </div>
-              {mode === 'signup' && (
-                <p className="mt-1 text-xs text-gray-500">
-                  Must be at least 8 characters with uppercase, lowercase, and number
-                </p>
-              )}
-            </div>
+                {/* Error Message */}
+                {error && (
+                  <div className="rounded-md bg-destructive/10 border border-destructive/20 p-4">
+                    <div className="flex items-center">
+                      <AiOutlineExclamationCircle className="h-4 w-4 text-destructive mr-2" />
+                      <div className="text-sm text-destructive">{error}</div>
+                    </div>
+                  </div>
+                )}
 
-            {/* Error Message */}
-            {error && (
-              <div className="rounded-md bg-red-50 p-4">
-                <div className="text-sm text-red-700">{error}</div>
-              </div>
-            )}
+                {/* Submit Button */}
+                <Button
+                  type="submit"
+                  disabled={submitting}
+                  className="w-full"
+                  size="lg"
+                >
+                  {submitting 
+                    ? 'Processing...' 
+                    : mode === 'signup' 
+                      ? 'Create Account & Join' 
+                      : 'Sign In & Join'
+                  }
+                </Button>
+              </form>
 
-            {/* Submit Button */}
-            <button
-              type="submit"
-              disabled={submitting}
-              className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {submitting 
-                ? 'Processing...' 
-                : mode === 'signup' 
-                  ? 'Create Account & Join' 
-                  : 'Sign In & Join'
-              }
-            </button>
-          </form>
+              {/* Footer Links */}
+              <div className="text-center text-sm text-muted-foreground">
+                {mode === 'signin' ? (
+                  <span>
+                    Don't have an account?{' '}
+                    <button
+                      type="button"
+                      onClick={() => setMode('signup')}
+                      className="text-primary hover:underline font-medium"
+                    >
+                      Create one
+                    </button>
+                  </span>
+                ) : (
+                  <span>
+                    Already have an account?{' '}
+                    <button
+                      type="button"
+                      onClick={() => setMode('signin')}
+                      className="text-primary hover:underline font-medium"
+                    >
+                      Sign in
+                    </button>
+                  </span>
+                )}
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
 
       {/* Right Side - Illustration */}
       <div className="hidden lg:block relative w-0 flex-1">
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center">
-          <Image
-            src="/side_image.png" 
-            alt="AI Assistant Illustration"
-            width={400}  
-            height={400}
-            className="max-w-md opacity-90"
-          />
+        <div className="absolute inset-0 bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center">
+          <div className="text-center text-white p-8">
+            <Image
+              src="/side_image.png" 
+              alt="AI Assistant Illustration"
+              width={400}  
+              height={400}
+              className="max-w-md opacity-90 mb-8"
+            />
+            <h2 className="text-2xl font-bold mb-4">Welcome to CallLive</h2>
+            <p className="text-lg opacity-90">
+              Join your team and start building amazing AI assistants together
+            </p>
+          </div>
         </div>
       </div>
     </div>
+  );
+}
+
+export default function InvitationPage() {
+  return (
+    <Suspense>
+      <InvitationPageContent />
+    </Suspense>
   );
 }
