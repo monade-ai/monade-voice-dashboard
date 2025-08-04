@@ -17,9 +17,9 @@ export async function middleware(req: NextRequest) {
     currentPath.startsWith(route),
   );
 
-  // if (!isAuthRoute && !user) {
-  //   return NextResponse.redirect(new URL('/auth/login', req.url));
-  // }
+  if (!isAuthRoute && !user) {
+    return NextResponse.redirect(new URL('/auth/login', req.url));
+  }
 
   if (isAuthRoute && user) {
     return NextResponse.redirect(new URL('/dashboard', req.url));

@@ -91,7 +91,7 @@ export const permissionsMatrix: Record<Role, Record<Action, boolean>> = {
     'assistants.view': true,
     'assistants.create': true,
     'assistants.edit': true,
-    'assistants.delete': false,
+    'assistants.delete': true,
     'assistants.assign_workflow': false,
     // Contacts
     'contacts.view': true,

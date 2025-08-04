@@ -6,8 +6,27 @@ import { Permission } from '@/types';
  * Usage: const canCreate = useHasPermission('contacts.create');
  */
 export function useHasPermission(permission: Permission): boolean {
-  const { hasPermission } = useAuth();
-  return hasPermission(permission);
+  const { hasPermission, permissions, user, userRole, currentOrganization } = useAuth();
+  const result = hasPermission(permission);
+
+
+  console.log('[useHasPermission] Permission check:', {
+    permission,
+    result,
+    allPermissions: permissions,
+    user: user?.id,
+    userRole,
+    currentOrganization
+  });
+  console.log('[useHasPermission] Detailed check:', 
+    'Permission:', permission, 
+    'Result:', result, 
+    'All permissions:', permissions, 
+    'User role:', userRole,
+    'Current organization:', currentOrganization
+  );
+
+  return result;
 }
 
 /**
