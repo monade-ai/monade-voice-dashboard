@@ -305,6 +305,24 @@ export class AuthClientManager {
   }
 
   /**
+   * Clear session data and reset client state
+   */
+  public async clearSession(): Promise<void> {
+    try {
+      console.log('[AuthClientManager] Clearing session data');
+      
+      // Reset client instances to force fresh initialization
+      this.componentClient = null;
+      this.adminClient = null;
+      
+      console.log('[AuthClientManager] Session data cleared successfully');
+    } catch (error) {
+      console.error('[AuthClientManager] Failed to clear session:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Reset the client manager (useful for testing or configuration changes)
    */
   public reset(): void {
