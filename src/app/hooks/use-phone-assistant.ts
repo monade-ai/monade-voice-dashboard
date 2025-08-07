@@ -2,6 +2,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
+import { initiateExotelCall } from '@/lib/services/exotel-service';
 
 interface UsePhoneAssistantProps {
   assistantId: string;
@@ -16,6 +17,7 @@ interface UsePhoneAssistantReturn {
   startCall: (phoneNumber: string) => Promise<void>;
   endCall: () => void;
   error: Error | null;
+  errorMessage?: string | null;
 }
 
 export function usePhoneAssistant({
@@ -26,49 +28,53 @@ export function usePhoneAssistant({
   const [remainingTime, setRemainingTime] = useState(15);
   const [error, setError] = useState<Error | null>(null);
 
-  // Simulate API call to initiate phone call
+  // Real API call to initiate phone call
   const startCall = useCallback(async (phoneNumber: string) => {
+    console.log('[usePhoneAssistant] Initiating call to', phoneNumber, 'with assistant', assistantId, `(${assistantName})`);
     if (!phoneNumber) {
       setError(new Error('Phone number is required'));
-
+      console.error('[usePhoneAssistant] No phone number provided');
       return;
     }
 
     try {
       setCallStatus('initiating');
-      
-      // Countdown simulation (would be replaced with actual API call)
       setRemainingTime(15);
-      
-      // Simulate API call
-      console.log(`Initiating call to ${phoneNumber} with assistant ${assistantId} (${assistantName})`);
-      
-      // Simulate API response delay
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Mock successful response
-      const mockResponse = {
-        success: true,
-        callId: `call-${Date.now()}`,
-        status: 'connecting',
-      };
-      
-      if (mockResponse.success) {
+
+      // Always use the real callback URL from env or fallback
+      let callbackUrl =
+        typeof window !== 'undefined' && process.env.NEXT_PUBLIC_EXOTEL_CALLBACK_URL
+          ? process.env.NEXT_PUBLIC_EXOTEL_CALLBACK_URL
+          : (typeof window !== 'undefined'
+              ? window.location.origin + '/api/exotel/hook'
+              : 'https://your-callback-url.example.com/exotel-hook');
+      console.log('[usePhoneAssistant] Calling initiateExotelCall with:', { phone_number: phoneNumber, callback_url: callbackUrl });
+      const response = await initiateExotelCall({
+        phone_number: phoneNumber,
+        callback_url: callbackUrl,
+      });
+
+      // Log response
+      console.log('[usePhoneAssistant] initiateExotelCall response:', response);
+
+      if (response.ok) {
         setCallStatus('connecting');
-        
-        // After a delay, simulate connected call
-        setTimeout(() => {
-          setCallStatus('connected');
-        }, 5000);
+        // Optionally, parse response for more status info
+        // const data = await response.json();
+        // handle data if needed
       } else {
-        throw new Error('Failed to initiate call');
+        setCallStatus('failed');
+        const errorText = await response.text();
+        setError(new Error(errorText));
+        console.error('[usePhoneAssistant] Call failed, response not ok:', errorText);
+        return;
       }
-      
+
       setError(null);
     } catch (err) {
       setCallStatus('failed');
       setError(err instanceof Error ? err : new Error('Unknown error initiating call'));
-      console.error('Error initiating phone call:', err);
+      console.error('[usePhoneAssistant] Error initiating phone call:', err);
     }
   }, [assistantId, assistantName]);
 
@@ -77,8 +83,7 @@ export function usePhoneAssistant({
     if (callStatus === 'idle' || callStatus === 'completed') {
       return;
     }
-    
-    console.log(`Ending call with assistant ${assistantId}`);
+    console.log('[usePhoneAssistant] Ending call with assistant ' + assistantId);
     setCallStatus('completed');
     setRemainingTime(0);
   }, [assistantId, callStatus]);
@@ -91,5 +96,7 @@ export function usePhoneAssistant({
     startCall,
     endCall,
     error,
+    // Add a helper for error message
+    errorMessage: error ? error.message : null,
   };
 }

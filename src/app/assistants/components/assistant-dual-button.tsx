@@ -3,7 +3,6 @@
 
 import { useState } from 'react';
 import { MessageCircle, Phone } from 'lucide-react';
-import { RTVIClientProvider } from '@pipecat-ai/client-react';
 
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -46,6 +45,7 @@ export default function AssistantDualButton({ assistant }: AssistantDualButtonPr
     startCall,
     endCall,
     error: callError,
+    errorMessage,
   } = usePhoneAssistant({
     assistantId: assistantData.id,
     assistantName: assistantData.name,
@@ -116,6 +116,7 @@ export default function AssistantDualButton({ assistant }: AssistantDualButtonPr
         isCallInitiating={isCallInitiating}
         callStatus={callStatus}
         remainingTime={remainingTime}
+        errorMessage={errorMessage}
       />
       
       {/* Web Assistant Dialog */}

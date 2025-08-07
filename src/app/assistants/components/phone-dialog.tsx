@@ -1,7 +1,7 @@
 // components/phone-dialog.tsx
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Phone, X } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -22,6 +22,7 @@ interface PhoneDialogProps {
   isCallInitiating: boolean;
   callStatus: 'idle' | 'initiating' | 'connecting' | 'connected' | 'failed' | 'completed';
   remainingTime: number;
+  errorMessage?: string | null;
 }
 
 export function PhoneDialog({
@@ -32,22 +33,25 @@ export function PhoneDialog({
   isCallInitiating,
   callStatus,
   remainingTime,
+  errorMessage,
 }: PhoneDialogProps) {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [error, setError] = useState('');
   
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+    console.log('[PhoneDialog] Form submitted with phoneNumber:', phoneNumber);
+
     // Basic phone number validation
     const cleaned = phoneNumber.replace(/\D/g, '');
     if (cleaned.length < 10) {
       setError('Please enter a valid phone number');
-
+      console.error('[PhoneDialog] Validation failed: invalid phone number:', phoneNumber);
       return;
     }
     
     setError('');
+    console.log('[PhoneDialog] Calling onCall with phoneNumber:', phoneNumber);
     onCall(phoneNumber);
   };
   
@@ -103,6 +107,9 @@ export function PhoneDialog({
           <p className="text-sm text-slate-500 text-center">
               Unable to connect your call. Please try again later.
           </p>
+          {errorMessage && (
+            <p className="text-sm text-red-500 text-center">{errorMessage}</p>
+          )}
           <Button variant="outline" onClick={onClose}>Close</Button>
         </div>
       );
@@ -119,10 +126,14 @@ export function PhoneDialog({
               type="tel"
               placeholder="(123) 456-7890"
               value={phoneNumber}
-              onChange={(e) => setPhoneNumber(e.target.value)}
+              onChange={(e) => {
+                setPhoneNumber(e.target.value);
+                console.log('[PhoneDialog] Phone number input changed:', e.target.value);
+              }}
               className={error ? 'border-red-300' : ''}
             />
             {error && <p className="text-sm text-red-500">{error}</p>}
+            {errorMessage && <p className="text-sm text-red-500">{errorMessage}</p>}
           </div>
             
           <p className="text-xs text-slate-500">
@@ -130,7 +141,10 @@ export function PhoneDialog({
           </p>
             
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose}>
+            <Button type="button" variant="outline" onClick={() => {
+                console.log('[PhoneDialog] Dialog closed (Cancel button)');
+                onClose();
+            }}>
                 Cancel
             </Button>
             <Button type="submit" disabled={isCallInitiating}>
@@ -142,6 +156,13 @@ export function PhoneDialog({
     }
   };
   
+  // Log dialog open event using useEffect
+  useEffect(() => {
+    if (isOpen) {
+      console.log('[PhoneDialog] Dialog opened for assistant:', assistantName);
+    }
+  }, [isOpen, assistantName]);
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md">
