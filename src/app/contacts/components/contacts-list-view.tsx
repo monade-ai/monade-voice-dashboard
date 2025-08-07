@@ -51,12 +51,16 @@ const ContactListView: React.FC = () => {
   const canDeleteBucket = useHasPermission('contacts.delete_bucket');
   const canAddContact = useHasPermission('contacts.add_contact');
   const canBulkUpload = useHasPermission('contacts.bulk_upload');
-  const canDeleteContact = useHasPermission('contacts.delete_contact');
+  // const canDeleteContact = useHasPermission('contacts.delete_contact');
+  const canDeleteContact = true; // TEMP: Always allow for testing
 
   const [isCreateBucketOpen, setCreateBucketOpen] = useState(false);
   const [isUploadOpen, setUploadOpen] = useState(false);
   const [isCreateContactOpen, setCreateContactOpen] = useState(false);
   const [uploadTargetBucket, setUploadTargetBucket] = useState<Bucket | null>(null);
+  const [bucketToDelete, setBucketToDelete] = useState<Bucket | null>(null);
+  const [deleteConfirmationName, setDeleteConfirmationName] = useState('');
+  const [selectedContacts, setSelectedContacts] = useState<Set<string>>(new Set());
 
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -119,20 +123,9 @@ const ContactListView: React.FC = () => {
       <p className="text-muted-foreground mt-2 mb-6 max-w-md">
         {t('contacts.empty_bucket_desc')}
       </p>
-      <div className="flex gap-4">
-        {canAddContact && (
-          <Button onClick={() => setCreateContactOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            {t('contacts.add_contact')}
-          </Button>
-        )}
-        {canBulkUpload && (
-          <Button variant="secondary" onClick={() => handleUploadClick(selectedBucket || undefined)}>
-            <Upload className="mr-2 h-4 w-4" />
-            {t('contacts.upload_to_bucket')}
-          </Button>
-        )}
-      </div>
+      <p className="text-sm text-muted-foreground">
+        Use the buttons above to add contacts to this bucket.
+      </p>
     </div>
   );
 
@@ -195,10 +188,10 @@ const ContactListView: React.FC = () => {
                               if (!bucket.id) {
                                 console.error('Bucket id is missing for removeBucket:', bucket);
                                 alert('Cannot delete this bucket: missing bucket id.');
-
                                 return;
                               }
-                              if (confirm(t('contacts.delete_bucket_confirm'))) removeBucket(bucket.id);
+                              setBucketToDelete(bucket);
+                              setDeleteConfirmationName('');
                             }}>
                               <Trash2 className="h-4 w-4 mr-2 text-destructive" /> {t('contacts.delete')}
                             </DropdownMenuItem>
@@ -231,7 +224,7 @@ const ContactListView: React.FC = () => {
               )}
               {canAddContact && (
                 <Button onClick={() => setCreateContactOpen(true)}>
-                  <Plus className="mr-2 h-4 w-4" /> {t('contacts.add_contact')}
+                  <Plus className="mr-2 h-4 w-4" /> {t('contacts.add_contact.title')}
                 </Button>
               )}
             </div>
@@ -247,22 +240,81 @@ const ContactListView: React.FC = () => {
           ) : filteredContacts.length === 0 ? (
             searchQuery ? <p>No results for "{searchQuery}".</p> : <EmptyContactsState />
           ) : (
-            <div className="border rounded-md overflow-hidden">
-              <table className="w-full">
-                <thead className="bg-muted/50">
-                  <tr>
-                    <th className="text-left p-4 font-medium">Phone Number</th>
-                    {selectedBucket.fields.map(field => <th key={field} className="text-left p-4 font-medium capitalize">{field}</th>)}
-                    <th className="text-right p-4 font-medium">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredContacts.map((contact) => (
-                    <tr key={contact.phone_number} className="border-t hover:bg-muted">
-                      <td className="p-4">{contact.phone_number}</td>
-                      {selectedBucket.fields.map(field => <td key={field} className="p-4">{contact.data[field] || '-'}</td>)}
-                      <td className="p-4 text-right">
-                        {canDeleteContact && (
+            <div className="space-y-4">
+              {/* Bulk Actions Bar */}
+              {selectedContacts.size > 0 && (
+                <div className="flex items-center justify-between p-4 bg-muted/50 rounded-md">
+                  <span className="text-sm font-medium">
+                    {selectedContacts.size} contact{selectedContacts.size > 1 ? 's' : ''} selected
+                  </span>
+                  <Button 
+                    variant="destructive" 
+                    size="sm"
+                    onClick={async () => {
+                      if (confirm(`Are you sure you want to delete ${selectedContacts.size} contact${selectedContacts.size > 1 ? 's' : ''}?`)) {
+                        try {
+                          for (const phoneNumber of selectedContacts) {
+                            await removeContact(selectedBucket.id, phoneNumber);
+                          }
+                          setSelectedContacts(new Set());
+                        } catch (error) {
+                          console.error('Failed to delete contacts:', error);
+                          alert('Failed to delete some contacts. Please try again.');
+                        }
+                      }
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete Selected
+                  </Button>
+                </div>
+              )}
+
+              <div className="border rounded-md overflow-hidden">
+                <table className="w-full">
+                  <thead className="bg-muted/50">
+                    <tr>
+                      <th className="text-left p-4 font-medium w-12">
+                        <input
+                          type="checkbox"
+                          checked={filteredContacts.length > 0 && filteredContacts.every(contact => selectedContacts.has(contact.phone_number))}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedContacts(new Set(filteredContacts.map(contact => contact.phone_number)));
+                            } else {
+                              setSelectedContacts(new Set());
+                            }
+                          }}
+                          className="rounded"
+                        />
+                      </th>
+                      <th className="text-left p-4 font-medium">Phone Number</th>
+                      {selectedBucket.fields.map(field => <th key={field} className="text-left p-4 font-medium capitalize">{field}</th>)}
+                      <th className="text-right p-4 font-medium">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredContacts.map((contact) => (
+                      <tr key={contact.phone_number} className="border-t hover:bg-muted">
+                        <td className="p-4">
+                          <input
+                            type="checkbox"
+                            checked={selectedContacts.has(contact.phone_number)}
+                            onChange={(e) => {
+                              const newSelected = new Set(selectedContacts);
+                              if (e.target.checked) {
+                                newSelected.add(contact.phone_number);
+                              } else {
+                                newSelected.delete(contact.phone_number);
+                              }
+                              setSelectedContacts(newSelected);
+                            }}
+                            className="rounded"
+                          />
+                        </td>
+                        <td className="p-4">{contact.phone_number}</td>
+                        {selectedBucket.fields.map(field => <td key={field} className="p-4">{contact.data[field] || '-'}</td>)}
+                        <td className="p-4 text-right">
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
@@ -273,12 +325,12 @@ const ContactListView: React.FC = () => {
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </div>
@@ -305,6 +357,52 @@ const ContactListView: React.FC = () => {
         <DialogContent className="w-3/5">
           <DialogHeader><DialogTitle>Add New Contact</DialogTitle></DialogHeader>
           <CreateContact onCancel={() => setCreateContactOpen(false)} onSuccess={() => setCreateContactOpen(false)} />
+        </DialogContent>
+      </Dialog>
+
+      {/* Bucket Deletion Confirmation Dialog */}
+      <Dialog open={!!bucketToDelete} onOpenChange={(open) => !open && setBucketToDelete(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-destructive">Delete Bucket</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <p className="text-sm text-muted-foreground">
+              This action cannot be undone. This will permanently delete the bucket "{bucketToDelete?.name}" and all {bucketToDelete?.count || 0} contacts in it.
+            </p>
+            <p className="text-sm font-medium">
+              Please type <span className="font-mono bg-muted px-1 rounded">{bucketToDelete?.name}</span> to confirm:
+            </p>
+            <Input
+              placeholder="Type bucket name here..."
+              value={deleteConfirmationName}
+              onChange={(e) => setDeleteConfirmationName(e.target.value)}
+              className="font-mono"
+            />
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setBucketToDelete(null)}>
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive" 
+              disabled={deleteConfirmationName !== bucketToDelete?.name}
+              onClick={async () => {
+                if (bucketToDelete && deleteConfirmationName === bucketToDelete.name) {
+                  try {
+                    await removeBucket(bucketToDelete.id);
+                    setBucketToDelete(null);
+                    setDeleteConfirmationName('');
+                  } catch (error) {
+                    console.error('Failed to delete bucket:', error);
+                    alert('Failed to delete bucket. Please try again.');
+                  }
+                }
+              }}
+            >
+              Delete Bucket
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

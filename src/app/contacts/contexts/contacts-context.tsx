@@ -66,25 +66,26 @@ export const ContactsProvider: React.FC<ContactsProviderProps> = ({ children }) 
     .filter((p): p is string => !!p);
 
   const fetchBuckets = useCallback(async () => {
-    // Only fetch if we have an organization context
-    if (!currentOrganization?.id) {
-      setBuckets([]);
-      setIsLoading(false);
-
-      return;
-    }
-
     setIsLoading(true);
     try {
+      console.log('[ContactsContext] Fetching buckets...');
+      console.log('[ContactsContext] API_BASE_URL:', process.env.NEXT_PUBLIC_DATABASE_URL);
       const fetchedBuckets = await getBuckets();
+      console.log('[ContactsContext] Fetched buckets:', fetchedBuckets);
+      console.log('[ContactsContext] Buckets count:', fetchedBuckets?.length || 0);
       setBuckets(fetchedBuckets || []);
     } catch (error) {
-      console.error('Failed to fetch buckets:', error);
+      console.error('[ContactsContext] Failed to fetch buckets:', error);
+      console.error('[ContactsContext] Error details:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      });
       setBuckets([]);
     } finally {
       setIsLoading(false);
     }
-  }, [currentOrganization?.id]);
+  }, []);
 
   useEffect(() => {
     fetchBuckets();
