@@ -348,16 +348,16 @@ export default function AssistantTabs({ editingAssistantId }: AssistantTabsProps
       <div className="flex justify-end space-x-2 pt-4 border-t border-[var(--border)] mt-6">
         {/* Delete Button - Only for users with permission */}
         {canDeleteAssistant && (
-          <Button
-            variant="destructive"
-            className="text-[var(--destructive)] border-[var(--destructive)] hover:bg-[var(--destructive)]/10"
-            onClick={() => setIsDeleteModalOpen(true)}
-            disabled={isSaving} // Only disable during save
-            title={isDraft ? 'Delete this draft assistant' : 'Delete this assistant'}
-          >
-            <Trash2 className="h-4 w-4 mr-2" />
-            Delete Assistant
-          </Button>
+<Button
+  variant="destructive"
+  className="text-white border-[var(--destructive)] hover:bg-[var(--destructive)]/10"
+  onClick={() => setIsDeleteModalOpen(true)}
+  disabled={isSaving} // Only disable during save
+  title={isDraft ? 'Delete this draft assistant' : 'Delete this assistant'}
+>
+  <Trash2 className="h-4 w-4 mr-2" />
+  Delete Assistant
+</Button>
         )}
         {/* Reset Button */}
         <Button

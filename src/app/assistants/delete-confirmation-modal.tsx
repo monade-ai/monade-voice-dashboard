@@ -79,9 +79,9 @@ export default function DeleteConfirmationModal({ isOpen, onClose }: DeleteConfi
           <Button variant="outline" onClick={handleCancel}>
             Cancel
           </Button>
-          <Button variant="destructive" onClick={handleDelete}>
-            Delete Assistant
-          </Button>
+<Button variant="destructive" className="text-white" onClick={handleDelete}>
+  Delete Assistant
+</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
