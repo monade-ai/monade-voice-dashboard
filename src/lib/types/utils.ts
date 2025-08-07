@@ -7,7 +7,7 @@ import {
   OrganizationMember, 
   OrganizationRole, 
   Permission,
-  AuthUser 
+  AuthUser, 
 } from '@/types';
 
 // Utility type for making certain fields optional
@@ -30,7 +30,7 @@ export interface OrganizationContext {
 export function createOrganizationContext(
   organization: Organization,
   membership: OrganizationMember,
-  permissions: Permission[]
+  permissions: Permission[],
 ): OrganizationContext {
   const userRole = membership.role;
   
@@ -41,7 +41,7 @@ export function createOrganizationContext(
     canEdit: userRole === 'owner' || userRole === 'admin',
     canDelete: userRole === 'owner',
     canInvite: userRole === 'owner' || userRole === 'admin',
-    canManageBilling: userRole === 'owner'
+    canManageBilling: userRole === 'owner',
   };
 }
 
@@ -84,7 +84,7 @@ export function createAsyncState<T>(initialData: T | null = null): AsyncState<T>
     data: initialData,
     loading: false,
     error: null,
-    success: false
+    success: false,
   };
 }
 
@@ -99,7 +99,7 @@ export interface MemberWithPermissions extends OrganizationMember {
 export function enhanceMemberWithPermissions(
   member: OrganizationMember,
   currentUserRole: OrganizationRole,
-  permissions: Permission[]
+  permissions: Permission[],
 ): MemberWithPermissions {
   const canEdit = currentUserRole === 'owner' || 
     (currentUserRole === 'admin' && member.role !== 'owner');
@@ -114,7 +114,7 @@ export function enhanceMemberWithPermissions(
     permissions,
     canEdit,
     canRemove,
-    canChangeRole
+    canChangeRole,
   };
 }
 
@@ -129,7 +129,7 @@ export interface ResourceOwnership {
 export function checkResourceOwnership(
   resourceOwnerId: string,
   currentUserId: string,
-  userRole: OrganizationRole
+  userRole: OrganizationRole,
 ): ResourceOwnership {
   const isOwner = resourceOwnerId === currentUserId;
   const isAdmin = userRole === 'owner' || userRole === 'admin';
@@ -138,7 +138,7 @@ export function checkResourceOwnership(
     isOwner,
     canEdit: isOwner || isAdmin,
     canDelete: isAdmin,
-    canShare: isOwner || isAdmin
+    canShare: isOwner || isAdmin,
   };
 }
 
@@ -161,7 +161,7 @@ export const SUBSCRIPTION_LIMITS: Record<string, SubscriptionLimits> = {
     maxStorageMB: 100,
     maxCallsPerMonth: 50,
     hasAnalytics: false,
-    hasPrioritySupport: false
+    hasPrioritySupport: false,
   },
   pro: {
     maxAssistants: 25,
@@ -170,7 +170,7 @@ export const SUBSCRIPTION_LIMITS: Record<string, SubscriptionLimits> = {
     maxStorageMB: 1000,
     maxCallsPerMonth: 1000,
     hasAnalytics: true,
-    hasPrioritySupport: false
+    hasPrioritySupport: false,
   },
   enterprise: {
     maxAssistants: -1, // unlimited
@@ -179,8 +179,8 @@ export const SUBSCRIPTION_LIMITS: Record<string, SubscriptionLimits> = {
     maxStorageMB: -1,
     maxCallsPerMonth: -1,
     hasAnalytics: true,
-    hasPrioritySupport: true
-  }
+    hasPrioritySupport: true,
+  },
 };
 
 export function getSubscriptionLimits(tier: string): SubscriptionLimits {
@@ -189,7 +189,7 @@ export function getSubscriptionLimits(tier: string): SubscriptionLimits {
 
 export function checkUsageLimit(
   currentUsage: number,
-  limit: number
+  limit: number,
 ): { withinLimit: boolean; percentage: number; remaining: number } {
   if (limit === -1) {
     return { withinLimit: true, percentage: 0, remaining: -1 };
@@ -217,7 +217,7 @@ export function getOrganizationTimeZone(organization: Organization): string {
 export function formatDateForOrganization(
   date: Date,
   organization: Organization,
-  format: 'short' | 'medium' | 'long' = 'medium'
+  format: 'short' | 'medium' | 'long' = 'medium',
 ): string {
   const timeZone = getOrganizationTimeZone(organization);
   
@@ -225,12 +225,12 @@ export function formatDateForOrganization(
     timeZone,
     ...(format === 'short' && {
       month: 'short',
-      day: 'numeric'
+      day: 'numeric',
     }),
     ...(format === 'medium' && {
       month: 'short',
       day: 'numeric',
-      year: 'numeric'
+      year: 'numeric',
     }),
     ...(format === 'long' && {
       weekday: 'long',
@@ -238,8 +238,8 @@ export function formatDateForOrganization(
       day: 'numeric',
       year: 'numeric',
       hour: 'numeric',
-      minute: '2-digit'
-    })
+      minute: '2-digit',
+    }),
   };
   
   return new Intl.DateTimeFormat('en-US', options).format(date);
@@ -262,7 +262,7 @@ export interface SortOptions {
 export function buildSearchParams(
   filters: SearchFilters,
   sort?: SortOptions,
-  pagination?: { page: number; limit: number }
+  pagination?: { page: number; limit: number },
 ): URLSearchParams {
   const params = new URLSearchParams();
   

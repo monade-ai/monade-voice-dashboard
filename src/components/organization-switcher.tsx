@@ -1,11 +1,12 @@
 'use client';
 
 import { useState } from 'react';
+import { Check, ChevronDown, Building2, Crown, Shield, User, Plus } from 'lucide-react';
+
 import { useAuth } from '@/lib/auth/AuthProvider';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
-import { Check, ChevronDown, Building2, Crown, Shield, User, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { OrganizationRole } from '@/types';
 
@@ -28,23 +29,23 @@ export function OrganizationSwitcher() {
 
   const getRoleIcon = (role: OrganizationRole) => {
     switch (role) {
-      case 'owner':
-        return <Crown className="h-3 w-3 text-yellow-500" />;
-      case 'admin':
-        return <Shield className="h-3 w-3 text-blue-500" />;
-      case 'member':
-        return <User className="h-3 w-3 text-gray-500" />;
+    case 'owner':
+      return <Crown className="h-3 w-3 text-yellow-500" />;
+    case 'admin':
+      return <Shield className="h-3 w-3 text-blue-500" />;
+    case 'member':
+      return <User className="h-3 w-3 text-gray-500" />;
     }
   };
 
   const getRoleBadgeColor = (role: OrganizationRole) => {
     switch (role) {
-      case 'owner':
-        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'admin':
-        return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'member':
-        return 'bg-gray-100 text-gray-800 border-gray-200';
+    case 'owner':
+      return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+    case 'admin':
+      return 'bg-blue-100 text-blue-800 border-blue-200';
+    case 'member':
+      return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
 
@@ -77,7 +78,7 @@ export function OrganizationSwitcher() {
                   {currentOrganization.name}
                 </span>
                 {userRole && (
-                  <Badge variant="outline" className={cn("text-xs h-4 px-1", getRoleBadgeColor(userRole))}>
+                  <Badge variant="outline" className={cn('text-xs h-4 px-1', getRoleBadgeColor(userRole))}>
                     <div className="flex items-center space-x-1">
                       {getRoleIcon(userRole)}
                       <span className="capitalize">{userRole}</span>
@@ -110,8 +111,8 @@ export function OrganizationSwitcher() {
                 key={org.id}
                 onClick={() => handleSwitchOrganization(org.id)}
                 className={cn(
-                  "flex items-center justify-between p-2 cursor-pointer",
-                  isCurrentOrg && "bg-blue-50"
+                  'flex items-center justify-between p-2 cursor-pointer',
+                  isCurrentOrg && 'bg-blue-50',
                 )}
                 disabled={switching || isCurrentOrg}
               >

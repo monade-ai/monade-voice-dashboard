@@ -27,8 +27,10 @@ export interface SearchOptions {
 export function getOrganizationSearchContext(): { organizationId?: string } {
   if (typeof window !== 'undefined') {
     const orgId = localStorage.getItem('current_organization_id');
+
     return orgId ? { organizationId: orgId } : {};
   }
+
   return {};
 }
 
@@ -37,7 +39,7 @@ export function getOrganizationSearchContext(): { organizationId?: string } {
  */
 export function buildOrganizationSearchParams(
   filters: SearchFilters,
-  options: SearchOptions = {}
+  options: SearchOptions = {},
 ): URLSearchParams {
   const params = new URLSearchParams();
   
@@ -69,9 +71,10 @@ export function buildOrganizationSearchParams(
  */
 export function filterByOrganization<T extends { organizationId?: string }>(
   data: T[],
-  organizationId?: string
+  organizationId?: string,
 ): T[] {
   if (!organizationId) return data;
+
   return data.filter(item => item.organizationId === organizationId);
 }
 
@@ -82,7 +85,7 @@ export function searchWithOrganizationContext<T>(
   data: T[],
   query: string,
   searchFields: (keyof T)[],
-  organizationId?: string
+  organizationId?: string,
 ): T[] {
   let filteredData = data;
   
@@ -95,6 +98,7 @@ export function searchWithOrganizationContext<T>(
   if (!query.trim()) return filteredData;
   
   const lowerQuery = query.toLowerCase();
+
   return filteredData.filter(item => {
     return searchFields.some(field => {
       const value = item[field];
@@ -104,6 +108,7 @@ export function searchWithOrganizationContext<T>(
       if (typeof value === 'number') {
         return value.toString().includes(lowerQuery);
       }
+
       return false;
     });
   });
@@ -118,23 +123,23 @@ export function useOrganizationSearch() {
   const search = <T>(
     data: T[],
     query: string,
-    searchFields: (keyof T)[]
+    searchFields: (keyof T)[],
   ): T[] => {
     return searchWithOrganizationContext(
       data,
       query,
       searchFields,
-      currentOrganization?.id
+      currentOrganization?.id,
     );
   };
   
   const buildSearchParams = (
     filters: SearchFilters,
-    options: SearchOptions = {}
+    options: SearchOptions = {},
   ): URLSearchParams => {
     return buildOrganizationSearchParams(
       { ...filters, organizationId: currentOrganization?.id },
-      options
+      options,
     );
   };
   

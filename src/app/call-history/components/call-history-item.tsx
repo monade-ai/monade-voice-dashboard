@@ -3,9 +3,10 @@
  * Represents a single call log in the call history list.
  */
 
-import React from "react";
-import { CallLog } from "../../../../types/call-management";
-import { PhoneCall, ArrowDownLeft, ArrowUpRight, CheckCircle2, XCircle, Clock, AlertTriangle } from "lucide-react";
+import React from 'react';
+import { PhoneCall, ArrowDownLeft, ArrowUpRight, CheckCircle2, XCircle, Clock, AlertTriangle } from 'lucide-react';
+
+import { CallLog } from '../../../../types/call-management';
 
 type CallHistoryItemProps = {
   call: CallLog;
@@ -14,16 +15,16 @@ type CallHistoryItemProps = {
 
 const getStatusClass = (status: string) => {
   switch (status) {
-    case "completed":
-      return "border-green-500 bg-green-500/10 text-green-500";
-    case "missed":
-      return "border-yellow-500 bg-yellow-500/10 text-yellow-500";
-    case "failed":
-      return "border-red-500 bg-red-500/10 text-red-500";
-    case "ongoing":
-      return "border-blue-500 bg-blue-500/10 text-blue-500";
-    default:
-      return "border-gray-500 bg-gray-500/10 text-gray-500";
+  case 'completed':
+    return 'border-green-500 bg-green-500/10 text-green-500';
+  case 'missed':
+    return 'border-yellow-500 bg-yellow-500/10 text-yellow-500';
+  case 'failed':
+    return 'border-red-500 bg-red-500/10 text-red-500';
+  case 'ongoing':
+    return 'border-blue-500 bg-blue-500/10 text-blue-500';
+  default:
+    return 'border-gray-500 bg-gray-500/10 text-gray-500';
   }
 };
 
@@ -41,7 +42,8 @@ const directionIcons: Record<string, React.ReactNode> = {
 
 function formatTime(iso: string) {
   const d = new Date(iso);
-  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
 const CallHistoryItem: React.FC<CallHistoryItemProps> = ({ call, onClick }) => {
@@ -60,7 +62,7 @@ const CallHistoryItem: React.FC<CallHistoryItemProps> = ({ call, onClick }) => {
       {/* Call Info */}
       <div className="flex-1 min-w-0">
         <div className="font-medium truncate">
-          {call.participants.map((p) => p.name).join(", ")}
+          {call.participants.map((p) => p.name).join(', ')}
         </div>
         <div className="text-xs text-muted-foreground flex items-center gap-2 mt-0.5">
           <span>{formatTime(call.startTime)}</span>

@@ -6,13 +6,13 @@ import { FileUp, X, Check, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-
-import { useToast } from '../hooks/use-toast';
 import { useKnowledgeBase } from '@/app/hooks/use-knowledge-base';
 import { useHasPermission } from '@/lib/auth/useHasPermission';
 
+import { useToast } from '../hooks/use-toast';
+
 export function DocumentUploader() {
-  const canUploadDocument = useHasPermission('knowledgeBase.upload');
+  const canUploadDocument = useHasPermission('knowledge.upload');
   const [file, setFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -48,7 +48,7 @@ export function DocumentUploader() {
 
       const success = await createKnowledgeBase(payload);
 
-      console.log("Success:", success);
+      console.log('Success:', success);
 
       if (success) {
         setUploadComplete(true);
@@ -135,7 +135,7 @@ export function DocumentUploader() {
               : uploadComplete
                 ? 'border-green-500 bg-green-50'
                 : 'border-muted-foreground/20 hover:border-primary/50 hover:bg-primary/5'
-              }`}
+            }`}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}

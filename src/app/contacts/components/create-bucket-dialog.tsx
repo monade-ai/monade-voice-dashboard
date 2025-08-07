@@ -1,11 +1,13 @@
 'use client';
 
 import React, { useState } from 'react';
+import { X } from 'lucide-react';
+
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { X } from 'lucide-react';
+
 import { useContactsContext } from '../contexts/contacts-context';
 
 interface CreateBucketDialogProps {
@@ -46,10 +48,12 @@ const CreateBucketDialog: React.FC<CreateBucketDialogProps> = ({ onClose }) => {
 
     if (!name.trim()) {
       setError('Bucket name is required.');
+
       return;
     }
     if (fields.length === 0) {
       setError('At least one field is required.');
+
       return;
     }
 

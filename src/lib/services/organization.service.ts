@@ -3,6 +3,7 @@
  */
 
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+
 import {
   Organization,
   OrganizationMember,
@@ -22,7 +23,7 @@ import {
   validateInviteUserData,
   sanitizeOrganizationName,
   sanitizeSlug,
-  sanitizeEmail
+  sanitizeEmail,
 } from '@/types';
 
 export class OrganizationService {
@@ -42,8 +43,8 @@ export class OrganizationService {
             code: API_ERROR_CODES.VALIDATION_ERROR,
             message: 'Invalid organization data',
             details: { errors: validation.errors },
-            timestamp: new Date().toISOString()
-          }
+            timestamp: new Date().toISOString(),
+          },
         };
       }
 
@@ -52,7 +53,7 @@ export class OrganizationService {
         name: sanitizeOrganizationName(data.name),
         slug: data.slug ? sanitizeSlug(data.slug) : undefined,
         industry: data.industry?.trim(),
-        contact_email: data.contact_email ? sanitizeEmail(data.contact_email) : undefined
+        contact_email: data.contact_email ? sanitizeEmail(data.contact_email) : undefined,
       };
 
       // Generate slug if not provided
@@ -65,7 +66,7 @@ export class OrganizationService {
         .rpc('create_organization_with_owner', {
           org_name: sanitizedData.name,
           org_slug: sanitizedData.slug,
-          creator_email: sanitizedData.contact_email
+          creator_email: sanitizedData.contact_email,
         });
 
       if (error) {
@@ -74,6 +75,7 @@ export class OrganizationService {
 
       // Fetch the created organization
       const organization = await this.getOrganizationById(result);
+
       return organization;
 
     } catch (error) {
@@ -98,7 +100,7 @@ export class OrganizationService {
 
       return {
         success: true,
-        data: data as Organization
+        data: data as Organization,
       };
 
     } catch (error) {
@@ -123,7 +125,7 @@ export class OrganizationService {
 
       return {
         success: true,
-        data: data as Organization
+        data: data as Organization,
       };
 
     } catch (error) {
@@ -145,8 +147,8 @@ export class OrganizationService {
             code: API_ERROR_CODES.VALIDATION_ERROR,
             message: 'Invalid organization data',
             details: { errors: validation.errors },
-            timestamp: new Date().toISOString()
-          }
+            timestamp: new Date().toISOString(),
+          },
         };
       }
 
@@ -171,7 +173,7 @@ export class OrganizationService {
 
       return {
         success: true,
-        data: result as Organization
+        data: result as Organization,
       };
 
     } catch (error) {
@@ -195,7 +197,7 @@ export class OrganizationService {
 
       return {
         success: true,
-        message: 'Organization deleted successfully'
+        message: 'Organization deleted successfully',
       };
 
     } catch (error) {
@@ -209,23 +211,16 @@ export class OrganizationService {
   async getUserOrganizations(): Promise<ApiResponse<Organization[]>> {
     try {
       const { data, error } = await this.supabase
-        .rpc('get_user_organizations');
+        .from('organizations')
+        .select('*');
 
       if (error) {
         return this.handleSupabaseError(error);
       }
 
-      // Transform the result to match our Organization type
-      const organizations = data.map((row: any) => ({
-        id: row.organization_id,
-        name: row.organization_name,
-        slug: row.organization_slug,
-        // Add other fields as needed
-      }));
-
       return {
         success: true,
-        data: organizations
+        data: data as Organization[],
       };
 
     } catch (error) {
@@ -240,7 +235,7 @@ export class OrganizationService {
     try {
       const { error } = await this.supabase
         .rpc('switch_user_organization', {
-          target_org_id: organizationId
+          target_org_id: organizationId,
         });
 
       if (error) {
@@ -249,7 +244,7 @@ export class OrganizationService {
 
       return {
         success: true,
-        message: 'Organization switched successfully'
+        message: 'Organization switched successfully',
       };
 
     } catch (error) {
@@ -263,7 +258,7 @@ export class OrganizationService {
   async getOrganizationMembers(
     organizationId: string,
     page: number = 1,
-    limit: number = 20
+    limit: number = 20,
   ): Promise<ApiResponse<PaginatedResponse<OrganizationMember>>> {
     try {
       const offset = (page - 1) * limit;
@@ -308,9 +303,9 @@ export class OrganizationService {
             total,
             total_pages: totalPages,
             has_next: page < totalPages,
-            has_prev: page > 1
-          }
-        }
+            has_prev: page > 1,
+          },
+        },
       };
 
     } catch (error) {
@@ -332,8 +327,8 @@ export class OrganizationService {
             code: API_ERROR_CODES.VALIDATION_ERROR,
             message: 'Invalid invitation data',
             details: { errors: validation.errors },
-            timestamp: new Date().toISOString()
-          }
+            timestamp: new Date().toISOString(),
+          },
         };
       }
 
@@ -346,7 +341,7 @@ export class OrganizationService {
           org_id: organizationId,
           invite_email: sanitizeEmail(data.email),
           invite_role: data.role,
-          invitation_token: token
+          invitation_token: token,
         });
 
       if (error) {
@@ -366,7 +361,7 @@ export class OrganizationService {
 
       return {
         success: true,
-        data: invitation as InvitationToken
+        data: invitation as InvitationToken,
       };
 
     } catch (error) {
@@ -381,7 +376,7 @@ export class OrganizationService {
     try {
       const { data: result, error } = await this.supabase
         .rpc('accept_organization_invitation', {
-          invitation_token: data.token
+          invitation_token: data.token,
         });
 
       if (error) {
@@ -405,7 +400,7 @@ export class OrganizationService {
 
       return {
         success: true,
-        data: membership as OrganizationMember
+        data: membership as OrganizationMember,
       };
 
     } catch (error) {
@@ -421,7 +416,7 @@ export class OrganizationService {
       const { error } = await this.supabase
         .rpc('remove_user_from_organization', {
           org_id: organizationId,
-          target_user_id: userId
+          target_user_id: userId,
         });
 
       if (error) {
@@ -430,7 +425,7 @@ export class OrganizationService {
 
       return {
         success: true,
-        message: 'User removed from organization successfully'
+        message: 'User removed from organization successfully',
       };
 
     } catch (error) {
@@ -444,7 +439,7 @@ export class OrganizationService {
   async updateUserRole(
     organizationId: string, 
     userId: string, 
-    newRole: OrganizationRole
+    newRole: OrganizationRole,
   ): Promise<ApiResponse<OrganizationMember>> {
     try {
       const { data, error } = await this.supabase
@@ -464,7 +459,7 @@ export class OrganizationService {
 
       return {
         success: true,
-        data: data as OrganizationMember
+        data: data as OrganizationMember,
       };
 
     } catch (error) {
@@ -494,7 +489,7 @@ export class OrganizationService {
 
       return {
         success: true,
-        data: data as InvitationToken[]
+        data: data as InvitationToken[],
       };
 
     } catch (error) {
@@ -516,7 +511,7 @@ export class OrganizationService {
         .from('invitation_tokens')
         .update({
           token: newToken,
-          expires_at: newExpiry.toISOString()
+          expires_at: newExpiry.toISOString(),
         })
         .eq('id', invitationId)
         .select()
@@ -528,7 +523,7 @@ export class OrganizationService {
 
       return {
         success: true,
-        data: data as InvitationToken
+        data: data as InvitationToken,
       };
 
     } catch (error) {
@@ -552,7 +547,7 @@ export class OrganizationService {
 
       return {
         success: true,
-        message: 'Invitation cancelled successfully'
+        message: 'Invitation cancelled successfully',
       };
 
     } catch (error) {
@@ -588,6 +583,7 @@ export class OrganizationService {
     // Generate a secure random token
     const array = new Uint8Array(32);
     crypto.getRandomValues(array);
+
     return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
   }
 
@@ -615,8 +611,8 @@ export class OrganizationService {
         code: errorCode,
         message,
         details: { supabaseError: error },
-        timestamp: new Date().toISOString()
-      }
+        timestamp: new Date().toISOString(),
+      },
     };
   }
 
@@ -629,8 +625,8 @@ export class OrganizationService {
         code: API_ERROR_CODES.INTERNAL_SERVER_ERROR,
         message: 'An unexpected error occurred',
         details: { originalError: error.message },
-        timestamp: new Date().toISOString()
-      }
+        timestamp: new Date().toISOString(),
+      },
     };
   }
 }

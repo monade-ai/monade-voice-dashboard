@@ -125,7 +125,7 @@ export const ROLE_PERMISSIONS: Record<OrganizationRole, Permission[]> = {
     // Dashboard - full access
     'dashboard.view',
     'dashboard.export',
-    'dashboard.configure'
+    'dashboard.configure',
   ],
   
   admin: [
@@ -182,7 +182,7 @@ export const ROLE_PERMISSIONS: Record<OrganizationRole, Permission[]> = {
     
     // Dashboard - view and export
     'dashboard.view',
-    'dashboard.export'
+    'dashboard.export',
   ],
   
   member: [
@@ -192,10 +192,11 @@ export const ROLE_PERMISSIONS: Record<OrganizationRole, Permission[]> = {
     // User management - view only
     'users.view_list',
     
-    // Assistant management - create and edit own
+    // Assistant management - create, edit, and delete own
     'assistants.view',
     'assistants.create',
     'assistants.edit',
+    'assistants.delete',
     
     // Contact management - create and edit
     'contacts.view',
@@ -222,8 +223,8 @@ export const ROLE_PERMISSIONS: Record<OrganizationRole, Permission[]> = {
     'workflows.run',
     
     // Dashboard - view only
-    'dashboard.view'
-  ]
+    'dashboard.view',
+  ],
 };
 
 // Permission checking utilities
@@ -236,7 +237,7 @@ export interface PermissionContext {
 
 export function hasPermission(
   permission: Permission, 
-  context: PermissionContext
+  context: PermissionContext,
 ): boolean {
   const { userRole } = context;
   
@@ -245,26 +246,27 @@ export function hasPermission(
   }
   
   const rolePermissions = ROLE_PERMISSIONS[userRole];
+
   return rolePermissions.includes(permission);
 }
 
 export function hasAnyPermission(
   permissions: Permission[], 
-  context: PermissionContext
+  context: PermissionContext,
 ): boolean {
   return permissions.some(permission => hasPermission(permission, context));
 }
 
 export function hasAllPermissions(
   permissions: Permission[], 
-  context: PermissionContext
+  context: PermissionContext,
 ): boolean {
   return permissions.every(permission => hasPermission(permission, context));
 }
 
 // Resource-specific permission checks
 export function canEditResource(
-  context: PermissionContext & { resourceOwnerId?: string }
+  context: PermissionContext & { resourceOwnerId?: string },
 ): boolean {
   const { userRole, userId, resourceOwnerId } = context;
   
@@ -282,7 +284,7 @@ export function canEditResource(
 }
 
 export function canDeleteResource(
-  context: PermissionContext
+  context: PermissionContext,
 ): boolean {
   const { userRole } = context;
   
@@ -296,32 +298,32 @@ export const PERMISSION_GROUPS = {
     'org.edit',
     'org.settings',
     'users.invite',
-    'users.remove'
+    'users.remove',
   ] as Permission[],
   
   BILLING_ACCESS: [
-    'org.billing'
+    'org.billing',
   ] as Permission[],
   
   ANALYTICS_ACCESS: [
     'calls.analytics',
     'calls.export',
-    'dashboard.export'
+    'dashboard.export',
   ] as Permission[],
   
   CONTENT_CREATOR: [
     'assistants.create',
     'contacts.create',
     'knowledge.create',
-    'workflows.create'
+    'workflows.create',
   ] as Permission[],
   
   CONTENT_MANAGER: [
     'assistants.delete',
     'contacts.delete',
     'knowledge.delete',
-    'workflows.delete'
-  ] as Permission[]
+    'workflows.delete',
+  ] as Permission[],
 } as const;
 
 export type PermissionGroup = keyof typeof PERMISSION_GROUPS;

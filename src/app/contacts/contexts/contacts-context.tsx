@@ -1,4 +1,5 @@
 import React, { createContext, useContext, ReactNode, useState, useEffect, useCallback } from 'react';
+
 import {
   getBuckets,
   createBucket as apiCreateBucket,
@@ -69,6 +70,7 @@ export const ContactsProvider: React.FC<ContactsProviderProps> = ({ children }) 
     if (!currentOrganization?.id) {
       setBuckets([]);
       setIsLoading(false);
+
       return;
     }
 
@@ -77,7 +79,7 @@ export const ContactsProvider: React.FC<ContactsProviderProps> = ({ children }) 
       const fetchedBuckets = await getBuckets();
       setBuckets(fetchedBuckets || []);
     } catch (error) {
-      console.error("Failed to fetch buckets:", error);
+      console.error('Failed to fetch buckets:', error);
       setBuckets([]);
     } finally {
       setIsLoading(false);
@@ -91,6 +93,7 @@ export const ContactsProvider: React.FC<ContactsProviderProps> = ({ children }) 
   const selectBucket = useCallback(async (bucketId: string | null) => {
     if (!bucketId) {
       setSelectedBucket(null);
+
       return;
     }
     const bucket = buckets.find(b => b.id === bucketId);
@@ -115,6 +118,7 @@ export const ContactsProvider: React.FC<ContactsProviderProps> = ({ children }) 
   const createBucket = async (name: string, description: string, fields: string[]) => {
     const newBucket = await apiCreateBucket({ name, description, fields });
     await fetchBuckets(); // Re-fetch to get the updated list
+
     return newBucket;
   };
 
@@ -132,6 +136,7 @@ export const ContactsProvider: React.FC<ContactsProviderProps> = ({ children }) 
     const fetchedContacts = await getContactsForBucket(bucketId);
     setContacts(prev => ({ ...prev, [bucketId]: fetchedContacts || [] }));
     await fetchBuckets(); // Re-fetch buckets to update count
+
     return newContact;
   };
 
@@ -141,6 +146,7 @@ export const ContactsProvider: React.FC<ContactsProviderProps> = ({ children }) 
     const fetchedContacts = await getContactsForBucket(bucketId);
     setContacts(prev => ({ ...prev, [bucketId]: fetchedContacts || [] }));
     await fetchBuckets(); // Re-fetch buckets to update count
+
     return newContacts;
   };
 
@@ -178,5 +184,6 @@ export const useContactsContext = () => {
   if (context === undefined) {
     throw new Error('useContactsContext must be used within a ContactsProvider');
   }
+
   return context;
 };

@@ -11,12 +11,12 @@ import { Search, Plus } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { useHasPermission } from '@/lib/auth/useHasPermission';
 
 import { useAssistants } from '../../hooks/use-assistants-context';
 
 import AssistantNameEdit from './assistant-name-edit';
 import { VoiceAssistantDialog } from './voice-assistant-dialog';
-import { useHasPermission } from '@/lib/auth/useHasPermission';
 
 export default function AssistantsHeader({ editingAssistantId, setEditingAssistantId }: AssistantsHeaderProps) {
   const {
@@ -53,30 +53,38 @@ export default function AssistantsHeader({ editingAssistantId, setEditingAssista
 
   // Handle selection from VoiceAssistantDialog
   const handleDialogSelect = (modelId: string) => {
-    // Map modelId to price/latency
+    // Map modelId to price/latency and correct model/provider for API
     let costPerMin = 0;
     let latencyMs = 0;
     let modelName = '';
-    const provider = 'openai'; // default, can be changed if needed
+    let model = '';
+    let provider = '';
 
     if (modelId === 'conversational') {
       costPerMin = 43;
       latencyMs = 678;
       modelName = 'Conversational';
+      model = 'gemini';
+      provider = 'google';
     } else if (modelId === 'professional') {
       costPerMin = 64;
       latencyMs = 730;
       modelName = 'Professional';
+      model = 'elevenlabs-multilingual-v2';
+      provider = 'elevenlabs';
     } else if (modelId === 'creative') {
       costPerMin = 78;
       latencyMs = 694;
       modelName = 'Creative';
+      // Not selectable, but fallback for completeness
+      model = 'creative';
+      provider = 'openai';
     }
 
     const newDraftData = {
       name: `New ${modelName} Assistant`,
       description: '',
-      model: modelId,
+      model,
       provider,
       voice: '',
       costPerMin,
@@ -136,13 +144,14 @@ export default function AssistantsHeader({ editingAssistantId, setEditingAssista
       <div className="flex overflow-x-auto pb-2 space-x-2 scrollbar-thin scrollbar-thumb-amber-200">
         {filteredAssistants.map(assistant => {
           const isDraft = assistant.id.startsWith('local-');
+
           return (
             <div
               key={assistant.id}
               className={`relative flex-shrink-0 p-3 rounded-md border transition-colors min-w-[200px] text-left ${currentAssistant?.id === assistant.id
                 ? 'bg-[var(--muted)] border-[var(--primary)]'
                 : 'bg-[var(--card)] hover:bg-[var(--muted)] border-[var(--border)]'
-                }`}
+              }`}
             >
               {isDraft && (
                 <Badge variant="outline" className="absolute top-1 right-1 bg-[var(--primary)]/10 text-[var(--primary)] border-[var(--primary)] text-xs px-1 py-0.5">

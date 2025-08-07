@@ -32,11 +32,11 @@ export type Action =
   | 'dashboard.export'
   | 'dashboard.configure'
   // Knowledge Base
-  | 'knowledgeBase.view'
-  | 'knowledgeBase.upload'
-  | 'knowledgeBase.edit'
-  | 'knowledgeBase.delete'
-  | 'knowledgeBase.download'
+  | 'knowledge.view'
+  | 'knowledge.upload'
+  | 'knowledge.edit'
+  | 'knowledge.delete'
+  | 'knowledge.download'
   // Workflow
   | 'workflow.view'
   | 'workflow.create'
@@ -73,11 +73,11 @@ export const permissionsMatrix: Record<Role, Record<Action, boolean>> = {
     'dashboard.export': true,
     'dashboard.configure': true,
     // Knowledge Base
-    'knowledgeBase.view': true,
-    'knowledgeBase.upload': true,
-    'knowledgeBase.edit': true,
-    'knowledgeBase.delete': true,
-    'knowledgeBase.download': true,
+    'knowledge.view': true,
+    'knowledge.upload': true,
+    'knowledge.edit': true,
+    'knowledge.delete': true,
+    'knowledge.download': true,
     // Workflow
     'workflow.view': true,
     'workflow.create': true,
@@ -113,11 +113,11 @@ export const permissionsMatrix: Record<Role, Record<Action, boolean>> = {
     'dashboard.export': false,
     'dashboard.configure': false,
     // Knowledge Base
-    'knowledgeBase.view': true,
-    'knowledgeBase.upload': true,
-    'knowledgeBase.edit': true,
-    'knowledgeBase.delete': false,
-    'knowledgeBase.download': true,
+    'knowledge.view': true,
+    'knowledge.upload': true,
+    'knowledge.edit': true,
+    'knowledge.delete': false,
+    'knowledge.download': true,
     // Workflow
     'workflow.view': true,
     'workflow.create': true,

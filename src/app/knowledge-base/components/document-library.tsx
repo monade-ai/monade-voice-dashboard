@@ -8,10 +8,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { useKnowledgeBase, KnowledgeBase } from '@/app/hooks/use-knowledge-base';
 
 import { useToast } from '../hooks/use-toast';
-import { useKnowledgeBase, KnowledgeBase } from '@/app/hooks/use-knowledge-base';
 
 const formatDate = (date: Date): string => {
   const now = new Date();
@@ -42,9 +42,10 @@ export function DocumentLibrary() {
       return knowledgeBases;
     }
     const searchLower = searchQuery.toLowerCase();
+
     return knowledgeBases.filter(kb =>
       kb.filename.toLowerCase().includes(searchLower) ||
-      kb.id.toLowerCase().includes(searchLower)
+      kb.id.toLowerCase().includes(searchLower),
     );
   }, [searchQuery, knowledgeBases]);
 

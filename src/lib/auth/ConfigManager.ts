@@ -34,6 +34,7 @@ class ConfigManager {
     if (!ConfigManager.instance) {
       ConfigManager.instance = new ConfigManager();
     }
+
     return ConfigManager.instance;
   }
 
@@ -57,7 +58,7 @@ class ConfigManager {
       url,
       anonKey,
       source,
-      isValid: this.isValidSupabaseConfig(url, anonKey)
+      isValid: this.isValidSupabaseConfig(url, anonKey),
     };
 
     // Cache the config
@@ -65,7 +66,7 @@ class ConfigManager {
       this.config = {
         supabase: config,
         environment: this.getEnvironment(),
-        debugMode: process.env.NODE_ENV === 'development'
+        debugMode: process.env.NODE_ENV === 'development',
       };
     }
 
@@ -110,7 +111,7 @@ class ConfigManager {
       isValid: errors.length === 0,
       errors,
       warnings,
-      config
+      config,
     };
   }
 
@@ -121,6 +122,7 @@ class ConfigManager {
     if (!this.config) {
       this.getSupabaseConfig(); // This will initialize the config
     }
+
     return this.config!;
   }
 
@@ -179,6 +181,7 @@ class ConfigManager {
     const nodeEnv = process.env.NODE_ENV;
     if (nodeEnv === 'test') return 'test';
     if (nodeEnv === 'production') return 'production';
+
     return 'development';
   }
 
@@ -189,6 +192,7 @@ class ConfigManager {
   private isValidUrl(url: string): boolean {
     try {
       new URL(url);
+
       return true;
     } catch {
       return false;
@@ -198,6 +202,7 @@ class ConfigManager {
   private isValidJWT(token: string): boolean {
     // Basic JWT format check (header.payload.signature)
     const parts = token.split('.');
+
     return parts.length === 3 && parts.every(part => part.length > 0);
   }
 
@@ -208,6 +213,7 @@ class ConfigManager {
       
       // Extract project ID from Supabase URL format: https://PROJECT_ID.supabase.co
       const match = hostname.match(/^([a-z0-9]+)\.supabase\.co$/);
+
       return match ? match[1] : null;
     } catch {
       return null;

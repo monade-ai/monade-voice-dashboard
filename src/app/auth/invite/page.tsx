@@ -5,7 +5,7 @@
  */
 'use client';
 
-export const dynamic = "force-dynamic";
+export const dynamic = 'force-dynamic';
 
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -14,6 +14,7 @@ import { FcGoogle } from 'react-icons/fc';
 import { AiOutlineMail, AiOutlineLock, AiOutlineUser, AiOutlineCheck, AiOutlineExclamationCircle } from 'react-icons/ai';
 import { HiOutlineOfficeBuilding } from 'react-icons/hi';
 import Image from 'next/image';
+
 import { getOrganizationService } from '@/lib/services';
 import { validateEmail, validatePassword, validateFullName } from '@/types';
 import { Button } from '@/components/ui/button';
@@ -44,6 +45,7 @@ function InvitationPageContent() {
       if (!token) {
         setError('Invalid invitation link');
         setLoading(false);
+
         return;
       }
 
@@ -64,6 +66,7 @@ function InvitationPageContent() {
         if (error || !data) {
           setError('Invalid or expired invitation');
           setLoading(false);
+
           return;
         }
 
@@ -75,6 +78,7 @@ function InvitationPageContent() {
         if (existingUser?.user) {
           // User is already signed in, just accept the invitation
           await acceptInvitation();
+
           return;
         }
 
@@ -113,17 +117,20 @@ function InvitationPageContent() {
       
       if (allErrors.length > 0) {
         setError(allErrors[0].message);
+
         return false;
       }
     } else {
       const emailErrors = validateEmail(email);
       if (emailErrors.length > 0) {
         setError(emailErrors[0].message);
+
         return false;
       }
       
       if (!password) {
         setError('Password is required');
+
         return false;
       }
     }
@@ -148,18 +155,20 @@ function InvitationPageContent() {
           options: {
             data: {
               full_name: fullName,
-              invitation_token: token
-            }
-          }
+              invitation_token: token,
+            },
+          },
         });
 
         if (authError) {
           setError(authError.message);
+
           return;
         }
 
         if (!authData.user) {
           setError('Failed to create account');
+
           return;
         }
 
@@ -170,11 +179,12 @@ function InvitationPageContent() {
         // Sign in existing user
         const { error: signInError } = await supabase.auth.signInWithPassword({
           email,
-          password
+          password,
         });
 
         if (signInError) {
           setError(signInError.message);
+
           return;
         }
 
@@ -291,7 +301,7 @@ function InvitationPageContent() {
               <CardDescription>
                 {mode === 'signin' 
                   ? 'Already have an account? Sign in to accept the invitation'
-                  : 'New to CallLive? Create an account to get started'
+                  : 'New to Monade? Create an account to get started'
                 }
               </CardDescription>
             </CardHeader>
@@ -462,7 +472,7 @@ function InvitationPageContent() {
               height={400}
               className="max-w-md opacity-90 mb-8"
             />
-            <h2 className="text-2xl font-bold mb-4">Welcome to CallLive</h2>
+            <h2 className="text-2xl font-bold mb-4">Welcome to Monade</h2>
             <p className="text-lg opacity-90">
               Join your team and start building amazing AI assistants together
             </p>

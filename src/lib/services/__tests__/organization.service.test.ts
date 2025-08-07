@@ -2,21 +2,22 @@
  * Unit tests for OrganizationService
  */
 
-import { OrganizationService } from '../organization.service';
 import { API_ERROR_CODES } from '@/types';
+
+import { OrganizationService } from '../organization.service';
 
 // Mock Supabase client
 const mockSupabase = {
   from: jest.fn(),
   rpc: jest.fn(),
   auth: {
-    getUser: jest.fn()
-  }
+    getUser: jest.fn(),
+  },
 };
 
 // Mock createClientComponentClient
 jest.mock('@supabase/auth-helpers-nextjs', () => ({
-  createClientComponentClient: () => mockSupabase
+  createClientComponentClient: () => mockSupabase,
 }));
 
 describe('OrganizationService', () => {
@@ -32,7 +33,7 @@ describe('OrganizationService', () => {
       const mockOrgData = {
         name: 'Test Organization',
         industry: 'Technology',
-        contact_email: 'test@example.com'
+        contact_email: 'test@example.com',
       };
 
       const mockOrgId = 'org-123';
@@ -45,13 +46,13 @@ describe('OrganizationService', () => {
         subscription_tier: 'free',
         subscription_status: 'active',
         created_at: '2024-01-01T00:00:00Z',
-        updated_at: '2024-01-01T00:00:00Z'
+        updated_at: '2024-01-01T00:00:00Z',
       };
 
       // Mock RPC call for creating organization
       mockSupabase.rpc.mockResolvedValueOnce({
         data: mockOrgId,
-        error: null
+        error: null,
       });
 
       // Mock getting the created organization
@@ -60,10 +61,10 @@ describe('OrganizationService', () => {
           eq: jest.fn().mockReturnValue({
             single: jest.fn().mockResolvedValue({
               data: mockOrganization,
-              error: null
-            })
-          })
-        })
+              error: null,
+            }),
+          }),
+        }),
       });
 
       const result = await service.createOrganization(mockOrgData);
@@ -73,14 +74,14 @@ describe('OrganizationService', () => {
       expect(mockSupabase.rpc).toHaveBeenCalledWith('create_organization_with_owner', {
         org_name: 'Test Organization',
         org_slug: undefined,
-        creator_email: 'test@example.com'
+        creator_email: 'test@example.com',
       });
     });
 
     it('should return validation error for invalid data', async () => {
       const invalidData = {
         name: '', // Empty name should fail validation
-        industry: 'Technology'
+        industry: 'Technology',
       };
 
       const result = await service.createOrganization(invalidData);
@@ -93,12 +94,12 @@ describe('OrganizationService', () => {
     it('should handle Supabase errors', async () => {
       const mockOrgData = {
         name: 'Test Organization',
-        industry: 'Technology'
+        industry: 'Technology',
       };
 
       mockSupabase.rpc.mockResolvedValueOnce({
         data: null,
-        error: { code: '23505', message: 'Duplicate key value' }
+        error: { code: '23505', message: 'Duplicate key value' },
       });
 
       const result = await service.createOrganization(mockOrgData);
@@ -113,7 +114,7 @@ describe('OrganizationService', () => {
       const mockOrganization = {
         id: 'org-123',
         name: 'Test Organization',
-        slug: 'test-organization'
+        slug: 'test-organization',
       };
 
       mockSupabase.from.mockReturnValue({
@@ -121,10 +122,10 @@ describe('OrganizationService', () => {
           eq: jest.fn().mockReturnValue({
             single: jest.fn().mockResolvedValue({
               data: mockOrganization,
-              error: null
-            })
-          })
-        })
+              error: null,
+            }),
+          }),
+        }),
       });
 
       const result = await service.getOrganizationById('org-123');
@@ -139,10 +140,10 @@ describe('OrganizationService', () => {
           eq: jest.fn().mockReturnValue({
             single: jest.fn().mockResolvedValue({
               data: null,
-              error: { code: 'PGRST116', message: 'Not found' }
-            })
-          })
-        })
+              error: { code: 'PGRST116', message: 'Not found' },
+            }),
+          }),
+        }),
       });
 
       const result = await service.getOrganizationById('nonexistent');
@@ -156,14 +157,14 @@ describe('OrganizationService', () => {
     it('should update organization successfully', async () => {
       const updateData = {
         name: 'Updated Organization',
-        industry: 'Healthcare'
+        industry: 'Healthcare',
       };
 
       const mockUpdatedOrg = {
         id: 'org-123',
         name: 'Updated Organization',
         industry: 'Healthcare',
-        updated_at: '2024-01-02T00:00:00Z'
+        updated_at: '2024-01-02T00:00:00Z',
       };
 
       mockSupabase.from.mockReturnValue({
@@ -172,11 +173,11 @@ describe('OrganizationService', () => {
             select: jest.fn().mockReturnValue({
               single: jest.fn().mockResolvedValue({
                 data: mockUpdatedOrg,
-                error: null
-              })
-            })
-          })
-        })
+                error: null,
+              }),
+            }),
+          }),
+        }),
       });
 
       const result = await service.updateOrganization('org-123', updateData);
@@ -188,7 +189,7 @@ describe('OrganizationService', () => {
     it('should validate update data', async () => {
       const invalidData = {
         name: 'A', // Too short
-        contact_email: 'invalid-email'
+        contact_email: 'invalid-email',
       };
 
       const result = await service.updateOrganization('org-123', invalidData);
@@ -202,7 +203,7 @@ describe('OrganizationService', () => {
     it('should invite user successfully', async () => {
       const inviteData = {
         email: 'user@example.com',
-        role: 'member' as const
+        role: 'member' as const,
       };
 
       const mockInvitationId = 'invite-123';
@@ -212,13 +213,13 @@ describe('OrganizationService', () => {
         email: 'user@example.com',
         role: 'member',
         token: 'mock-token',
-        expires_at: '2024-01-08T00:00:00Z'
+        expires_at: '2024-01-08T00:00:00Z',
       };
 
       // Mock RPC call for creating invitation
       mockSupabase.rpc.mockResolvedValueOnce({
         data: mockInvitationId,
-        error: null
+        error: null,
       });
 
       // Mock getting the created invitation
@@ -227,10 +228,10 @@ describe('OrganizationService', () => {
           eq: jest.fn().mockReturnValue({
             single: jest.fn().mockResolvedValue({
               data: mockInvitation,
-              error: null
-            })
-          })
-        })
+              error: null,
+            }),
+          }),
+        }),
       });
 
       const result = await service.inviteUser('org-123', inviteData);
@@ -242,7 +243,7 @@ describe('OrganizationService', () => {
     it('should validate invitation data', async () => {
       const invalidData = {
         email: 'invalid-email',
-        role: 'invalid-role' as any
+        role: 'invalid-role' as any,
       };
 
       const result = await service.inviteUser('org-123', invalidData);
@@ -264,8 +265,8 @@ describe('OrganizationService', () => {
           user_profile: {
             id: 'user-1',
             email: 'owner@example.com',
-            full_name: 'John Owner'
-          }
+            full_name: 'John Owner',
+          },
         },
         {
           id: 'member-2',
@@ -276,9 +277,9 @@ describe('OrganizationService', () => {
           user_profile: {
             id: 'user-2',
             email: 'member@example.com',
-            full_name: 'Jane Member'
-          }
-        }
+            full_name: 'Jane Member',
+          },
+        },
       ];
 
       // Mock count query
@@ -287,10 +288,10 @@ describe('OrganizationService', () => {
           eq: jest.fn().mockReturnValue({
             eq: jest.fn().mockResolvedValue({
               count: 2,
-              error: null
-            })
-          })
-        })
+              error: null,
+            }),
+          }),
+        }),
       });
 
       // Mock data query
@@ -301,12 +302,12 @@ describe('OrganizationService', () => {
               order: jest.fn().mockReturnValue({
                 range: jest.fn().mockResolvedValue({
                   data: mockMembers,
-                  error: null
-                })
-              })
-            })
-          })
-        })
+                  error: null,
+                }),
+              }),
+            }),
+          }),
+        }),
       });
 
       const result = await service.getOrganizationMembers('org-123', 1, 20);
@@ -319,7 +320,7 @@ describe('OrganizationService', () => {
         total: 2,
         total_pages: 1,
         has_next: false,
-        has_prev: false
+        has_prev: false,
       });
     });
   });
@@ -328,7 +329,7 @@ describe('OrganizationService', () => {
     it('should remove user successfully', async () => {
       mockSupabase.rpc.mockResolvedValueOnce({
         data: null,
-        error: null
+        error: null,
       });
 
       const result = await service.removeUser('org-123', 'user-456');
@@ -337,14 +338,14 @@ describe('OrganizationService', () => {
       expect(result.message).toBe('User removed from organization successfully');
       expect(mockSupabase.rpc).toHaveBeenCalledWith('remove_user_from_organization', {
         org_id: 'org-123',
-        target_user_id: 'user-456'
+        target_user_id: 'user-456',
       });
     });
 
     it('should handle permission errors', async () => {
       mockSupabase.rpc.mockResolvedValueOnce({
         data: null,
-        error: { code: '42501', message: 'Insufficient permissions' }
+        error: { code: '42501', message: 'Insufficient permissions' },
       });
 
       const result = await service.removeUser('org-123', 'user-456');
@@ -358,7 +359,7 @@ describe('OrganizationService', () => {
     it('should switch organization successfully', async () => {
       mockSupabase.rpc.mockResolvedValueOnce({
         data: null,
-        error: null
+        error: null,
       });
 
       const result = await service.switchOrganization('org-456');
@@ -366,7 +367,7 @@ describe('OrganizationService', () => {
       expect(result.success).toBe(true);
       expect(result.message).toBe('Organization switched successfully');
       expect(mockSupabase.rpc).toHaveBeenCalledWith('switch_user_organization', {
-        target_org_id: 'org-456'
+        target_org_id: 'org-456',
       });
     });
   });
@@ -379,13 +380,13 @@ describe('OrganizationService', () => {
         organization_id: 'org-123',
         user_id: 'user-456',
         role: 'member',
-        status: 'active'
+        status: 'active',
       };
 
       // Mock RPC call for accepting invitation
       mockSupabase.rpc.mockResolvedValueOnce({
         data: mockMembershipId,
-        error: null
+        error: null,
       });
 
       // Mock getting the created membership
@@ -394,10 +395,10 @@ describe('OrganizationService', () => {
           eq: jest.fn().mockReturnValue({
             single: jest.fn().mockResolvedValue({
               data: mockMembership,
-              error: null
-            })
-          })
-        })
+              error: null,
+            }),
+          }),
+        }),
       });
 
       const result = await service.acceptInvitation({ token: 'valid-token' });

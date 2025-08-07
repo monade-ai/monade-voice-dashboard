@@ -11,8 +11,10 @@ function getOrganizationContext(): { organizationId?: string } {
   // Get organization context from localStorage or auth provider
   if (typeof window !== 'undefined') {
     const orgId = localStorage.getItem('current_organization_id');
+
     return orgId ? { organizationId: orgId } : {};
   }
+
   return {};
 }
 
@@ -56,6 +58,7 @@ export async function deleteBucket(bucketId: string) {
   if (!bucketId) {
     throw new Error('deleteBucket called with undefined or empty bucketId');
   }
+
   return fetchWithAuth(`${API_BASE_URL}/buckets/${bucketId}`, {
     method: 'DELETE',
   });
@@ -69,10 +72,10 @@ export async function addContact(bucketId: string, contactData: { phone_number: 
 }
 
 export async function addContactsBulk(bucketId: string, contacts: any[]) {
-    return fetchWithAuth(`${API_BASE_URL}/buckets/${bucketId}/contacts/bulk`, {
-        method: 'POST',
-        body: JSON.stringify(contacts),
-    });
+  return fetchWithAuth(`${API_BASE_URL}/buckets/${bucketId}/contacts/bulk`, {
+    method: 'POST',
+    body: JSON.stringify(contacts),
+  });
 }
 
 export async function deleteContact(bucketId: string, phoneNumber: string) {
@@ -84,6 +87,7 @@ export async function deleteContact(bucketId: string, phoneNumber: string) {
 // LocalStorage-based functions with organization context
 function getStorageKey(key: string): string {
   const orgContext = getOrganizationContext();
+
   return orgContext.organizationId ? `${key}_${orgContext.organizationId}` : key;
 }
 
@@ -92,6 +96,7 @@ export async function getContactListsFromStorage(): Promise<{ lists: any[] }> {
   
   const storageKey = getStorageKey('contact_lists');
   const stored = localStorage.getItem(storageKey);
+
   return stored ? JSON.parse(stored) : { lists: [] };
 }
 
@@ -104,7 +109,7 @@ export async function createContactListInStorage(name: string, description?: str
     description: description || '',
     count: 0,
     createdAt: new Date().toISOString(),
-    fields: ['name', 'email'] // default fields
+    fields: ['name', 'email'], // default fields
   };
   
   const storageKey = getStorageKey('contact_lists');
@@ -112,6 +117,7 @@ export async function createContactListInStorage(name: string, description?: str
   const updated = { lists: [...existing.lists, newList] };
   
   localStorage.setItem(storageKey, JSON.stringify(updated));
+
   return newList;
 }
 
@@ -120,6 +126,7 @@ export async function getListContactsFromStorage(listId: string): Promise<any[]>
   
   const storageKey = getStorageKey(`contacts_${listId}`);
   const stored = localStorage.getItem(storageKey);
+
   return stored ? JSON.parse(stored) : [];
 }
 
@@ -130,7 +137,7 @@ export async function createContactInStorage(listId: string, contact: any): Prom
     id: `contact_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
     ...contact,
     createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
+    updatedAt: new Date().toISOString(),
   };
   
   // Add to contacts list
@@ -143,7 +150,7 @@ export async function createContactInStorage(listId: string, contact: any): Prom
   const listsKey = getStorageKey('contact_lists');
   const listsData = await getContactListsFromStorage();
   const updatedLists = listsData.lists.map(list => 
-    list.id === listId ? { ...list, count: updatedContacts.length } : list
+    list.id === listId ? { ...list, count: updatedContacts.length } : list,
   );
   localStorage.setItem(listsKey, JSON.stringify({ lists: updatedLists }));
   
@@ -157,7 +164,7 @@ export async function bulkCreateContactsInStorage(listId: string, contacts: any[
     id: `contact_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
     ...contact,
     createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
+    updatedAt: new Date().toISOString(),
   }));
   
   // Add to contacts list
@@ -170,7 +177,7 @@ export async function bulkCreateContactsInStorage(listId: string, contacts: any[
   const listsKey = getStorageKey('contact_lists');
   const listsData = await getContactListsFromStorage();
   const updatedLists = listsData.lists.map(list => 
-    list.id === listId ? { ...list, count: updatedContacts.length } : list
+    list.id === listId ? { ...list, count: updatedContacts.length } : list,
   );
   localStorage.setItem(listsKey, JSON.stringify({ lists: updatedLists }));
   
@@ -204,7 +211,7 @@ export async function removeContactFromListInStorage(listId: string, contactId: 
   const listsKey = getStorageKey('contact_lists');
   const listsData = await getContactListsFromStorage();
   const updatedLists = listsData.lists.map(list => 
-    list.id === listId ? { ...list, count: updatedContacts.length } : list
+    list.id === listId ? { ...list, count: updatedContacts.length } : list,
   );
   localStorage.setItem(listsKey, JSON.stringify({ lists: updatedLists }));
 }
@@ -221,7 +228,7 @@ export async function searchContactsInStorage(query: string, listId: string): Pr
       contact.name,
       contact.phone,
       contact.email,
-      ...Object.values(contact.data || {})
+      ...Object.values(contact.data || {}),
     ].join(' ').toLowerCase();
     
     return searchableText.includes(lowerQuery);

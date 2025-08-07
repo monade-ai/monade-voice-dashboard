@@ -19,16 +19,14 @@ import {
   Contact2,
   LogOut,
   Sun, 
-  Moon
+  Moon,
 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { useTranslations } from '@/i18n/translations-context';
 import { LanguageSelector } from '@/components/language-selector';
 import { useTheme } from '@/components/theme-provider';
-
 import { useAuth } from '@/lib/auth/AuthProvider';
-import { useRouter } from 'next/navigation';
 import { useHasPermission } from '@/lib/auth/useHasPermission';
 import { OrganizationSwitcher } from '@/components/organization-switcher';
 
@@ -59,27 +57,9 @@ function NavItem({ href, icon, label, isActive = false }: NavItemProps) {
 export function Sidebar() {
   const pathname = usePathname();
   const { t } = useTranslations();
-  const { user, loading, signOut } = useAuth();
-  const router = useRouter();
+  const { user, loading, signOut, isLoggingOut } = useAuth();
   const canViewOrgSettings = useHasPermission('org.view');
   const { theme, toggleTheme } = useTheme();
-
-  const handleLogout = async () => {
-    try {
-      console.log('[Sidebar] Starting logout process...');
-      await signOut();
-      console.log('[Sidebar] Sign out successful, redirecting...');
-      
-      // Force navigation to login page
-      window.location.href = '/auth/login';
-    } catch (error) {
-      console.error('[Sidebar] Logout failed:', error);
-      
-      // Even if sign out fails, redirect to login page
-      // This prevents users from being stuck in a broken state
-      window.location.href = '/auth/login';
-    }
-  };
 
   return (
     <div className="w-64 h-full bg-sidebar border-r border-sidebar-border flex flex-col overflow-y-auto shadow-md">
@@ -87,7 +67,7 @@ export function Sidebar() {
         <div className="flex items-center mb-8">
           <div className="ml-2">
             <Image
-              src="/callive-logo.png"
+              src="/monade-logo.png"
               alt="monade logo"
               width={140}
               height={50}
@@ -193,11 +173,12 @@ export function Sidebar() {
         />
 
         <button
-          onClick={handleLogout}
-          className="mt-2 flex items-center gap-2 text-sm text-red-500 hover:text-red-700 transition"
+          onClick={signOut}
+          disabled={isLoggingOut}
+          className="mt-2 flex items-center gap-2 text-sm text-red-500 hover:text-red-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <LogOut size={18} />
-          {t('sidebar.logout')}
+          {isLoggingOut ? t('sidebar.loggingOut') || 'Logging out...' : t('sidebar.logout')}
         </button>
         
         <div className="mt-4 pt-4 border-t border-sidebar-border">

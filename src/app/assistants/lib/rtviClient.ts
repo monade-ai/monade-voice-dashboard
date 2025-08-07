@@ -35,6 +35,7 @@ export function getClient() {
       });
     } catch (error) {
       console.error('Failed to initialize Daily transport:', error);
+
       return null;
     }
 

@@ -4,8 +4,9 @@
  * Displays a list of recent calls with live updates.
  */
 
-import React from "react";
-import CallHistoryList from "./components/call-history-list";
+import React from 'react';
+
+import CallHistoryList from './components/call-history-list';
 
 const CallHistoryPage = () => {
   return (

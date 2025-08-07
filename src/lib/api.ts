@@ -21,8 +21,10 @@ function getOrganizationContext(): { organizationId?: string } {
   // This will be populated by the auth context
   if (typeof window !== 'undefined') {
     const orgId = localStorage.getItem('current_organization_id');
+
     return orgId ? { organizationId: orgId } : {};
   }
+
   return {};
 }
   
@@ -82,32 +84,38 @@ export const apiService = {
   // Dashboard APIs
   getDashboardMetrics: async (options?: FetchOptions) => {
     const queryParams = buildQueryParams(options);
+
     return fetchWithErrorHandling(`/api/dashboard/metrics${queryParams}`);
   },
     
   getCallDetails: async (options?: FetchOptions) => {
     const queryParams = buildQueryParams(options);
+
     return fetchWithErrorHandling(`/api/calls${queryParams}`);
   },
     
   getCallAnalysis: async (options?: FetchOptions) => {
     const queryParams = buildQueryParams(options);
+
     return fetchWithErrorHandling(`/api/calls/analysis${queryParams}`);
   },
     
   getUnsuccessfulCalls: async (options?: FetchOptions) => {
     const queryParams = buildQueryParams(options);
+
     return fetchWithErrorHandling(`/api/calls/unsuccessful${queryParams}`);
   },
     
   getConcurrentCalls: async (options?: FetchOptions) => {
     const queryParams = buildQueryParams(options);
+
     return fetchWithErrorHandling(`/api/calls/concurrent${queryParams}`);
   },
 
   // Assistants APIs
   getAssistants: async (options?: FetchOptions) => {
     const queryParams = buildQueryParams(options);
+
     return fetchWithErrorHandling(`/api/assistants${queryParams}`);
   },
 
@@ -134,6 +142,7 @@ export const apiService = {
   // Contacts APIs
   getContactBuckets: async (options?: FetchOptions) => {
     const queryParams = buildQueryParams(options);
+
     return fetchWithErrorHandling(`/api/contacts/buckets${queryParams}`);
   },
 
@@ -146,6 +155,7 @@ export const apiService = {
 
   getContactsInBucket: async (bucketId: string, options?: FetchOptions) => {
     const queryParams = buildQueryParams(options);
+
     return fetchWithErrorHandling(`/api/contacts/buckets/${bucketId}/contacts${queryParams}`);
   },
 
@@ -178,12 +188,14 @@ export const apiService = {
   searchContacts: async (query: string, bucketId?: string, options?: FetchOptions) => {
     const searchOptions = { ...options, query, bucketId };
     const queryParams = buildQueryParams(searchOptions);
+
     return fetchWithErrorHandling(`/api/contacts/search${queryParams}`);
   },
 
   // Knowledge Base APIs
   getKnowledgeBases: async (options?: FetchOptions) => {
     const queryParams = buildQueryParams(options);
+
     return fetchWithErrorHandling(`/api/knowledge-bases${queryParams}`);
   },
 
@@ -210,6 +222,7 @@ export const apiService = {
   // Workflows APIs
   getWorkflows: async (options?: FetchOptions) => {
     const queryParams = buildQueryParams(options);
+
     return fetchWithErrorHandling(`/api/workflows${queryParams}`);
   },
 

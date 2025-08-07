@@ -1,10 +1,11 @@
-"use client";
+'use client';
 
-import { useState, useRef, useEffect } from "react";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { X, Info } from "lucide-react";
-import * as THREE from "three";
+import { useState, useRef, useEffect } from 'react';
+import { X, Info } from 'lucide-react';
+import * as THREE from 'three';
+
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 
 interface VoiceOption {
   id: string;
@@ -24,63 +25,63 @@ interface VoiceModel {
 
 const voiceModels: VoiceModel[] = [
   {
-    id: "conversational",
-    name: "Conversational",
-    description: "Natural, friendly dialogue for customer service and support",
+    id: 'conversational',
+    name: 'Conversational',
+    description: 'Natural, friendly dialogue for customer service and support',
     features: [
-      "Natural Speech Patterns",
-      "Emotion Recognition",
-      "Context Awareness",
-      "Multi-turn Conversations",
+      'Natural Speech Patterns',
+      'Emotion Recognition',
+      'Context Awareness',
+      'Multi-turn Conversations',
     ],
-    color: "#3A8DFF",
+    color: '#3A8DFF',
     voices: [
-      { id: "algieba", name: "Algieba", description: "Warm & Professional", avatar: "avatars/01.png" },
-      { id: "aoede", name: "Aoede", description: "Friendly & Approachable", avatar: "avatars/02.png" },
-      { id: "autonoe", name: "Autonoe", description: "Calm & Reassuring", avatar: "avatars/04.png" },
-      { id: "callirrhoe", name: "Callirrhoe", description: "Energetic & Upbeat", avatar: "avatars/05.png" },
-      { id: "charon", name: "Charon", description: "Clear & Articulate", avatar: "avatars/06.png" },
+      { id: 'algieba', name: 'Algieba', description: 'Warm & Professional', avatar: 'avatars/01.png' },
+      { id: 'aoede', name: 'Aoede', description: 'Friendly & Approachable', avatar: 'avatars/02.png' },
+      { id: 'autonoe', name: 'Autonoe', description: 'Calm & Reassuring', avatar: 'avatars/04.png' },
+      { id: 'callirrhoe', name: 'Callirrhoe', description: 'Energetic & Upbeat', avatar: 'avatars/05.png' },
+      { id: 'charon', name: 'Charon', description: 'Clear & Articulate', avatar: 'avatars/06.png' },
     ],
   },
   {
-    id: "professional",
-    name: "Professional",
-    description: "Authoritative and clear for business and enterprise applications",
+    id: 'professional',
+    name: 'Professional',
+    description: 'Authoritative and clear for business and enterprise applications',
     features: [
-      "Executive Presence",
-      "Technical Accuracy",
-      "Formal Tone",
-      "Industry Terminology",
-      "Compliance Ready",
+      'Executive Presence',
+      'Technical Accuracy',
+      'Formal Tone',
+      'Industry Terminology',
+      'Compliance Ready',
     ],
-    color: "#39594D",
+    color: '#39594D',
     voices: [
-      { id: "despina", name: "Despina", description: "Executive Authority", avatar: "avatars/07.png" },
-      { id: "ennceladus", name: "Ennceladus", description: "Corporate Elegance", avatar: "avatars/08.png" },
-      { id: "erinome", name: "Erinome", description: "Technical Expert", avatar: "avatars/09.png" },
-      { id: "fenrir", name: "Fenrir", description: "Strategic Advisor", avatar: "avatars/10.png" },
-      { id: "iapetus", name: "Iapetus", description: "Industry Leader", avatar: "avatars/12.png" },
+      { id: 'despina', name: 'Despina', description: 'Executive Authority', avatar: 'avatars/07.png' },
+      { id: 'ennceladus', name: 'Ennceladus', description: 'Corporate Elegance', avatar: 'avatars/08.png' },
+      { id: 'erinome', name: 'Erinome', description: 'Technical Expert', avatar: 'avatars/09.png' },
+      { id: 'fenrir', name: 'Fenrir', description: 'Strategic Advisor', avatar: 'avatars/10.png' },
+      { id: 'iapetus', name: 'Iapetus', description: 'Industry Leader', avatar: 'avatars/12.png' },
     ],
   },
   {
-    id: "creative",
-    name: "Creative",
-    description: "Expressive and dynamic for entertainment and creative content",
+    id: 'creative',
+    name: 'Creative',
+    description: 'Expressive and dynamic for entertainment and creative content',
     features: [
-      "Dynamic Range",
-      "Character Voices",
-      "Storytelling",
-      "Emotional Depth",
-      "Creative Expression",
+      'Dynamic Range',
+      'Character Voices',
+      'Storytelling',
+      'Emotional Depth',
+      'Creative Expression',
     ],
-    color: "#D18EE2",
+    color: '#D18EE2',
     voices: [
-      { id: "kore", name: "Kore", description: "Artistic & Expressive", avatar: "avatars/13.png" },
-      { id: "leda", name: "Leda", description: "Bold & Dynamic", avatar: "avatars/15.png" },
-      { id: "orus", name: "Orus", description: "Mystical & Wise", avatar: "avatars/19.png" },
-      { id: "puck", name: "Puck", description: "Flowing & Melodic", avatar: "avatars/20.png" },
-      { id: "umbriel", name: "Umbriel", description: "Bright & Energetic", avatar: "avatars/22.png" },
-      { id: "zephyr", name: "Zephyr", description: "Bright & Energetic", avatar: "avatars/24.png" },
+      { id: 'kore', name: 'Kore', description: 'Artistic & Expressive', avatar: 'avatars/13.png' },
+      { id: 'leda', name: 'Leda', description: 'Bold & Dynamic', avatar: 'avatars/15.png' },
+      { id: 'orus', name: 'Orus', description: 'Mystical & Wise', avatar: 'avatars/19.png' },
+      { id: 'puck', name: 'Puck', description: 'Flowing & Melodic', avatar: 'avatars/20.png' },
+      { id: 'umbriel', name: 'Umbriel', description: 'Bright & Energetic', avatar: 'avatars/22.png' },
+      { id: 'zephyr', name: 'Zephyr', description: 'Bright & Energetic', avatar: 'avatars/24.png' },
     ],
   },
 ];
@@ -199,6 +200,7 @@ function VoiceModelCard({ model, showInfo, onInfoClick, onSelect }: VoiceModelCa
     if (rect.width === 0 || rect.height === 0) {
       // Retry initialization after a short delay
       setTimeout(initThreeJS, 100);
+
       return;
     }
 
@@ -230,7 +232,7 @@ function VoiceModelCard({ model, showInfo, onInfoClick, onSelect }: VoiceModelCa
         vertexColors: true,
         transparent: true,
         opacity: 0.8,
-        blending: THREE.AdditiveBlending
+        blending: THREE.AdditiveBlending,
       });
       wavePointsRef.current = new THREE.Points(waveGeometryRef.current, waveMaterialRef.current);
       sceneRef.current.add(wavePointsRef.current);
@@ -275,7 +277,7 @@ function VoiceModelCard({ model, showInfo, onInfoClick, onSelect }: VoiceModelCa
         size: 0.005,
         vertexColors: true,
         transparent: true,
-        opacity: 0.3
+        opacity: 0.3,
       });
       gridPointsRef.current = new THREE.Points(gridGeometryRef.current, gridMaterialRef.current);
       sceneRef.current.add(gridPointsRef.current);
@@ -311,6 +313,7 @@ function VoiceModelCard({ model, showInfo, onInfoClick, onSelect }: VoiceModelCa
     const animate = () => {
       if (!isHovered || showInfo) {
         animationRef.current = null;
+
         return; // Stop animation
       }
 
@@ -354,18 +357,26 @@ function VoiceModelCard({ model, showInfo, onInfoClick, onSelect }: VoiceModelCa
     }
   };
 
+  // "Creative" card: frosted glass, blur, "Coming Soon", no select
+  const isComingSoon = model.id === 'creative';
+
   return (
     <div
-      className={`relative bg-white border-2 rounded-3xl overflow-hidden transition-all duration-700 ease-out cursor-pointer ${
-        isHovered
-          ? "shadow-2xl scale-105 border-opacity-100"
-          : "border-[#E5E5E0] hover:border-[#39594D]"
+      className={`relative bg-white border-2 rounded-3xl overflow-hidden transition-all duration-700 ease-out ${
+        isComingSoon
+          ? 'pointer-events-none select-none opacity-80'
+          : 'cursor-pointer'
+      } ${
+        isHovered && !isComingSoon
+          ? 'shadow-2xl scale-105 border-opacity-100'
+          : 'border-[#E5E5E0] hover:border-[#39594D]'
       }`}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
+      onMouseEnter={() => !isComingSoon && setIsHovered(true)}
+      onMouseLeave={() => !isComingSoon && setIsHovered(false)}
       style={{
-        borderColor: isHovered ? model.color : undefined,
-        minHeight: '600px'
+        borderColor: isHovered && !isComingSoon ? model.color : undefined,
+        minHeight: '600px',
+        filter: isComingSoon ? 'blur(0px)' : undefined,
       }}
     >
       <audio ref={audioRef} />
@@ -393,7 +404,15 @@ function VoiceModelCard({ model, showInfo, onInfoClick, onSelect }: VoiceModelCa
         </div>
       )}
 
-      {/* Info button removed as per UI refactor */}
+      {/* Frosted glass overlay for "Coming Soon" */}
+      {isComingSoon && (
+        <div className="absolute inset-0 z-30 flex flex-col items-center justify-center backdrop-blur-lg bg-white/40">
+          <div className="text-3xl font-bold text-[#181A1B] mb-2 drop-shadow-lg">Creative</div>
+          <div className="px-6 py-3 rounded-2xl bg-white/60 border border-white/40 shadow-lg text-xl font-semibold text-[#39594D] backdrop-blur-md" style={{ letterSpacing: 1 }}>
+            Coming Soon
+          </div>
+        </div>
+      )}
 
       <div className="relative z-10 p-8 h-full flex flex-col">
         <div className="text-center mb-12">
@@ -410,7 +429,8 @@ function VoiceModelCard({ model, showInfo, onInfoClick, onSelect }: VoiceModelCa
           />
         </div>
 
-        {isHovered && !showInfo && (
+        {/* Only show select button for non-coming-soon cards */}
+        {!isComingSoon && isHovered && !showInfo && (
           <div className="absolute bottom-8 left-8 right-8">
             <Button
               className="w-full text-white font-semibold py-4 rounded-xl transition-all duration-500 transform hover:scale-105"
@@ -444,6 +464,7 @@ function VoiceCarousel({ voices, selectedVoice, onVoiceChange, accentColor }: Vo
         index,
       });
     }
+
     return result;
   };
 
@@ -464,13 +485,13 @@ function VoiceCarousel({ voices, selectedVoice, onVoiceChange, accentColor }: Vo
                 <button
                   key={`${voice.id}-${index}`}
                   onClick={() => onVoiceChange(index)}
-                  className={`relative transition-all duration-500 ease-out rounded-full overflow-hidden ring-2 ring-offset-2`}
+                  className={'relative transition-all duration-500 ease-out rounded-full overflow-hidden ring-2 ring-offset-2'}
                   style={{
                     width: size,
                     height: size,
                     opacity,
                     boxShadow: `0 0 0 4px ${accentColor}`,
-                    transform: `scale(0.8)`,
+                    transform: 'scale(0.8)',
                   }}
                   aria-label={`Select voice ${voice.name}`}
                 >
@@ -478,11 +499,11 @@ function VoiceCarousel({ voices, selectedVoice, onVoiceChange, accentColor }: Vo
                     src={`/${voice.avatar}`}
                     alt={voice.name}
                     style={{
-                      width: "100%",
-                      height: "100%",
-                      objectFit: "cover",
-                      borderRadius: "9999px",
-                      display: "block",
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                      borderRadius: '9999px',
+                      display: 'block',
                     }}
                   />
                 </button>
@@ -497,7 +518,7 @@ function VoiceCarousel({ voices, selectedVoice, onVoiceChange, accentColor }: Vo
                     width: size,
                     height: size,
                     opacity,
-                    transform: `scale(0.6)`,
+                    transform: 'scale(0.6)',
                   }}
                   aria-label={`Select voice ${voice.name}`}
                 >
@@ -505,11 +526,11 @@ function VoiceCarousel({ voices, selectedVoice, onVoiceChange, accentColor }: Vo
                     src={`/${voice.avatar}`}
                     alt={voice.name}
                     style={{
-                      width: "100%",
-                      height: "100%",
-                      objectFit: "cover",
-                      borderRadius: "9999px",
-                      display: "block",
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                      borderRadius: '9999px',
+                      display: 'block',
                     }}
                   />
                 </button>

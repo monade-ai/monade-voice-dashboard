@@ -41,6 +41,7 @@ export interface UserProfile {
   preferences: Record<string, any>;
   created_at: string;
   updated_at: string;
+  has_completed_onboarding?: boolean;
 }
 
 export interface InvitationToken {

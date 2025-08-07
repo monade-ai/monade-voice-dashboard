@@ -8,7 +8,7 @@ import {
   OrganizationMember,
   ROLE_PERMISSIONS,
   hasPermission as checkPermission,
-  PermissionContext
+  PermissionContext,
 } from '@/types';
 
 /**
@@ -34,6 +34,7 @@ export function getUserPermissions(membership: OrganizationMember | null): Permi
  */
 export function roleHasPermission(role: OrganizationRole, permission: Permission): boolean {
   const rolePermissions = getPermissionsForRole(role);
+
   return rolePermissions.includes(permission);
 }
 
@@ -47,7 +48,7 @@ export function canPerformAction(
     resourceOwnerId?: string;
     userId?: string;
     organizationId?: string;
-  }
+  },
 ): boolean {
   if (!userRole) return false;
 
@@ -55,7 +56,7 @@ export function canPerformAction(
     userRole,
     organizationId: context?.organizationId,
     resourceOwnerId: context?.resourceOwnerId,
-    userId: context?.userId
+    userId: context?.userId,
   };
 
   return checkPermission(permission, permissionContext);
@@ -66,11 +67,12 @@ export function canPerformAction(
  */
 export function getMissingPermissions(
   userRole: OrganizationRole | null,
-  requiredPermissions: Permission[]
+  requiredPermissions: Permission[],
 ): Permission[] {
   if (!userRole) return requiredPermissions;
 
   const userPermissions = getPermissionsForRole(userRole);
+
   return requiredPermissions.filter(permission => !userPermissions.includes(permission));
 }
 
@@ -79,7 +81,7 @@ export function getMissingPermissions(
  */
 export function canAccessFeature(
   userRole: OrganizationRole | null,
-  feature: 'billing' | 'analytics' | 'user_management' | 'org_settings'
+  feature: 'billing' | 'analytics' | 'user_management' | 'org_settings',
 ): boolean {
   if (!userRole) return false;
 
@@ -87,7 +89,7 @@ export function canAccessFeature(
     billing: ['org.billing'],
     analytics: ['calls.analytics', 'dashboard.export'],
     user_management: ['users.invite', 'users.remove'],
-    org_settings: ['org.edit', 'org.settings']
+    org_settings: ['org.edit', 'org.settings'],
   };
 
   const requiredPermissions = featurePermissions[feature] || [];
@@ -101,7 +103,7 @@ export function canAccessFeature(
  */
 export function getEffectivePermissions(
   membership: OrganizationMember | null,
-  organizationId?: string
+  organizationId?: string,
 ): {
   permissions: Permission[];
   role: OrganizationRole | null;
@@ -119,7 +121,7 @@ export function getEffectivePermissions(
     canEdit: permissions.includes('org.edit'),
     canDelete: permissions.includes('org.delete'),
     canInvite: permissions.includes('users.invite'),
-    canManageBilling: permissions.includes('org.billing')
+    canManageBilling: permissions.includes('org.billing'),
   };
 }
 
@@ -129,7 +131,7 @@ export function getEffectivePermissions(
 export const ROLE_HIERARCHY: Record<OrganizationRole, number> = {
   member: 1,
   admin: 2,
-  owner: 3
+  owner: 3,
 };
 
 /**
@@ -146,7 +148,7 @@ export function getHighestRole(roles: OrganizationRole[]): OrganizationRole | nu
   if (roles.length === 0) return null;
 
   return roles.reduce((highest, current) => 
-    ROLE_HIERARCHY[current] > ROLE_HIERARCHY[highest] ? current : highest
+    ROLE_HIERARCHY[current] > ROLE_HIERARCHY[highest] ? current : highest,
   );
 }
 
@@ -162,26 +164,26 @@ export interface PermissionValidationResult {
 export function validateApiPermission(
   userRole: OrganizationRole | null,
   requiredPermission: Permission,
-  context?: PermissionContext
+  context?: PermissionContext,
 ): PermissionValidationResult {
   if (!userRole) {
     return {
       allowed: false,
       reason: 'User not authenticated',
-      requiredPermissions: [requiredPermission]
+      requiredPermissions: [requiredPermission],
     };
   }
 
   const hasPermission = checkPermission(requiredPermission, { 
     userRole, 
-    ...context 
+    ...context, 
   });
 
   if (!hasPermission) {
     return {
       allowed: false,
       reason: 'Insufficient permissions',
-      requiredPermissions: [requiredPermission]
+      requiredPermissions: [requiredPermission],
     };
   }
 
@@ -195,19 +197,19 @@ export function validateMultiplePermissions(
   userRole: OrganizationRole | null,
   requiredPermissions: Permission[],
   requireAll: boolean = false,
-  context?: PermissionContext
+  context?: PermissionContext,
 ): PermissionValidationResult {
   if (!userRole) {
     return {
       allowed: false,
       reason: 'User not authenticated',
-      requiredPermissions
+      requiredPermissions,
     };
   }
 
   const userPermissions = getPermissionsForRole(userRole);
   const hasPermissions = requiredPermissions.filter(permission => 
-    userPermissions.includes(permission)
+    userPermissions.includes(permission),
   );
 
   const allowed = requireAll 
@@ -216,7 +218,7 @@ export function validateMultiplePermissions(
 
   if (!allowed) {
     const missing = requiredPermissions.filter(permission => 
-      !userPermissions.includes(permission)
+      !userPermissions.includes(permission),
     );
 
     return {
@@ -224,7 +226,7 @@ export function validateMultiplePermissions(
       reason: requireAll 
         ? 'Missing required permissions' 
         : 'No matching permissions found',
-      requiredPermissions: missing
+      requiredPermissions: missing,
     };
   }
 
@@ -237,7 +239,7 @@ export function validateMultiplePermissions(
 export function canEditResource(
   userRole: OrganizationRole | null,
   resourceOwnerId: string,
-  userId: string
+  userId: string,
 ): boolean {
   if (!userRole) return false;
 
@@ -253,7 +255,7 @@ export function canEditResource(
 export function canDeleteResource(
   userRole: OrganizationRole | null,
   resourceOwnerId?: string,
-  userId?: string
+  userId?: string,
 ): boolean {
   if (!userRole) return false;
 
@@ -264,7 +266,7 @@ export function canDeleteResource(
 export function canShareResource(
   userRole: OrganizationRole | null,
   resourceOwnerId: string,
-  userId: string
+  userId: string,
 ): boolean {
   if (!userRole) return false;
 
@@ -309,20 +311,20 @@ export const PERMISSION_ERROR_MESSAGES = {
   OWNER_ONLY: 'Only organization owners can perform this action',
   ADMIN_ONLY: 'Only organization owners and admins can perform this action',
   RESOURCE_OWNER_ONLY: 'You can only modify resources you own',
-  ORGANIZATION_REQUIRED: 'You must be part of an organization to perform this action'
+  ORGANIZATION_REQUIRED: 'You must be part of an organization to perform this action',
 } as const;
 
 export function getPermissionErrorMessage(
-  validation: PermissionValidationResult
+  validation: PermissionValidationResult,
 ): string {
   if (validation.allowed) return '';
 
   switch (validation.reason) {
-    case 'User not authenticated':
-      return PERMISSION_ERROR_MESSAGES.NOT_AUTHENTICATED;
-    case 'Insufficient permissions':
-      return PERMISSION_ERROR_MESSAGES.INSUFFICIENT_PERMISSIONS;
-    default:
-      return validation.reason || PERMISSION_ERROR_MESSAGES.INSUFFICIENT_PERMISSIONS;
+  case 'User not authenticated':
+    return PERMISSION_ERROR_MESSAGES.NOT_AUTHENTICATED;
+  case 'Insufficient permissions':
+    return PERMISSION_ERROR_MESSAGES.INSUFFICIENT_PERMISSIONS;
+  default:
+    return validation.reason || PERMISSION_ERROR_MESSAGES.INSUFFICIENT_PERMISSIONS;
   }
 }

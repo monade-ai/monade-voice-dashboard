@@ -7,7 +7,7 @@ import {
   ChevronRight,
   FileText,
   Trash2,
-  AlertCircle
+  AlertCircle,
 } from 'lucide-react';
 
 import { useTranslations } from '@/i18n/translations-context';
@@ -15,10 +15,10 @@ import { Button } from '@/components/ui/button';
 import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { useKnowledgeBase, KnowledgeBase } from '@/app/hooks/use-knowledge-base';
 
 import { useToast } from '../hooks/use-toast';
-import { useKnowledgeBase, KnowledgeBase } from '@/app/hooks/use-knowledge-base';
 
 const formatDate = (date: Date): string => {
   const now = new Date();

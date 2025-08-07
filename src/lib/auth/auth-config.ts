@@ -27,7 +27,7 @@ export const AUTH_CONFIG = {
     SIGNUP_ATTEMPTS: 5, // Per 10 minutes
     LOGIN_ATTEMPTS: 10, // Per 5 minutes
     PASSWORD_RESET: 3, // Per hour
-  }
+  },
 };
 
 /**
@@ -37,7 +37,7 @@ export async function retryWithBackoff<T>(
   operation: () => Promise<T>,
   maxAttempts: number = AUTH_CONFIG.SESSION_RETRY.MAX_ATTEMPTS,
   baseDelay: number = AUTH_CONFIG.SESSION_RETRY.RETRY_DELAY,
-  backoffMultiplier: number = AUTH_CONFIG.SESSION_RETRY.BACKOFF_MULTIPLIER
+  backoffMultiplier: number = AUTH_CONFIG.SESSION_RETRY.BACKOFF_MULTIPLIER,
 ): Promise<T> {
   let lastError: Error;
   
@@ -83,6 +83,7 @@ export function getRateLimitMessage(error: any): string {
   if (isRateLimitError(error)) {
     return 'Too many signup attempts. Please wait a few minutes before trying again.';
   }
+
   return error?.message || 'An unexpected error occurred';
 }
 

@@ -45,7 +45,7 @@ export function AssistantCard({ assistant, onSelect }: AssistantCardProps) {
         knowledgeBaseId: assistant.knowledgeBase ?? undefined,
       });
     } catch (error) {
-      console.error("Failed to publish assistant:", error);
+      console.error('Failed to publish assistant:', error);
     } finally {
       setIsPublishing(false);
     }
@@ -66,8 +66,8 @@ export function AssistantCard({ assistant, onSelect }: AssistantCardProps) {
               <span
                 className="absolute inset-0 animate-gradient-spin"
                 style={{
-                  background: "conic-gradient(from 0deg, var(--primary), var(--accent), var(--secondary), var(--primary))",
-                  filter: "blur(2px)",
+                  background: 'conic-gradient(from 0deg, var(--primary), var(--accent), var(--secondary), var(--primary))',
+                  filter: 'blur(2px)',
                   opacity: 0.8,
                 }}
               />

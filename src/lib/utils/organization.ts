@@ -9,7 +9,7 @@ import {
   Permission,
   ROLE_PERMISSIONS,
   SubscriptionLimits,
-  SUBSCRIPTION_LIMITS
+  SUBSCRIPTION_LIMITS,
 } from '@/types';
 
 /**
@@ -17,7 +17,7 @@ import {
  */
 export function hasRole(
   membership: OrganizationMember | null,
-  role: OrganizationRole
+  role: OrganizationRole,
 ): boolean {
   if (!membership || membership.status !== 'active') {
     return false;
@@ -31,7 +31,7 @@ export function hasRole(
  */
 export function hasMinimumRole(
   membership: OrganizationMember | null,
-  minimumRole: OrganizationRole
+  minimumRole: OrganizationRole,
 ): boolean {
   if (!membership || membership.status !== 'active') {
     return false;
@@ -40,7 +40,7 @@ export function hasMinimumRole(
   const roleHierarchy: Record<OrganizationRole, number> = {
     member: 1,
     admin: 2,
-    owner: 3
+    owner: 3,
   };
 
   return roleHierarchy[membership.role] >= roleHierarchy[minimumRole];
@@ -50,7 +50,7 @@ export function hasMinimumRole(
  * Get user's permissions based on their role in organization
  */
 export function getUserPermissions(
-  membership: OrganizationMember | null
+  membership: OrganizationMember | null,
 ): Permission[] {
   if (!membership || membership.status !== 'active') {
     return [];
@@ -64,9 +64,10 @@ export function getUserPermissions(
  */
 export function hasPermission(
   membership: OrganizationMember | null,
-  permission: Permission
+  permission: Permission,
 ): boolean {
   const permissions = getUserPermissions(membership);
+
   return permissions.includes(permission);
 }
 
@@ -76,7 +77,7 @@ export function hasPermission(
 export function canEditUserRole(
   currentUserRole: OrganizationRole,
   targetUserRole: OrganizationRole,
-  newRole: OrganizationRole
+  newRole: OrganizationRole,
 ): boolean {
   // Only owners can manage owner roles
   if (targetUserRole === 'owner' || newRole === 'owner') {
@@ -96,7 +97,7 @@ export function canEditUserRole(
  */
 export function canRemoveUser(
   currentUserRole: OrganizationRole,
-  targetUserRole: OrganizationRole
+  targetUserRole: OrganizationRole,
 ): boolean {
   // Owners can remove anyone except other owners (unless they're the last owner)
   if (currentUserRole === 'owner') {
@@ -129,7 +130,7 @@ export function checkOrganizationUsage(
     knowledgeBases?: number;
     storageMB?: number;
     callsThisMonth?: number;
-  }
+  },
 ): {
   assistants: { withinLimit: boolean; used: number; limit: number };
   contacts: { withinLimit: boolean; used: number; limit: number };
@@ -142,7 +143,7 @@ export function checkOrganizationUsage(
   const checkLimit = (used: number, limit: number) => ({
     withinLimit: limit === -1 || used < limit,
     used,
-    limit
+    limit,
   });
 
   return {
@@ -150,7 +151,7 @@ export function checkOrganizationUsage(
     contacts: checkLimit(usage.contacts || 0, limits.maxContacts),
     knowledgeBases: checkLimit(usage.knowledgeBases || 0, limits.maxKnowledgeBases),
     storage: checkLimit(usage.storageMB || 0, limits.maxStorageMB),
-    calls: checkLimit(usage.callsThisMonth || 0, limits.maxCallsPerMonth)
+    calls: checkLimit(usage.callsThisMonth || 0, limits.maxCallsPerMonth),
   };
 }
 
@@ -164,6 +165,7 @@ export function formatMemberDisplayName(member: OrganizationMember): string {
   
   // Extract name from email if no full name
   const emailName = member.user_profile?.email?.split('@')[0];
+
   return emailName || 'Unknown User';
 }
 
@@ -174,7 +176,7 @@ export function formatRoleDisplayName(role: OrganizationRole): string {
   const roleNames: Record<OrganizationRole, string> = {
     owner: 'Owner',
     admin: 'Admin',
-    member: 'Member'
+    member: 'Member',
   };
   
   return roleNames[role] || role;
@@ -187,7 +189,7 @@ export function getRoleBadgeColor(role: OrganizationRole): string {
   const colors: Record<OrganizationRole, string> = {
     owner: 'bg-purple-100 text-purple-800',
     admin: 'bg-blue-100 text-blue-800',
-    member: 'bg-gray-100 text-gray-800'
+    member: 'bg-gray-100 text-gray-800',
   };
   
   return colors[role] || colors.member;
@@ -198,6 +200,7 @@ export function getRoleBadgeColor(role: OrganizationRole): string {
  */
 export function isValidSlug(slug: string): boolean {
   const slugPattern = /^[a-z0-9-]+$/;
+
   return slugPattern.test(slug) && 
          slug.length >= 3 && 
          slug.length <= 50 &&
@@ -236,34 +239,34 @@ export function getOrganizationStatusInfo(organization: Organization): {
   message?: string;
 } {
   switch (organization.subscription_status) {
-    case 'active':
-      return {
-        status: 'Active',
-        color: 'text-green-600'
-      };
-    case 'trialing':
-      return {
-        status: 'Trial',
-        color: 'text-blue-600',
-        message: 'Trial period active'
-      };
-    case 'past_due':
-      return {
-        status: 'Past Due',
-        color: 'text-yellow-600',
-        message: 'Payment required'
-      };
-    case 'cancelled':
-      return {
-        status: 'Cancelled',
-        color: 'text-red-600',
-        message: 'Subscription cancelled'
-      };
-    default:
-      return {
-        status: 'Unknown',
-        color: 'text-gray-600'
-      };
+  case 'active':
+    return {
+      status: 'Active',
+      color: 'text-green-600',
+    };
+  case 'trialing':
+    return {
+      status: 'Trial',
+      color: 'text-blue-600',
+      message: 'Trial period active',
+    };
+  case 'past_due':
+    return {
+      status: 'Past Due',
+      color: 'text-yellow-600',
+      message: 'Payment required',
+    };
+  case 'cancelled':
+    return {
+      status: 'Cancelled',
+      color: 'text-red-600',
+      message: 'Subscription cancelled',
+    };
+  default:
+    return {
+      status: 'Unknown',
+      color: 'text-gray-600',
+    };
   }
 }
 
@@ -274,7 +277,7 @@ export function sortOrganizationMembers(members: OrganizationMember[]): Organiza
   const roleOrder: Record<OrganizationRole, number> = {
     owner: 0,
     admin: 1,
-    member: 2
+    member: 2,
   };
 
   return [...members].sort((a, b) => {
@@ -287,6 +290,7 @@ export function sortOrganizationMembers(members: OrganizationMember[]): Organiza
     // Then sort by name
     const nameA = formatMemberDisplayName(a).toLowerCase();
     const nameB = formatMemberDisplayName(b).toLowerCase();
+
     return nameA.localeCompare(nameB);
   });
 }
@@ -296,7 +300,7 @@ export function sortOrganizationMembers(members: OrganizationMember[]): Organiza
  */
 export function filterOrganizationMembers(
   members: OrganizationMember[],
-  searchQuery: string
+  searchQuery: string,
 ): OrganizationMember[] {
   if (!searchQuery.trim()) {
     return members;
@@ -332,31 +336,31 @@ export function getOrganizationMemberStats(members: OrganizationMember[]): {
     admins: 0,
     members: 0,
     active: 0,
-    invited: 0
+    invited: 0,
   };
 
   members.forEach(member => {
     // Count by role
     switch (member.role) {
-      case 'owner':
-        stats.owners++;
-        break;
-      case 'admin':
-        stats.admins++;
-        break;
-      case 'member':
-        stats.members++;
-        break;
+    case 'owner':
+      stats.owners++;
+      break;
+    case 'admin':
+      stats.admins++;
+      break;
+    case 'member':
+      stats.members++;
+      break;
     }
 
     // Count by status
     switch (member.status) {
-      case 'active':
-        stats.active++;
-        break;
-      case 'invited':
-        stats.invited++;
-        break;
+    case 'active':
+      stats.active++;
+      break;
+    case 'invited':
+      stats.invited++;
+      break;
     }
   });
 
@@ -389,13 +393,13 @@ export function canInviteUsers(membership: OrganizationMember | null): boolean {
  */
 export function getAssignableRoles(currentUserRole: OrganizationRole): OrganizationRole[] {
   switch (currentUserRole) {
-    case 'owner':
-      return ['owner', 'admin', 'member'];
-    case 'admin':
-      return ['admin', 'member'];
-    case 'member':
-      return [];
-    default:
-      return [];
+  case 'owner':
+    return ['owner', 'admin', 'member'];
+  case 'admin':
+    return ['admin', 'member'];
+  case 'member':
+    return [];
+  default:
+    return [];
   }
 }

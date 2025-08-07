@@ -15,22 +15,16 @@
 
 .auto-scroll-fade.top {
   top: 0;
-  background: linear-gradient(to bottom, rgba(255,255,255,1) 0%, rgba(255,255,255,0) 100%);
-}
-.dark .auto-scroll-fade.top {
-  background: linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 100%);
+  background: linear-gradient(to bottom, hsl(var(--background)) 0%, hsl(var(--background) / 0.8) 50%, transparent 100%);
 }
 
 .auto-scroll-fade.bottom {
   bottom: 0;
-  background: linear-gradient(to top, rgba(255,255,255,1) 0%, rgba(255,255,255,0) 100%);
-}
-.dark .auto-scroll-fade.bottom {
-  background: linear-gradient(to top, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 100%);
+  background: linear-gradient(to top, hsl(var(--background)) 0%, hsl(var(--background) / 0.8) 50%, transparent 100%);
 }
 
 .auto-scroll-content {
-  animation: scrollVertical 30s linear infinite;
+  animation: scrollVertical 35s linear infinite;
 }
 
 @keyframes scrollVertical {

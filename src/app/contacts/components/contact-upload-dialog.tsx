@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
+
 import { useContactsContext, Bucket } from '../contexts/contacts-context';
 
 interface ContactUploadDialogProps {
@@ -56,7 +57,7 @@ const ContactUploadDialog: React.FC<ContactUploadDialogProps> = ({ isOpen, onClo
         fileInputRef.current.value = '';
       }
     } else {
-        setSelectedBucketId(bucket?.id);
+      setSelectedBucketId(bucket?.id);
     }
   }, [isOpen, bucket]);
 
@@ -68,6 +69,7 @@ const ContactUploadDialog: React.FC<ContactUploadDialogProps> = ({ isOpen, onClo
       } else {
         newSet.add(header);
       }
+
       return newSet;
     });
   };
@@ -88,6 +90,7 @@ const ContactUploadDialog: React.FC<ContactUploadDialogProps> = ({ isOpen, onClo
         if (headers.length === 0) {
           setError('CSV file appears to be empty or has no headers.');
           setStatus('error');
+
           return;
         }
         setCsvHeaders(headers);
@@ -110,8 +113,8 @@ const ContactUploadDialog: React.FC<ContactUploadDialogProps> = ({ isOpen, onClo
     const isValidPhone = (phone: string) => /^(\+[1-9]\d{1,14}|0\d{9,14})$/.test(normalizePhone(phone));
 
     return parsedData.map(row => ({
-        phone_number: normalizePhone(row.phone || row.phoneNumber || row.phone_number),
-        data: row,
+      phone_number: normalizePhone(row.phone || row.phoneNumber || row.phone_number),
+      data: row,
     })).filter(contact => isValidPhone(contact.phone_number));
   };
 
@@ -123,6 +126,7 @@ const ContactUploadDialog: React.FC<ContactUploadDialogProps> = ({ isOpen, onClo
     if (validContacts.length === 0) {
       setError('No valid contacts found. Ensure a "phone" column exists and numbers start with a country code (e.g., +1) or 0 (e.g., 0987654321).');
       setStatus('error');
+
       return;
     }
 
@@ -134,13 +138,15 @@ const ContactUploadDialog: React.FC<ContactUploadDialogProps> = ({ isOpen, onClo
         if (!newBucketName.trim()) {
           setError('Bucket name is required.');
           setStatus('error');
+
           return;
         }
         const finalHeaders = csvHeaders.filter(h => enabledHeaders.has(h));
         if (finalHeaders.length === 0) {
-            setError('You must select at least one header to include in the bucket.');
-            setStatus('error');
-            return;
+          setError('You must select at least one header to include in the bucket.');
+          setStatus('error');
+
+          return;
         }
         const newBucket = await createBucket(newBucketName.trim(), newBucketDescription.trim(), finalHeaders);
         targetBucketId = newBucket.id;
@@ -149,19 +155,21 @@ const ContactUploadDialog: React.FC<ContactUploadDialogProps> = ({ isOpen, onClo
       if (!targetBucketId) {
         setError('Could not determine the target bucket.');
         setStatus('error');
+
         return;
       }
       
       // Workflow 2: Upload to existing bucket (with validation)
       const targetBucket = buckets.find(b => b.id === targetBucketId);
       if (!isCreatingNewBucket && targetBucket) {
-          const bucketFields = new Set(targetBucket.fields);
-          const csvFields = new Set(csvHeaders);
-          if (targetBucket.fields.some(field => !csvFields.has(field))) {
-              setError(`CSV headers do not match bucket fields. Required: ${targetBucket.fields.join(', ')}`);
-              setStatus('error');
-              return;
-          }
+        const bucketFields = new Set(targetBucket.fields);
+        const csvFields = new Set(csvHeaders);
+        if (targetBucket.fields.some(field => !csvFields.has(field))) {
+          setError(`CSV headers do not match bucket fields. Required: ${targetBucket.fields.join(', ')}`);
+          setStatus('error');
+
+          return;
+        }
       }
 
       await addContactsBulk(targetBucketId, validContacts.map(c => c.data));
@@ -205,13 +213,13 @@ const ContactUploadDialog: React.FC<ContactUploadDialogProps> = ({ isOpen, onClo
             </div>
           ) : (
             <div className="flex items-center justify-between p-2 border rounded-md">
-                <div className="flex items-center gap-2">
-                    <FileSpreadsheet className="h-6 w-6 text-primary" />
-                    <span className="font-medium">{file.name}</span>
-                </div>
-                <Button variant="ghost" size="icon" onClick={() => setFile(null)}>
-                    <X className="h-4 w-4" />
-                </Button>
+              <div className="flex items-center gap-2">
+                <FileSpreadsheet className="h-6 w-6 text-primary" />
+                <span className="font-medium">{file.name}</span>
+              </div>
+              <Button variant="ghost" size="icon" onClick={() => setFile(null)}>
+                <X className="h-4 w-4" />
+              </Button>
             </div>
           )}
 
@@ -225,11 +233,11 @@ const ContactUploadDialog: React.FC<ContactUploadDialogProps> = ({ isOpen, onClo
                 </>
               )}
               {!isCreatingNewBucket && (
-                  <Alert>
-                      <AlertDescription>
+                <Alert>
+                  <AlertDescription>
                           CSV headers must match these fields: <strong>{bucket?.fields.join(', ')}</strong>
-                      </AlertDescription>
-                  </Alert>
+                  </AlertDescription>
+                </Alert>
               )}
               <div>
                 <h3 className="font-medium text-sm mb-2">Select Headers to Include:</h3>

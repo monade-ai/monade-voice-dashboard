@@ -14,11 +14,13 @@ export function decodeJWT(token: string): Record<string, any> | null {
         .map(function (c) {
           return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
         })
-        .join('')
+        .join(''),
     );
+
     return JSON.parse(jsonPayload);
   } catch (e) {
     console.error('[decodeJWT] Failed to decode JWT:', e);
+
     return null;
   }
 }
@@ -38,5 +40,6 @@ export function getRoleFromJWT(token: string): string | null {
     return payload['app_metadata'].role;
   }
   if (payload['custom:role']) return payload['custom:role'];
+
   return null;
 }

@@ -26,12 +26,13 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useTranslations } from '@/i18n/translations-context';
+import { useHasPermission } from '@/lib/auth/useHasPermission';
 
 import { useContactsContext, Bucket, Contact } from '../contexts/contacts-context';
+
 import CreateBucketDialog from './create-bucket-dialog';
 import ContactUploadDialog from './contact-upload-dialog';
 import CreateContact from './create-contact';
-import { useHasPermission } from '@/lib/auth/useHasPermission';
 
 const ContactListView: React.FC = () => {
   const { t } = useTranslations();
@@ -62,14 +63,15 @@ const ContactListView: React.FC = () => {
   const currentContacts = selectedBucket ? contacts[selectedBucket.id] || [] : [];
   const filteredContacts = currentContacts.filter(contact => 
     Object.values(contact.data).some(value => 
-      String(value).toLowerCase().includes(searchQuery.toLowerCase())
-    ) || contact.phone_number.toLowerCase().includes(searchQuery.toLowerCase())
+      String(value).toLowerCase().includes(searchQuery.toLowerCase()),
+    ) || contact.phone_number.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
   const formatDate = (dateString: string | undefined | null): string => {
     if (!dateString) return '-';
     const date = new Date(dateString);
     if (isNaN(date.getTime())) return '-';
+
     return new Intl.DateTimeFormat('en-US', {
       month: 'short',
       day: 'numeric',
@@ -171,13 +173,14 @@ const ContactListView: React.FC = () => {
             {buckets.map((bucket) => (
               <motion.div key={bucket.id} layout>
                 <Card className="cursor-pointer hover:shadow-md transition-shadow h-full" onClick={() => {
-  if (!bucket.id) {
-    console.error('Bucket id is missing for selectBucket:', bucket);
-    alert('Cannot open this bucket: missing bucket id.');
-    return;
-  }
-  selectBucket(bucket.id);
-}}>
+                  if (!bucket.id) {
+                    console.error('Bucket id is missing for selectBucket:', bucket);
+                    alert('Cannot open this bucket: missing bucket id.');
+
+                    return;
+                  }
+                  selectBucket(bucket.id);
+                }}>
                   <CardContent className="p-5 flex flex-col h-full">
                     <div className="flex justify-between items-start">
                       <FileSpreadsheet className="h-8 w-8 text-primary mt-1" />
@@ -192,6 +195,7 @@ const ContactListView: React.FC = () => {
                               if (!bucket.id) {
                                 console.error('Bucket id is missing for removeBucket:', bucket);
                                 alert('Cannot delete this bucket: missing bucket id.');
+
                                 return;
                               }
                               if (confirm(t('contacts.delete_bucket_confirm'))) removeBucket(bucket.id);
@@ -289,11 +293,11 @@ const ContactListView: React.FC = () => {
 
       <Dialog open={isUploadOpen} onOpenChange={setUploadOpen}>
         <DialogContent className="w-3/5 transition-all duration-300">
-            <ContactUploadDialog 
-                isOpen={isUploadOpen} 
-                onClose={() => setUploadOpen(false)} 
-                bucket={uploadTargetBucket} 
-            />
+          <ContactUploadDialog 
+            isOpen={isUploadOpen} 
+            onClose={() => setUploadOpen(false)} 
+            bucket={uploadTargetBucket} 
+          />
         </DialogContent>
       </Dialog>
 

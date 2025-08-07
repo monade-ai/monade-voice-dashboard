@@ -1,9 +1,10 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import { v4 as uuidv4 } from 'uuid';
+
 import { useToast } from '@/app/knowledge-base/hooks/use-toast';
 import { useAuth } from '@/lib/auth/AuthProvider';
-import { v4 as uuidv4 } from 'uuid';
 
 // Define the Assistant type - Matches API GET response structure & Prisma Schema
 export interface Assistant {
@@ -94,6 +95,7 @@ const getOrgHeaders = (organizationId?: string): Record<string, string> => {
 const getApiError = async (res: Response): Promise<string> => {
   try {
     const body = await res.json();
+
     return body.error || `Request failed with status ${res.status}`;
   } catch (e) {
     return `Request failed with status ${res.status}`;
@@ -108,12 +110,14 @@ const loadDrafts = (organizationId?: string): Assistant[] => {
     const storedDrafts = localStorage.getItem(storageKey);
     if (storedDrafts) {
       const parsed = JSON.parse(storedDrafts);
+
       // Ensure dates are parsed correctly
       return parsed.map((d: any) => ({ ...d, createdAt: new Date(d.createdAt) }));
     }
   } catch (error) {
-    console.error("Error loading drafts from localStorage:", error);
+    console.error('Error loading drafts from localStorage:', error);
   }
+
   return [];
 };
 
@@ -124,7 +128,7 @@ const saveDrafts = (drafts: Assistant[], organizationId?: string) => {
     const storageKey = getStorageKey(organizationId);
     localStorage.setItem(storageKey, JSON.stringify(drafts));
   } catch (error) {
-    console.error("Error saving drafts to localStorage:", error);
+    console.error('Error saving drafts to localStorage:', error);
   }
 };
 
@@ -132,28 +136,35 @@ let assistantsCache: Assistant[] | null = null;
 
 export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
   const { toast } = useToast();
-  const { currentOrganization } = useAuth();
+  const { currentOrganization, loading: authLoading } = useAuth();
   const [assistants, setAssistants] = useState<Assistant[]>([]);
   const [currentAssistant, setCurrentAssistant] = useState<Assistant | null>(null);
 
   // Combined fetch and merge logic with in-memory cache
-  const fetchAssistants = async () => {
+  const fetchAssistants = useCallback(async () => {
     const organizationId = currentOrganization?.id;
+    console.log('[Assistants] Starting fetchAssistants. Organization ID:', organizationId, 'Auth loading:', authLoading);
     
     // Check in-memory cache first (organization-specific)
     if (assistantsCache && assistantsCache.length > 0) {
       setAssistants(assistantsCache);
       console.log('[Assistants] Loaded from in-memory cache:', assistantsCache);
+
       return;
     }
 
     let apiAssistants: Assistant[] = [];
     try {
       const headers = getOrgHeaders(organizationId);
+      console.log('[Assistants] Making API request with headers:', headers);
+      console.log('[Assistants] API URL:', `${API_BASE_URL}/assistants`);
+      
       const res = await fetch(`${API_BASE_URL}/assistants`, { headers });
+      console.log('[Assistants] API response status:', res.status, 'OK:', res.ok);
+      
       if (!res.ok) {
         const errorText = await getApiError(res);
-        console.error('Failed to fetch assistants:', errorText);
+        console.error('[Assistants] API request failed. Status:', res.status, 'Error:', errorText);
         toast({ title: 'Error Fetching Assistants', description: errorText });
         // Don't return, proceed to load drafts
       } else {
@@ -169,7 +180,13 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
       }
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Could not load assistants.';
-      console.error('Error fetching assistants:', err);
+      console.error('[Assistants] Fetch error caught:', err);
+      console.error('[Assistants] Error details:', {
+        message: errorMsg,
+        stack: err instanceof Error ? err.stack : 'No stack trace',
+        organizationId,
+        apiUrl: `${API_BASE_URL}/assistants`,
+      });
       toast({ title: 'Error Fetching Assistants', description: errorMsg });
       // Proceed to load drafts even if API fetch fails
     }
@@ -192,13 +209,22 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
 
     console.log('[Assistants] Combined and Sorted list:', combinedAssistants);
     setAssistants(combinedAssistants);
-  };
+  }, [currentOrganization?.id, toast]); // Dependencies for useCallback
 
-  // Initial fetch on mount
+  // Initial fetch on mount and when organization changes
   useEffect(() => {
+    // Don't fetch if auth is still loading
+    if (authLoading) {
+      console.log('[Assistants] Skipping fetch - auth still loading');
+
+      return;
+    }
+    
+    console.log('[Assistants] Auth loaded, proceeding with fetch. Organization ID:', currentOrganization?.id);
+    // Clear cache when organization changes
+    assistantsCache = null;
     fetchAssistants();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [currentOrganization?.id, fetchAssistants, authLoading]); // Depend on organization ID, fetchAssistants, and authLoading
 
   // Adds a draft assistant to local state AND localStorage
   const addDraftAssistant = (draftAssistantData: Omit<Assistant, 'id' | 'createdAt'>): Assistant => {
@@ -248,6 +274,7 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
         const errorText = await getApiError(res);
         console.error('Failed to create/publish assistant:', res.status, errorText);
         toast({ title: 'Publish Error', description: errorText });
+
         return undefined; // Indicate failure
       }
 
@@ -277,6 +304,7 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
       const errorMsg = err instanceof Error ? err.message : 'An unknown error occurred.';
       console.error('Error publishing assistant:', err);
       toast({ title: 'Publish Error', description: errorMsg });
+
       return undefined; // Indicate failure
     }
   };
@@ -289,8 +317,9 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
 
     setAssistants((prev) => {
       updatedAssistants = prev.map((assistant) =>
-        assistant.id === id ? { ...assistant, ...updatedData } : assistant
+        assistant.id === id ? { ...assistant, ...updatedData } : assistant,
       );
+
       return updatedAssistants;
     });
 
@@ -314,6 +343,7 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
     if (id.startsWith('local-')) {
       console.error('Attempted to save updates for a draft assistant using saveAssistantUpdates. Use createAssistant (publish) instead.');
       toast({ title: 'Error', description: 'Cannot save changes for a draft. Publish it first.' });
+
       return undefined;
     }
 
@@ -327,6 +357,7 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
 
     if (Object.keys(payload).length === 0) {
       toast({ title: 'No Changes', description: 'No fields were modified to save.' });
+
       return undefined;
     }
 
@@ -343,6 +374,7 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
         const errorText = await getApiError(res);
         console.error('Failed to save assistant updates:', res.status, errorText);
         toast({ title: 'Save Error', description: errorText });
+
         return undefined;
       }
 
@@ -360,18 +392,20 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
       // Update local state with confirmed data
       setAssistants((prev) =>
         prev.map((assistant) =>
-          assistant.id === id ? processedAssistant : assistant
-        )
+          assistant.id === id ? processedAssistant : assistant,
+        ),
       );
       if (currentAssistant?.id === id) {
         setCurrentAssistant(processedAssistant);
       }
+
       return processedAssistant;
 
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'An unknown error occurred.';
       console.error('Error saving assistant updates:', err);
       toast({ title: 'Save Error', description: errorMsg });
+
       return undefined;
     }
   };
@@ -394,6 +428,7 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
       if (currentAssistant?.id === id) {
         setCurrentAssistant(null); // Deselect if it was the current one
       }
+
       return true; // Indicate local success
     }
 
@@ -410,6 +445,7 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
         const errorText = await getApiError(res);
         console.error('Failed to delete assistant:', res.status, errorText);
         toast({ title: 'Delete Error', description: errorText });
+
         return false; // Indicate failure
       }
 
@@ -421,12 +457,14 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
       if (currentAssistant?.id === id) {
         setCurrentAssistant(null);
       }
+
       return true; // Indicate success
 
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'An unknown error occurred.';
       console.error('Error deleting assistant:', err);
       toast({ title: 'Delete Error', description: errorMsg });
+
       return false; // Indicate failure
     }
   };

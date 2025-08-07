@@ -100,6 +100,7 @@ export default function ModelTab({ onChangesMade }: ModelTabProps) {
   const validatePhoneNumber = (number: string): boolean => {
     if (!number) return true; // Allow empty initially
     const phoneRegex = /^\d+$/; // Only digits, no length limit
+
     return phoneRegex.test(number);
   };
 
@@ -209,7 +210,7 @@ export default function ModelTab({ onChangesMade }: ModelTabProps) {
           </label>
           <Select value={knowledgeBaseId} onValueChange={handleKnowledgeBaseChange}>
             <SelectTrigger className="w-full bg-white">
-              <SelectValue placeholder={knowledgeBases.length === 0 ? "No KBs found" : "Select knowledge base"} />
+              <SelectValue placeholder={knowledgeBases.length === 0 ? 'No KBs found' : 'Select knowledge base'} />
             </SelectTrigger>
             <SelectContent>
               {knowledgeBases.length === 0 ? (
@@ -237,9 +238,9 @@ export default function ModelTab({ onChangesMade }: ModelTabProps) {
             Contact Bucket
           </label>
           <Select
-            value={contactBucketId || "none"}
+            value={contactBucketId || 'none'}
             onValueChange={(value) => {
-              const bucketId = value === "none" ? null : value;
+              const bucketId = value === 'none' ? null : value;
               setContactBucketId(bucketId);
               if (currentAssistant) {
                 updateAssistantLocally(currentAssistant.id, { contact_bucket_id: bucketId });
@@ -248,7 +249,7 @@ export default function ModelTab({ onChangesMade }: ModelTabProps) {
             }}
           >
             <SelectTrigger className="w-full bg-white">
-              <SelectValue placeholder={buckets.length === 0 ? "No buckets found" : "Select contact bucket"} />
+              <SelectValue placeholder={buckets.length === 0 ? 'No buckets found' : 'Select contact bucket'} />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="none">None</SelectItem>
@@ -268,15 +269,15 @@ export default function ModelTab({ onChangesMade }: ModelTabProps) {
 
       {/* Voice Configuration Section */}
       {/* <div className="border rounded-lg p-6 bg-gray-50"> */}
-        {/* <h3 className="text-lg font-medium mb-2">Voice Configuration</h3>
+      {/* <h3 className="text-lg font-medium mb-2">Voice Configuration</h3>
         <p className="text-sm text-gray-600 mb-6">
           Choose from the list of voices, or sync your voice library if you aren't able to find your voice in the dropdown.
           If you are still facing any error, you can enable custom voice and add a voice ID manually.
         </p> */}
 
-        {/* <div className="grid grid-cols-1 md:grid-cols-2 gap-6"> */}
-          {/* Provider Selection */}
-          {/* <div className="space-y-2">
+      {/* <div className="grid grid-cols-1 md:grid-cols-2 gap-6"> */}
+      {/* Provider Selection */}
+      {/* <div className="space-y-2">
             <label htmlFor="provider" className="text-sm font-medium">
               Provider
             </label>
@@ -294,8 +295,8 @@ export default function ModelTab({ onChangesMade }: ModelTabProps) {
             </Select>
           </div> */}
 
-          {/* Voice Selection */}
-          {/* <div className="space-y-2">
+      {/* Voice Selection */}
+      {/* <div className="space-y-2">
             <label htmlFor="voice" className="text-sm font-medium">
               Voice
             </label>
@@ -312,7 +313,7 @@ export default function ModelTab({ onChangesMade }: ModelTabProps) {
               </SelectContent>
             </Select>
           </div> */}
-        {/* </div> */}
+      {/* </div> */}
       {/* </div> */}
 
       {/* Model Section */}

@@ -3,12 +3,14 @@
  * Popup dialog for selecting agent(s) to filter call history.
  */
 
-import React, { useState } from "react";
-import { useAssistants } from "@/app/hooks/use-assistants-context";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { Check, Search, User } from "lucide-react";
-import { useTranslations } from "@/i18n/translations-context";
-import { CallLog } from "../../../../types/call-management";
+import React, { useState } from 'react';
+import { Check, Search, User } from 'lucide-react';
+
+import { useAssistants } from '@/app/hooks/use-assistants-context';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { useTranslations } from '@/i18n/translations-context';
+
+import { CallLog } from '../../../../types/call-management';
 
 type AgentFilterDialogProps = {
   open: boolean;
@@ -26,7 +28,7 @@ const AgentFilterDialog: React.FC<AgentFilterDialogProps> = ({
   onSelect,
 }) => {
   const { t } = useTranslations();
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState('');
   const { assistants } = useAssistants();
 
   // Use assistant names from global context
@@ -34,7 +36,7 @@ const AgentFilterDialog: React.FC<AgentFilterDialogProps> = ({
 
   // Filter assistant names by search
   const filteredAgents = assistantNames.filter((name) =>
-    name.toLowerCase().includes(search.trim().toLowerCase())
+    name.toLowerCase().includes(search.trim().toLowerCase()),
   );
 
   // Toggle agent selection
@@ -50,11 +52,11 @@ const AgentFilterDialog: React.FC<AgentFilterDialogProps> = ({
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-sm w-full rounded-xl p-0 overflow-hidden animate-in fade-in-0 zoom-in-95">
         <div className="p-4 border-b border-border flex items-center justify-between">
-          <div className="font-semibold text-lg">{t("callHistory.agentFilter.title")}</div>
+          <div className="font-semibold text-lg">{t('callHistory.agentFilter.title')}</div>
           <button
             className="text-muted-foreground hover:text-foreground transition"
             onClick={onClose}
-            aria-label={t("callHistory.agentFilter.close")}
+            aria-label={t('callHistory.agentFilter.close')}
           >
             &times;
           </button>
@@ -65,7 +67,7 @@ const AgentFilterDialog: React.FC<AgentFilterDialogProps> = ({
             <input
               type="text"
               className="flex-1 px-2 py-1 rounded border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-amber-200"
-              placeholder={t("callHistory.agentFilter.searchPlaceholder")}
+              placeholder={t('callHistory.agentFilter.searchPlaceholder')}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -73,7 +75,7 @@ const AgentFilterDialog: React.FC<AgentFilterDialogProps> = ({
           <div className="max-h-56 overflow-y-auto space-y-1">
             {filteredAgents.length === 0 ? (
               <div className="text-muted-foreground text-sm py-6 text-center">
-                {t("callHistory.agentFilter.noAgents")}
+                {t('callHistory.agentFilter.noAgents')}
               </div>
             ) : (
               filteredAgents.map((name) => (
@@ -81,8 +83,8 @@ const AgentFilterDialog: React.FC<AgentFilterDialogProps> = ({
                   key={name}
                   className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg transition group ${
                     selectedAgents.includes(name)
-                      ? "bg-amber-100 text-amber-900"
-                      : "hover:bg-muted"
+                      ? 'bg-amber-100 text-amber-900'
+                      : 'hover:bg-muted'
                   }`}
                   onClick={() => toggleAgent(name)}
                   tabIndex={0}
@@ -93,8 +95,8 @@ const AgentFilterDialog: React.FC<AgentFilterDialogProps> = ({
                   <span
                     className={`transition-opacity duration-200 ${
                       selectedAgents.includes(name)
-                        ? "opacity-100 scale-110"
-                        : "opacity-0 scale-90"
+                        ? 'opacity-100 scale-110'
+                        : 'opacity-0 scale-90'
                     }`}
                   >
                     <Check size={18} className="text-amber-600" />
@@ -109,13 +111,13 @@ const AgentFilterDialog: React.FC<AgentFilterDialogProps> = ({
             className="px-4 py-2 rounded bg-muted text-foreground hover:bg-amber-50 transition"
             onClick={onClose}
           >
-            {t("common.cancel")}
+            {t('common.cancel')}
           </button>
           <button
             className="px-4 py-2 rounded bg-amber-600 text-white hover:bg-amber-700 transition"
             onClick={onClose}
           >
-            {t("common.save")}
+            {t('common.save')}
           </button>
         </div>
       </DialogContent>

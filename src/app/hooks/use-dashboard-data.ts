@@ -1,246 +1,222 @@
-// app/dashboard/hooks/use-dashboard-data.ts
+'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
-import { apiService } from '@/lib/api';
-import { useAuth } from '@/lib/auth/AuthProvider';
+import { ChartDataPoint } from '@/components/charts';
+import { fetchChartData, defaultChartData } from '@/app/dashboard/data/chart-data';
 
-// Import mock data for fallback
-import {
-  totalCallMinutesData,
-  numberOfCallsData,
-  totalSpentData,
-  avgCostPerCallData,
-  callEndReasonData,
-  callDurationByAssistantData,
-  costBreakdownData,
-  successEvaluationData,
-  unsuccessfulCallsData,
-  concurrentCallsData,
-} from '../dashboard/data/mock-data';
-
-interface DashboardDataOptions {
-  dateFrom?: string;
-  dateTo?: string;
-  groupBy?: 'day' | 'week' | 'month';
-  assistantId?: string;
-  useMockData?: boolean; // For development/testing
+interface DashboardMetrics {
+  agents: {
+    total: number
+    active: number
+    trend: {
+      direction: 'up' | 'down' | 'neutral'
+      percentage: number
+    }
+  }
+  calls: {
+    total: number
+    today: number
+    trend: {
+      direction: 'up' | 'down' | 'neutral'
+      percentage: number
+    }
+  }
+  wallet: {
+    balance: number
+    currency: string
+    minutesRemaining: number
+  }
 }
 
-/**
- * Custom hook for fetching dashboard data
- * Optimized with memoization to prevent unnecessary recalculations
- */
-export function useDashboardData({
-  dateFrom,
-  dateTo,
-  groupBy = 'day',
-  assistantId,
-  useMockData = true, // Default to mock data for now
-}: DashboardDataOptions) {
-  const { currentOrganization } = useAuth();
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<Error | null>(null);
-  
-  // Memoize filter functions to prevent recreation on each render
-  const filterDataByDateRange = useCallback(<T extends { date: string }>(data: T[]): T[] => {
-    if (!dateFrom || !dateTo) return data;
-    
-    const fromDate = new Date(dateFrom);
-    const toDate = new Date(dateTo);
-    
-    return data.filter(item => {
-      const itemDate = new Date(item.date);
+interface DashboardDataState {
+  metrics: DashboardMetrics | null
+  chartData: ChartDataPoint[]
+  timeRange: '24h' | '7d' | '30d'
+  loading: {
+    metrics: boolean
+    chart: boolean
+    initial: boolean
+  }
+  errors: {
+    metrics: string | null
+    chart: string | null
+  }
+}
 
-      return itemDate >= fromDate && itemDate <= toDate;
-    });
-  }, [dateFrom, dateTo]);
+const defaultMetrics: DashboardMetrics = {
+  agents: {
+    total: 23,
+    active: 18,
+    trend: { direction: 'up', percentage: 12 },
+  },
+  calls: {
+    total: 1234,
+    today: 89,
+    trend: { direction: 'up', percentage: 8 },
+  },
+  wallet: {
+    balance: 12345,
+    currency: '₹',
+    minutesRemaining: 3400,
+  },
+};
+
+// Simulate metrics API call
+const fetchMetrics = async (): Promise<DashboardMetrics> => {
+  await new Promise(resolve => setTimeout(resolve, 300 + Math.random() * 200));
   
-  // Filter data by assistant ID if provided - memoized
-  const filterDataByAssistant = useCallback((data: any) => {
-    if (!assistantId || assistantId === 'all') return data;
-    
-    // For call duration by assistant, we need special handling
-    const filteredCallDuration = data.callDurationByAssistant.map((item: any) => {
-      const newItem = { date: item.date };
+  // Simulate occasional errors (3% chance)
+  if (Math.random() < 0.03) {
+    throw new Error('Failed to fetch dashboard metrics');
+  }
+  
+  // Generate slightly varied metrics
+  const variation = (base: number, factor: number = 0.1) => 
+    Math.floor(base + (Math.random() - 0.5) * base * factor);
+  
+  return {
+    agents: {
+      total: variation(23),
+      active: variation(18),
+      trend: { 
+        direction: Math.random() > 0.3 ? 'up' : Math.random() > 0.5 ? 'down' : 'neutral',
+        percentage: Math.floor(Math.random() * 20) + 1,
+      },
+    },
+    calls: {
+      total: variation(1234, 0.2),
+      today: variation(89, 0.3),
+      trend: { 
+        direction: Math.random() > 0.2 ? 'up' : Math.random() > 0.6 ? 'down' : 'neutral',
+        percentage: Math.floor(Math.random() * 15) + 1,
+      },
+    },
+    wallet: {
+      balance: variation(12345, 0.05),
+      currency: '₹',
+      minutesRemaining: variation(3400, 0.1),
+    },
+  };
+};
+
+export const useDashboardData = () => {
+  const [state, setState] = useState<DashboardDataState>({
+    metrics: null,
+    chartData: defaultChartData,
+    timeRange: '7d',
+    loading: {
+      metrics: true,
+      chart: false,
+      initial: true,
+    },
+    errors: {
+      metrics: null,
+      chart: null,
+    },
+  });
+
+  // Load metrics data
+  const loadMetrics = useCallback(async () => {
+    setState(prev => ({
+      ...prev,
+      loading: { ...prev.loading, metrics: true },
+      errors: { ...prev.errors, metrics: null },
+    }));
+
+    try {
+      const metrics = await fetchMetrics();
+      setState(prev => ({
+        ...prev,
+        metrics,
+        loading: { ...prev.loading, metrics: false },
+      }));
+    } catch (error) {
+      console.error('Failed to load dashboard metrics:', error);
+      setState(prev => ({
+        ...prev,
+        metrics: defaultMetrics, // Fallback to default metrics
+        loading: { ...prev.loading, metrics: false },
+        errors: { 
+          ...prev.errors, 
+          metrics: error instanceof Error ? error.message : 'Failed to load metrics',
+        },
+      }));
+    }
+  }, []);
+
+  // Load chart data
+  const loadChartData = useCallback(async (timeRange: '24h' | '7d' | '30d') => {
+    setState(prev => ({
+      ...prev,
+      loading: { ...prev.loading, chart: true },
+      errors: { ...prev.errors, chart: null },
+    }));
+
+    try {
+      const chartData = await fetchChartData(timeRange);
+      setState(prev => ({
+        ...prev,
+        chartData,
+        timeRange,
+        loading: { ...prev.loading, chart: false },
+      }));
+    } catch (error) {
+      console.error('Failed to load chart data:', error);
+      // Provide fallback chart data instead of showing error
+      const { generateMockChartData } = await import('@/app/dashboard/data/chart-data');
+      const fallbackData = generateMockChartData(timeRange);
       
-      if (assistantId === 'new' && 'New Assistant' in item) {
-        (newItem as any)['New Assistant'] = item['New Assistant'];
-      } else if (assistantId === 'unknown' && 'Unknown Assistant' in item) {
-        (newItem as any)['Unknown Assistant'] = item['Unknown Assistant'];
-      }
-      
-      return newItem;
-    });
-    
-    return {
-      ...data,
-      callDurationByAssistant: filteredCallDuration,
-    };
-  }, [assistantId]);
-  
-  // Adjust granularity based on groupBy parameter - memoized
-  const adjustDataByGrouping = useCallback((data: any) => {
-    if (groupBy === 'day') return data; // No adjustment needed
-    
-    // For demo purposes, we'll just return the data as is
-    // In a real implementation, you would aggregate data by week or month
-    return data;
-  }, [groupBy]);
+      setState(prev => ({
+        ...prev,
+        chartData: fallbackData,
+        timeRange,
+        loading: { ...prev.loading, chart: false },
+        errors: { 
+          ...prev.errors, 
+          chart: null, // Don't show error, just use fallback data
+        },
+      }));
+    }
+  }, []);
 
-  // Memoize the processed data to prevent recalculation on every render
-  const processedMockData = useMemo(() => ({
-    totalCallMinutes: {
-      ...totalCallMinutesData,
-      points: filterDataByDateRange(totalCallMinutesData.points),
-    },
-    numberOfCalls: {
-      ...numberOfCallsData,
-      points: filterDataByDateRange(numberOfCallsData.points),
-    },
-    totalSpent: {
-      ...totalSpentData,
-      points: filterDataByDateRange(totalSpentData.points),
-    },
-    avgCostPerCall: {
-      ...avgCostPerCallData,
-      points: filterDataByDateRange(avgCostPerCallData.points),
-    },
-  }), [filterDataByDateRange]);
-  
-  const [metrics, setMetrics] = useState(processedMockData);
-  
-  const processedAnalysisData = useMemo(() => filterDataByAssistant({
-    callEndReason: callEndReasonData,
-    callDurationByAssistant: callDurationByAssistantData,
-    costBreakdown: costBreakdownData,
-    successEvaluation: successEvaluationData,
-  }), [filterDataByAssistant]);
-  
-  const [analysis, setAnalysis] = useState(processedAnalysisData);
-  
-  // Filter failed calls if needed - memoized
-  const filteredFailedCalls = useMemo(() => {
-    return assistantId && assistantId !== 'all'
-      ? unsuccessfulCallsData.filter(call => 
-        (assistantId === 'new' && call.assistant === 'New Assistant') ||
-          (assistantId === 'unknown' && call.assistant === 'Unknown Assistant'),
-      )
-      : unsuccessfulCallsData;
-  }, [assistantId]);
-  
-  const [failedCalls, setFailedCalls] = useState(filteredFailedCalls);
-  
-  // Filter concurrent calls by date range - memoized
-  const filteredConcurrentCalls = useMemo(() => 
-    filterDataByDateRange(concurrentCallsData),
-  [filterDataByDateRange]);
-  
-  const [concurrentCalls, setConcurrentCalls] = useState(filteredConcurrentCalls);
+  // Change time range
+  const changeTimeRange = useCallback((newTimeRange: '24h' | '7d' | '30d') => {
+    if (newTimeRange !== state.timeRange) {
+      loadChartData(newTimeRange);
+    }
+  }, [state.timeRange, loadChartData]);
 
-  // Refresh data function - memoized to prevent recreation on each render
+  // Refresh all data
   const refreshData = useCallback(() => {
-    setLoading(true);
-    setError(null);
-    
-    // Simulate API call delay
-    setTimeout(() => {
-      try {
-        if (useMockData) {
-          // Update metrics with filtered data
-          setMetrics({
-            totalCallMinutes: {
-              ...totalCallMinutesData,
-              points: filterDataByDateRange(totalCallMinutesData.points),
-            },
-            numberOfCalls: {
-              ...numberOfCallsData,
-              points: filterDataByDateRange(numberOfCallsData.points),
-            },
-            totalSpent: {
-              ...totalSpentData,
-              points: filterDataByDateRange(totalSpentData.points),
-            },
-            avgCostPerCall: {
-              ...avgCostPerCallData,
-              points: filterDataByDateRange(avgCostPerCallData.points),
-            },
-          });
-          
-          // Update analysis data
-          setAnalysis(filterDataByAssistant({
-            callEndReason: callEndReasonData,
-            callDurationByAssistant: callDurationByAssistantData,
-            costBreakdown: costBreakdownData,
-            successEvaluation: successEvaluationData,
-          }));
-          
-          // Update failed calls
-          setFailedCalls(filteredFailedCalls);
-          
-          // Update concurrent calls
-          setConcurrentCalls(filteredConcurrentCalls);
-          
-          setLoading(false);
-        } else {
-          // In a real app, you would call your API here with organization context
-          const apiOptions = { 
-            dateFrom, 
-            dateTo, 
-            groupBy, 
-            assistantId,
-            organizationId: currentOrganization?.id 
-          };
-          
-          Promise.all([
-            apiService.getDashboardMetrics(apiOptions),
-            apiService.getCallAnalysis(apiOptions),
-            apiService.getUnsuccessfulCalls(apiOptions),
-            apiService.getConcurrentCalls(apiOptions)
-          ])
-          .then(([metricsData, analysisData, failedCallsData, concurrentCallsData]) => {
-            setMetrics(metricsData);
-            setAnalysis(analysisData);
-            setFailedCalls(failedCallsData);
-            setConcurrentCalls(concurrentCallsData);
-            setLoading(false);
-          })
-          .catch(err => {
-            setError(err);
-            setLoading(false);
-          });
-        }
-      } catch (err) {
-        setError(err instanceof Error ? err : new Error('Unknown error'));
-        setLoading(false);
-      }
-    }, 1000); // Simulate network delay
-  }, [
-    dateFrom, 
-    dateTo, 
-    groupBy, 
-    assistantId, 
-    useMockData, 
-    filterDataByDateRange, 
-    filterDataByAssistant,
-    processedMockData,
-    processedAnalysisData,
-    filteredFailedCalls,
-    filteredConcurrentCalls,
-  ]);
+    loadMetrics();
+    loadChartData(state.timeRange);
+  }, [loadMetrics, loadChartData, state.timeRange]);
 
-  // Effect to refresh data when dependencies change
+  // Initial data load with progressive loading
   useEffect(() => {
-    refreshData();
-  }, [dateFrom, dateTo, groupBy, assistantId, refreshData]);
+    const initializeData = async () => {
+      // Load metrics first (faster)
+      await loadMetrics();
+      
+      // Then load chart data
+      await loadChartData('7d');
+      
+      // Mark initial loading as complete
+      setState(prev => ({
+        ...prev,
+        loading: { ...prev.loading, initial: false },
+      }));
+    };
+
+    initializeData();
+  }, []); // Only run once on mount
 
   return {
-    loading,
-    error,
-    metrics,
-    analysis,
-    failedCalls,
-    concurrentCalls,
+    ...state,
+    changeTimeRange,
     refreshData,
+    loadMetrics,
+    loadChartData,
   };
-}
+};

@@ -15,6 +15,13 @@ import {
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
+import { useHasPermission } from '@/lib/auth/useHasPermission';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 import { useAssistants } from '../../hooks/use-assistants-context';
 import DeleteConfirmationModal from '../delete-confirmation-modal';
@@ -22,17 +29,9 @@ import DeleteConfirmationModal from '../delete-confirmation-modal';
 import CostDisplay from './cost-display';
 import ModelTab from './tab-views/model-tab';
 import AssistantDualButton from './assistant-dual-button';
-import { useHasPermission } from '@/lib/auth/useHasPermission';
-
 import CallScheduling from './tab-views/call-management/call-scheduling';
 import CallInsights from './tab-views/call-management/call-insights';
 
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 
 // Modern, animated latency card
 function LatencyCard({ latencyMs }: { latencyMs: number }) {
@@ -59,13 +58,14 @@ function LatencyCard({ latencyMs }: { latencyMs: number }) {
         }
       }
       frame = requestAnimationFrame(animate);
+
       return () => cancelAnimationFrame(frame);
     }
   }, [latencyMs]);
 
   // Bar width and color based on latency
   const barWidth = Math.min(100, Math.max(10, (latencyMs / 2000) * 100));
-  const barColor = "bg-[#3A8DFF]";
+  const barColor = 'bg-[#3A8DFF]';
 
   return (
     <div className="relative w-full p-4 bg-[#F5F6FA] rounded-xl border border-[#E5E5E0] shadow-md transition-transform duration-200 hover:scale-[1.025] hover:shadow-lg group">
@@ -89,7 +89,7 @@ function LatencyCard({ latencyMs }: { latencyMs: number }) {
       <div className="w-full text-center">
         <div
           className="font-extrabold text-4xl text-[#181A1B] transition-all duration-300"
-          style={{ letterSpacing: "0.01em" }}
+          style={{ letterSpacing: '0.01em' }}
         >
           ~{Math.round(displayLatency)}
           <span className="text-lg text-[#39594D] font-medium ml-1">ms</span>
@@ -101,8 +101,8 @@ function LatencyCard({ latencyMs }: { latencyMs: number }) {
           className={`h-full transition-all duration-500 ${barColor}`}
           style={{
             width: `${barWidth}%`,
-            minWidth: "10%",
-            boxShadow: "0 0 8px 0 rgba(255,119,89,0.18)",
+            minWidth: '10%',
+            boxShadow: '0 0 8px 0 rgba(255,119,89,0.18)',
           }}
         ></div>
       </div>
@@ -353,7 +353,7 @@ export default function AssistantTabs({ editingAssistantId }: AssistantTabsProps
             className="text-[var(--destructive)] border-[var(--destructive)] hover:bg-[var(--destructive)]/10"
             onClick={() => setIsDeleteModalOpen(true)}
             disabled={isSaving} // Only disable during save
-            title={isDraft ? "Delete this draft assistant" : "Delete this assistant"}
+            title={isDraft ? 'Delete this draft assistant' : 'Delete this assistant'}
           >
             <Trash2 className="h-4 w-4 mr-2" />
             Delete Assistant
@@ -386,10 +386,10 @@ export default function AssistantTabs({ editingAssistantId }: AssistantTabsProps
               className="bg-green-600 hover:bg-green-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
               title={
                 isEditingName
-                  ? "Finish editing the assistant name before publishing"
+                  ? 'Finish editing the assistant name before publishing'
                   : (!currentAssistant.phoneNumber || currentAssistant.phoneNumber.trim() === '')
-                    ? "Phone number is required before publishing"
-                    : "Publish this draft assistant"
+                    ? 'Phone number is required before publishing'
+                    : 'Publish this draft assistant'
               }
             >
               {isSaving ? 'Publishing...' : 'Publish Assistant'}
@@ -401,10 +401,10 @@ export default function AssistantTabs({ editingAssistantId }: AssistantTabsProps
             disabled={isSaveDisabled}
             className="bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-[var(--on-primary)] disabled:opacity-50 disabled:cursor-not-allowed"
             title={
-              isDraft ? "(Should not happen - Save button shown for non-drafts)" : // Adjusted title logic slightly
-                (!currentAssistant.phoneNumber || currentAssistant.phoneNumber.trim() === '') ? "Phone number is required before saving changes" :
-                  !hasUnsavedChanges ? "No changes to save" :
-                    "Save changes to this assistant"
+              isDraft ? '(Should not happen - Save button shown for non-drafts)' : // Adjusted title logic slightly
+                (!currentAssistant.phoneNumber || currentAssistant.phoneNumber.trim() === '') ? 'Phone number is required before saving changes' :
+                  !hasUnsavedChanges ? 'No changes to save' :
+                    'Save changes to this assistant'
             }
           >
             {isSaving ? 'Saving...' : 'Save Changes'}

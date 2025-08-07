@@ -1,13 +1,14 @@
 'use client';
 
-import { useRef, useEffect, useState } from "react";
-import { InfoIcon } from "lucide-react";
+import { useRef, useEffect, useState } from 'react';
+import { InfoIcon } from 'lucide-react';
+
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from "@/components/ui/tooltip";
+} from '@/components/ui/tooltip';
 
 interface CostDisplayProps {
   costPerMinute: number;
@@ -18,9 +19,9 @@ interface CostDisplayProps {
 
 export default function CostDisplay({
   costPerMinute,
-  label = "Cost",
+  label = 'Cost',
   showInfo = true,
-  infoText = "Estimated cost per minute of usage",
+  infoText = 'Estimated cost per minute of usage',
 }: CostDisplayProps) {
   // Animate the cost value on change
   const [displayCost, setDisplayCost] = useState(costPerMinute);
@@ -45,13 +46,14 @@ export default function CostDisplay({
         }
       }
       frame = requestAnimationFrame(animate);
+
       return () => cancelAnimationFrame(frame);
     }
   }, [costPerMinute]);
 
   // Bar width and color based on cost
   const barWidth = Math.min(100, Math.max(10, (costPerMinute / 30) * 100));
-  const barColor = "bg-[#39594D]";
+  const barColor = 'bg-[#39594D]';
 
   return (
     <div className="relative w-full p-4 bg-[#F5F6FA] rounded-xl border border-[#E5E5E0] shadow-md transition-transform duration-200 hover:scale-[1.025] hover:shadow-lg group">
@@ -78,7 +80,7 @@ export default function CostDisplay({
       <div className="w-full text-center">
         <div
           className="font-extrabold text-4xl text-[#181A1B] transition-all duration-300"
-          style={{ letterSpacing: "0.01em" }}
+          style={{ letterSpacing: '0.01em' }}
         >
           ~₹{displayCost.toFixed(2)}
           <span className="text-lg text-[#39594D] font-medium ml-1">/min</span>
@@ -91,8 +93,8 @@ export default function CostDisplay({
           className={`h-full transition-all duration-500 ${barColor}`}
           style={{
             width: `${barWidth}%`,
-            minWidth: "10%",
-            boxShadow: "0 0 8px 0 rgba(226,93,65,0.18)",
+            minWidth: '10%',
+            boxShadow: '0 0 8px 0 rgba(226,93,65,0.18)',
           }}
         ></div>
       </div>

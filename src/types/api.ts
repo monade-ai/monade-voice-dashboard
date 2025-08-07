@@ -61,7 +61,7 @@ export const API_ERROR_CODES = {
   
   // Rate limiting
   RATE_LIMIT_EXCEEDED: 'RATE_LIMIT_EXCEEDED',
-  TOO_MANY_INVITATIONS: 'TOO_MANY_INVITATIONS'
+  TOO_MANY_INVITATIONS: 'TOO_MANY_INVITATIONS',
 } as const;
 
 export type ApiErrorCode = typeof API_ERROR_CODES[keyof typeof API_ERROR_CODES];
@@ -215,18 +215,18 @@ export function isSuccessResponse<T>(response: ApiResponse<T>): response is ApiR
 export class ApiErrorHandler {
   static getErrorMessage(error: ApiError): string {
     switch (error.code) {
-      case API_ERROR_CODES.INSUFFICIENT_PERMISSIONS:
-        return 'You do not have permission to perform this action.';
-      case API_ERROR_CODES.ORGANIZATION_NOT_FOUND:
-        return 'Organization not found.';
-      case API_ERROR_CODES.USER_ALREADY_MEMBER:
-        return 'User is already a member of this organization.';
-      case API_ERROR_CODES.INVITATION_EXPIRED:
-        return 'This invitation has expired. Please request a new one.';
-      case API_ERROR_CODES.RATE_LIMIT_EXCEEDED:
-        return 'Too many requests. Please try again later.';
-      default:
-        return error.message || 'An unexpected error occurred.';
+    case API_ERROR_CODES.INSUFFICIENT_PERMISSIONS:
+      return 'You do not have permission to perform this action.';
+    case API_ERROR_CODES.ORGANIZATION_NOT_FOUND:
+      return 'Organization not found.';
+    case API_ERROR_CODES.USER_ALREADY_MEMBER:
+      return 'User is already a member of this organization.';
+    case API_ERROR_CODES.INVITATION_EXPIRED:
+      return 'This invitation has expired. Please request a new one.';
+    case API_ERROR_CODES.RATE_LIMIT_EXCEEDED:
+      return 'Too many requests. Please try again later.';
+    default:
+      return error.message || 'An unexpected error occurred.';
     }
   }
 
@@ -234,8 +234,9 @@ export class ApiErrorHandler {
     const retryableCodes = [
       API_ERROR_CODES.INTERNAL_SERVER_ERROR,
       API_ERROR_CODES.DATABASE_ERROR,
-      API_ERROR_CODES.RATE_LIMIT_EXCEEDED
+      API_ERROR_CODES.RATE_LIMIT_EXCEEDED,
     ];
+
     return retryableCodes.includes(error.code as ApiErrorCode);
   }
 }

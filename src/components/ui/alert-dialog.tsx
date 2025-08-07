@@ -1,9 +1,10 @@
-"use client"
+'use client';
 
-import * as React from "react"
-import { cn } from "@/lib/utils"
-import { Button, buttonVariants } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import * as React from 'react';
+
+import { cn } from '@/lib/utils';
+import { Button, buttonVariants } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 
 // Simple AlertDialog implementation using Dialog as base
 interface AlertDialogProps {
@@ -49,7 +50,7 @@ const AlertDialogTrigger = React.forwardRef<
     </Button>
   );
 });
-AlertDialogTrigger.displayName = "AlertDialogTrigger";
+AlertDialogTrigger.displayName = 'AlertDialogTrigger';
 
 const AlertDialogContent = React.forwardRef<
   HTMLDivElement,
@@ -68,8 +69,8 @@ const AlertDialogContent = React.forwardRef<
       <div
         ref={ref}
         className={cn(
-          "relative z-50 grid w-full max-w-lg gap-4 border bg-white p-6 shadow-lg rounded-lg",
-          className
+          'relative z-50 grid w-full max-w-lg gap-4 border bg-white p-6 shadow-lg rounded-lg',
+          className,
         )}
         {...props}
       >
@@ -78,7 +79,7 @@ const AlertDialogContent = React.forwardRef<
     </div>
   );
 });
-AlertDialogContent.displayName = "AlertDialogContent";
+AlertDialogContent.displayName = 'AlertDialogContent';
 
 const AlertDialogHeader = ({
   className,
@@ -86,13 +87,13 @@ const AlertDialogHeader = ({
 }: React.HTMLAttributes<HTMLDivElement>) => (
   <div
     className={cn(
-      "flex flex-col space-y-2 text-center sm:text-left",
-      className
+      'flex flex-col space-y-2 text-center sm:text-left',
+      className,
     )}
     {...props}
   />
 );
-AlertDialogHeader.displayName = "AlertDialogHeader";
+AlertDialogHeader.displayName = 'AlertDialogHeader';
 
 const AlertDialogFooter = ({
   className,
@@ -100,13 +101,13 @@ const AlertDialogFooter = ({
 }: React.HTMLAttributes<HTMLDivElement>) => (
   <div
     className={cn(
-      "flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2",
-      className
+      'flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2',
+      className,
     )}
     {...props}
   />
 );
-AlertDialogFooter.displayName = "AlertDialogFooter";
+AlertDialogFooter.displayName = 'AlertDialogFooter';
 
 const AlertDialogTitle = React.forwardRef<
   HTMLHeadingElement,
@@ -114,11 +115,11 @@ const AlertDialogTitle = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <h2
     ref={ref}
-    className={cn("text-lg font-semibold", className)}
+    className={cn('text-lg font-semibold', className)}
     {...props}
   />
 ));
-AlertDialogTitle.displayName = "AlertDialogTitle";
+AlertDialogTitle.displayName = 'AlertDialogTitle';
 
 const AlertDialogDescription = React.forwardRef<
   HTMLParagraphElement,
@@ -126,11 +127,11 @@ const AlertDialogDescription = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <p
     ref={ref}
-    className={cn("text-sm text-gray-500", className)}
+    className={cn('text-sm text-gray-500', className)}
     {...props}
   />
 ));
-AlertDialogDescription.displayName = "AlertDialogDescription";
+AlertDialogDescription.displayName = 'AlertDialogDescription';
 
 const AlertDialogAction = React.forwardRef<
   HTMLButtonElement,
@@ -152,7 +153,7 @@ const AlertDialogAction = React.forwardRef<
     />
   );
 });
-AlertDialogAction.displayName = "AlertDialogAction";
+AlertDialogAction.displayName = 'AlertDialogAction';
 
 const AlertDialogCancel = React.forwardRef<
   HTMLButtonElement,
@@ -169,13 +170,13 @@ const AlertDialogCancel = React.forwardRef<
     <Button
       ref={ref}
       variant="outline"
-      className={cn("mt-2 sm:mt-0", className)}
+      className={cn('mt-2 sm:mt-0', className)}
       onClick={handleClick}
       {...props}
     />
   );
 });
-AlertDialogCancel.displayName = "AlertDialogCancel";
+AlertDialogCancel.displayName = 'AlertDialogCancel';
 
 export {
   AlertDialog,
@@ -187,4 +188,4 @@ export {
   AlertDialogDescription,
   AlertDialogAction,
   AlertDialogCancel,
-}
+};

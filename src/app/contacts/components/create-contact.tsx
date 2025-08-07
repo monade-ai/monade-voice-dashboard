@@ -2,11 +2,12 @@
 
 import React, { useState, useEffect } from 'react';
 import { z } from 'zod';
-import { useTranslations } from '@/i18n/translations-context';
 
+import { useTranslations } from '@/i18n/translations-context';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+
 import { useContactsContext, Contact } from '../contexts/contacts-context';
 
 interface CreateContactProps {
@@ -53,6 +54,7 @@ const CreateContact: React.FC<CreateContactProps> = ({ onCancel, onSuccess }) =>
     });
 
     setErrors(newErrors);
+
     return Object.keys(newErrors).length === 0;
   };
 
@@ -75,7 +77,7 @@ const CreateContact: React.FC<CreateContactProps> = ({ onCancel, onSuccess }) =>
         onSuccess(newContact);
       }
     } catch (error: any) {
-      console.error("Error submitting contact:", error);
+      console.error('Error submitting contact:', error);
       setErrors(prev => ({ ...prev, form: error.message || 'An error occurred.' }));
     } finally {
       setIsSubmitting(false);

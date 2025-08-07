@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useAssistants } from '@/app/hooks/use-assistants-context';
 import { Check, Zap, CheckCircle2, Loader2, AlertTriangle } from 'lucide-react';
 
+import { useAssistants } from '@/app/hooks/use-assistants-context';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,

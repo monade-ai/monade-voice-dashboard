@@ -1,9 +1,10 @@
 'use client';
 
 import { useState } from 'react';
+import { ChevronDown, Check, Building2, Plus } from 'lucide-react';
+
 import { useAuth } from '@/lib/auth/AuthProvider';
 import { Organization } from '@/types';
-import { ChevronDown, Check, Building2, Plus } from 'lucide-react';
 
 interface OrganizationSelectorProps {
   className?: string;
@@ -17,6 +18,7 @@ export function OrganizationSelector({ className = '' }: OrganizationSelectorPro
   const handleSwitchOrganization = async (orgId: string) => {
     if (orgId === currentOrganization?.id) {
       setIsOpen(false);
+
       return;
     }
 
@@ -134,6 +136,7 @@ export function CompactOrganizationSelector({ className = '' }: OrganizationSele
   const handleSwitchOrganization = async (orgId: string) => {
     if (orgId === currentOrganization?.id) {
       setIsOpen(false);
+
       return;
     }
 

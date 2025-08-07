@@ -1,7 +1,9 @@
 'use client';
 
 import React from 'react';
+
 import { ContactsProvider } from '../contexts/contacts-context';
+
 import ContactListView from './contacts-list-view';
 
 /**

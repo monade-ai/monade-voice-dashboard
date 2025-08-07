@@ -3,11 +3,11 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const notifications = [
-  "Agent Smith has a high drop-off rate.",
-  "Campaign 'Summer Sale' completed.",
-  "Campaign 'Q3 Outreach' for Agent 007 has started.",
-  "New lead assigned to Agent Carter.",
-  "Server maintenance scheduled for 2 AM.",
+  'Agent Smith has a high drop-off rate.',
+  'Campaign \'Summer Sale\' completed.',
+  'Campaign \'Q3 Outreach\' for Agent 007 has started.',
+  'New lead assigned to Agent Carter.',
+  'Server maintenance scheduled for 2 AM.',
 ];
 
 export function NotificationCarousel() {
@@ -17,6 +17,7 @@ export function NotificationCarousel() {
     const timer = setTimeout(() => {
       setIndex((prevIndex) => (prevIndex + 1) % notifications.length);
     }, 3000);
+
     return () => clearTimeout(timer);
   }, [index]);
 

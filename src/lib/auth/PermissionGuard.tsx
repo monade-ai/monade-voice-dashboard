@@ -3,8 +3,10 @@
  */
 
 import React from 'react';
-import { useAuth } from './AuthProvider';
+
 import { Permission, PERMISSION_GROUPS, PermissionGroup } from '@/types';
+
+import { useAuth } from './AuthProvider';
 
 interface PermissionGuardProps {
   permission?: Permission;
@@ -24,7 +26,7 @@ export function PermissionGuard({
   permissionGroup,
   requireAll = false,
   fallback = null,
-  children
+  children,
 }: PermissionGuardProps) {
   const { hasPermission, hasAnyPermission, hasAllPermissions } = useAuth();
 
@@ -75,7 +77,7 @@ interface OrganizationGuardProps {
 export function OrganizationGuard({ 
   requireOrganization = true, 
   fallback = null, 
-  children 
+  children, 
 }: OrganizationGuardProps) {
   const { currentOrganization } = useAuth();
 
@@ -88,7 +90,7 @@ export function OrganizationGuard({
 export function withPermission<P extends object>(
   Component: React.ComponentType<P>,
   permission: Permission,
-  fallback?: React.ComponentType<P>
+  fallback?: React.ComponentType<P>,
 ) {
   return function PermissionWrappedComponent(props: P) {
     const { hasPermission } = useAuth();
@@ -99,6 +101,7 @@ export function withPermission<P extends object>(
 
     if (fallback) {
       const FallbackComponent = fallback;
+
       return <FallbackComponent {...props} />;
     }
 
@@ -110,7 +113,7 @@ export function withPermission<P extends object>(
 export function withRole<P extends object>(
   Component: React.ComponentType<P>,
   roles: ('owner' | 'admin' | 'member')[],
-  fallback?: React.ComponentType<P>
+  fallback?: React.ComponentType<P>,
 ) {
   return function RoleWrappedComponent(props: P) {
     const { userRole } = useAuth();
@@ -121,6 +124,7 @@ export function withRole<P extends object>(
 
     if (fallback) {
       const FallbackComponent = fallback;
+
       return <FallbackComponent {...props} />;
     }
 

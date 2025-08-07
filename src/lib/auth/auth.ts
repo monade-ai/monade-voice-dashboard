@@ -31,11 +31,14 @@ export const getAccessToken = async (): Promise<string | null> => {
         console.warn('[getAccessToken] No Supabase session found in localStorage.');
       }
     }
+
     return null;
   }
   if (!session.access_token) {
     console.warn('[getAccessToken] Session found but access_token is missing:', session);
+
     return null;
   }
+
   return session.access_token;
 };

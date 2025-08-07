@@ -8,7 +8,7 @@ import {
   CreateOrganizationData,
   UpdateOrganizationData,
   InviteUserData,
-  ValidationError 
+  ValidationError, 
 } from '@/types';
 
 // Validation result type
@@ -25,19 +25,19 @@ export function validateOrganizationName(name: string): ValidationError[] {
     errors.push({
       field: 'name',
       message: 'Organization name is required',
-      code: 'REQUIRED'
+      code: 'REQUIRED',
     });
   } else if (name.trim().length < 2) {
     errors.push({
       field: 'name',
       message: 'Organization name must be at least 2 characters',
-      code: 'MIN_LENGTH'
+      code: 'MIN_LENGTH',
     });
   } else if (name.trim().length > 100) {
     errors.push({
       field: 'name',
       message: 'Organization name must be less than 100 characters',
-      code: 'MAX_LENGTH'
+      code: 'MAX_LENGTH',
     });
   }
   
@@ -51,8 +51,9 @@ export function validateOrganizationSlug(slug: string): ValidationError[] {
     errors.push({
       field: 'slug',
       message: 'Organization slug is required',
-      code: 'REQUIRED'
+      code: 'REQUIRED',
     });
+
     return errors;
   }
   
@@ -61,7 +62,7 @@ export function validateOrganizationSlug(slug: string): ValidationError[] {
     errors.push({
       field: 'slug',
       message: 'Slug can only contain lowercase letters, numbers, and hyphens',
-      code: 'INVALID_FORMAT'
+      code: 'INVALID_FORMAT',
     });
   }
   
@@ -69,7 +70,7 @@ export function validateOrganizationSlug(slug: string): ValidationError[] {
     errors.push({
       field: 'slug',
       message: 'Slug must be at least 3 characters',
-      code: 'MIN_LENGTH'
+      code: 'MIN_LENGTH',
     });
   }
   
@@ -77,7 +78,7 @@ export function validateOrganizationSlug(slug: string): ValidationError[] {
     errors.push({
       field: 'slug',
       message: 'Slug must be less than 50 characters',
-      code: 'MAX_LENGTH'
+      code: 'MAX_LENGTH',
     });
   }
   
@@ -85,7 +86,7 @@ export function validateOrganizationSlug(slug: string): ValidationError[] {
     errors.push({
       field: 'slug',
       message: 'Slug cannot start or end with a hyphen',
-      code: 'INVALID_FORMAT'
+      code: 'INVALID_FORMAT',
     });
   }
   
@@ -99,8 +100,9 @@ export function validateEmail(email: string): ValidationError[] {
     errors.push({
       field: 'email',
       message: 'Email is required',
-      code: 'REQUIRED'
+      code: 'REQUIRED',
     });
+
     return errors;
   }
   
@@ -109,7 +111,7 @@ export function validateEmail(email: string): ValidationError[] {
     errors.push({
       field: 'email',
       message: 'Please enter a valid email address',
-      code: 'INVALID_FORMAT'
+      code: 'INVALID_FORMAT',
     });
   }
   
@@ -131,7 +133,7 @@ export function validateCreateOrganizationData(data: CreateOrganizationData): Va
   
   return {
     isValid: errors.length === 0,
-    errors
+    errors,
   };
 }
 
@@ -152,7 +154,7 @@ export function validateUpdateOrganizationData(data: UpdateOrganizationData): Va
   
   return {
     isValid: errors.length === 0,
-    errors
+    errors,
   };
 }
 
@@ -165,19 +167,19 @@ export function validateInviteUserData(data: InviteUserData): ValidationResult {
     errors.push({
       field: 'role',
       message: 'Role is required',
-      code: 'REQUIRED'
+      code: 'REQUIRED',
     });
   } else if (!['admin', 'member'].includes(data.role)) {
     errors.push({
       field: 'role',
       message: 'Role must be either admin or member',
-      code: 'INVALID_VALUE'
+      code: 'INVALID_VALUE',
     });
   }
   
   return {
     isValid: errors.length === 0,
-    errors
+    errors,
   };
 }
 
@@ -185,7 +187,7 @@ export function validateInviteUserData(data: InviteUserData): ValidationResult {
 export function validateRoleChange(
   currentRole: OrganizationRole,
   newRole: OrganizationRole,
-  targetUserRole: OrganizationRole
+  targetUserRole: OrganizationRole,
 ): ValidationResult {
   const errors: ValidationError[] = [];
   
@@ -194,7 +196,7 @@ export function validateRoleChange(
     errors.push({
       field: 'role',
       message: 'Only owners can manage owner roles',
-      code: 'INSUFFICIENT_PERMISSIONS'
+      code: 'INSUFFICIENT_PERMISSIONS',
     });
   }
   
@@ -203,13 +205,13 @@ export function validateRoleChange(
     errors.push({
       field: 'role',
       message: 'Admins cannot change owner roles',
-      code: 'INSUFFICIENT_PERMISSIONS'
+      code: 'INSUFFICIENT_PERMISSIONS',
     });
   }
   
   return {
     isValid: errors.length === 0,
-    errors
+    errors,
   };
 }
 
@@ -221,8 +223,9 @@ export function validatePassword(password: string): ValidationError[] {
     errors.push({
       field: 'password',
       message: 'Password is required',
-      code: 'REQUIRED'
+      code: 'REQUIRED',
     });
+
     return errors;
   }
   
@@ -230,7 +233,7 @@ export function validatePassword(password: string): ValidationError[] {
     errors.push({
       field: 'password',
       message: 'Password must be at least 8 characters',
-      code: 'MIN_LENGTH'
+      code: 'MIN_LENGTH',
     });
   }
   
@@ -238,7 +241,7 @@ export function validatePassword(password: string): ValidationError[] {
     errors.push({
       field: 'password',
       message: 'Password must be less than 128 characters',
-      code: 'MAX_LENGTH'
+      code: 'MAX_LENGTH',
     });
   }
   
@@ -246,7 +249,7 @@ export function validatePassword(password: string): ValidationError[] {
     errors.push({
       field: 'password',
       message: 'Password must contain at least one lowercase letter',
-      code: 'WEAK_PASSWORD'
+      code: 'WEAK_PASSWORD',
     });
   }
   
@@ -254,7 +257,7 @@ export function validatePassword(password: string): ValidationError[] {
     errors.push({
       field: 'password',
       message: 'Password must contain at least one uppercase letter',
-      code: 'WEAK_PASSWORD'
+      code: 'WEAK_PASSWORD',
     });
   }
   
@@ -262,7 +265,7 @@ export function validatePassword(password: string): ValidationError[] {
     errors.push({
       field: 'password',
       message: 'Password must contain at least one number',
-      code: 'WEAK_PASSWORD'
+      code: 'WEAK_PASSWORD',
     });
   }
   
@@ -277,19 +280,19 @@ export function validateFullName(name: string): ValidationError[] {
     errors.push({
       field: 'full_name',
       message: 'Full name is required',
-      code: 'REQUIRED'
+      code: 'REQUIRED',
     });
   } else if (name.trim().length < 2) {
     errors.push({
       field: 'full_name',
       message: 'Full name must be at least 2 characters',
-      code: 'MIN_LENGTH'
+      code: 'MIN_LENGTH',
     });
   } else if (name.trim().length > 100) {
     errors.push({
       field: 'full_name',
       message: 'Full name must be less than 100 characters',
-      code: 'MAX_LENGTH'
+      code: 'MAX_LENGTH',
     });
   }
   
@@ -310,7 +313,7 @@ export function validateUrl(url: string, fieldName: string = 'url'): ValidationE
     errors.push({
       field: fieldName,
       message: 'Please enter a valid URL',
-      code: 'INVALID_FORMAT'
+      code: 'INVALID_FORMAT',
     });
   }
   
@@ -320,7 +323,7 @@ export function validateUrl(url: string, fieldName: string = 'url'): ValidationE
 // Batch validation utility
 export function validateBatch<T>(
   items: T[],
-  validator: (item: T) => ValidationResult
+  validator: (item: T) => ValidationResult,
 ): { valid: T[]; invalid: Array<{ item: T; errors: ValidationError[] }> } {
   const valid: T[] = [];
   const invalid: Array<{ item: T; errors: ValidationError[] }> = [];
@@ -370,6 +373,7 @@ export function formatValidationErrors(errors: ValidationError[]): Record<string
 
 export function getFirstError(errors: ValidationError[], field: string): string | null {
   const fieldError = errors.find(error => error.field === field);
+
   return fieldError ? fieldError.message : null;
 }
 
@@ -380,7 +384,7 @@ export const VALIDATION_PATTERNS = {
   PHONE: /^\+?[\d\s\-\(\)]+$/,
   URL: /^https?:\/\/.+/,
   ALPHANUMERIC: /^[a-zA-Z0-9]+$/,
-  ALPHANUMERIC_SPACES: /^[a-zA-Z0-9\s]+$/
+  ALPHANUMERIC_SPACES: /^[a-zA-Z0-9\s]+$/,
 } as const;
 
 // Validation error codes
@@ -392,5 +396,5 @@ export const VALIDATION_ERROR_CODES = {
   INVALID_VALUE: 'INVALID_VALUE',
   WEAK_PASSWORD: 'WEAK_PASSWORD',
   INSUFFICIENT_PERMISSIONS: 'INSUFFICIENT_PERMISSIONS',
-  DUPLICATE_VALUE: 'DUPLICATE_VALUE'
+  DUPLICATE_VALUE: 'DUPLICATE_VALUE',
 } as const;

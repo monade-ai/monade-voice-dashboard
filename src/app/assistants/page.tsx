@@ -1,17 +1,17 @@
 'use client';
 
 import { Suspense } from 'react';
+import { useState } from 'react';
 
 import { Card } from '@/components/ui/card';
 
 import { AssistantsProvider } from '../hooks/use-assistants-context';
-import { KnowledgeBaseProvider } from "../hooks/use-knowledge-base";
+import { KnowledgeBaseProvider } from '../hooks/use-knowledge-base';
 import { ContactsProvider } from '../contacts/contexts/contacts-context';
 
 import AssistantsHeader from './components/assistants-header';
 import AssistantTabs from './components/assistant-tabs';
 
-import { useState } from 'react';
 
 export default function AssistantsPage() {
   const [editingAssistantId, setEditingAssistantId] = useState<string | null>(null);

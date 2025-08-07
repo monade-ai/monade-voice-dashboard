@@ -1,6 +1,7 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
+import { createContext, useContext, useEffect, useState, ReactNode, useCallback, useRef } from 'react';
+
 import { 
   AuthContextType, 
   AuthUser, 
@@ -8,13 +9,14 @@ import {
   OrganizationMember, 
   OrganizationRole,
   Permission,
-  ROLE_PERMISSIONS
+  LogoutResult,
 } from '@/types';
 import { getUserPermissions, getPermissionsForRole } from '@/lib/auth/permissionUtils';
 import { getOrganizationService } from '@/lib/services';
-import { getRoleFromJWT } from './decodeJWT';
+
 import { configManager } from './ConfigManager';
 import { authClientManager } from './AuthClientManager';
+// Removed LogoutService import - using simplified logout
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -25,6 +27,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [userRole, setUserRole] = useState<OrganizationRole | null>(null);
   const [permissions, setPermissions] = useState<Permission[]>([]);
+  
+  // Logout state management
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [logoutError, setLogoutError] = useState<string | null>(null);
+  const [logoutProgress, setLogoutProgress] = useState<string | null>(null);
+
+  // Loading state tracking to prevent concurrent loads
+  const isLoadingUserDataRef = useRef(false);
+  const isRefreshingPermissionsRef = useRef(false);
 
   // Initialize and validate configuration
   configManager.resolveConflicts();
@@ -34,57 +45,69 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Load user profile and organization data
   const loadUserData = useCallback(async (userId: string) => {
+    // Prevent concurrent loads
+    if (isLoadingUserDataRef.current) {
+      console.log('[AuthProvider] loadUserData already in progress, skipping');
+
+      return;
+    }
+
+    isLoadingUserDataRef.current = true;
+    
     try {
       console.log('[AuthProvider] Starting loadUserData for:', userId);
       
       // Get user profile
       console.log('[AuthProvider] Fetching user profile...');
-const { data: initialProfile, error: profileError } = await supabase
-  .from('user_profiles')
-  .select('*')
-  .eq('id', userId)
-  .single();
-let profile = initialProfile;
+      const { data: profileData, error: profileError } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .eq('id', userId)
+        .maybeSingle();
 
       if (profileError) {
         console.error('[AuthProvider] Error loading user profile:', profileError);
-        
-        // If profile doesn't exist, create it
-        if (profileError.code === 'PGRST116') {
-          console.log('[AuthProvider] User profile not found, creating it...');
-          
-          // Get user data from Supabase auth
-          const { data: { user: supabaseUser } } = await supabase.auth.getUser();
-          if (!supabaseUser) {
-            console.error('[AuthProvider] No authenticated user found');
-            return;
-          }
-          
-          // Create user profile
-          const { data: newProfile, error: createError } = await supabase
-            .from('user_profiles')
-            .insert({
-              id: userId,
-              email: supabaseUser.email || '',
-              full_name: supabaseUser.user_metadata?.full_name || supabaseUser.user_metadata?.name || '',
-              avatar_url: supabaseUser.user_metadata?.avatar_url || '',
-              account_type: 'personal'
-            })
-            .select()
-            .single();
-            
-          if (createError) {
-            console.error('[AuthProvider] Error creating user profile:', createError);
-            return;
-          }
-          
-          console.log('[AuthProvider] User profile created:', newProfile);
-          profile = newProfile;
-        } else {
+
+        return;
+      }
+
+      let profile = profileData;
+
+      if (!profile) {
+        console.log('[AuthProvider] User profile not found, creating it...');
+        const { data: { user: supabaseUser } } = await supabase.auth.getUser();
+        if (!supabaseUser) {
+          console.error('[AuthProvider] No authenticated user found');
+
           return;
         }
-      } else {
-        console.log('[AuthProvider] User profile loaded:', profile);
+
+        const { data: newProfile, error: createError } = await supabase
+          .from('user_profiles')
+          .insert({
+            id: userId,
+            email: supabaseUser.email || '',
+            full_name: supabaseUser.user_metadata?.full_name || supabaseUser.user_metadata?.name || '',
+            avatar_url: supabaseUser.user_metadata?.avatar_url || '',
+            account_type: 'personal',
+          })
+          .select()
+          .single();
+
+        if (createError) {
+          console.error('[AuthProvider] Error creating user profile:', createError);
+
+          return;
+        }
+        profile = newProfile;
+      }
+
+      if (profile && profile.account_type === 'organization' && !profile.has_completed_onboarding) {
+        if (typeof window !== 'undefined') {
+          window.location.href = '/auth/onboarding';
+        }
+
+        return;
       }
 
       // Get user's organizations
@@ -136,6 +159,7 @@ let profile = initialProfile;
         preferences: profile.preferences || {},
         created_at: profile.created_at,
         updated_at: profile.updated_at,
+        has_completed_onboarding: profile.has_completed_onboarding,
         supabase_user: supabaseUser!,
         organizations: userOrgs.map(org => ({
           id: org.id,
@@ -145,36 +169,36 @@ let profile = initialProfile;
           status: 'active' as const,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
-          joined_at: new Date().toISOString()
+          joined_at: new Date().toISOString(),
         })),
         current_organization: currentOrg,
         role: currentRole,
         permissions: currentMembership ? getUserPermissions(currentMembership) : [],
         is_verified: !!supabaseUser?.email_confirmed_at,
-        last_sign_in: supabaseUser?.last_sign_in_at || new Date().toISOString()
+        last_sign_in: supabaseUser?.last_sign_in_at || new Date().toISOString(),
       };
 
+      // Batch state updates to minimize re-renders
+      const userPermissions = currentMembership 
+        ? getUserPermissions(currentMembership)
+        : getPermissionsForRole('member');
+
+      console.log('[AuthProvider] Setting permissions:', userPermissions);
+      if (!currentMembership) {
+        console.log('[AuthProvider] Personal account permissions include assistants.create:', userPermissions.includes('assistants.create'));
+      }
+
+      // Update all auth state in sequence to minimize re-renders
       setUser(enhancedUser);
       setCurrentOrganization(currentOrg);
       setOrganizations(userOrgs);
       setUserRole(currentRole);
-      
-      // Set permissions: organization members get their role permissions, 
-      // personal accounts get default user permissions
-      if (currentMembership) {
-        const memberPermissions = getUserPermissions(currentMembership);
-        console.log('[AuthProvider] Organization member permissions:', memberPermissions);
-        setPermissions(memberPermissions);
-      } else {
-        // For personal accounts, give them default user permissions
-        const defaultPermissions = getPermissionsForRole('member');
-        console.log('[AuthProvider] Personal account permissions:', defaultPermissions);
-        console.log('[AuthProvider] Does it include assistants.create?', defaultPermissions.includes('assistants.create'));
-        setPermissions(defaultPermissions);
-      }
+      setPermissions(userPermissions);
 
     } catch (error) {
       console.error('[AuthProvider] Error loading user data:', error);
+    } finally {
+      isLoadingUserDataRef.current = false;
     }
   }, [supabase, organizationService]);
 
@@ -212,85 +236,158 @@ let profile = initialProfile;
 
   // Refresh user data
   const refreshUserData = useCallback(async () => {
-    if (user) {
-      await loadUserData(user.id);
+    if (user && !isLoadingUserDataRef.current) {
+      try {
+        await loadUserData(user.id);
+      } catch (error) {
+        console.error('[AuthProvider] Error refreshing user data:', error);
+        // Don't throw the error, just log it to prevent breaking the UI
+      }
     }
-  }, [user, loadUserData]);
+  }, [loadUserData]); // Removed 'user' dependency to prevent loops
 
-  // Sign out
-  const signOut = useCallback(async () => {
+  // Simple, reliable sign out function
+  const signOut = useCallback(async (): Promise<LogoutResult> => {
+    console.log('[AuthProvider] Starting logout process...');
+    
+    // Set logout state
+    setIsLoggingOut(true);
+    setLogoutError(null);
+    setLogoutProgress('Signing out...');
+    
     try {
-      console.log('[AuthProvider] Starting sign out process...');
-      
-      // Clear all localStorage data
-      if (typeof window !== 'undefined') {
-        // Remove auth-related items
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('current_organization_id');
-        
-        // Remove organization-scoped data
-        const keys = Object.keys(localStorage);
-        keys.forEach(key => {
-          if (key.includes('_') && (
-            key.includes('draftAssistants') ||
-            key.includes('contact_lists') ||
-            key.includes('contacts_') ||
-            key.includes('monade_documents')
-          )) {
-            localStorage.removeItem(key);
-          }
-        });
-        
-        console.log('[AuthProvider] Cleared localStorage data');
-      }
-      
-      // Sign out from Supabase
-      const { error } = await supabase.auth.signOut();
-      if (error) {
-        console.error('[AuthProvider] Supabase sign out error:', error);
-        throw error;
-      }
-      
-      // Clear all state
+      // Step 1: Clear auth state immediately
+      console.log('[AuthProvider] Clearing auth state...');
       setUser(null);
       setCurrentOrganization(null);
       setOrganizations([]);
       setUserRole(null);
       setPermissions([]);
       
-      console.log('[AuthProvider] Sign out completed successfully');
+      // Step 2: Sign out from Supabase
+      console.log('[AuthProvider] Signing out from Supabase...');
+      setLogoutProgress('Clearing session...');
       
-      // Add delay to ensure auth state propagates before redirect
-      await new Promise(resolve => setTimeout(resolve, 200));
+      try {
+        const { error } = await supabase.auth.signOut();
+        if (error) {
+          console.warn('[AuthProvider] Supabase signOut warning:', error);
+          // Continue with logout even if Supabase signOut has issues
+        }
+      } catch (supabaseError) {
+        console.warn('[AuthProvider] Supabase signOut error:', supabaseError);
+        // Continue with logout even if Supabase signOut fails
+      }
       
-      // Redirect to login page with sign out parameter
+      // Step 3: Clear localStorage
+      console.log('[AuthProvider] Clearing local storage...');
+      setLogoutProgress('Clearing local data...');
+      
+      if (typeof window !== 'undefined') {
+        try {
+          // Clear auth-related items
+          localStorage.removeItem('access_token');
+          localStorage.removeItem('current_organization_id');
+          
+          // Clear Supabase keys
+          const allKeys = Object.keys(localStorage);
+          const supabaseKeys = allKeys.filter(key => key.startsWith('sb-'));
+          supabaseKeys.forEach(key => {
+            localStorage.removeItem(key);
+          });
+          
+          // Clear organization-scoped data
+          const orgKeys = allKeys.filter(key => 
+            key.includes('_') && (
+              key.includes('draftAssistants') ||
+              key.includes('contact_lists') ||
+              key.includes('contacts_') ||
+              key.includes('monade_documents')
+            ),
+          );
+          orgKeys.forEach(key => {
+            localStorage.removeItem(key);
+          });
+          
+          console.log('[AuthProvider] Local storage cleared successfully');
+        } catch (storageError) {
+          console.warn('[AuthProvider] Local storage clear error:', storageError);
+          // Continue with logout even if storage clear fails
+        }
+      }
+      
+      // Step 4: Redirect to login
+      console.log('[AuthProvider] Redirecting to login...');
+      setLogoutProgress('Redirecting...');
+      setLogoutError(null);
+      
+      // Small delay to show progress
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
       if (typeof window !== 'undefined') {
         window.location.href = '/auth/login?signedOut=true';
       }
       
+      console.log('[AuthProvider] Logout completed successfully');
+
+      return { success: true };
+      
     } catch (error) {
-      console.error('[AuthProvider] Sign out failed:', error);
+      console.error('[AuthProvider] Logout error:', error);
       
-      // Even if sign out fails, clear local state to prevent stuck sessions
-      setUser(null);
-      setCurrentOrganization(null);
-      setOrganizations([]);
-      setUserRole(null);
-      setPermissions([]);
+      const errorMessage = error instanceof Error ? error.message : 'Logout failed';
+      setLogoutError(errorMessage);
+      setLogoutProgress('Logout failed, trying emergency logout...');
       
-      // Force clear localStorage anyway
-      if (typeof window !== 'undefined') {
-        localStorage.clear();
+      // Emergency fallback
+      try {
+        console.log('[AuthProvider] Attempting emergency logout...');
+        
+        // Force clear everything
+        setUser(null);
+        setCurrentOrganization(null);
+        setOrganizations([]);
+        setUserRole(null);
+        setPermissions([]);
+        
+        if (typeof window !== 'undefined') {
+          // Clear all storage
+          try {
+            localStorage.clear();
+            sessionStorage.clear();
+          } catch (clearError) {
+            console.warn('[AuthProvider] Emergency storage clear failed:', clearError);
+          }
+          
+          // Force redirect
+          window.location.href = '/auth/login?emergency=true';
+        }
+        
+        console.log('[AuthProvider] Emergency logout completed');
+
+        return { success: true };
+        
+      } catch (emergencyError) {
+        console.error('[AuthProvider] Emergency logout failed:', emergencyError);
+        setLogoutError('Logout failed completely. Please close your browser and try again.');
+        
+        // Ultimate fallback: reload the page
+        if (typeof window !== 'undefined') {
+          setTimeout(() => {
+            window.location.reload();
+          }, 2000);
+        }
+        
+        return { success: false, error: 'Emergency logout failed' };
       }
       
-      // Still redirect to login even on error
-      if (typeof window !== 'undefined') {
-        setTimeout(() => {
-          window.location.href = '/auth/login';
-        }, 100);
-      }
-      
-      throw error;
+      return { success: false, error: errorMessage };
+    } finally {
+      // Clear logout state after a delay
+      setTimeout(() => {
+        setIsLoggingOut(false);
+        setLogoutProgress(null);
+      }, 1000);
     }
   }, [supabase]);
 
@@ -301,7 +398,13 @@ let profile = initialProfile;
       setLoading(true);
       
       try {
-        const { data } = await supabase.auth.getSession();
+        const { data, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('[AuthProvider] Session fetch error:', error);
+          // Don't throw, just log and continue
+        }
+        
         console.log('[AuthProvider] Initial session check:', data.session?.user?.id);
         
         if (data.session?.user) {
@@ -312,6 +415,12 @@ let profile = initialProfile;
         }
       } catch (error) {
         console.error('[AuthProvider] Error initializing auth:', error);
+        // Clear any partial state on initialization error
+        setUser(null);
+        setCurrentOrganization(null);
+        setOrganizations([]);
+        setUserRole(null);
+        setPermissions([]);
       } finally {
         setLoading(false);
       }
@@ -324,11 +433,21 @@ let profile = initialProfile;
       console.log('[AuthProvider] Auth state changed:', event, session?.user?.id);
       
       if (event === 'SIGNED_IN' && session?.user) {
-        if (session.access_token) {
-          localStorage.setItem('access_token', session.access_token);
+        try {
+          if (session.access_token) {
+            localStorage.setItem('access_token', session.access_token);
+          }
+          const accountTypeIntent = localStorage.getItem('account_type_intent') || 'personal';
+          localStorage.removeItem('account_type_intent');
+
+          console.log('[AuthProvider] SIGNED_IN event - ensuring user profile for:', session.user.id, 'with account type:', accountTypeIntent);
+          await supabase.rpc('ensure_user_profile', { account_type: accountTypeIntent });
+          console.log('[AuthProvider] SIGNED_IN event - loading user data for:', session.user.id);
+          await loadUserData(session.user.id);
+        } catch (error) {
+          console.error('[AuthProvider] Error handling SIGNED_IN event:', error);
+          // Don't break the auth flow, just log the error
         }
-        console.log('[AuthProvider] SIGNED_IN event - loading user data for:', session.user.id);
-        await loadUserData(session.user.id);
       } else if (event === 'SIGNED_OUT') {
         console.log('[AuthProvider] SIGNED_OUT event received, clearing all state...');
         setUser(null);
@@ -339,26 +458,32 @@ let profile = initialProfile;
         
         // Clear all localStorage data on sign out event
         if (typeof window !== 'undefined') {
-          localStorage.removeItem('access_token');
-          localStorage.removeItem('current_organization_id');
-          
-          // Remove organization-scoped data
-          const keys = Object.keys(localStorage);
-          keys.forEach(key => {
-            if (key.includes('_') && (
-              key.includes('draftAssistants') ||
-              key.includes('contact_lists') ||
-              key.includes('contacts_') ||
-              key.includes('monade_documents')
-            )) {
-              localStorage.removeItem(key);
-            }
-          });
+          try {
+            localStorage.removeItem('access_token');
+            localStorage.removeItem('current_organization_id');
+            
+            // Remove organization-scoped data
+            const keys = Object.keys(localStorage);
+            keys.forEach(key => {
+              if (key.includes('_') && (
+                key.includes('draftAssistants') ||
+                key.includes('contact_lists') ||
+                key.includes('contacts_') ||
+                key.includes('monade_documents')
+              )) {
+                localStorage.removeItem(key);
+              }
+            });
+          } catch (storageError) {
+            console.warn('[AuthProvider] Error clearing storage on SIGNED_OUT:', storageError);
+          }
         }
       } else if (event === 'TOKEN_REFRESHED' && session?.user) {
-        // Update permissions in case role changed
-        if (user && user.id === session.user.id) {
-          await refreshUserData();
+        // Only refresh permissions when token refreshes, avoid full user data reload
+        if (user && user.id === session.user.id && !isRefreshingPermissionsRef.current) {
+          console.log('[AuthProvider] Token refreshed, checking if permissions need update');
+          // For now, we'll skip automatic refresh on token refresh to prevent loops
+          // Permissions will be updated when user actively switches organizations or roles change
         }
       }
       
@@ -368,7 +493,7 @@ let profile = initialProfile;
     return () => {
       listener.subscription.unsubscribe();
     };
-  }, [supabase, loadUserData, user, refreshUserData]);
+  }, [supabase, loadUserData, refreshUserData]); // Removed 'user' to prevent circular dependency
 
   const contextValue: AuthContextType = {
     user,
@@ -380,9 +505,12 @@ let profile = initialProfile;
     hasPermission,
     hasAnyPermission,
     hasAllPermissions,
+    isLoggingOut,
+    logoutError,
+    logoutProgress,
     signOut,
     switchOrganization,
-    refreshUserData
+    refreshUserData,
   };
 
   return (
@@ -397,5 +525,6 @@ export function useAuth() {
   if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
+
   return context;
 }

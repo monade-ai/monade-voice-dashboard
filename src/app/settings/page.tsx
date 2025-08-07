@@ -51,10 +51,12 @@ export default function AccountSettingsPage() {
     setError(null);
     if (!isNewPasswordValid) {
       setError('Password must be at least 8 characters.');
+
       return;
     }
     if (!isPasswordMatch) {
       setError('Passwords do not match.');
+
       return;
     }
     setSaveSuccess(true);

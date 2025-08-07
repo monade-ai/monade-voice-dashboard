@@ -12,8 +12,10 @@ const KB_SERVICE_BASEURL = process.env.NEXT_PUBLIC_KB_SERVICE_BASEURL;
 function getOrganizationContext(): { organizationId?: string } {
   if (typeof window !== 'undefined') {
     const orgId = localStorage.getItem('current_organization_id');
+
     return orgId ? { organizationId: orgId } : {};
   }
+
   return {};
 }
 
@@ -98,6 +100,7 @@ export class DocumentStorage {
   
   private static getStorageKey(): string {
     const orgContext = getOrganizationContext();
+
     return orgContext.organizationId ? `${this.STORAGE_KEY}_${orgContext.organizationId}` : this.STORAGE_KEY;
   }
   
@@ -110,7 +113,7 @@ export class DocumentStorage {
       // Upload to cloud service
       const payload = {
         kb_text: atob(document.content),
-        filename: document.title || `document_${document.id}.${document.fileType}`
+        filename: document.title || `document_${document.id}.${document.fileType}`,
       };
 
       const apiUrl = `${KB_SERVICE_BASEURL}/api/upload_kb`;
@@ -137,14 +140,14 @@ export class DocumentStorage {
       }
 
       // Still keep document metadata in localStorage for backward compatibility
-    const documents = this.getAllDocuments();
-    const existingIndex = documents.findIndex(doc => doc.id === document.id);
+      const documents = this.getAllDocuments();
+      const existingIndex = documents.findIndex(doc => doc.id === document.id);
       
-    if (existingIndex >= 0) {
-      documents[existingIndex] = document;
-    } else {
-      documents.push(document);
-    }
+      if (existingIndex >= 0) {
+        documents[existingIndex] = document;
+      } else {
+        documents.push(document);
+      }
       
       const storageKey = this.getStorageKey();
       localStorage.setItem(storageKey, JSON.stringify(documents));
@@ -214,16 +217,17 @@ export class DocumentStorage {
       }
 
       // Also delete from localStorage
-    const documents = this.getAllDocuments();
-    const filteredDocuments = documents.filter(doc => doc.id !== id);
+      const documents = this.getAllDocuments();
+      const filteredDocuments = documents.filter(doc => doc.id !== id);
       
-    if (filteredDocuments.length === documents.length) {
-      return false; // Document not found
-    }
+      if (filteredDocuments.length === documents.length) {
+        return false; // Document not found
+      }
       
-    const storageKey = this.getStorageKey();
-    localStorage.setItem(storageKey, JSON.stringify(filteredDocuments));
-    return true;
+      const storageKey = this.getStorageKey();
+      localStorage.setItem(storageKey, JSON.stringify(filteredDocuments));
+
+      return true;
     } catch (error) {
       console.error('Error deleting document:', error);
       throw error;

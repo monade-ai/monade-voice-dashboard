@@ -759,66 +759,66 @@ export function PromptEditor({ promptId }: PromptEditorProps) {
             </TabsContent>
 
             <TabsContent value="upload" className="p-0 focus-visible:outline-none focus-visible:ring-0">
-                <div className="p-6 flex flex-col items-center justify-center bg-background">
-                  <div className="mb-4 text-center">
-                    <h3 className="text-lg font-medium text-foreground/90">Upload a Prompt Document</h3>
-                    <p className="text-sm text-muted-foreground mt-1">
+              <div className="p-6 flex flex-col items-center justify-center bg-background">
+                <div className="mb-4 text-center">
+                  <h3 className="text-lg font-medium text-foreground/90">Upload a Prompt Document</h3>
+                  <p className="text-sm text-muted-foreground mt-1">
                       Import an existing prompt from a Markdown (.md) file
-                    </p>
-                  </div>
-                  
-                  <div className="w-full max-w-sm">
-                    <Label htmlFor="file-upload" className="block text-sm font-medium mb-2 text-foreground/90">
-                      Select File
-                    </Label>
-                    <Input
-                      id="file-upload"
-                      type="file"
-                      accept=".md,.txt"
-                      onChange={handleUploadFile}
-                      className="cursor-pointer border-muted/60 focus-visible:ring-primary/50 focus-visible:border-primary/50"
-                    />
-                    <p className="text-xs text-muted-foreground mt-2">
-                      Supported formats: Markdown (.md), Text (.txt)
-                    </p>
-                  </div>
+                  </p>
                 </div>
+                  
+                <div className="w-full max-w-sm">
+                  <Label htmlFor="file-upload" className="block text-sm font-medium mb-2 text-foreground/90">
+                      Select File
+                  </Label>
+                  <Input
+                    id="file-upload"
+                    type="file"
+                    accept=".md,.txt"
+                    onChange={handleUploadFile}
+                    className="cursor-pointer border-muted/60 focus-visible:ring-primary/50 focus-visible:border-primary/50"
+                  />
+                  <p className="text-xs text-muted-foreground mt-2">
+                      Supported formats: Markdown (.md), Text (.txt)
+                  </p>
+                </div>
+              </div>
             </TabsContent>
             
             <TabsContent value="markdown-preview" className="p-0 focus-visible:outline-none focus-visible:ring-0">
-                <div className="p-4 border-b bg-background">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-medium text-foreground/90">Markdown Preview</h3>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setIsMarkdownVisible(!isMarkdownVisible)}
-                      className="text-xs text-muted-foreground hover:text-foreground transition-colors duration-150"
-                    >
-                      {isMarkdownVisible ? (
-                        <>
-                          <Eye className="h-3.5 w-3.5 mr-1 text-primary/80" />
+              <div className="p-4 border-b bg-background">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-medium text-foreground/90">Markdown Preview</h3>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setIsMarkdownVisible(!isMarkdownVisible)}
+                    className="text-xs text-muted-foreground hover:text-foreground transition-colors duration-150"
+                  >
+                    {isMarkdownVisible ? (
+                      <>
+                        <Eye className="h-3.5 w-3.5 mr-1 text-primary/80" />
                           Hide Raw Markdown
-                        </>
-                      ) : (
-                        <>
-                          <EyeOff className="h-3.5 w-3.5 mr-1 text-primary/80" />
+                      </>
+                    ) : (
+                      <>
+                        <EyeOff className="h-3.5 w-3.5 mr-1 text-primary/80" />
                           Show Raw Markdown
-                        </>
-                      )}
-                    </Button>
-                  </div>
+                      </>
+                    )}
+                  </Button>
                 </div>
+              </div>
                 
-                {isMarkdownVisible ? (
-                  <div className="p-4 font-mono text-sm whitespace-pre-wrap bg-muted/20 border-b">
-                    {markdownContent}
-                  </div>
-                ) : (
-                  <div className="p-4 prose prose-sm max-w-none bg-background">
-                    <div dangerouslySetInnerHTML={{ __html: editor?.getHTML() || '' }} />
-                  </div>
-                )}
+              {isMarkdownVisible ? (
+                <div className="p-4 font-mono text-sm whitespace-pre-wrap bg-muted/20 border-b">
+                  {markdownContent}
+                </div>
+              ) : (
+                <div className="p-4 prose prose-sm max-w-none bg-background">
+                  <div dangerouslySetInnerHTML={{ __html: editor?.getHTML() || '' }} />
+                </div>
+              )}
             </TabsContent>
           </Tabs>
         </CardContent>

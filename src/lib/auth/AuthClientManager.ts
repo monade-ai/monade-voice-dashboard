@@ -5,8 +5,10 @@
 
 import { createClientComponentClient, createServerComponentClient } from '@supabase/auth-helpers-nextjs';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { configManager, type SupabaseConfig } from './ConfigManager';
+
 import type { Database } from '@/types/database';
+
+import { configManager, type SupabaseConfig } from './ConfigManager';
 
 export type ClientType = 'component' | 'server' | 'admin';
 
@@ -44,6 +46,7 @@ export class AuthClientManager {
     if (!AuthClientManager.instance) {
       AuthClientManager.instance = new AuthClientManager();
     }
+
     return AuthClientManager.instance;
   }
 
@@ -56,6 +59,7 @@ export class AuthClientManager {
       this.validateConfiguration();
       this.componentClient = createClientComponentClient<Database>();
     }
+
     return this.componentClient;
   }
 
@@ -65,6 +69,7 @@ export class AuthClientManager {
    */
   public getServerClient(cookies: any): SupabaseClient<Database> {
     this.validateConfiguration();
+
     return createServerComponentClient<Database>({ cookies });
   }
 
@@ -94,11 +99,12 @@ export class AuthClientManager {
         {
           auth: {
             autoRefreshToken: false,
-            persistSession: false
-          }
-        }
+            persistSession: false,
+          },
+        },
       );
     }
+
     return this.adminClient;
   }
 
@@ -113,7 +119,7 @@ export class AuthClientManager {
       errors: validation.errors,
       warnings: validation.warnings,
       clientType: 'component',
-      configSource: validation.config.source
+      configSource: validation.config.source,
     };
 
     if (!validation.isValid) {
@@ -132,7 +138,7 @@ export class AuthClientManager {
       clearLocalStorage = true,
       clearSessionStorage = true,
       clearSupabaseSession = true,
-      organizationScoped = true
+      organizationScoped = true,
     } = options;
 
     console.log('[AuthClientManager] Starting session cleanup...', options);
@@ -180,7 +186,7 @@ export class AuthClientManager {
         'access_token',
         'refresh_token',
         'current_organization_id',
-        'user_preferences'
+        'user_preferences',
       ];
 
       authKeys.forEach(key => {
@@ -205,7 +211,7 @@ export class AuthClientManager {
             key.includes('workflow_') ||
             key.includes('knowledge_base_') ||
             key.includes('assistant_')
-          )
+          ),
         );
 
         orgScopedKeys.forEach(key => {
@@ -254,12 +260,14 @@ export class AuthClientManager {
       
       if (error) {
         console.warn('[AuthClientManager] Session check error:', error);
+
         return false;
       }
 
       return !!session?.user;
     } catch (error) {
       console.error('[AuthClientManager] Authentication check failed:', error);
+
       return false;
     }
   }
@@ -274,12 +282,14 @@ export class AuthClientManager {
       
       if (error) {
         console.warn('[AuthClientManager] Get session error:', error);
+
         return null;
       }
 
       return data.session;
     } catch (error) {
       console.error('[AuthClientManager] Get session failed:', error);
+
       return null;
     }
   }
@@ -340,7 +350,7 @@ export class AuthClientManager {
       config: this.config,
       hasComponentClient: !!this.componentClient,
       hasAdminClient: !!this.adminClient,
-      validation: this.validateConfiguration()
+      validation: this.validateConfiguration(),
     };
   }
 }

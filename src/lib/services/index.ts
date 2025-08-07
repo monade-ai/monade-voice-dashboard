@@ -15,6 +15,7 @@ class ServiceRegistry {
     if (!ServiceRegistry.instance) {
       ServiceRegistry.instance = new ServiceRegistry();
     }
+
     return ServiceRegistry.instance;
   }
 
@@ -22,6 +23,7 @@ class ServiceRegistry {
     if (!this.services.has(key)) {
       this.services.set(key, factory());
     }
+
     return this.services.get(key);
   }
 
@@ -34,7 +36,7 @@ class ServiceRegistry {
 export function getOrganizationService(): OrganizationService {
   return ServiceRegistry.getInstance().getService(
     'organization',
-    () => new OrganizationService()
+    () => new OrganizationService(),
   );
 }
 
@@ -53,7 +55,7 @@ export type {
   AcceptInvitationData,
   OrganizationRole,
   ApiResponse,
-  PaginatedResponse
+  PaginatedResponse,
 } from '@/types';
 
 // Service configuration
@@ -66,7 +68,7 @@ export interface ServiceConfig {
 // Default service configuration
 export const DEFAULT_SERVICE_CONFIG: ServiceConfig = {
   timeout: 30000, // 30 seconds
-  retryAttempts: 3
+  retryAttempts: 3,
 };
 
 // Service error handling utilities
@@ -79,7 +81,7 @@ export function createServiceError(code: string, message: string, details?: any)
     code,
     message,
     details,
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
   };
 }
 
@@ -109,14 +111,14 @@ export async function checkServiceHealth(): Promise<ServiceHealthStatus[]> {
       service: 'organization',
       status: 'healthy',
       lastCheck: new Date().toISOString(),
-      responseTime
+      responseTime,
     });
   } catch (error) {
     results.push({
       service: 'organization',
       status: 'unhealthy',
       lastCheck: new Date().toISOString(),
-      error: error instanceof Error ? error.message : 'Unknown error'
+      error: error instanceof Error ? error.message : 'Unknown error',
     });
   }
   

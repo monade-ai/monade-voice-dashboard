@@ -1,5 +1,6 @@
-import { useAuth } from './AuthProvider';
 import { Permission } from '@/types';
+
+import { useAuth } from './AuthProvider';
 
 /**
  * Hook to check if the current user has permission for a given action.
@@ -16,14 +17,14 @@ export function useHasPermission(permission: Permission): boolean {
     allPermissions: permissions,
     user: user?.id,
     userRole,
-    currentOrganization
+    currentOrganization,
   });
   console.log('[useHasPermission] Detailed check:', 
     'Permission:', permission, 
     'Result:', result, 
     'All permissions:', permissions, 
     'User role:', userRole,
-    'Current organization:', currentOrganization
+    'Current organization:', currentOrganization,
   );
 
   return result;
@@ -35,6 +36,7 @@ export function useHasPermission(permission: Permission): boolean {
  */
 export function useHasAnyPermission(permissions: Permission[]): boolean {
   const { hasAnyPermission } = useAuth();
+
   return hasAnyPermission(permissions);
 }
 
@@ -44,6 +46,7 @@ export function useHasAnyPermission(permissions: Permission[]): boolean {
  */
 export function useHasAllPermissions(permissions: Permission[]): boolean {
   const { hasAllPermissions } = useAuth();
+
   return hasAllPermissions(permissions);
 }
 
@@ -52,6 +55,7 @@ export function useHasAllPermissions(permissions: Permission[]): boolean {
  */
 export function usePermissions(): Permission[] {
   const { permissions } = useAuth();
+
   return permissions;
 }
 
@@ -60,6 +64,7 @@ export function usePermissions(): Permission[] {
  */
 export function useUserRole() {
   const { userRole } = useAuth();
+
   return userRole;
 }
 
@@ -68,6 +73,7 @@ export function useUserRole() {
  */
 export function useIsOwner(): boolean {
   const { userRole } = useAuth();
+
   return userRole === 'owner';
 }
 
@@ -76,5 +82,6 @@ export function useIsOwner(): boolean {
  */
 export function useIsAdmin(): boolean {
   const { userRole } = useAuth();
+
   return userRole === 'owner' || userRole === 'admin';
 }

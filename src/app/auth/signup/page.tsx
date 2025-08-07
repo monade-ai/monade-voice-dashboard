@@ -6,6 +6,7 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { FcGoogle } from 'react-icons/fc';
 import { AiOutlineMail, AiOutlineLock, AiOutlineUser, AiOutlineBank } from 'react-icons/ai';
 import Image from 'next/image';
+
 import { getOrganizationService } from '@/lib/services';
 import { validateEmail, validatePassword, validateFullName, validateOrganizationName } from '@/types';
 import { AUTH_CONFIG, ClientRateLimiter, isRateLimitError, getRateLimitMessage } from '@/lib/auth/auth-config';
@@ -46,6 +47,7 @@ export default function SignupPage() {
     
     if (allErrors.length > 0) {
       setError(allErrors[0].message);
+
       return false;
     }
     
@@ -63,6 +65,7 @@ export default function SignupPage() {
       const remainingTime = ClientRateLimiter.getRemainingTime(rateLimitKey, 10 * 60 * 1000);
       const minutes = Math.ceil(remainingTime / (60 * 1000));
       setError(`Too many signup attempts. Please wait ${minutes} minute(s) before trying again.`);
+
       return;
     }
     
@@ -82,9 +85,9 @@ export default function SignupPage() {
           data: {
             full_name: fullName,
             account_type: orgMode ? 'organization' : 'personal',
-            organization_name: orgMode ? organizationName : undefined
-          }
-        }
+            organization_name: orgMode ? organizationName : undefined,
+          },
+        },
       });
 
       if (authError) {
@@ -94,11 +97,13 @@ export default function SignupPage() {
         } else {
           setError(authError.message);
         }
+
         return;
       }
 
       if (!authData.user) {
         setError('Failed to create user account');
+
         return;
       }
 
@@ -106,6 +111,7 @@ export default function SignupPage() {
       if (!authData.user.email_confirmed_at) {
         // Show email verification step
         setStep('email-verification');
+
         return;
       }
 
@@ -146,6 +152,7 @@ export default function SignupPage() {
       const remainingTime = ClientRateLimiter.getRemainingTime(resendKey, 60 * 60 * 1000);
       const minutes = Math.ceil(remainingTime / (60 * 1000));
       setError(`Too many resend attempts. Please wait ${minutes} minute(s) before trying again.`);
+
       return;
     }
 
@@ -160,8 +167,8 @@ export default function SignupPage() {
         type: 'signup',
         email: email,
         options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`
-        }
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+        },
       });
 
       if (error) {
@@ -199,8 +206,8 @@ export default function SignupPage() {
         redirectTo: `${window.location.origin}/auth/callback`,
         queryParams: {
           account_type: orgMode ? 'organization' : 'personal',
-          organization_name: orgMode ? organizationName : undefined
-        }
+          organization_name: orgMode ? organizationName : undefined,
+        },
       },
     });
   

@@ -3,8 +3,14 @@
  */
 
 import { User } from '@supabase/supabase-js';
+
 import { Organization, OrganizationMember, UserProfile, OrganizationRole } from './organization';
 import { Permission } from './permissions';
+// Simple logout result for simplified logout flow
+export interface LogoutResult {
+  success: boolean;
+  error?: string;
+}
 
 // Extended authentication context
 export interface AuthContextType {
@@ -23,8 +29,13 @@ export interface AuthContextType {
   hasAnyPermission: (permissions: Permission[]) => boolean;
   hasAllPermissions: (permissions: Permission[]) => boolean;
   
+  // Logout state management
+  isLoggingOut: boolean;
+  logoutError: string | null;
+  logoutProgress: string | null;
+  
   // Actions
-  signOut: () => Promise<void>;
+  signOut: () => Promise<LogoutResult>;
   switchOrganization: (organizationId: string) => Promise<void>;
   refreshUserData: () => Promise<void>;
 }
@@ -174,7 +185,7 @@ export interface AuthActions {
   signUp: (data: SignUpData) => Promise<void>;
   signIn: (data: SignInData) => Promise<void>;
   signInWithOAuth: (data: OAuthSignInData) => Promise<void>;
-  signOut: () => Promise<void>;
+  signOut: () => Promise<LogoutResult>;
   resetPassword: (data: ResetPasswordData) => Promise<void>;
   updatePassword: (data: UpdatePasswordData) => Promise<void>;
   acceptInvitation: (data: InvitationAcceptanceData) => Promise<void>;
@@ -222,7 +233,7 @@ export const AUTH_ERROR_CODES = {
   ORGANIZATION_REQUIRED: 'organization_required',
   INVITATION_REQUIRED: 'invitation_required',
   SESSION_EXPIRED: 'session_expired',
-  ORGANIZATION_SWITCH_FAILED: 'organization_switch_failed'
+  ORGANIZATION_SWITCH_FAILED: 'organization_switch_failed',
 } as const;
 
 export type AuthErrorCode = typeof AUTH_ERROR_CODES[keyof typeof AUTH_ERROR_CODES];

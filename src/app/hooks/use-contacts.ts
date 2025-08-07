@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+
 import {
   // getContactLists,
   // createContactList as apiCreateContactList,
@@ -91,6 +92,7 @@ export function useContacts({
         setSearchResults([]);
         setSearchQuery('');
         setIsLoading(false);
+
         return;
       }
 
@@ -131,9 +133,11 @@ export function useContacts({
       // Update state
       setContactLists(prev => [...prev, newList]);
       setContacts(prev => ({ ...prev, [newList.id]: [] })); // Initialize contacts for the new list in state
+
       return newList;
     } catch (err) {
       console.error('[createContactList] error:', err);
+
       return null;
     } finally {
       setIsLoading(false);
@@ -146,6 +150,7 @@ export function useContacts({
       setSelectedList(null);
       setSearchResults([]);
       setSearchQuery('');
+
       return;
     }
     const list = contactLists.find(list => list.id === listId);
@@ -175,6 +180,7 @@ export function useContacts({
       return newContact;
     } catch (err) {
       console.error('[addContactToList] error:', err);
+
       return null;
     } finally {
       setIsLoading(false);
@@ -202,6 +208,7 @@ export function useContacts({
       return createdContacts; // Return the contacts that were added
     } catch (err) {
       console.error('[addContactsToList] error:', err);
+
       return [];
     } finally {
       setIsLoading(false);
@@ -219,6 +226,7 @@ export function useContacts({
       setContacts(prev => {
         const listContacts = prev[listId] || [];
         const updatedContacts = listContacts.filter(contact => contact.id !== contactId);
+
         return {
           ...prev,
           [listId]: updatedContacts,
@@ -251,6 +259,7 @@ export function useContacts({
       setContactLists(prev => prev.filter(list => list.id !== listId));
       setContacts(prev => {
         const { [listId]: _, ...rest } = prev;
+
         return rest;
       });
 
@@ -273,6 +282,7 @@ export function useContacts({
     setSearchQuery(query);
     if (!selectedList || !query.trim()) {
       setSearchResults([]);
+
       return;
     }
     setIsLoading(true);

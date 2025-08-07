@@ -18,12 +18,11 @@ import {
   DialogHeader, 
   DialogTitle, 
 } from '@/components/ui/dialog';
-
+import { useHasPermission } from '@/lib/auth/useHasPermission';
 
 import { useWorkflowStore } from './store/workflow-store';
 import { validateFlow } from './utils/validation';
 import { createNodeFromType } from './utils/node-utils';
-import { useHasPermission } from '@/lib/auth/useHasPermission';
 
 /**
  * Toolbar component with flow actions (new, import, export, zoom)
