@@ -42,7 +42,7 @@ export function usePhoneAssistant({
       setRemainingTime(15);
 
       // Always use the real callback URL from env or fallback
-      let callbackUrl =
+      const callbackUrl =
         typeof window !== 'undefined' && process.env.NEXT_PUBLIC_EXOTEL_CALLBACK_URL
           ? process.env.NEXT_PUBLIC_EXOTEL_CALLBACK_URL
           : (typeof window !== 'undefined'
