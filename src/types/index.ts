@@ -13,7 +13,6 @@ export type {
   SubscriptionTier,
   SubscriptionStatus,
   MemberStatus,
-  AuthUser,
   CreateOrganizationData,
   UpdateOrganizationData,
   InviteUserData,
@@ -76,38 +75,6 @@ export {
   isSuccessResponse,
 } from './api';
 
-// Auth types
-export type {
-  AuthContextType,
-  AuthUser as AuthUserType,
-  JWTClaims,
-  SignUpData,
-  SignInData,
-  OAuthSignInData,
-  ResetPasswordData,
-  UpdatePasswordData,
-  SessionData,
-  SessionContext,
-  OrganizationSwitchContext,
-  InvitationAcceptanceData,
-  VerificationData,
-  MFAData,
-  AuthState,
-  AuthActions,
-  UseAuthReturn,
-  UsePermissionsReturn,
-  UseOrganizationReturn,
-  AuthError,
-  AuthErrorCode,
-} from './auth';
-
-export {
-  AUTH_ERROR_CODES,
-  isAuthUser,
-  hasOrganizationContext,
-  isOrganizationOwner,
-  isOrganizationAdmin,
-} from './auth';
 
 // Utility types
 export type {

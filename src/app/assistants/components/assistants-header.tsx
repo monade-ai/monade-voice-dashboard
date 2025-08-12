@@ -11,7 +11,6 @@ import { Search, Plus } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { useHasPermission } from '@/lib/auth/useHasPermission';
 
 import { useAssistants } from '../../hooks/use-assistants-context';
 
@@ -35,7 +34,8 @@ export default function AssistantsHeader({ editingAssistantId, setEditingAssista
   const [dialogOpen, setDialogOpen] = useState(false);
 
   // RBAC
-  const canCreateAssistant = useHasPermission('assistants.create');
+  // TODO: Replace with new Supabase-based permission check
+  const canCreateAssistant = true; // Placeholder
   
   // Debug logging
   console.log('[AssistantsHeader] canCreateAssistant:', canCreateAssistant);

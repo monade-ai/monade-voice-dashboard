@@ -10,7 +10,6 @@ import {
   deleteContact as apiDeleteContact,
 } from '@/app/contacts/utils/contacts-api';
 import { useAssistants, Assistant } from '@/app/hooks/use-assistants-context';
-import { useAuth } from '@/lib/auth/AuthProvider';
 
 // Define the new data structures based on the API
 export interface Bucket {
@@ -59,7 +58,8 @@ export const ContactsProvider: React.FC<ContactsProviderProps> = ({ children }) 
   const [selectedBucket, setSelectedBucket] = useState<Bucket | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  const { currentOrganization } = useAuth();
+  // TODO: Replace with new Supabase-based organization context
+  const currentOrganization = { id: 'default-org-id' }; // Placeholder
   const { assistants } = useAssistants();
   const assistantPhoneNumbers = assistants
     .map((a) => a.phoneNumber)

@@ -3,7 +3,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 
 import { useToast } from '@/app/knowledge-base/hooks/use-toast'; // Assuming toast is needed
-import { useAuth } from '@/lib/auth/AuthProvider';
 
 // Define Knowledge Base type (matches API response)
 export interface KnowledgeBase {
@@ -56,7 +55,9 @@ const getApiError = async (res: Response): Promise<string> => {
 // Knowledge Base Provider Component
 export const KnowledgeBaseProvider = ({ children }: { children: ReactNode }) => {
   const { toast } = useToast();
-  const { currentOrganization, loading: authLoading } = useAuth();
+  // TODO: Replace with new Supabase-based organization context
+  const currentOrganization = { id: 'default-org-id' }; // Placeholder
+  const authLoading = false; // Placeholder
   const [knowledgeBases, setKnowledgeBases] = useState<KnowledgeBase[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null); // State for error
@@ -219,4 +220,4 @@ export const KnowledgeBaseProvider = ({ children }: { children: ReactNode }) => 
 };
 
 // Custom hook for using the context
-export const useKnowledgeBase = () => useContext(KnowledgeBaseContext); 
+export const useKnowledgeBase = () => useContext(KnowledgeBaseContext);

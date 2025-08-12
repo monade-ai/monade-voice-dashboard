@@ -1,15 +1,17 @@
-import { getAccessToken } from '@/lib/auth/auth';
+import { createClient } from '@/utils/supabase/client'; // Import the new client client
 
 // Remove trailing /api if it exists since we'll add it in the endpoint calls
 const API_BASE_URL = (process.env.NEXT_PUBLIC_DATABASE_URL || 'http://localhost:8764').replace(/\/api$/, '');
 
 async function getSupabaseToken() {
   try {
-    const token = await getAccessToken();
-    if (!token) {
-      throw new Error('No authentication token available');
+    const supabase = createClient(); // Use client-side client
+    const { data: { session }, error } = await supabase.auth.getSession();
+
+    if (error || !session) {
+      throw new Error(error?.message || 'No authentication token available');
     }
-    return token;
+    return session.access_token;
   } catch (error) {
     console.error('Error getting Supabase token:', error);
     throw new Error('Authentication failed');
@@ -19,6 +21,7 @@ async function getSupabaseToken() {
 function getOrganizationContext(): { organizationId?: string } {
   // Get organization context from localStorage or auth provider
   if (typeof window !== 'undefined') {
+    // TODO: Replace with actual organization context from new auth flow
     const orgId = localStorage.getItem('current_organization_id');
 
     return orgId ? { organizationId: orgId } : {};

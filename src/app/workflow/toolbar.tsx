@@ -18,7 +18,6 @@ import {
   DialogHeader, 
   DialogTitle, 
 } from '@/components/ui/dialog';
-import { useHasPermission } from '@/lib/auth/useHasPermission';
 
 import { useWorkflowStore } from './store/workflow-store';
 import { validateFlow } from './utils/validation';
@@ -28,8 +27,9 @@ import { createNodeFromType } from './utils/node-utils';
  * Toolbar component with flow actions (new, import, export, zoom)
  */
 export function Toolbar() {
-  const canCreateWorkflow = useHasPermission('workflow.create');
-  const canEditWorkflow = useHasPermission('workflow.edit');
+  // TODO: Replace with new Supabase-based permission check
+  const canCreateWorkflow = true; // Placeholder
+  const canEditWorkflow = true; // Placeholder
   const reactFlowInstance = useReactFlow();
   const { clearGraph, importFlow, exportFlow } = useWorkflowStore();
   const [newFlowDialogOpen, setNewFlowDialogOpen] = useState(false);
@@ -239,4 +239,5 @@ export function Toolbar() {
         </DialogContent>
       </Dialog>
     </div>
-  );}
+  );
+}
