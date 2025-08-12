@@ -7,12 +7,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useKnowledgeBase } from '@/app/hooks/use-knowledge-base';
-import { useHasPermission } from '@/lib/auth/useHasPermission';
 
 import { useToast } from '../hooks/use-toast';
 
 export function DocumentUploader() {
-  const canUploadDocument = useHasPermission('knowledge.upload');
+  // TODO: Replace with new Supabase-based permission check
+  const canUploadDocument = true; // Placeholder
   const [file, setFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);

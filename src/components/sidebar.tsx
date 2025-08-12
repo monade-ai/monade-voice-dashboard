@@ -26,9 +26,9 @@ import { cn } from '@/lib/utils';
 import { useTranslations } from '@/i18n/translations-context';
 import { LanguageSelector } from '@/components/language-selector';
 import { useTheme } from '@/components/theme-provider';
-import { useAuth } from '@/lib/auth/AuthProvider';
-import { useHasPermission } from '@/lib/auth/useHasPermission';
 import { OrganizationSwitcher } from '@/components/organization-switcher';
+import { signOut } from '@/app/protected/actions'; // Import the new signOut Server Action
+import { useAuth } from '@/contexts/auth-context'; // Import the new useAuth hook
 
 interface NavItemProps {
   href: string;
@@ -57,9 +57,25 @@ function NavItem({ href, icon, label, isActive = false }: NavItemProps) {
 export function Sidebar() {
   const pathname = usePathname();
   const { t } = useTranslations();
-  const { user, loading, signOut, isLoggingOut } = useAuth();
-  const canViewOrgSettings = useHasPermission('org.view');
+  const { user, isLoading: authLoading } = useAuth(); // Use the new useAuth hook
+  const isLoggingOut = false; // Placeholder, as signOut is a server action
+  // TODO: Implement proper permission checks using user roles from Supabase metadata/DB
+  const canViewOrgSettings = true; // Placeholder
   const { theme, toggleTheme } = useTheme();
+
+  // Routes where sidebar should be hidden
+  const noSidebarRoutes = [
+    '/login',
+    '/auth/confirm',
+    '/auth/auth-code-error',
+    // Add other public routes here
+  ];
+
+  const hideSidebar = noSidebarRoutes.includes(pathname);
+
+  if (hideSidebar) {
+    return null; // Don't render sidebar on these routes
+  }
 
   return (
     <div className="w-64 h-full bg-sidebar border-r border-sidebar-border flex flex-col overflow-y-auto shadow-md">
@@ -161,7 +177,7 @@ export function Sidebar() {
           <div className="flex items-center space-x-2">
             <div className="w-3 h-3 rounded-full bg-primary"></div>
             <p className="text-sm text-foreground/80 truncate">
-              {loading ? 'Loading...' : user?.email || ''}
+              {authLoading ? 'Loading...' : user?.email || 'Guest'}
             </p>
           </div>
         </div>
@@ -172,14 +188,16 @@ export function Sidebar() {
           isActive={pathname === '/help'}
         />
 
-        <button
-          onClick={signOut}
-          disabled={isLoggingOut}
-          className="mt-2 flex items-center gap-2 text-sm text-red-500 hover:text-red-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <LogOut size={18} />
-          {isLoggingOut ? t('sidebar.loggingOut') || 'Logging out...' : t('sidebar.logout')}
-        </button>
+        <form action={signOut}>
+          <button
+            type="submit"
+            disabled={isLoggingOut || authLoading}
+            className="mt-2 flex items-center gap-2 text-sm text-red-500 hover:text-red-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <LogOut size={18} />
+            {isLoggingOut ? t('sidebar.loggingOut') || 'Logging out...' : t('sidebar.logout')}
+          </button>
+        </form>
         
         <div className="mt-4 pt-4 border-t border-sidebar-border">
           <LanguageSelector />

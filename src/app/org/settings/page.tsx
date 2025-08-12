@@ -1,23 +1,29 @@
 'use client';
 import React, { useState, useEffect, useRef } from 'react';
 
-import { useOrganization, useOrganizationMembers } from '@/hooks/useOrganization';
-import { useAuth } from '@/lib/auth/AuthProvider';
-import { useHasPermission } from '@/lib/auth/useHasPermission';
 import { OrganizationRole, UpdateOrganizationData, InviteUserData } from '@/types/organization';
 
 const TABS = ['Profile', 'Users', 'Billing', 'Danger Zone'] as const;
 type Tab = typeof TABS[number];
 
 export default function OrgSettingsPage() {
-  const { user } = useAuth();
-  const { organization, loading: orgLoading, updateOrganization, deleteOrganization } = useOrganization();
-  const { members, loading: membersLoading, inviteUser, removeUser, updateUserRole } = useOrganizationMembers();
+  // TODO: Replace with new Supabase-based user, organization, and permission context
+  const user = null; // Placeholder
+  const organization = null; // Placeholder
+  const orgLoading = false; // Placeholder
+  const updateOrganization = async (data: UpdateOrganizationData) => { console.warn('Organization update not implemented.'); }; // Placeholder
+  const deleteOrganization = async () => { console.warn('Organization deletion not implemented.'); }; // Placeholder
+  
+  const members = []; // Placeholder
+  const membersLoading = false; // Placeholder
+  const inviteUser = async (data: InviteUserData) => { console.warn('User invite not implemented.'); }; // Placeholder
+  const removeUser = async (userId: string) => { console.warn('User removal not implemented.'); }; // Placeholder
+  const updateUserRole = async (data: { userId: string; newRole: OrganizationRole; }) => { console.warn('User role update not implemented.'); }; // Placeholder
 
-  const canEditOrg = useHasPermission('org.edit');
-  const canManageUsers = useHasPermission('users.invite');
-  const canViewBilling = useHasPermission('org.billing');
-  const canDeleteOrg = useHasPermission('org.delete');
+  const canEditOrg = true; // Placeholder
+  const canManageUsers = true; // Placeholder
+  const canViewBilling = true; // Placeholder
+  const canDeleteOrg = true; // Placeholder
   
   const [tab, setTab] = useState<Tab>('Profile');
   const [saving, setSaving] = useState(false);

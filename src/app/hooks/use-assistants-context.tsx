@@ -4,7 +4,6 @@ import { createContext, useContext, useState, useEffect, ReactNode, useCallback 
 import { v4 as uuidv4 } from 'uuid';
 
 import { useToast } from '@/app/knowledge-base/hooks/use-toast';
-import { useAuth } from '@/lib/auth/AuthProvider';
 
 // Define the Assistant type - Matches API GET response structure & Prisma Schema
 export interface Assistant {
@@ -136,7 +135,9 @@ let assistantsCache: Assistant[] | null = null;
 
 export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
   const { toast } = useToast();
-  const { currentOrganization, loading: authLoading } = useAuth();
+  // TODO: Replace with new organization context if needed
+  const currentOrganization = { id: 'default-org-id' }; // Placeholder
+  const authLoading = false; // Placeholder
   const [assistants, setAssistants] = useState<Assistant[]>([]);
   const [currentAssistant, setCurrentAssistant] = useState<Assistant | null>(null);
 

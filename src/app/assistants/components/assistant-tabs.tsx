@@ -15,7 +15,6 @@ import {
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { useHasPermission } from '@/lib/auth/useHasPermission';
 import {
   Tooltip,
   TooltipContent,
@@ -135,7 +134,8 @@ export default function AssistantTabs({ editingAssistantId }: AssistantTabsProps
   }, [currentAssistant?.id]);
 
   // RBAC
-  const canDeleteAssistant = useHasPermission('assistants.delete');
+  // TODO: Replace with new Supabase-based permission check
+  const canDeleteAssistant = true; // Placeholder
 
   if (!currentAssistant) {
     return (

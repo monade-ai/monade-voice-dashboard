@@ -26,7 +26,6 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useTranslations } from '@/i18n/translations-context';
-import { useHasPermission } from '@/lib/auth/useHasPermission';
 
 import { useContactsContext, Bucket, Contact } from '../contexts/contacts-context';
 
@@ -47,12 +46,12 @@ const ContactListView: React.FC = () => {
   } = useContactsContext();
 
   // RBAC permissions
-  const canCreateBucket = useHasPermission('contacts.create_bucket');
-  const canDeleteBucket = useHasPermission('contacts.delete_bucket');
-  const canAddContact = useHasPermission('contacts.add_contact');
-  const canBulkUpload = useHasPermission('contacts.bulk_upload');
-  // const canDeleteContact = useHasPermission('contacts.delete_contact');
-  const canDeleteContact = true; // TEMP: Always allow for testing
+  // TODO: Replace with new Supabase-based permission checks
+  const canCreateBucket = true; // Placeholder
+  const canDeleteBucket = true; // Placeholder
+  const canAddContact = true; // Placeholder
+  const canBulkUpload = true; // Placeholder
+  const canDeleteContact = true; // Placeholder
 
   const [isCreateBucketOpen, setCreateBucketOpen] = useState(false);
   const [isUploadOpen, setUploadOpen] = useState(false);

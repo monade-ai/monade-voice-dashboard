@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { Check, ChevronDown, Building2, Crown, Shield, User, Plus } from 'lucide-react';
 
-import { useAuth } from '@/lib/auth/AuthProvider';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
@@ -11,7 +10,12 @@ import { cn } from '@/lib/utils';
 import { OrganizationRole } from '@/types';
 
 export function OrganizationSwitcher() {
-  const { user, currentOrganization, organizations, userRole, switchOrganization } = useAuth();
+  // TODO: Replace with new Supabase-based user and organization context
+  const user = null; // Placeholder
+  const currentOrganization = null; // Placeholder
+  const organizations = []; // Placeholder
+  const userRole = null; // Placeholder
+  const switchOrganization = async (id: string) => { console.warn('Organization switching not implemented yet.'); }; // Placeholder
   const [switching, setSwitching] = useState(false);
 
   const handleSwitchOrganization = async (organizationId: string) => {
