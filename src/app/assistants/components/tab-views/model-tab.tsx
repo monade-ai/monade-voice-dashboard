@@ -12,6 +12,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
+import { PlusCircle, FileText } from 'lucide-react';
+import { fetchKnowledgeBaseContent } from '@/app/knowledge-base/api/knowldege-api';
+import ContactBucketCarousel from '../contact-bucket-carousel';
 
 // Define available providers and their models
 const providerOptions = [
@@ -85,6 +89,9 @@ export default function ModelTab({ onChangesMade }: ModelTabProps) {
   const [knowledgeBaseId, setKnowledgeBaseId] = useState(currentAssistant?.knowledgeBase || '');
   const [contactBucketId, setContactBucketId] = useState(currentAssistant?.contact_bucket_id || '');
   const [phoneError, setPhoneError] = useState<string | null>(null);
+  const [kbPreview, setKbPreview] = useState('');
+  const [isLoadingPreview, setIsLoadingPreview] = useState(false);
+  const [isEditorMaximized, setEditorMaximized] = useState(true);
 
   // Synchronize local state with currentAssistant when it changes
   useEffect(() => {
@@ -165,16 +172,62 @@ export default function ModelTab({ onChangesMade }: ModelTabProps) {
   };
 
   // Handler for knowledge base change
-  const handleKnowledgeBaseChange = (value: string) => {
+  const handleKnowledgeBaseChange = async (value: string) => {
     setKnowledgeBaseId(value);
     if (currentAssistant) {
       updateAssistantLocally(currentAssistant.id, { knowledgeBase: value });
       onChangesMade(); // Mark changes
     }
+
+    if (value && !value.startsWith('text:')) {
+      setIsLoadingPreview(true);
+      const selectedKb = knowledgeBases.find(kb => kb.id === value);
+      if (selectedKb) {
+        try {
+          const response = await fetch(selectedKb.url);
+          if (!response.ok) {
+            throw new Error(`Failed to fetch preview: ${response.statusText}`);
+          }
+          const content = await response.text();
+          setKbPreview(content);
+        } catch (error) {
+          console.error('Failed to fetch KB preview:', error);
+          setKbPreview('Error loading preview.');
+        } finally {
+          setIsLoadingPreview(false);
+        }
+      }
+    } else {
+      setKbPreview('');
+    }
   };
 
   return (
     <div className="space-y-8">
+      {/* Description Section */}
+      <div className="border rounded-lg p-6 bg-gray-50">
+        <h3 className="text-lg font-medium mb-2">Short Description</h3>
+        
+        <div className="space-y-2">
+          <input
+            type="text"
+            placeholder="Enter assistant description"
+            maxLength={30}
+            value={currentAssistant?.description || ''}
+            onChange={(e) => {
+              if (currentAssistant) {
+                updateAssistantLocally(currentAssistant.id, { description: e.target.value });
+                onChangesMade();
+              }
+            }}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-400"
+          />
+          <div className="text-xs text-right text-gray-500">
+            {currentAssistant?.description?.length || 0}/30
+          </div>
+        </div>
+      </div>
+
       {/* Phone Number Section */}
       <div className="border rounded-lg p-6 bg-gray-50">
         <h3 className="text-lg font-medium mb-2">Phone Number</h3>
@@ -198,32 +251,99 @@ export default function ModelTab({ onChangesMade }: ModelTabProps) {
         </div>
       </div>
 
-      {/* Knowledge Base Section */}
+      {/* Script Section */}
       <div className="border rounded-lg p-6 bg-gray-50">
-        <h3 className="text-lg font-medium mb-2">Knowledge Base</h3>
+        <h3 className="text-lg font-medium mb-2">Script</h3>
         <p className="text-sm text-gray-600 mb-6">
-          Select the knowledge base this assistant should use for answering questions.
+          Provide the script for this assistant. You can create a new one or select an existing one.
         </p>
-        <div className="space-y-2">
-          <label htmlFor="knowledge-base" className="text-sm font-medium">
-            Knowledge Base
-          </label>
-          <Select value={knowledgeBaseId} onValueChange={handleKnowledgeBaseChange}>
-            <SelectTrigger className="w-full bg-white">
-              <SelectValue placeholder={knowledgeBases.length === 0 ? 'No KBs found' : 'Select knowledge base'} />
-            </SelectTrigger>
-            <SelectContent>
-              {knowledgeBases.length === 0 ? (
-                <SelectItem value="none" disabled>No knowledge bases available</SelectItem>
-              ) : (
-                knowledgeBases.map((kb) => (
-                  <SelectItem key={kb.id} value={kb.id}>
-                    {kb.filename}
-                  </SelectItem>
-                ))
-              )}
-            </SelectContent>
-          </Select>
+        <div className="grid grid-cols-1 gap-6">
+          {isEditorMaximized ? (
+            <>
+              {/* Create New Script */}
+              <div className="border rounded-md p-4 bg-white shadow-sm">
+                <div className="flex items-center mb-3">
+                  <PlusCircle className="h-5 w-5 mr-2 text-blue-500" />
+                  <h4 className="text-md font-semibold">Create New Script</h4>
+                </div>
+                <textarea
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  placeholder="Type or paste script content here..."
+                  rows={5}
+                  value={knowledgeBaseId && knowledgeBaseId.startsWith('text:') ? knowledgeBaseId.replace(/^text:/, '') : ''}
+                  onChange={(e) => {
+                    const textValue = e.target.value;
+                    setKnowledgeBaseId(`text:${textValue}`);
+                    if (currentAssistant) {
+                      updateAssistantLocally(currentAssistant.id, { knowledgeBase: `text:${textValue}` });
+                      onChangesMade();
+                    }
+                  }}
+                />
+                <p className="text-xs text-gray-500 mt-1">This will be saved as a new script entry.</p>
+              </div>
+            </>
+          ) : (
+            <div className="flex items-center justify-between p-4 border rounded-md bg-white shadow-sm">
+              <h4 className="text-md font-semibold">Create or Upload a Script</h4>
+              <div className="flex gap-2">
+                <Button
+                  onClick={() => setEditorMaximized(true)}
+                  className="bg-yellow-400 text-black font-bold hover:bg-yellow-500"
+                >
+                  Create Script
+                </Button>
+                <Button
+                  variant="outline"
+                  className="bg-yellow-400 text-black font-bold hover:bg-yellow-500"
+                >
+                  Upload Script
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Select Existing Script */}
+          <div className="border rounded-md p-4 bg-white shadow-sm">
+            <div className="flex items-center mb-3">
+              <FileText className="h-5 w-5 mr-2 text-green-500" />
+              <h4 className="text-md font-semibold">Use Existing Script</h4>
+            </div>
+            <Select
+              value={knowledgeBaseId}
+              onValueChange={handleKnowledgeBaseChange}
+              onOpenChange={(isOpen) => {
+                if (isOpen) {
+                  setEditorMaximized(false);
+                }
+              }}
+            >
+              <SelectTrigger className="w-full bg-white">
+                <SelectValue placeholder={knowledgeBases.length === 0 ? 'No Scripts found' : 'Select script'} />
+              </SelectTrigger>
+              <SelectContent>
+                {knowledgeBases.length === 0 ? (
+                  <SelectItem value="none" disabled>No scripts available</SelectItem>
+                ) : (
+                  knowledgeBases.map((kb) => (
+                    <SelectItem key={kb.id} value={kb.id}>
+                      {kb.filename}
+                    </SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
+            {knowledgeBaseId && !knowledgeBaseId.startsWith('text:') && (
+              <div className="mt-3 p-2 border rounded bg-gray-50 text-sm text-gray-700 h-32 overflow-y-auto">
+                <strong>Preview:</strong>
+                {isLoadingPreview ? (
+                  <p className="mt-1">Loading preview...</p>
+                ) : (
+                  <p className="mt-1 whitespace-pre-wrap">{kbPreview}</p>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -233,111 +353,20 @@ export default function ModelTab({ onChangesMade }: ModelTabProps) {
         <p className="text-sm text-gray-600 mb-6">
           Select the contact bucket to associate with this assistant. This will be used for contact-related features.
         </p>
-        <div className="space-y-2">
-          <label htmlFor="contact-bucket" className="text-sm font-medium">
-            Contact Bucket
-          </label>
-          <Select
-            value={contactBucketId || 'none'}
-            onValueChange={(value) => {
-              const bucketId = value === 'none' ? null : value;
-              setContactBucketId(bucketId);
-              if (currentAssistant) {
-                updateAssistantLocally(currentAssistant.id, { contact_bucket_id: bucketId });
-                onChangesMade();
-              }
-            }}
-          >
-            <SelectTrigger className="w-full bg-white">
-              <SelectValue placeholder={buckets.length === 0 ? 'No buckets found' : 'Select contact bucket'} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">None</SelectItem>
-              {buckets.length === 0 ? (
-                <SelectItem value="none" disabled>No buckets available</SelectItem>
-              ) : (
-                buckets.map((bucket) => (
-                  <SelectItem key={bucket.id} value={bucket.id}>
-                    {bucket.name}
-                  </SelectItem>
-                ))
-              )}
-            </SelectContent>
-          </Select>
-        </div>
+        <ContactBucketCarousel
+          buckets={buckets}
+          selectedBucketId={contactBucketId}
+          onSelectBucket={(bucketId) => {
+            setContactBucketId(bucketId || '');
+            if (currentAssistant) {
+              updateAssistantLocally(currentAssistant.id, { contact_bucket_id: bucketId });
+              onChangesMade();
+            }
+          }}
+        />
       </div>
 
-      {/* Voice Configuration Section */}
-      {/* <div className="border rounded-lg p-6 bg-gray-50"> */}
-      {/* <h3 className="text-lg font-medium mb-2">Voice Configuration</h3>
-        <p className="text-sm text-gray-600 mb-6">
-          Choose from the list of voices, or sync your voice library if you aren't able to find your voice in the dropdown.
-          If you are still facing any error, you can enable custom voice and add a voice ID manually.
-        </p> */}
 
-      {/* <div className="grid grid-cols-1 md:grid-cols-2 gap-6"> */}
-      {/* Provider Selection */}
-      {/* <div className="space-y-2">
-            <label htmlFor="provider" className="text-sm font-medium">
-              Provider
-            </label>
-            <Select value={provider} onValueChange={handleProviderChange}>
-              <SelectTrigger className="w-full bg-white">
-                <SelectValue placeholder="Select provider" />
-              </SelectTrigger>
-              <SelectContent>
-                {providerOptions.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div> */}
-
-      {/* Voice Selection */}
-      {/* <div className="space-y-2">
-            <label htmlFor="voice" className="text-sm font-medium">
-              Voice
-            </label>
-            <Select value={voice} onValueChange={handleVoiceChange}>
-              <SelectTrigger className="w-full bg-white">
-                <SelectValue placeholder="Select voice" />
-              </SelectTrigger>
-              <SelectContent>
-                {availableVoices.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div> */}
-      {/* </div> */}
-      {/* </div> */}
-
-      {/* Model Section */}
-      {/* <div className="border rounded-lg p-6 bg-gray-50">
-        <h3 className="text-lg font-medium mb-2">Model</h3>
-        <p className="text-sm text-gray-600 mb-6">
-          This is the model that will be used.
-        </p>
-
-        <div className="space-y-2">
-          <Select value={model} onValueChange={handleModelChange}>
-            <SelectTrigger className="w-full bg-white">
-              <SelectValue placeholder="Select model" />
-            </SelectTrigger>
-            <SelectContent>
-              {availableModels.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div> */}
     </div>
   );
 }

@@ -1,0 +1,121 @@
+'use client';
+
+import { useState } from 'react';
+import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
+
+interface FunctionCardProps {
+  icon: React.ReactNode;
+  name: string;
+  description: string;
+  userEmail?: string; // Make email optional
+}
+
+export default function FunctionCard({
+  icon,
+  name,
+  description,
+  userEmail,
+}: FunctionCardProps) {
+  const [isEnabled, setIsEnabled] = useState(!!userEmail);
+  const [showConfig, setShowConfig] = useState(false);
+
+  const handleToggle = (checked: boolean) => {
+    if (!userEmail) {
+      // Here you would trigger the Google OAuth flow
+      console.log(`Redirecting to Google OAuth for ${name}...`);
+      // In a real app, you'd redirect or open a popup.
+      // For this example, we'll simulate a successful login.
+      // setUserEmail('user@example.com'); // This would be set by your auth context
+      setIsEnabled(true);
+    } else {
+      setIsEnabled(checked);
+    }
+    setShowConfig(checked);
+  };
+
+  const handleSignIn = () => {
+    // This function would also trigger the OAuth flow
+    console.log(`Signing in with Google for ${name}...`);
+    // Simulate successful login
+    setIsEnabled(true);
+    setShowConfig(true);
+  };
+
+  return (
+    <div className="flex flex-col rounded-2xl border border-gray-200/80 bg-white shadow-sm transition-all duration-300 hover:shadow-lg hover:border-gray-300">
+      <div className="flex items-center space-x-6 p-6">
+        {/* Icon */}
+        <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-gray-100 text-gray-600">
+          {icon}
+        </div>
+
+        {/* Content */}
+        <div className="flex-1">
+          <h3 className="text-lg font-semibold text-gray-800">{name}</h3>
+          <p className="mt-1 text-sm text-gray-500">{description}</p>
+        </div>
+
+        {/* Action Control */}
+        <div className="flex items-center">
+          <Switch
+            checked={isEnabled}
+            onCheckedChange={handleToggle}
+            aria-label={`Enable or disable ${name} integration`}
+          />
+        </div>
+      </div>
+
+      {/* User Status and Configuration */}
+      <div className="border-t border-gray-200/80 bg-gray-50/50 px-6 py-3">
+        <div className="flex items-center justify-between">
+          {userEmail ? (
+            <Badge variant="outline" className="flex items-center space-x-2 border-green-300 bg-green-50 text-green-800">
+              <span className="h-2 w-2 rounded-full bg-green-500"></span>
+              <span>{userEmail}</span>
+            </Badge>
+          ) : (
+            <Badge
+              variant="destructive"
+              className="cursor-pointer flex items-center space-x-2 border-red-300 bg-red-50 text-red-800"
+              onClick={handleSignIn}
+            >
+              <span className="h-2 w-2 rounded-full bg-red-500"></span>
+              <span>Sign in with Google</span>
+            </Badge>
+          )}
+        </div>
+      </div>
+
+      {/* Collapsible Configuration Section */}
+      {isEnabled && showConfig && (
+        <div className="border-t border-gray-200/80 p-6">
+          <div className="space-y-4">
+            <div>
+              <label htmlFor="subject" className="block text-sm font-medium text-gray-700">
+                Email Subject
+              </label>
+              <input
+                type="text"
+                id="subject"
+                placeholder="e.g., Test Email from Assistant"
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+              />
+            </div>
+            <div>
+              <label htmlFor="body" className="block text-sm font-medium text-gray-700">
+                Email Body
+              </label>
+              <textarea
+                id="body"
+                rows={5}
+                placeholder="e.g., This is a test email sent via the assistant."
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

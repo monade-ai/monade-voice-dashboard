@@ -24,7 +24,7 @@ interface KnowledgeBaseContextType {
     isLoading: boolean;
     error: string | null; // Add error state to type
     fetchKnowledgeBases: () => Promise<void>;
-    createKnowledgeBase: (payload: CreateKnowledgeBasePayload) => Promise<boolean>; // Returns true on success
+    createKnowledgeBase: (payload: CreateKnowledgeBasePayload) => Promise<KnowledgeBase | null>; // Returns new KB on success
     deleteKnowledgeBase: (id: string) => Promise<boolean>; // Returns true on success
 }
 
@@ -34,7 +34,7 @@ export const KnowledgeBaseContext = createContext<KnowledgeBaseContextType>({
   isLoading: true,
   error: null, // Add error to default value
   fetchKnowledgeBases: async () => { },
-  createKnowledgeBase: async () => false,
+  createKnowledgeBase: async () => null,
   deleteKnowledgeBase: async () => false,
 });
 
@@ -101,11 +101,11 @@ export const KnowledgeBaseProvider = ({ children }: { children: ReactNode }) => 
   }, [toast]); // Add toast as dependency
 
   // Create Knowledge Base
-  const createKnowledgeBase = async (payload: CreateKnowledgeBasePayload): Promise<boolean> => {
+  const createKnowledgeBase = async (payload: CreateKnowledgeBasePayload): Promise<KnowledgeBase | null> => {
     if (!payload.kb_text && !payload.kb_file_base64) {
       toast({ title: 'Creation Failed', description: 'No content provided (text or file).' });
 
-      return false;
+      return null;
     }
     setIsLoading(true); // Indicate loading during creation
     setError(null); // Reset error
@@ -133,10 +133,10 @@ export const KnowledgeBaseProvider = ({ children }: { children: ReactNode }) => 
       }
 
       const newKb = await res.json();
-      toast({ title: 'Knowledge Base Created', description: `Successfully added ${payload.filename || 'new document'}. ID: ${newKb.kb_id}` });
+      toast({ title: 'Knowledge Base Created', description: `Successfully added ${payload.filename || 'new document'}. ID: ${newKb.id}` });
       await fetchKnowledgeBases(); // Refresh list
 
-      return true;
+      return newKb;
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Could not create knowledge base.';
       console.error('[createKnowledgeBase] Error caught:', err); // More specific logging
@@ -144,7 +144,7 @@ export const KnowledgeBaseProvider = ({ children }: { children: ReactNode }) => 
       setError(errorMsg); // Set error state
       setIsLoading(false); // Stop loading on error
 
-      return false;
+      return null;
     }
     // No finally isLoading=false here, as fetchKnowledgeBases will handle it
   };
