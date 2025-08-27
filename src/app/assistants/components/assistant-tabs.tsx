@@ -129,7 +129,7 @@ interface AssistantTabsProps {
 }
 
 export default function AssistantTabs({ editingAssistantId }: AssistantTabsProps) {
-  const { currentAssistant, saveAssistantUpdates, fetchAssistants, createAssistant, setCurrentAssistant } = useAssistants();
+  const { currentAssistant, saveAssistantUpdates, fetchAssistants, createAssistant, setCurrentAssistant, updateAssistantLocally } = useAssistants();
   const { createKnowledgeBase } = useKnowledgeBase();
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('model');
@@ -338,6 +338,11 @@ export default function AssistantTabs({ editingAssistantId }: AssistantTabsProps
               name="Gmail"
               description="Allow your assistant to read, draft, and send emails."
               userEmail={user?.email}
+              gmail={currentAssistant.gmail}
+              onGmailChange={(gmail) => {
+                updateAssistantLocally(currentAssistant.id, { gmail });
+                handleMarkUnsavedChanges();
+              }}
             />
             <FunctionCard
               icon={<MessageSquare className="h-6 w-6" />}
