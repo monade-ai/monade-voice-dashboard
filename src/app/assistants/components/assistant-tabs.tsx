@@ -343,6 +343,8 @@ export default function AssistantTabs({ editingAssistantId }: AssistantTabsProps
                 updateAssistantLocally(currentAssistant.id, { gmail });
                 handleMarkUnsavedChanges();
               }}
+              saveAssistantUpdates={saveAssistantUpdates}
+              currentAssistantId={currentAssistant.id}
             />
             <FunctionCard
               icon={<MessageSquare className="h-6 w-6" />}

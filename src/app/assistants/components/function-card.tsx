@@ -13,19 +13,23 @@ interface FunctionCardProps {
   description: string;
   userEmail?: string; // Make email optional
   gmail?: {
-    from_email?: string;
+    from?: string;
     to_email?: string;
     subject?: string;
     body?: string;
     agent_email?: boolean;
+    personalisation?: boolean;
   };
   onGmailChange?: (gmail: {
-    from_email?: string;
+    from?: string;
     to_email?: string;
     subject?: string;
     body?: string;
     agent_email?: boolean;
+    personalisation?: boolean;
   }) => void;
+  saveAssistantUpdates?: (id: string, data: any) => Promise<any>;
+  currentAssistantId?: string;
 }
 
 export default function FunctionCard({
@@ -35,11 +39,12 @@ export default function FunctionCard({
   userEmail,
   gmail,
   onGmailChange,
+  saveAssistantUpdates,
+  currentAssistantId,
 }: FunctionCardProps) {
   const [isEnabled, setIsEnabled] = useState(!!userEmail);
   const [showConfig, setShowConfig] = useState(false);
-  const [fromEmail, setFromEmail] = useState(gmail?.from_email || '');
-  const [toEmail, setToEmail] = useState(gmail?.to_email || '');
+  const [fromEmail, setFromEmail] = useState(gmail?.from || '');
   const [subject, setSubject] = useState(gmail?.subject || '');
   const [body, setBody] = useState(gmail?.body || '');
   const [agentEmailEnabled, setAgentEmailEnabled] = useState(gmail?.agent_email || false);
@@ -128,11 +133,14 @@ export default function FunctionCard({
                 value={fromEmail}
                 onChange={(e) => setFromEmail(e.target.value)}
               />
+              {/* Gmail Save Button */}
               <Button
-                onClick={() => {
+                onClick={async () => {
                   try {
-                    onGmailChange?.({ ...gmail, from_email: fromEmail });
-                    toast({ title: 'Success', description: 'Email saved.' });
+                    if (currentAssistantId) {
+                      await saveAssistantUpdates?.(currentAssistantId, { ...gmail, from: fromEmail  });
+                      toast({ title: 'Success', description: 'Email saved.' });
+                    }
                   } catch (error) {
                     toast({ title: 'Error', description: 'Failed to save email.' });
                   }
@@ -165,9 +173,29 @@ export default function FunctionCard({
               <Switch
                 id="agent-email-toggle"
                 checked={agentEmailEnabled}
-                onCheckedChange={(checked) => {
+                onCheckedChange={async (checked) => {
                   setAgentEmailEnabled(checked);
-                  onGmailChange?.({ ...gmail, agent_email: checked });
+                  onGmailChange?.({ ...gmail, agent_email: checked, personalisation: checked });
+                  if (currentAssistantId) {
+                    try {
+                      await saveAssistantUpdates?.(currentAssistantId, {
+                        ...gmail,
+                        agent_email: checked,
+                        personalisation: checked,
+                      });
+                      toast({
+                        title: 'Success',
+                        description: 'Personalisation settings saved.',
+                      });
+                    } catch (error) {
+                      toast({
+                        title: 'Error',
+                        description: 'Failed to save settings.',
+                      });
+                      setAgentEmailEnabled(!checked);
+                      onGmailChange?.({ ...gmail, agent_email: !checked, personalisation: !checked });
+                    }
+                  }
                 }}
               />
             </div>
@@ -178,22 +206,6 @@ export default function FunctionCard({
               </div>
             ) : (
               <>
-                <div>
-                  <label htmlFor="to_email" className="block text-sm font-medium text-gray-700">
-                    To Email
-                  </label>
-                  <input
-                    type="email"
-                    id="to_email"
-                    placeholder="e.g., recipient@example.com"
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                    value={toEmail}
-                    onChange={(e) => {
-                      setToEmail(e.target.value);
-                      onGmailChange?.({ ...gmail, to_email: e.target.value });
-                    }}
-                  />
-                </div>
                 <div>
                   <label htmlFor="subject" className="block text-sm font-medium text-gray-700">
                     Email Subject
@@ -226,6 +238,32 @@ export default function FunctionCard({
                     }}
                   />
                 </div>
+                {/* Subject and Body Save Button */}
+                <Button
+                  onClick={async () => {
+                    try {
+                      if (currentAssistantId) {
+                        await saveAssistantUpdates?.(currentAssistantId, {
+                          ...gmail,
+                          emailSubject: subject,
+                          emailBody: body,
+                        });
+                        toast({
+                          title: 'Success',
+                          description: 'Subject and body saved.',
+                        });
+                      }
+                    } catch (error) {
+                      toast({
+                        title: 'Error',
+                        description: 'Failed to save subject and body.',
+                      });
+                    }
+                  }}
+                  disabled={!subject && !body}
+                >
+                  Save
+                </Button>
               </>
             )}
           </div>

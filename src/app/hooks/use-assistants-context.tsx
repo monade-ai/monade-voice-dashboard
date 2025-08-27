@@ -21,7 +21,7 @@ export interface Assistant {
   createdAt: Date; // Represents local creation time for drafts, API time for published
   knowledgeBase?: string | null; // Stores the URL from GET, or null
   gmail?: {
-    from_email?: string;
+    from?: string;
     to_email?: string;
     subject?: string;
     body?: string;
@@ -48,6 +48,13 @@ type CreateAssistantData = {
 // Using Partial on relevant Assistant fields + knowledgeBaseId
 type UpdateAssistantData = Partial<Omit<Assistant, 'id' | 'createdAt' | 'knowledgeBase'>> & {
   knowledgeBaseId?: string | null; // Use ID or null for updating link
+  gmail?: {
+    from?: string;
+    to_email?: string;
+    subject?: string;
+    body?: string;
+    agent_email?: boolean;
+  };
 };
 
 
@@ -347,6 +354,7 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
   // Saves updates for an EXISTING PUBLISHED assistant to the backend
   const saveAssistantUpdates = async (id: string, updatedData: UpdateAssistantData): Promise<Assistant | undefined> => {
     const organizationId = currentOrganization?.id;
+    console.log('😊😊😊😊');
     
     if (id.startsWith('local-')) {
       console.error('Attempted to save updates for a draft assistant using saveAssistantUpdates. Use createAssistant (publish) instead.');
@@ -356,14 +364,14 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
     }
 
     // Restore original logic: Destructure knowledgeBaseId from updatedData
-    const { knowledgeBaseId, gmail, ...restData } = updatedData;
+    const { knowledgeBaseId, ...restData } = updatedData;
     const payload: any = { ...restData };
     // Send knowledgeBase in payload ONLY if knowledgeBaseId was present in updatedData
     if (knowledgeBaseId !== undefined) {
       payload.knowledgeBase = knowledgeBaseId;
     }
-    if (gmail !== undefined) {
-      payload.gmail = gmail;
+    if (updatedData.gmail !== undefined) {
+      payload.gmail = updatedData.gmail;
     }
 
     if (Object.keys(payload).length === 0) {
