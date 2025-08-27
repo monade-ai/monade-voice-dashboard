@@ -12,12 +12,35 @@ const KB_SERVICE_BASEURL = process.env.NEXT_PUBLIC_KB_SERVICE_BASEURL;
 function getOrganizationContext(): { organizationId?: string } {
   if (typeof window !== 'undefined') {
     const orgId = localStorage.getItem('current_organization_id');
-
     return orgId ? { organizationId: orgId } : {};
   }
-
   return {};
 }
+
+export async function fetchKnowledgeBaseContent(id: string): Promise<string> {
+  try {
+    const orgContext = getOrganizationContext();
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    if (orgContext.organizationId) {
+      headers['X-Organization-ID'] = orgContext.organizationId;
+    }
+    const response = await fetch(`${KB_SERVICE_BASEURL}/api/get_kb/${id}`, {
+      method: 'GET',
+      headers,
+    });
+    if (!response.ok) {
+      throw new Error(`Error fetching KB content: ${response.status} ${response.statusText}`);
+    }
+    const data = await response.json();
+    return data.kb_text || '';
+  } catch (error) {
+    console.error('Error fetching KB content:', error);
+    throw error;
+  }
+}
+
 
 /**
  * Update system prompt with document content
@@ -78,7 +101,35 @@ export async function updateSystemPrompt(base64Content: string): Promise<any> {
     throw error;
   }
 }
-  
+
+export async function uploadKnowledgeBase(file: File): Promise<{ url: string }> {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  try {
+    const orgContext = getOrganizationContext();
+    const headers: Record<string, string> = {};
+    if (orgContext.organizationId) {
+      headers['X-Organization-ID'] = orgContext.organizationId;
+    }
+
+    const response = await fetch(`${KB_SERVICE_BASEURL}/api/upload_kb`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+
+    if (!response.ok) {
+      throw new Error(`Error uploading KB: ${response.status} ${response.statusText}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error uploading KB:', error);
+    throw error;
+  }
+}
+
 /**
    * Document metadata interface
    */

@@ -8,6 +8,8 @@ interface AssistantsHeaderProps {
 }
 import { Search, Plus } from 'lucide-react';
 
+import OrganicFlowProfile from './OrganicFlowProfile';
+
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -172,14 +174,20 @@ export default function AssistantsHeader({ editingAssistantId, setEditingAssista
                     setEditingAssistantId(assistant.id);
                   }}
                 >
+                  <OrganicFlowProfile
+                    name={assistant.name || "User"}
+                    size="circle"
+                    dimension={32}
+                    className="mx-auto cursor-pointer transition-transform hover:scale-110"
+                  />
                   <AssistantNameEdit
                     assistant={assistant}
                     isEditing={editingAssistantId === assistant.id}
                     onSave={(newName) => handleSaveName(assistant.id, newName)}
                     onCancel={() => setEditingAssistantId(null)}
                   />
+                  <p className="text-xs text-gray-500 mt-1 truncate">{assistant.description}</p>
                 </div>
-                <div className="text-sm text-[var(--muted-foreground)] truncate pt-1">{assistant.description || 'No description'}</div>
 
                 <div className="flex flex-wrap gap-1 mt-2">
                   {assistant.tags?.slice(0, 3).map(tag => (
