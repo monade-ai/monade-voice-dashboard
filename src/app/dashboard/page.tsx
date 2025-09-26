@@ -201,10 +201,16 @@ export default function DashboardPage() {
               </Button>
             )}
           </div>
-          <Button className="flex items-center">
-            <Plus className="w-4 h-4 mr-2" />
-            Deploy Agent
-          </Button>
+          <div className="flex space-x-3">
+            <Button className="flex items-center" onClick={() => window.location.href = '/campaigns'}>
+              <Users className="w-4 h-4 mr-2" />
+              Campaigns
+            </Button>
+            <Button className="flex items-center">
+              <Plus className="w-4 h-4 mr-2" />
+              Deploy Agent
+            </Button>
+          </div>
         </header>
 
         {/* Enhanced responsive grid layout */}
