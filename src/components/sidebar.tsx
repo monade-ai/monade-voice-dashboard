@@ -20,6 +20,7 @@ import {
   LogOut,
   Sun, 
   Moon,
+  Megaphone,
 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -115,6 +116,12 @@ export function Sidebar() {
             icon={<Contact2 size={18} />}
             label={t('sidebar.contacts')}
             isActive={pathname === '/contacts'}
+          />
+          <NavItem
+            href="/campaigns"
+            icon={<Megaphone size={18} />}
+            label="Campaigns"
+            isActive={pathname === '/campaigns'}
           />
           <NavItem
             href="/phone-numbers"

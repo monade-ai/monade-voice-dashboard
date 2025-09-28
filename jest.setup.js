@@ -49,6 +49,9 @@ process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key'
 process.env.EXOTEL_API_KEY = 'test-api-key'
 process.env.EXOTEL_FUNCTIONS_KEY = 'test-functions-key'
 process.env.EXOTEL_API_URL = 'https://test-exotel-api.com/api/call'
+// Campaign API test environment variables
+process.env.EXOTEL_ACCOUNT_SID = 'test-account-sid'
+process.env.EXOTEL_BASE_URL = 'api.exotel.com'
 
 // Mock fetch globally
 global.fetch = jest.fn()
