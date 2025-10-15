@@ -163,7 +163,7 @@ export function NewPhoneDialog({
             <Input
               id="phone"
               type="tel"
-              placeholder="e.g., +919122833772 or 9122833772"
+              placeholder="e.g., +911234567890 or 1234567890"
               value={phoneNumber}
               onChange={(e) => {
                 setPhoneNumber(e.target.value);
