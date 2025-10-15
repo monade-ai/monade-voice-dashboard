@@ -28,6 +28,7 @@ import DeleteConfirmationModal from '../delete-confirmation-modal';
 import CostDisplay from './cost-display';
 import ModelTab from './tab-views/model-tab';
 import AssistantDualButton from './assistant-dual-button';
+import NewAssistantDualButton from './new-assistant-dual-button';
 import CallScheduling from './tab-views/call-management/call-scheduling';
 import CallInsights from './tab-views/call-management/call-insights';
 
@@ -304,7 +305,7 @@ export default function AssistantTabs({ editingAssistantId }: AssistantTabsProps
           </TabsList>
           {/* Move test call dual button next to tabs */}
           <div className="ml-4 flex-shrink-0">
-            <AssistantDualButton assistant={currentAssistant} />
+            <NewAssistantDualButton assistant={currentAssistant} />
           </div>
         </div>
 
