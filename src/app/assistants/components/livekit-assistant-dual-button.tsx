@@ -1,4 +1,4 @@
-// components/new-assistant-dual-button.tsx
+// components/livekit-assistant-dual-button.tsx
 'use client';
 
 import { useState } from 'react';
@@ -7,10 +7,11 @@ import { MessageCircle, Phone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useNewPhoneAssistant } from '@/app/hooks/use-new-phone-assistant';
+import { useLiveKitWebAssistant } from '@/app/hooks/use-livekit-web-assistant';
 
 import { useAssistants } from '../../hooks/use-assistants-context';
 import { NewPhoneDialog } from '../components/new-phone-dialog';
-import { WebAssistantDialog } from '../components/web-assistant-dialog';
+import { LiveKitWebAssistantDialog } from '../components/livekit-web-assistant-dialog';
 
 interface AssistantDualButtonProps {
   assistant: Assistant | string;
@@ -22,7 +23,7 @@ interface Assistant {
   name: string;
 }
 
-export default function NewAssistantDualButton({ assistant }: AssistantDualButtonProps) {
+export default function LiveKitAssistantDualButton({ assistant }: AssistantDualButtonProps) {
   const [mode, setMode] = useState<'chat' | 'talk'>('chat');
   const { assistants } = useAssistants();
   
@@ -49,6 +50,20 @@ export default function NewAssistantDualButton({ assistant }: AssistantDualButto
     assistantId: assistantData.id,
     assistantName: assistantData.name,
   });
+  
+  // Use LiveKit web assistant hook
+  const {
+    isConnecting: isWebConnecting,
+    isConnected: isWebConnected,
+    connectionStatus: webConnectionStatus,
+    startSession,
+    endSession,
+    error: webError,
+    errorMessage: webErrorMessage,
+  } = useLiveKitWebAssistant({
+    assistantId: assistantData.id,
+    assistantName: assistantData.name,
+  });
 
   const handleAction = () => {
     if (mode === 'chat') {
@@ -68,6 +83,13 @@ export default function NewAssistantDualButton({ assistant }: AssistantDualButto
     setIsPhoneDialogOpen(false);
     if (isCallInProgress) {
       endCall();
+    }
+  };
+  
+  const handleWebDialogClose = () => {
+    setIsWebDialogOpen(false);
+    if (isWebConnected) {
+      endSession();
     }
   };
 
@@ -119,12 +141,12 @@ export default function NewAssistantDualButton({ assistant }: AssistantDualButto
         errorMessage={errorMessage}
       />
       
-      {/* Web Assistant Dialog */}
-      <WebAssistantDialog
-        url="wss://api.pipecat.com/v1/rtvi" // Replace with your actual API URL
-        assistantName="Pipecat Assistant"
+      {/* LiveKit Web Assistant Dialog */}
+      <LiveKitWebAssistantDialog
+        assistantName="voice-agent"
+        assistantId={assistantData.id}
         isOpen={isWebDialogOpen}
-        onClose={() => setIsWebDialogOpen(false)}
+        onClose={handleWebDialogClose}
       />
 
     </>

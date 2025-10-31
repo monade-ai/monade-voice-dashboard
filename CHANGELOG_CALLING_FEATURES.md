@@ -14,77 +14,78 @@
 - **Proxy API Route**: Created [src/app/api/calling/route.ts](file:///mnt/e/monade_dashboard/monade-voice-dashboard/src/app/api/calling/route.ts) to handle CORS issues and communicate with the external calling service
 - **Enhanced Logging**: Added detailed console logging to track API requests and responses throughout the calling flow
 
+## LiveKit Web Assistant Implementation
+### New Features
+
+#### LiveKit Integration for Web Assistant
+- **LiveKit Service**: Implemented [livekit-service.ts](file:///mnt/e/monade_dashboard/monade-voice-dashboard/src/lib/services/livekit-service.ts) to handle LiveKit dispatch creation
+- **LiveKit API Route**: Created [src/app/api/livekit-dispatch/route.ts](file:///mnt/e/monade_dashboard/monade-voice-dashboard/src/app/api/livekit-dispatch/route.ts) to handle LiveKit dispatch requests
+- **LiveKit Web Assistant Hook**: Created [use-livekit-web-assistant.ts](file:///mnt/e/monade_dashboard/monade-voice-dashboard/src/app/hooks/use-livekit-web-assistant.ts) for managing LiveKit web assistant sessions
+- **LiveKit Web Assistant Dialog**: Created [livekit-web-assistant-dialog.tsx](file:///mnt/e/monade_dashboard/monade-voice-dashboard/src/app/assistants/components/livekit-web-assistant-dialog.tsx) component for the LiveKit web assistant UI
+- **LiveKit Assistant Dual Button**: Created [livekit-assistant-dual-button.tsx](file:///mnt/e/monade_dashboard/monade-voice-dashboard/src/app/assistants/components/livekit-assistant-dual-button.tsx) component that combines phone and LiveKit web assistant functionality
+
+### Enhanced LiveKit Implementation with Assistant Prompt Integration
+
+#### Automatic Prompt Fetching
+- **Assistant Data Retrieval**: The LiveKit service now automatically fetches all assistants from the assistants API
+- **Current Assistant Identification**: Identifies the current assistant by ID to retrieve its knowledge base URL
+- **Prompt Extraction**: Automatically fetches the knowledge base prompt and includes it in the metadata sent to LiveKit
+- **Fallback Handling**: Gracefully handles cases where no knowledge base is associated with an assistant
+
 ### Technical Implementation Details
 
-#### Proxy API Architecture
-To avoid CORS issues when calling the external service from the browser, we implemented a proxy API route:
+#### LiveKit Dispatch Architecture
+To integrate LiveKit for web assistant sessions, we implemented a dispatch system:
 
-1. The frontend calls `/api/calling` with the phone number and callee information
-2. The Next.js API route forwards the request to `http://34.47.175.17:8000/outbound-call/{phone_number}`
-3. The response is returned to the frontend through the same channel
+1. The frontend collects user metadata in the web assistant dialog
+2. When the user starts a session, a request is sent to `/api/livekit-dispatch`
+3. The Next.js API route creates a LiveKit dispatch using the AgentDispatchClient
+4. The dispatch instructs a LiveKit agent to join a room with the provided metadata
 
-#### New API Endpoint
-- **URL**: `/api/calling` (proxy to `http://34.47.175.17:8000/outbound-call/{phone_number}`)
-- **Method**: POST
-- **Headers**: `Content-Type: application/json`
-- **Payload Structure**:
-  ```json
-  {
-    "phone_number": "+919122833772",
-    "callee_info": {
-      "key1": "value1",
-      "key2": "value2"
-      // ... additional key-value pairs
-    }
-  }
-  ```
+#### Enhanced Metadata with Prompt
+The metadata sent to LiveKit now includes:
+- All user-provided information (name, company, etc.)
+- The assistant's prompt fetched from its knowledge base
 
 #### Environment Configuration
-- Added new environment variable: `NEXT_PUBLIC_CALLING_SERVICE_URL`
-- Default value: `http://34.47.175.17:8000`
-- Can be overridden in environment configuration
+Added new environment variables for LiveKit configuration:
+- `LIVEKIT_URL` - The LiveKit server URL
+- `LIVEKIT_API_KEY` - The LiveKit API key
+- `LIVEKIT_API_SECRET` - The LiveKit API secret
 
 #### File Structure
 New files created:
-- [src/app/assistants/components/new-phone-dialog.tsx](file:///mnt/e/monade_dashboard/monade-voice-dashboard/src/app/assistants/components/new-phone-dialog.tsx)
-- [src/app/assistants/components/new-assistant-dual-button.tsx](file:///mnt/e/monade_dashboard/monade-voice-dashboard/src/app/assistants/components/new-assistant-dual-button.tsx)
-- [src/app/hooks/use-new-phone-assistant.ts](file:///mnt/e/monade_dashboard/monade-voice-dashboard/src/app/hooks/use-new-phone-assistant.ts)
-- [src/lib/services/new-calling-service.ts](file:///mnt/e/monade_dashboard/monade-voice-dashboard/src/lib/services/new-calling-service.ts)
-- [src/app/api/calling/route.ts](file:///mnt/e/monade_dashboard/monade-voice-dashboard/src/app/api/calling/route.ts)
+- [src/lib/services/livekit-service.ts](file:///mnt/e/monade_dashboard/monade-voice-dashboard/src/lib/services/livekit-service.ts)
+- [src/app/api/livekit-dispatch/route.ts](file:///mnt/e/monade_dashboard/monade-voice-dashboard/src/app/api/livekit-dispatch/route.ts)
+- [src/app/hooks/use-livekit-web-assistant.ts](file:///mnt/e/monade_dashboard/monade-voice-dashboard/src/app/hooks/use-livekit-web-assistant.ts)
+- [src/app/assistants/components/livekit-web-assistant-dialog.tsx](file:///mnt/e/monade_dashboard/monade-voice-dashboard/src/app/assistants/components/livekit-web-assistant-dialog.tsx)
+- [src/app/assistants/components/livekit-assistant-dual-button.tsx](file:///mnt/e/monade_dashboard/monade-voice-dashboard/src/app/assistants/components/livekit-assistant-dual-button.tsx)
 
 ### How to Switch Between Implementations
 
-#### To Use the New Implementation (Currently Active)
-The new implementation is currently active in the UI. No additional steps needed.
+#### To Use the LiveKit Implementation (Currently Active)
+The LiveKit implementation is currently active in the UI. No additional steps needed.
 
-#### To Switch Back to the Old Implementation
+#### To Switch Back to the Previous Implementation
 1. Edit [src/app/assistants/components/assistant-tabs.tsx](file:///mnt/e/monade_dashboard/monade-voice-dashboard/src/app/assistants/components/assistant-tabs.tsx)
-2. Find the import statement:
+2. Replace the component usage:
    ```typescript
-   import NewAssistantDualButton from './new-assistant-dual-button';
+   // Change this line:
+   <LiveKitAssistantDualButton assistant={currentAssistant} />
+   
+   // To this:
+   <NewAssistantDualButton assistant={currentAssistant} />
    ```
-3. Replace the component usage:
+
+#### To Switch to the LiveKit Implementation (if reverted back)
+1. Edit [src/app/assistants/components/assistant-tabs.tsx](file:///mnt/e/monade_dashboard/monade-voice-dashboard/src/app/assistants/components/assistant-tabs.tsx)
+2. Replace the component usage:
    ```typescript
    // Change this line:
    <NewAssistantDualButton assistant={currentAssistant} />
    
    // To this:
-   <AssistantDualButton assistant={currentAssistant} />
-   ```
-
-#### To Switch to the New Implementation (if reverted back)
-1. Edit [src/app/assistants/components/assistant-tabs.tsx](file:///mnt/e/monade_dashboard/monade-voice-dashboard/src/app/assistants/components/assistant-tabs.tsx)
-2. Ensure the import statement exists:
-   ```typescript
-   import NewAssistantDualButton from './new-assistant-dual-button';
-   ```
-3. Replace the component usage:
-   ```typescript
-   // Change this line:
-   <AssistantDualButton assistant={currentAssistant} />
-   
-   // To this:
-   <NewAssistantDualButton assistant={currentAssistant} />
+   <LiveKitAssistantDualButton assistant={currentAssistant} />
    ```
 
 ### Backward Compatibility
@@ -93,57 +94,30 @@ All original files and implementations have been preserved:
 - Original [AssistantDualButton](file:///mnt/e/monade_dashboard/monade-voice-dashboard/src/app/assistants/components/assistant-dual-button.tsx#L27-L83) component remains unchanged
 - Original [usePhoneAssistant](file:///mnt/e/monade_dashboard/monade-voice-dashboard/src/app/hooks/use-phone-assistant.ts#L16-L78) hook remains unchanged
 - Original [exotel-service.ts](file:///mnt/e/monade_dashboard/monade-voice-dashboard/src/lib/services/exotel-service.ts) remains unchanged
+- New calling implementation files remain unchanged for future use
 
-This ensures that if any issues arise with the new implementation, the system can be quickly reverted to the previous working version.
+This ensures that if any issues arise with the LiveKit implementation, the system can be quickly reverted to the previous working version.
 
-### Testing the New Implementation
+### Testing the LiveKit Implementation
 1. Navigate to the Assistants page
 2. Select an assistant
-3. Click on the "Phone assistant" mode in the dual button
-4. Enter a phone number (e.g., 9122833772 or +919122833772)
-5. Optionally add callee information using the "Add" button
-6. Click "Call"
-7. The system will make a POST request to `/api/calling` which forwards to `http://34.47.175.17:8000/outbound-call/+919122833772` with the metadata payload
+3. Click on the "Web assistant" mode in the dual button
+4. Optionally add user information using the "Add" button
+5. Click "Start Session"
+6. The system will make a POST request to `/api/livekit-dispatch` which creates a LiveKit dispatch with the provided metadata and assistant prompt
 
-### Debugging API Responses
-
-To see the actual API responses in the console:
-
-1. Open the browser's developer tools (F12)
-2. Go to the Console tab
-3. Look for log messages with the following prefixes:
-   - `[NewCallingService]` - Frontend service logs
-   - `[Calling API Route]` - Backend proxy API logs
-
-These logs will show:
-- Request payloads being sent
-- Response statuses received
-- Response bodies from the calling service
-- Error messages if any occur
-
-### Curl Example (Direct)
+### Curl Example (LiveKit Dispatch)
 ```bash
-curl -X POST "http://34.47.175.17:8000/outbound-call/+9122833772" \
+curl -X POST "http://localhost:3000/api/livekit-dispatch" \
   -H "Content-Type: application/json" \
   -d '{
-    "metadata": {
-      "name": "Amol",
+    "roomName": "assistant-room-123",
+    "agentName": "Test Assistant",
+    "calleeInfo": {
+      "name": "John Doe",
       "company": "Acme Corp",
       "priority": "high"
-    }
-  }'
-```
-
-### Curl Example (Through Proxy API)
-```bash
-curl -X POST "http://localhost:3000/api/calling" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "phone_number": "+919122833772",
-    "callee_info": {
-      "name": "Amol",
-      "company": "Acme Corp",
-      "priority": "high"
-    }
+    },
+    "assistantId": "assistant-uuid"
   }'
 ```

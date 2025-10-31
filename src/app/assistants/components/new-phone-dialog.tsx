@@ -21,6 +21,7 @@ interface CalleeInfo {
 
 interface NewPhoneDialogProps {
   assistantName: string;
+  assistantId: string;
   isOpen: boolean;
   onClose: () => void;
   onCall: (phoneNumber: string, calleeInfo: CalleeInfo) => void;
@@ -32,6 +33,7 @@ interface NewPhoneDialogProps {
 
 export function NewPhoneDialog({
   assistantName,
+  assistantId,
   isOpen,
   onClose,
   onCall,
