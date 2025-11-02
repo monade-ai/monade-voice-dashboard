@@ -20,9 +20,9 @@ const nextConfig: NextConfig = {
     EXOTEL_BASE_URL: process.env.EXOTEL_BASE_URL,
     NEXT_PUBLIC_EXOTEL_CALLBACK_URL: process.env.NEXT_PUBLIC_EXOTEL_CALLBACK_URL,
     NEXT_PUBLIC_CALLING_SERVICE_URL: process.env.NEXT_PUBLIC_CALLING_SERVICE_URL || 'http://34.47.175.17:8000',
-    LIVEKIT_URL: process.env.LIVEKIT_URL,
-    LIVEKIT_API_KEY: process.env.LIVEKIT_API_KEY,
-    LIVEKIT_API_SECRET: process.env.LIVEKIT_API_SECRET
+    LIVEKIT_URL: process.env.LIVEKIT_URL ||'wss://monade-testing-r3st0js0.livekit.cloud',
+    LIVEKIT_API_KEY: process.env.LIVEKIT_API_KEY || 'APIS8xdGVuoQTcc',
+    LIVEKIT_API_SECRET: process.env.LIVEKIT_API_SECRET || 'YaZkJCJ4rDz8UV642a07h3sYyv9W6R0q8D0UiggTqxK'
   },
   typescript: {
     ignoreBuildErrors: true,

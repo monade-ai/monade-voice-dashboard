@@ -144,6 +144,7 @@ export default function LiveKitAssistantDualButton({ assistant }: AssistantDualB
       {/* LiveKit Web Assistant Dialog */}
       <LiveKitWebAssistantDialog
         assistantName="voice-agent"
+        // assistantName="monade-test"
         assistantId={assistantData.id}
         isOpen={isWebDialogOpen}
         onClose={handleWebDialogClose}
