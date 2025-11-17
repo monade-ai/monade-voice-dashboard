@@ -63,7 +63,7 @@ export async function login(formData: FormData) {
     redirect('/login?message=' + encodeURIComponent(error.message));
   }
 
-  redirect('/protected');
+  redirect('/dashboard');
 }
 
 export async function signup(formData: FormData) {
@@ -92,4 +92,18 @@ export async function logout() {
   
   await supabase.auth.signOut();
   redirect('/login');
+}
+
+// Placeholder function for OAuth authentication
+// This will be implemented in a future phase
+export async function initiateOAuth(provider: 'google' | 'apple') {
+  // Placeholder for OAuth implementation
+  console.log(`OAuth ${provider} flow - not yet implemented`);
+  
+  // Future implementation will include:
+  // - Provider-specific OAuth configuration
+  // - Redirect URL handling  
+  // - Error handling
+  
+  return { success: false, message: 'OAuth not yet implemented' };
 }

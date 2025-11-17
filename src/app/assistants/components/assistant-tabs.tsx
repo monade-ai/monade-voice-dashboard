@@ -11,6 +11,11 @@ import {
   Calendar,
   BarChart3,
   InfoIcon,
+  Edit3,
+  FileText,
+  Eye,
+  Mail,
+  MessageSquare,
 } from 'lucide-react';
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -23,6 +28,8 @@ import {
 } from '@/components/ui/tooltip';
 
 import { useAssistants } from '../../hooks/use-assistants-context';
+import { useKnowledgeBase } from '@/app/hooks/use-knowledge-base';
+import { useAuth } from '@/contexts/auth-context';
 import DeleteConfirmationModal from '../delete-confirmation-modal';
 
 import CostDisplay from './cost-display';
@@ -32,6 +39,7 @@ import NewAssistantDualButton from './new-assistant-dual-button';
 import LiveKitAssistantDualButton from './livekit-assistant-dual-button';
 import CallScheduling from './tab-views/call-management/call-scheduling';
 import CallInsights from './tab-views/call-management/call-insights';
+import FunctionCard from './function-card';
 
 
 // Modern, animated latency card
@@ -123,7 +131,9 @@ interface AssistantTabsProps {
 }
 
 export default function AssistantTabs({ editingAssistantId }: AssistantTabsProps) {
-  const { currentAssistant, saveAssistantUpdates, fetchAssistants, createAssistant, setCurrentAssistant } = useAssistants();
+  const { currentAssistant, saveAssistantUpdates, fetchAssistants, createAssistant, setCurrentAssistant, updateAssistantLocally } = useAssistants();
+  const { createKnowledgeBase } = useKnowledgeBase();
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('model');
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -213,13 +223,24 @@ export default function AssistantTabs({ editingAssistantId }: AssistantTabsProps
 
     setIsSaving(true); // Use isSaving state to indicate processing
     try {
+      let knowledgeBaseId: string | null = null;
+
+      // Handle knowledge base content from textarea
+      if (currentAssistant.knowledgeBase && typeof currentAssistant.knowledgeBase === 'string' && currentAssistant.knowledgeBase.startsWith('text:')) {
+        const kbContent = currentAssistant.knowledgeBase.substring(5);
+        const newKb = await createKnowledgeBase({ kb_text: kbContent, filename: `${currentAssistant.name}_kb.txt` });
+        if (newKb) {
+          knowledgeBaseId = newKb.id;
+        }
+      } else if (currentAssistant.knowledgeBase) {
+        knowledgeBaseId = currentAssistant.knowledgeBase;
+      }
+
       // Prepare payload for CreateAssistantData: remove id, createdAt, potentially map knowledgeBase
       const { id: localId, createdAt, knowledgeBase, ...restOfDraft } = currentAssistant;
       const createPayload /*: CreateAssistantData */ = {
         ...restOfDraft,
-        // Ensure knowledgeBaseId is handled correctly - assuming context expects the ID string
-        knowledgeBaseId: knowledgeBase !== undefined ? knowledgeBase : null, // Pass null if undefined
-        // Ensure other required fields for CreateAssistantData are present
+        knowledgeBaseId,
       };
 
       // Call createAssistant with the local draft ID and the prepared data
@@ -248,6 +269,7 @@ export default function AssistantTabs({ editingAssistantId }: AssistantTabsProps
         <LatencyCard latencyMs={currentAssistant.latencyMs || 1800} />
       </div>
 
+
       {/* Tab navigation */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <div className="relative flex items-center">
@@ -260,11 +282,11 @@ export default function AssistantTabs({ editingAssistantId }: AssistantTabsProps
               Model
             </TabsTrigger>
             <TabsTrigger
-              value="transcriber"
+              value="functions"
               className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-full transition-all duration-200 font-medium text-[var(--muted-foreground)] data-[state=active]:bg-[var(--card)] data-[state=active]:text-[var(--primary)] data-[state=active]:shadow-lg data-[state=active]:font-semibold hover:bg-[var(--muted)] focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
             >
-              <Mic className="h-4 w-4" />
-              Transcriber
+              <Terminal className="h-4 w-4" />
+              Functions
             </TabsTrigger>
             <TabsTrigger
               value="voice"
@@ -273,13 +295,7 @@ export default function AssistantTabs({ editingAssistantId }: AssistantTabsProps
               <Volume2 className="h-4 w-4" />
               Voice
             </TabsTrigger>
-            <TabsTrigger
-              value="functions"
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-full transition-all duration-200 font-medium text-[var(--muted-foreground)] data-[state=active]:bg-[var(--card)] data-[state=active]:text-[var(--primary)] data-[state=active]:shadow-lg data-[state=active]:font-semibold hover:bg-[var(--muted)] focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
-            >
-              <Terminal className="h-4 w-4" />
-              Functions
-            </TabsTrigger>
+
             <TabsTrigger
               value="advanced"
               className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-full transition-all duration-200 font-medium text-[var(--muted-foreground)] data-[state=active]:bg-[var(--card)] data-[state=active]:text-[var(--primary)] data-[state=active]:shadow-lg data-[state=active]:font-semibold hover:bg-[var(--muted)] focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
@@ -317,8 +333,27 @@ export default function AssistantTabs({ editingAssistantId }: AssistantTabsProps
           </Suspense>
         </TabsContent>
 
-        <TabsContent value="transcriber" className="mt-6">
-          <PlaceholderTab title="Transcriber" />
+        <TabsContent value="functions" className="mt-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <FunctionCard
+              icon={<Mail className="h-6 w-6" />}
+              name="Gmail"
+              description="Allow your assistant to read, draft, and send emails."
+              userEmail={user?.email}
+              gmail={currentAssistant.gmail}
+              onGmailChange={(gmail) => {
+                updateAssistantLocally(currentAssistant.id, { gmail });
+                handleMarkUnsavedChanges();
+              }}
+              saveAssistantUpdates={saveAssistantUpdates}
+              currentAssistantId={currentAssistant.id}
+            />
+            <FunctionCard
+              icon={<MessageSquare className="h-6 w-6" />}
+              name="WhatsApp"
+              description="Connect to send and receive messages."
+            />
+          </div>
         </TabsContent>
 
         <TabsContent value="voice" className="mt-6">

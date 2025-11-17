@@ -20,6 +20,13 @@ export interface Assistant {
   tags: string[]; // Non-optional (defaults to [])
   createdAt: Date; // Represents local creation time for drafts, API time for published
   knowledgeBase?: string | null; // Stores the URL from GET, or null
+  gmail?: {
+    from?: string;
+    to_email?: string;
+    subject?: string;
+    body?: string;
+    agent_email?: boolean;
+  };
 }
 
 // Define the structure for creating an assistant (maps to POST body)
@@ -41,6 +48,13 @@ type CreateAssistantData = {
 // Using Partial on relevant Assistant fields + knowledgeBaseId
 type UpdateAssistantData = Partial<Omit<Assistant, 'id' | 'createdAt' | 'knowledgeBase'>> & {
   knowledgeBaseId?: string | null; // Use ID or null for updating link
+  gmail?: {
+    from?: string;
+    to_email?: string;
+    subject?: string;
+    body?: string;
+    agent_email?: boolean;
+  };
 };
 
 
@@ -122,7 +136,7 @@ const loadDrafts = (organizationId?: string): Assistant[] => {
 
 // Helper to save drafts to localStorage with organization context
 const saveDrafts = (drafts: Assistant[], organizationId?: string) => {
-  if (typeof window === 'undefined') return; // Guard for SSR
+  if (typeof window === 'undefined') return []; // Guard for SSR
   try {
     const storageKey = getStorageKey(organizationId);
     localStorage.setItem(storageKey, JSON.stringify(drafts));
@@ -317,9 +331,16 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
     let updatedAssistants: Assistant[] | null = null;
 
     setAssistants((prev) => {
-      updatedAssistants = prev.map((assistant) =>
+      const updatedAssistants = prev.map((assistant) =>
         assistant.id === id ? { ...assistant, ...updatedData } : assistant,
       );
+
+      // If it was a draft, update localStorage with organization context
+      if (id.startsWith('local-')) {
+        const currentDrafts = updatedAssistants.filter(a => a.id.startsWith('local-'));
+        saveDrafts(currentDrafts, organizationId);
+        console.log('[Assistants] Updated draft in localStorage:', id);
+      }
 
       return updatedAssistants;
     });
@@ -328,18 +349,12 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
     if (currentAssistant?.id === id) {
       setCurrentAssistant((prev) => (prev ? { ...prev, ...updatedData } : null));
     }
-
-    // If it was a draft, update localStorage with organization context
-    if (id.startsWith('local-') && updatedAssistants) {
-      const currentDrafts = updatedAssistants.filter(a => a.id.startsWith('local-'));
-      saveDrafts(currentDrafts, organizationId);
-      console.log('[Assistants] Updated draft in localStorage:', id);
-    }
   };
 
   // Saves updates for an EXISTING PUBLISHED assistant to the backend
   const saveAssistantUpdates = async (id: string, updatedData: UpdateAssistantData): Promise<Assistant | undefined> => {
     const organizationId = currentOrganization?.id;
+    console.log('😊😊😊😊');
     
     if (id.startsWith('local-')) {
       console.error('Attempted to save updates for a draft assistant using saveAssistantUpdates. Use createAssistant (publish) instead.');
@@ -354,6 +369,9 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
     // Send knowledgeBase in payload ONLY if knowledgeBaseId was present in updatedData
     if (knowledgeBaseId !== undefined) {
       payload.knowledgeBase = knowledgeBaseId;
+    }
+    if (updatedData.gmail !== undefined) {
+      payload.gmail = updatedData.gmail;
     }
 
     if (Object.keys(payload).length === 0) {
