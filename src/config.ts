@@ -8,8 +8,12 @@
 
 export const CONFIG = {
     // Monade Voice Config Server API (db_services)
+    // On client-side, use proxy; on server-side, use direct URL
     MONADE_API: {
-        BASE_URL: 'http://35.200.254.189/db_services',
+        // For client-side fetch calls, use the proxy to avoid mixed content
+        BASE_URL: typeof window !== 'undefined' ? '/api/proxy' : 'http://35.200.254.189/db_services',
+        // Direct URL for server-side calls
+        DIRECT_URL: 'http://35.200.254.189/db_services',
         API_KEY: 'monade_d8325992-cf93-4cdd-9c54-34ca18d72441',
         DEFAULT_USER_UID: 'b08d1d4d-a47d-414b-9360-80264388793f',
     },

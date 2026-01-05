@@ -1,7 +1,9 @@
 import { createClient } from '@/utils/supabase/client'; // Import the new client client
 
-// Remove trailing /api if it exists since we'll add it in the endpoint calls
-const API_BASE_URL = (process.env.NEXT_PUBLIC_DATABASE_URL || 'http://localhost:8764').replace(/\/api$/, '');
+// NOTE: External buckets API is disabled for production
+// This was pointing to localhost:8764 which is not available in production
+// Using localStorage fallback functions instead (see below)
+const API_BASE_URL = ''; // Disabled - use localStorage functions
 
 async function getSupabaseToken() {
   try {
