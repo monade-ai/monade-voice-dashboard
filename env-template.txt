@@ -1,0 +1,25 @@
+# Monade Dashboard Environment Configuration
+# Copy this file to .env.local and fill in the values
+
+# New Monade Voice Config Server API
+NEXT_PUBLIC_ASSISTANTS_BASEURL=http://35.200.254.189/db_services
+NEXT_PUBLIC_PROVIDER=vobiz.ai
+
+# Default User UID (for development/testing)
+NEXT_PUBLIC_DEFAULT_USER_UID=b08d1d4d-a47d-414b-9360-80264388793f
+
+# LiveKit Configuration
+LIVEKIT_URL=
+LIVEKIT_API_KEY=
+LIVEKIT_API_SECRET=
+
+# Calling Service (legacy - no longer used)
+# NEXT_PUBLIC_CALLING_SERVICE_URL=http://34.47.175.17:8000
+
+# Voice Agents API (new outbound calling)
+NEXT_PUBLIC_VOICE_AGENTS_URL=http://35.200.254.189/voice_agents
+VOICE_AGENTS_API_KEY=monade_d8325992-cf93-4cdd-9c54-34ca18d72441
+
+# Supabase
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=

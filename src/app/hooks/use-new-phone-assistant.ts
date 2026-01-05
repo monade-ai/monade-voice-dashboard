@@ -45,10 +45,11 @@ export function useNewPhoneAssistant({
       setCallStatus('initiating');
       setRemainingTime(15);
 
-      console.log('[useNewPhoneAssistant] Calling initiateNewCall with:', { phone_number: phoneNumber, callee_info: calleeInfo });
+      console.log('[useNewPhoneAssistant] Calling initiateNewCall with:', { phone_number: phoneNumber, callee_info: calleeInfo, assistant_id: assistantId });
       const response = await initiateNewCall({
         phone_number: phoneNumber,
         callee_info: calleeInfo,
+        assistant_id: assistantId,
       });
 
       // Log response

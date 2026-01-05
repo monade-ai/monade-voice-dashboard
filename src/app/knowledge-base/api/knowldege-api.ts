@@ -28,33 +28,33 @@ export async function updateSystemPrompt(base64Content: string): Promise<any> {
   try {
     console.log('Calling updateSystemPrompt API with base64 content length:', base64Content.length);
     console.log('First 50 chars of base64:', base64Content.substring(0, 50));
-      
+
     // Log the JSON payload for debugging
     const payload = {
       prompt_base64: base64Content,
     };
     console.log('Payload preview:', JSON.stringify(payload).substring(0, 100) + '...');
-    
+
     const orgContext = getOrganizationContext();
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
-    
+
     // Add organization context if available
     if (orgContext.organizationId) {
       headers['X-Organization-ID'] = orgContext.organizationId;
     }
-      
+
     const response = await fetch('https://039f-2405-201-d003-d814-fc48-8886-8dad-ad9.ngrok-free.app/update_system_prompt', {
       method: 'POST',
       headers,
       body: JSON.stringify(payload),
     });
-  
+
     // Log response details
     console.log('API Response status:', response.status);
     console.log('API Response status text:', response.statusText);
-  
+
     if (!response.ok) {
       // Try to get error details from response
       let errorDetail = '';
@@ -65,10 +65,10 @@ export async function updateSystemPrompt(base64Content: string): Promise<any> {
       } catch (e) {
         console.error('Could not read error response text:', e);
       }
-        
+
       throw new Error(`Error: ${response.status} ${response.statusText} - ${errorDetail}`);
     }
-  
+
     const jsonResponse = await response.json();
     console.log('API Success response:', jsonResponse);
 
@@ -78,32 +78,32 @@ export async function updateSystemPrompt(base64Content: string): Promise<any> {
     throw error;
   }
 }
-  
+
 /**
    * Document metadata interface
    */
 export interface DocumentMetadata {
-    id: string;
-    title: string;
-    description?: string;
-    fileType: string;
-    fileSize: number;
-    content: string; // base64 encoded content
-    uploadedAt: string;
-  }
-  
+  id: string;
+  title: string;
+  description?: string;
+  fileType: string;
+  fileSize: number;
+  content: string; // base64 encoded content
+  uploadedAt: string;
+}
+
 /**
    * Class to manage document storage with organization context
    */
 export class DocumentStorage {
   private static STORAGE_KEY = 'monade_documents';
-  
+
   private static getStorageKey(): string {
     const orgContext = getOrganizationContext();
 
     return orgContext.organizationId ? `${this.STORAGE_KEY}_${orgContext.organizationId}` : this.STORAGE_KEY;
   }
-  
+
   /**
      * Save a document to storage
      * @param document - Document metadata to save
@@ -123,7 +123,7 @@ export class DocumentStorage {
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
       };
-      
+
       // Add organization context if available
       if (orgContext.organizationId) {
         headers['X-Organization-ID'] = orgContext.organizationId;
@@ -142,13 +142,13 @@ export class DocumentStorage {
       // Still keep document metadata in localStorage for backward compatibility
       const documents = this.getAllDocuments();
       const existingIndex = documents.findIndex(doc => doc.id === document.id);
-      
+
       if (existingIndex >= 0) {
         documents[existingIndex] = document;
       } else {
         documents.push(document);
       }
-      
+
       const storageKey = this.getStorageKey();
       localStorage.setItem(storageKey, JSON.stringify(documents));
     } catch (error) {
@@ -156,7 +156,7 @@ export class DocumentStorage {
       throw error;
     }
   }
-  
+
   /**
      * Get all documents from storage
      * @returns Array of document metadata
@@ -164,11 +164,11 @@ export class DocumentStorage {
   static getAllDocuments(): DocumentMetadata[] {
     const storageKey = this.getStorageKey();
     const documentsJson = localStorage.getItem(storageKey);
-      
+
     if (!documentsJson) {
       return [];
     }
-      
+
     try {
       return JSON.parse(documentsJson) as DocumentMetadata[];
     } catch (error) {
@@ -177,7 +177,7 @@ export class DocumentStorage {
       return [];
     }
   }
-  
+
   /**
      * Get a document by ID
      * @param id - Document ID
@@ -188,7 +188,7 @@ export class DocumentStorage {
 
     return documents.find(doc => doc.id === id) || null;
   }
-  
+
   /**
      * Delete a document by ID
      * @param id - Document ID
@@ -200,7 +200,7 @@ export class DocumentStorage {
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
       };
-      
+
       // Add organization context if available
       if (orgContext.organizationId) {
         headers['X-Organization-ID'] = orgContext.organizationId;
@@ -219,11 +219,11 @@ export class DocumentStorage {
       // Also delete from localStorage
       const documents = this.getAllDocuments();
       const filteredDocuments = documents.filter(doc => doc.id !== id);
-      
+
       if (filteredDocuments.length === documents.length) {
         return false; // Document not found
       }
-      
+
       const storageKey = this.getStorageKey();
       localStorage.setItem(storageKey, JSON.stringify(filteredDocuments));
 
@@ -233,7 +233,7 @@ export class DocumentStorage {
       throw error;
     }
   }
-  
+
   /**
      * Clear all documents from storage
      */

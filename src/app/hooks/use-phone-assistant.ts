@@ -46,8 +46,8 @@ export function usePhoneAssistant({
         typeof window !== 'undefined' && process.env.NEXT_PUBLIC_EXOTEL_CALLBACK_URL
           ? process.env.NEXT_PUBLIC_EXOTEL_CALLBACK_URL
           : (typeof window !== 'undefined'
-              ? window.location.origin + '/api/exotel/hook'
-              : 'https://your-callback-url.example.com/exotel-hook');
+            ? window.location.origin + '/api/exotel/hook'
+            : 'https://your-callback-url.example.com/exotel-hook');
       console.log('[usePhoneAssistant] Calling initiateExotelCall with:', { phone_number: phoneNumber, callback_url: callbackUrl });
       const response = await initiateExotelCall({
         phone_number: phoneNumber,

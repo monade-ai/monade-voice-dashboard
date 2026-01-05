@@ -2,30 +2,31 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 
-import { useToast } from '@/app/knowledge-base/hooks/use-toast'; // Assuming toast is needed
+import { useToast } from '@/app/knowledge-base/hooks/use-toast';
+import { MONADE_API_CONFIG } from '@/types/monade-api.types';
 
 // Define Knowledge Base type (matches API response)
 export interface KnowledgeBase {
-    id: string;
-    filename: string;
-    url: string;
-    createdAt: Date;
+  id: string;
+  filename: string;
+  url: string;
+  createdAt: Date;
 }
 
 // Define the structure for creating a KB
 interface CreateKnowledgeBasePayload {
-    kb_text?: string;
-    kb_file_base64?: string;
-    filename?: string;
+  kb_text?: string;
+  kb_file_base64?: string;
+  filename?: string;
 }
 
 interface KnowledgeBaseContextType {
-    knowledgeBases: KnowledgeBase[];
-    isLoading: boolean;
-    error: string | null; // Add error state to type
-    fetchKnowledgeBases: () => Promise<void>;
-    createKnowledgeBase: (payload: CreateKnowledgeBasePayload) => Promise<boolean>; // Returns true on success
-    deleteKnowledgeBase: (id: string) => Promise<boolean>; // Returns true on success
+  knowledgeBases: KnowledgeBase[];
+  isLoading: boolean;
+  error: string | null; // Add error state to type
+  fetchKnowledgeBases: () => Promise<void>;
+  createKnowledgeBase: (payload: CreateKnowledgeBasePayload) => Promise<boolean>; // Returns true on success
+  deleteKnowledgeBase: (id: string) => Promise<boolean>; // Returns true on success
 }
 
 // Create context with default values
@@ -38,8 +39,9 @@ export const KnowledgeBaseContext = createContext<KnowledgeBaseContextType>({
   deleteKnowledgeBase: async () => false,
 });
 
-// Define API base URL (can be moved to a config file later)
-const API_BASE_URL = process.env.NEXT_PUBLIC_ASSISTANTS_BASEURL || 'http://localhost:7071/api';
+// Define API base URL (new Monade Voice Config Server API)
+const API_BASE_URL = MONADE_API_CONFIG.BASE_URL;
+const DEFAULT_USER_UID = MONADE_API_CONFIG.DEFAULT_USER_UID;
 
 // Helper to parse API errors (can be shared or duplicated)
 const getApiError = async (res: Response): Promise<string> => {
@@ -55,8 +57,8 @@ const getApiError = async (res: Response): Promise<string> => {
 // Knowledge Base Provider Component
 export const KnowledgeBaseProvider = ({ children }: { children: ReactNode }) => {
   const { toast } = useToast();
-  // TODO: Replace with new Supabase-based organization context
-  const currentOrganization = { id: 'default-org-id' }; // Placeholder
+  // Use user_uid from Monade API config
+  const currentUserUid = DEFAULT_USER_UID;
   const authLoading = false; // Placeholder
   const [knowledgeBases, setKnowledgeBases] = useState<KnowledgeBase[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -69,14 +71,11 @@ export const KnowledgeBaseProvider = ({ children }: { children: ReactNode }) => 
     try {
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
+        'X-API-Key': MONADE_API_CONFIG.API_KEY,
       };
-            
-      // Add organization context if available
-      if (currentOrganization?.id) {
-        headers['X-Organization-ID'] = currentOrganization.id;
-      }
 
-      const res = await fetch(`${API_BASE_URL}/knowledge-bases`, { headers });
+      // Use user-specific endpoint for new API
+      const res = await fetch(`${API_BASE_URL}/api/users/${currentUserUid}/knowledge-bases`, { headers });
       if (!res.ok) {
         const errorText = await getApiError(res);
         throw new Error(errorText); // Throw error to be caught below
@@ -111,20 +110,22 @@ export const KnowledgeBaseProvider = ({ children }: { children: ReactNode }) => 
     setError(null); // Reset error
     try {
       console.log('[createKnowledgeBase] Attempting to create KB with payload:', payload);
-            
+
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
+        'X-API-Key': MONADE_API_CONFIG.API_KEY,
       };
-            
-      // Add organization context if available
-      if (currentOrganization?.id) {
-        headers['X-Organization-ID'] = currentOrganization.id;
-      }
 
-      const res = await fetch(`${API_BASE_URL}/knowledge-bases`, {
+      // Include user_uid in the payload for new API
+      const apiPayload = {
+        ...payload,
+        user_uid: currentUserUid,
+      };
+
+      const res = await fetch(`${API_BASE_URL}/api/knowledge-bases`, {
         method: 'POST',
         headers,
-        body: JSON.stringify(payload),
+        body: JSON.stringify(apiPayload),
       });
 
       if (!res.ok) {
@@ -133,7 +134,7 @@ export const KnowledgeBaseProvider = ({ children }: { children: ReactNode }) => 
       }
 
       const newKb = await res.json();
-      toast({ title: 'Knowledge Base Created', description: `Successfully added ${payload.filename || 'new document'}. ID: ${newKb.kb_id}` });
+      toast({ title: 'Knowledge Base Created', description: `Successfully added ${payload.filename || 'new document'}.` });
       await fetchKnowledgeBases(); // Refresh list
 
       return true;
@@ -156,14 +157,10 @@ export const KnowledgeBaseProvider = ({ children }: { children: ReactNode }) => 
     try {
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
+        'X-API-Key': MONADE_API_CONFIG.API_KEY,
       };
-            
-      // Add organization context if available
-      if (currentOrganization?.id) {
-        headers['X-Organization-ID'] = currentOrganization.id;
-      }
 
-      const res = await fetch(`${API_BASE_URL}/knowledge-bases/${id}`, {
+      const res = await fetch(`${API_BASE_URL}/api/knowledge-bases/${id}`, {
         method: 'DELETE',
         headers,
       });
@@ -198,8 +195,8 @@ export const KnowledgeBaseProvider = ({ children }: { children: ReactNode }) => 
 
       return;
     }
-        
-    console.log('[KnowledgeBase] Auth loaded, proceeding with fetch. Organization ID:', currentOrganization?.id);
+
+    console.log('[KnowledgeBase] Auth loaded, proceeding with fetch. User UID:', currentUserUid);
     fetchKnowledgeBases();
   }, [fetchKnowledgeBases, authLoading]); // Use fetchKnowledgeBases from useCallback and authLoading
 

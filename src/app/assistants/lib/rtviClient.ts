@@ -6,18 +6,18 @@ let client: RTVIClient | null = null;
 
 export function getClient() {
   if (typeof window === 'undefined') return null;
-  
-  if (!client) {
-    if (!process.env.NEXT_PUBLIC_DAILY_ROOM_URL) {
-      console.error('Daily room URL not configured. Please set NEXT_PUBLIC_DAILY_ROOM_URL in .env.local');
 
+  if (!client) {
+    // Daily.co is optional - LiveKit is the primary transport
+    if (!process.env.NEXT_PUBLIC_DAILY_ROOM_URL) {
+      console.warn('[rtviClient] Daily room URL not configured. Daily-based features disabled. Using LiveKit instead.');
       return null;
     }
 
     // Initialize Daily transport
     try {
       const transport = new DailyTransport();
-      
+
       if (!transport) throw new Error('Failed to initialize DailyTransport');
 
       client = new RTVIClient({
@@ -48,6 +48,6 @@ export function getClient() {
       console.log('Transport state changed:', state);
     });
   }
-  
+
   return client;
 }

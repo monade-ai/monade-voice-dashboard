@@ -1,203 +1,153 @@
 /**
  * CallHistoryList
- * Displays a list of call logs with live updates.
+ * Displays a list of call logs from the transcripts API with transcript viewer.
  */
 
 'use client';
-import React, { useState, useEffect } from 'react';
-import { User } from 'lucide-react';
+import React, { useState } from 'react';
+import { Phone, ExternalLink, MessageSquare, Calendar, Loader2 } from 'lucide-react';
 
 import { useTranslations } from '@/i18n/translations-context';
+import { useTranscripts, Transcript } from '@/app/hooks/use-transcripts';
+import { TranscriptViewer } from '@/components/transcript-viewer';
 
-import { CallLog } from '../../../../types/call-management';
+// Format date helper
+const formatDate = (dateString: string) => {
+  const date = new Date(dateString);
+  return date.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+};
 
-import CallHistoryItem from './call-history-item';
-import CallDetailsPanel from './call-details-panel';
-import AgentFilterDialog from './agent-filter-dialog';
-
-
-// Minimal filter options (labels will be translated)
-const STATUS_OPTIONS = [
-  { value: 'all', labelKey: 'callHistory.filter.status.all' },
-  { value: 'completed', labelKey: 'callHistory.filter.status.completed' },
-  { value: 'missed', labelKey: 'callHistory.filter.status.missed' },
-  { value: 'failed', labelKey: 'callHistory.filter.status.failed' },
-  { value: 'ongoing', labelKey: 'callHistory.filter.status.ongoing' },
-];
-const DIRECTION_OPTIONS = [
-  { value: 'all', labelKey: 'callHistory.filter.direction.all' },
-  { value: 'inbound', labelKey: 'callHistory.filter.direction.inbound' },
-  { value: 'outbound', labelKey: 'callHistory.filter.direction.outbound' },
-];
-
-// TODO: Replace with API data and loading state
-const mockCalls: CallLog[] = [
-  {
-    id: '1',
-    participants: [
-      { name: 'Alice', number: '+1234567890', role: 'contact' },
-      { name: 'AI Assistant', number: 'virtual', role: 'assistant' },
-    ],
-    direction: 'outbound',
-    status: 'completed',
-    startTime: '2025-04-20T13:00:00Z',
-    endTime: '2025-04-20T13:05:00Z',
-    durationSeconds: 300,
-    transcript: 'Hello, this is Alice...',
-    logs: [
-      { timestamp: '2025-04-20T13:00:01Z', message: 'Call started', type: 'info' },
-      { timestamp: '2025-04-20T13:05:00Z', message: 'Call ended', type: 'info' },
-    ],
-    telemetry: { quality: 'good' },
-  },
-  {
-    id: '2',
-    participants: [
-      { name: 'Bob', number: '+1987654321', role: 'contact' },
-      { name: 'AI Assistant', number: 'virtual', role: 'assistant' },
-    ],
-    direction: 'inbound',
-    status: 'missed',
-    startTime: '2025-04-20T12:30:00Z',
-    transcript: '',
-    logs: [
-      { timestamp: '2025-04-20T12:30:01Z', message: 'Missed call', type: 'warning' },
-    ],
-    telemetry: { quality: 'n/a' },
-  },
-];
+// Call History Item Component
+const CallHistoryItem = ({
+  transcript,
+  onViewTranscript,
+}: {
+  transcript: Transcript;
+  onViewTranscript: () => void;
+}) => {
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-md transition-shadow">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+            <Phone className="w-5 h-5 text-green-600" />
+          </div>
+          <div>
+            <p className="font-medium text-gray-900">{transcript.call_id}</p>
+            <p className="text-sm text-gray-500">{transcript.phone_number}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-6">
+          <div className="text-right">
+            <span className="px-2 py-1 rounded text-xs font-medium bg-green-50 text-green-600">
+              Completed
+            </span>
+            <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
+              <Calendar className="w-3 h-3" />
+              {formatDate(transcript.created_at)}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onViewTranscript}
+              className="flex items-center gap-2 px-3 py-2 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-lg transition-colors text-sm font-medium"
+            >
+              <MessageSquare className="w-4 h-4" />
+              View Transcript
+            </button>
+            <a
+              href={transcript.transcript_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              title="Open raw file"
+            >
+              <ExternalLink className="w-4 h-4 text-gray-500" />
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const CallHistoryList: React.FC = () => {
   const { t } = useTranslations();
-  const [selectedCall, setSelectedCall] = useState<CallLog | null>(null);
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [directionFilter, setDirectionFilter] = useState('all');
+  const { transcripts, loading, error, refetch } = useTranscripts();
   const [search, setSearch] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [calls, setCalls] = useState<CallLog[]>([]);
-  const [agentDialogOpen, setAgentDialogOpen] = useState(false);
-  const [selectedAgents, setSelectedAgents] = useState<string[]>([]);
+  const [selectedTranscript, setSelectedTranscript] = useState<Transcript | null>(null);
 
-  // Simulate API loading
-  useEffect(() => {
-    setLoading(true);
-    // TODO: Replace with real API call to fetch call logs
-    setTimeout(() => {
-      setCalls(mockCalls);
-      setLoading(false);
-    }, 800);
-  }, []);
-
-  // Extract unique agent names from all calls (role === "assistant")
-  const agentNames = Array.from(
-    new Set(
-      calls
-        .flatMap((call) =>
-          call.participants
-            .filter((p) => p.role === 'assistant')
-            .map((p) => p.name),
-        )
-        .filter(Boolean),
-    ),
-  );
-
-  // Filter logic
-  const filteredCalls = calls.filter((call) => {
-    const statusMatch = statusFilter === 'all' || call.status === statusFilter;
-    const directionMatch = directionFilter === 'all' || call.direction === directionFilter;
-    const searchMatch =
-      search.trim() === '' ||
-      call.participants.some((p) =>
-        p.name.toLowerCase().includes(search.trim().toLowerCase()),
-      );
-    const agentMatch =
-      selectedAgents.length === 0 ||
-      call.participants.some(
-        (p) => p.role === 'assistant' && selectedAgents.includes(p.name),
-      );
-
-    return statusMatch && directionMatch && searchMatch && agentMatch;
+  // Filter by search
+  const filteredTranscripts = transcripts.filter((transcript) => {
+    if (!search.trim()) return true;
+    const searchLower = search.toLowerCase();
+    return (
+      transcript.call_id.toLowerCase().includes(searchLower) ||
+      transcript.phone_number.toLowerCase().includes(searchLower)
+    );
   });
 
   return (
     <>
-      {/* Filter Bar */}
-      <div className="flex flex-wrap items-center gap-2 mb-4">
+      {/* Search Bar */}
+      <div className="flex items-center gap-4 mb-6">
         <input
           type="text"
-          placeholder={t('callHistory.filter.searchPlaceholder')}
-          className="px-3 py-2 rounded border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-amber-200"
+          placeholder="Search by call ID or phone number..."
+          className="flex-1 px-4 py-3 rounded-xl border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-200"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
-        <select
-          className="px-2 py-2 rounded border border-input bg-background text-sm"
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-        >
-          {STATUS_OPTIONS.map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {t(opt.labelKey)}
-            </option>
-          ))}
-        </select>
-        <select
-          className="px-2 py-2 rounded border border-input bg-background text-sm"
-          value={directionFilter}
-          onChange={(e) => setDirectionFilter(e.target.value)}
-        >
-          {DIRECTION_OPTIONS.map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {t(opt.labelKey)}
-            </option>
-          ))}
-        </select>
         <button
-          className={`flex items-center gap-2 px-3 py-2 rounded border border-input text-sm transition ${
-            selectedAgents.length > 0
-              ? 'bg-amber-100 text-amber-900 border-amber-300'
-              : 'bg-background text-muted-foreground hover:bg-muted'
-          }`}
-          onClick={() => setAgentDialogOpen(true)}
-          type="button"
+          onClick={() => refetch()}
+          className="px-4 py-3 bg-amber-100 hover:bg-amber-200 text-amber-700 rounded-xl transition-colors text-sm font-medium"
         >
-          <User size={16} />
-          {selectedAgents.length > 0
-            ? selectedAgents.join(', ')
-            : t('callHistory.agentFilter.button')}
+          Refresh
         </button>
-        <AgentFilterDialog
-          open={agentDialogOpen}
-          onClose={() => setAgentDialogOpen(false)}
-          agentNames={agentNames}
-          selectedAgents={selectedAgents}
-          onSelect={setSelectedAgents}
-        />
       </div>
-      <div className="w-full h-full flex flex-col gap-2">
-        {/* Loading state */}
+
+      {/* Error State */}
+      {error && (
+        <div className="p-4 mb-4 bg-red-50 border border-red-200 rounded-xl text-red-600">
+          {error}
+        </div>
+      )}
+
+      {/* Call List */}
+      <div className="space-y-3">
         {loading ? (
-          <div className="flex-1 flex items-center justify-center text-muted-foreground">
-            <span>{t('callHistory.loading')}</span>
+          <div className="flex-1 flex items-center justify-center py-12 text-gray-500">
+            <Loader2 className="w-6 h-6 animate-spin mr-2" />
+            Loading call history...
           </div>
-        ) : filteredCalls.length > 0 ? (
-          filteredCalls.map((call) => (
+        ) : filteredTranscripts.length > 0 ? (
+          filteredTranscripts.map((transcript) => (
             <CallHistoryItem
-              key={call.id}
-              call={call}
-              onClick={setSelectedCall}
+              key={transcript.id}
+              transcript={transcript}
+              onViewTranscript={() => setSelectedTranscript(transcript)}
             />
           ))
         ) : (
-          <div className="flex-1 flex items-center justify-center text-muted-foreground">
-            <span>{t('callHistory.empty')}</span>
+          <div className="flex-1 flex flex-col items-center justify-center py-12 text-gray-500">
+            <Phone className="w-12 h-12 text-gray-300 mb-4" />
+            <p>{search ? 'No calls match your search' : 'No call history yet'}</p>
           </div>
         )}
       </div>
-      {selectedCall && (
-        <CallDetailsPanel
-          call={selectedCall}
-          onClose={() => setSelectedCall(null)}
+
+      {/* Transcript Viewer Modal */}
+      {selectedTranscript && (
+        <TranscriptViewer
+          transcriptUrl={selectedTranscript.transcript_url}
+          callId={selectedTranscript.call_id}
+          onClose={() => setSelectedTranscript(null)}
         />
       )}
     </>

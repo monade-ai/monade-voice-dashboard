@@ -23,7 +23,7 @@ import {
   removeContactFromListInStorage,
   searchContactsInStorage,
 } from '@/app/contacts/utils/contacts-api';
-import { useAuth } from '@/lib/auth/AuthProvider';
+// Removed useAuth dependency - contacts are localStorage-based
 
 export interface Contact {
   id: string;
@@ -73,7 +73,7 @@ export function useContacts({
   initialLists = [],
   initialContacts = {},
 }: UseContactsProps = {}): UseContactsReturn {
-  const { currentOrganization } = useAuth();
+  // Contacts are localStorage-based - no organization context needed
   const [contactLists, setContactLists] = useState<ContactList[]>(initialLists);
   const [contacts, setContacts] = useState<Record<string, Contact[]>>(initialContacts);
   const [selectedList, setSelectedList] = useState<ContactList | null>(null);
@@ -81,21 +81,9 @@ export function useContacts({
   const [searchResults, setSearchResults] = useState<Contact[]>([]);
   const [searchQuery, setSearchQuery] = useState<string>('');
 
-  // Load all contact lists and their contacts from localStorage on mount and when organization changes
+  // Load all contact lists and their contacts from localStorage on mount
   useEffect(() => {
     const fetchData = async () => {
-      // Only fetch if we have an organization context
-      if (!currentOrganization?.id) {
-        setContactLists([]);
-        setContacts({});
-        setSelectedList(null);
-        setSearchResults([]);
-        setSearchQuery('');
-        setIsLoading(false);
-
-        return;
-      }
-
       setIsLoading(true);
       try {
         const listsRes = await getContactListsFromStorage();
@@ -119,7 +107,7 @@ export function useContacts({
       }
     };
     fetchData();
-  }, [currentOrganization?.id]); // Refresh when organization changes
+  }, []); // Only run once on mount
 
   // Create a new contact list in storage
   const createContactList = useCallback(async (name: string, description?: string): Promise<ContactList | null> => {

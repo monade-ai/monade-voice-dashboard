@@ -4,10 +4,12 @@ import { createContext, useContext, useState, useEffect, ReactNode, useCallback 
 import { v4 as uuidv4 } from 'uuid';
 
 import { useToast } from '@/app/knowledge-base/hooks/use-toast';
+import { MONADE_API_CONFIG } from '@/types/monade-api.types';
 
 // Define the Assistant type - Matches API GET response structure & Prisma Schema
 export interface Assistant {
   id: string; // Can be 'local-...' for drafts or UUID for published
+  user_uid: string; // Required - links assistant to user
   contact_bucket_id: string | null; // Associated contact bucket
   name: string;
   phoneNumber: string; // Non-optional in DB, but might be empty in draft state initially
@@ -20,6 +22,13 @@ export interface Assistant {
   tags: string[]; // Non-optional (defaults to [])
   createdAt: Date; // Represents local creation time for drafts, API time for published
   knowledgeBase?: string | null; // Stores the URL from GET, or null
+  // Email and workflow fields from new API
+  emailSubject?: string;
+  emailBody?: string;
+  from?: string;
+  attachments?: string[];
+  personalisation?: boolean;
+  flowJson?: Record<string, unknown> | null;
 }
 
 // Define the structure for creating an assistant (maps to POST body)
@@ -69,7 +78,9 @@ export const AssistantsContext = createContext<AssistantsContextType>({
   saveAssistantUpdates: async () => undefined,
 });
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_ASSISTANTS_BASEURL || 'http://localhost:7071/api';
+// Use new Monade Voice Config Server API
+const API_BASE_URL = MONADE_API_CONFIG.BASE_URL;
+const DEFAULT_USER_UID = MONADE_API_CONFIG.DEFAULT_USER_UID;
 const DRAFT_ASSISTANTS_STORAGE_KEY = 'draftAssistants';
 
 // Helper to get organization-scoped storage key
@@ -82,11 +93,11 @@ const getOrgHeaders = (organizationId?: string): Record<string, string> => {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
   };
-  
+
   if (organizationId) {
     headers['X-Organization-ID'] = organizationId;
   }
-  
+
   return headers;
 };
 
@@ -135,18 +146,18 @@ let assistantsCache: Assistant[] | null = null;
 
 export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
   const { toast } = useToast();
-  // TODO: Replace with new organization context if needed
-  const currentOrganization = { id: 'default-org-id' }; // Placeholder
+  // Use user_uid from Monade API config
+  const currentUserUid = DEFAULT_USER_UID;
   const authLoading = false; // Placeholder
   const [assistants, setAssistants] = useState<Assistant[]>([]);
   const [currentAssistant, setCurrentAssistant] = useState<Assistant | null>(null);
 
   // Combined fetch and merge logic with in-memory cache
   const fetchAssistants = useCallback(async () => {
-    const organizationId = currentOrganization?.id;
-    console.log('[Assistants] Starting fetchAssistants. Organization ID:', organizationId, 'Auth loading:', authLoading);
-    
-    // Check in-memory cache first (organization-specific)
+    const userUid = currentUserUid;
+    console.log('[Assistants] Starting fetchAssistants. User UID:', userUid, 'Auth loading:', authLoading);
+
+    // Check in-memory cache first
     if (assistantsCache && assistantsCache.length > 0) {
       setAssistants(assistantsCache);
       console.log('[Assistants] Loaded from in-memory cache:', assistantsCache);
@@ -156,13 +167,17 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
 
     let apiAssistants: Assistant[] = [];
     try {
-      const headers = getOrgHeaders(organizationId);
+      const headers = {
+        'Content-Type': 'application/json',
+        'X-API-Key': MONADE_API_CONFIG.API_KEY
+      };
       console.log('[Assistants] Making API request with headers:', headers);
-      console.log('[Assistants] API URL:', `${API_BASE_URL}/assistants`);
-      
-      const res = await fetch(`${API_BASE_URL}/assistants`, { headers });
+      // Use user-specific endpoint for the new API
+      console.log('[Assistants] API URL:', `${API_BASE_URL}/api/assistants/user/${userUid}`);
+
+      const res = await fetch(`${API_BASE_URL}/api/assistants/user/${userUid}`, { headers });
       console.log('[Assistants] API response status:', res.status, 'OK:', res.ok);
-      
+
       if (!res.ok) {
         const errorText = await getApiError(res);
         console.error('[Assistants] API request failed. Status:', res.status, 'Error:', errorText);
@@ -185,15 +200,15 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
       console.error('[Assistants] Error details:', {
         message: errorMsg,
         stack: err instanceof Error ? err.stack : 'No stack trace',
-        organizationId,
-        apiUrl: `${API_BASE_URL}/assistants`,
+        userUid,
+        apiUrl: `${API_BASE_URL}/api/assistants/user/${userUid}`,
       });
       toast({ title: 'Error Fetching Assistants', description: errorMsg });
       // Proceed to load drafts even if API fetch fails
     }
 
-    // Load local drafts with organization context
-    const localDrafts = loadDrafts(organizationId);
+    // Load local drafts with user context
+    const localDrafts = loadDrafts(userUid);
     console.log('[Assistants] Loaded Local Drafts:', localDrafts);
 
     // Merge: Combine API assistants and local drafts
@@ -210,7 +225,7 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
 
     console.log('[Assistants] Combined and Sorted list:', combinedAssistants);
     setAssistants(combinedAssistants);
-  }, [currentOrganization?.id, toast]); // Dependencies for useCallback
+  }, [currentUserUid, toast]); // Dependencies for useCallback
 
   // Initial fetch on mount and when organization changes
   useEffect(() => {
@@ -220,16 +235,16 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
 
       return;
     }
-    
-    console.log('[Assistants] Auth loaded, proceeding with fetch. Organization ID:', currentOrganization?.id);
-    // Clear cache when organization changes
+
+    console.log('[Assistants] Auth loaded, proceeding with fetch. User UID:', currentUserUid);
+    // Clear cache when user changes
     assistantsCache = null;
     fetchAssistants();
-  }, [currentOrganization?.id, fetchAssistants, authLoading]); // Depend on organization ID, fetchAssistants, and authLoading
+  }, [currentUserUid, fetchAssistants, authLoading]); // Depend on user UID, fetchAssistants, and authLoading
 
   // Adds a draft assistant to local state AND localStorage
   const addDraftAssistant = (draftAssistantData: Omit<Assistant, 'id' | 'createdAt'>): Assistant => {
-    const organizationId = currentOrganization?.id;
+    const userUid = currentUserUid;
     const localId = `local-${uuidv4()}`;
     const newDraft: Assistant = {
       ...draftAssistantData,
@@ -244,17 +259,17 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
     const updatedAssistants = [...assistants, newDraft];
     setAssistants(updatedAssistants);
 
-    // Update localStorage with the new list of drafts (organization-scoped)
+    // Update localStorage with the new list of drafts (user-scoped)
     const currentDrafts = updatedAssistants.filter(a => a.id.startsWith('local-'));
-    saveDrafts(currentDrafts, organizationId);
+    saveDrafts(currentDrafts, userUid);
 
     return newDraft;
   };
 
   // UPDATED: Publishes a draft assistant to the backend
   const createAssistant = async (localId: string, assistantData: CreateAssistantData): Promise<Assistant | undefined> => {
-    const organizationId = currentOrganization?.id;
-    
+    const userUid = currentUserUid;
+
     // Payload uses data passed in, which should be validated beforehand
     const { knowledgeBaseId, ...restData } = assistantData;
     const payload: any = { ...restData };
@@ -264,8 +279,13 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
 
     console.log('[Assistants] POST /api/assistants (Publishing Draft) Payload:', payload);
     try {
-      const headers = getOrgHeaders(organizationId);
-      const res = await fetch(`${API_BASE_URL}/assistants`, {
+      // Include user_uid in the payload for the new API
+      payload.user_uid = userUid;
+      const headers = {
+        'Content-Type': 'application/json',
+        'X-API-Key': MONADE_API_CONFIG.API_KEY
+      };
+      const res = await fetch(`${API_BASE_URL}/api/assistants`, {
         method: 'POST',
         headers,
         body: JSON.stringify(payload),
@@ -295,9 +315,9 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
       await fetchAssistants();
 
       // Remove the specific published draft from localStorage
-      const currentDrafts = loadDrafts(organizationId);
+      const currentDrafts = loadDrafts(userUid);
       const updatedDrafts = currentDrafts.filter(d => d.id !== localId);
-      saveDrafts(updatedDrafts, organizationId);
+      saveDrafts(updatedDrafts, userUid);
 
       return processedAssistant; // Return the published assistant data
 
@@ -312,7 +332,7 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
 
   // Updates assistant state LOCALLY and updates localStorage if it's a draft
   const updateAssistantLocally = (id: string, updatedData: Partial<Assistant>) => {
-    const organizationId = currentOrganization?.id;
+    const userUid = currentUserUid;
     console.log('[Assistants] Update Locally:', id, updatedData);
     let updatedAssistants: Assistant[] | null = null;
 
@@ -329,18 +349,16 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
       setCurrentAssistant((prev) => (prev ? { ...prev, ...updatedData } : null));
     }
 
-    // If it was a draft, update localStorage with organization context
+    // If it was a draft, update localStorage with user context
     if (id.startsWith('local-') && updatedAssistants) {
       const currentDrafts = updatedAssistants.filter(a => a.id.startsWith('local-'));
-      saveDrafts(currentDrafts, organizationId);
+      saveDrafts(currentDrafts, userUid);
       console.log('[Assistants] Updated draft in localStorage:', id);
     }
   };
 
   // Saves updates for an EXISTING PUBLISHED assistant to the backend
   const saveAssistantUpdates = async (id: string, updatedData: UpdateAssistantData): Promise<Assistant | undefined> => {
-    const organizationId = currentOrganization?.id;
-    
     if (id.startsWith('local-')) {
       console.error('Attempted to save updates for a draft assistant using saveAssistantUpdates. Use createAssistant (publish) instead.');
       toast({ title: 'Error', description: 'Cannot save changes for a draft. Publish it first.' });
@@ -362,10 +380,13 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
       return undefined;
     }
 
-    console.log('[Assistants] PATCH /api/assistants/:id', `${API_BASE_URL}/assistants/${id}`, 'Payload:', payload);
+    console.log('[Assistants] PATCH /api/assistants/:id', `${API_BASE_URL}/api/assistants/${id}`, 'Payload:', payload);
     try {
-      const headers = getOrgHeaders(organizationId);
-      const res = await fetch(`${API_BASE_URL}/assistants/${id}`, {
+      const headers = {
+        'Content-Type': 'application/json',
+        'X-API-Key': MONADE_API_CONFIG.API_KEY
+      };
+      const res = await fetch(`${API_BASE_URL}/api/assistants/${id}`, {
         method: 'PATCH',
         headers,
         body: JSON.stringify(payload),
@@ -413,17 +434,17 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
 
   // UPDATED: Deletes either a local draft or a published assistant via API
   const deleteAssistant = async (id: string): Promise<boolean> => {
-    const organizationId = currentOrganization?.id;
-    
+    const userUid = currentUserUid;
+
     // Handle draft deletion locally
     if (id.startsWith('local-')) {
       console.log('[Assistants] Deleting Draft Locally:', id);
       const updatedAssistants = assistants.filter((assistant) => assistant.id !== id);
       setAssistants(updatedAssistants);
 
-      // Remove from localStorage with organization context
+      // Remove from localStorage with user context
       const currentDrafts = updatedAssistants.filter(a => a.id.startsWith('local-'));
-      saveDrafts(currentDrafts, organizationId);
+      saveDrafts(currentDrafts, userUid);
 
       toast({ title: 'Success', description: 'Draft discarded.' });
       if (currentAssistant?.id === id) {
@@ -434,10 +455,13 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
     }
 
     // Handle published assistant deletion via API
-    console.log('[Assistants] DELETE /api/assistants/:id', `${API_BASE_URL}/assistants/${id}`);
+    console.log('[Assistants] DELETE /api/assistants/:id', `${API_BASE_URL}/api/assistants/${id}`);
     try {
-      const headers = getOrgHeaders(organizationId);
-      const res = await fetch(`${API_BASE_URL}/assistants/${id}`, {
+      const headers = {
+        'Content-Type': 'application/json',
+        'X-API-Key': MONADE_API_CONFIG.API_KEY
+      };
+      const res = await fetch(`${API_BASE_URL}/api/assistants/${id}`, {
         method: 'DELETE',
         headers,
       });

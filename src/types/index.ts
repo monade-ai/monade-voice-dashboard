@@ -2,6 +2,9 @@
  * Central export file for all type definitions
  */
 
+// Monade Voice Config Server API types
+export * from './monade-api.types';
+
 // Organization types
 export type {
   Organization,

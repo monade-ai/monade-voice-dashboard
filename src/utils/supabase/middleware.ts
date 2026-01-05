@@ -1,43 +1,57 @@
 import { createServerClient } from '@supabase/ssr';
-import { type NextRequest, NextResponse } from 'next/server';
+import { NextResponse, type NextRequest } from 'next/server';
 
-export const updateSession = async (request: NextRequest) => {
-  let response = NextResponse.next({
-    request: {
-      headers: request.headers,
-    },
-  });
+// Hardcoded Supabase config for Vercel deployment
+const SUPABASE_URL = 'https://jmuzbxveurbpmlgawcvq.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImptdXpieHZldXJicG1sZ2F3Y3ZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDcyNDIxMTgsImV4cCI6MjA2MjgxODExOH0.9GtSBBCwK3dqPPRIcqAOdHOlVVwU7rYFWOz1ejO_KaI';
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name: string) {
-          return request.cookies.get(name)?.value;
-        },
-        set(name: string, value: string, options: object) {
-          request.cookies.set(name, value);
-          response = NextResponse.next({
-            request: {
-              headers: request.headers,
+export async function updateSession(request: NextRequest) {
+    let supabaseResponse = NextResponse.next({
+        request,
+    });
+
+    const supabase = createServerClient(
+        SUPABASE_URL,
+        SUPABASE_ANON_KEY,
+        {
+            cookies: {
+                getAll() {
+                    return request.cookies.getAll();
+                },
+                setAll(cookiesToSet) {
+                    cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+                    supabaseResponse = NextResponse.next({
+                        request,
+                    });
+                    cookiesToSet.forEach(({ name, value, options }) =>
+                        supabaseResponse.cookies.set(name, value, options),
+                    );
+                },
             },
-          });
-          response.cookies.set({ name, value, ...options });
         },
-        remove(name: string, options: object) {
-          request.cookies.delete(name);
-          response = NextResponse.next({
-            request: {
-              headers: request.headers,
-            },
-          });
-          response.cookies.set({ name, value: '', ...options, expires: new Date(0) });
-        },
-      },
+    );
+
+    // Do not run code between createServerClient and
+    // supabase.auth.getUser(). A simple mistake could make it very hard to debug
+    // issues with users being randomly logged out.
+
+    const {
+        data: { user },
+    } = await supabase.auth.getUser();
+
+    if (
+        !user &&
+        !request.nextUrl.pathname.startsWith('/login') &&
+        !request.nextUrl.pathname.startsWith('/auth') &&
+        !request.nextUrl.pathname.startsWith('/api') &&
+        request.nextUrl.pathname !== '/'
+    ) {
+        // no user, potentially respond by redirecting the user to the login page
+        const url = request.nextUrl.clone();
+        url.pathname = '/login';
+
+        return NextResponse.redirect(url);
     }
-  );
 
-  await supabase.auth.getUser();
-  return response;
-};
+    return supabaseResponse;
+}
