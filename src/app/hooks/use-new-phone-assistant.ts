@@ -11,6 +11,7 @@ interface CalleeInfo {
 interface UseNewPhoneAssistantProps {
   assistantId: string;
   assistantName: string;
+  assistantPhoneNumber?: string; // The trunk phone number for routing calls
 }
 
 interface UseNewPhoneAssistantReturn {
@@ -27,6 +28,7 @@ interface UseNewPhoneAssistantReturn {
 export function useNewPhoneAssistant({
   assistantId,
   assistantName,
+  assistantPhoneNumber,
 }: UseNewPhoneAssistantProps): UseNewPhoneAssistantReturn {
   const [callStatus, setCallStatus] = useState<'idle' | 'initiating' | 'connecting' | 'connected' | 'failed' | 'completed'>('idle');
   const [remainingTime, setRemainingTime] = useState(15);
@@ -45,11 +47,13 @@ export function useNewPhoneAssistant({
       setCallStatus('initiating');
       setRemainingTime(15);
 
-      console.log('[useNewPhoneAssistant] Calling initiateNewCall with:', { phone_number: phoneNumber, callee_info: calleeInfo, assistant_id: assistantId });
+      console.log('[useNewPhoneAssistant] Calling initiateNewCall with:', { phone_number: phoneNumber, callee_info: calleeInfo, assistant_id: assistantId, assistant_name: assistantName, from_number: assistantPhoneNumber });
       const response = await initiateNewCall({
         phone_number: phoneNumber,
         callee_info: calleeInfo,
         assistant_id: assistantId,
+        assistant_name: assistantName, // Pass actual name for script selection
+        from_number: assistantPhoneNumber, // Route through correct trunk
       });
 
       // Log response
@@ -74,7 +78,7 @@ export function useNewPhoneAssistant({
       setError(err instanceof Error ? err : new Error('Unknown error initiating call'));
       console.error('[useNewPhoneAssistant] Error initiating phone call:', err);
     }
-  }, [assistantId, assistantName]);
+  }, [assistantId, assistantName, assistantPhoneNumber]);
 
   // End the call
   const endCall = useCallback(() => {

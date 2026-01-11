@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 import { useAssistants } from '@/app/hooks/use-assistants-context';
 import { useKnowledgeBase } from '@/app/hooks/use-knowledge-base';
 import { useContactsContext } from '@/app/contacts/contexts/contacts-context';
+import { useTrunks } from '@/app/hooks/use-trunks';
 import {
   Select,
   SelectContent,
@@ -77,6 +78,7 @@ export default function ModelTab({ onChangesMade }: ModelTabProps) {
   const { currentAssistant, updateAssistantLocally } = useAssistants();
   const { knowledgeBases } = useKnowledgeBase();
   const { buckets } = useContactsContext();
+  const { phoneNumbers, loading: phoneNumbersLoading } = useTrunks();
 
   const [provider, setProvider] = useState(currentAssistant?.provider || 'openai');
   const [model, setModel] = useState(currentAssistant?.model || 'tts-1');
@@ -84,7 +86,6 @@ export default function ModelTab({ onChangesMade }: ModelTabProps) {
   const [phoneNumber, setPhoneNumber] = useState(currentAssistant?.phoneNumber || '');
   const [knowledgeBaseId, setKnowledgeBaseId] = useState(currentAssistant?.knowledgeBase || '');
   const [contactBucketId, setContactBucketId] = useState(currentAssistant?.contact_bucket_id || '');
-  const [phoneError, setPhoneError] = useState<string | null>(null);
 
   // Synchronize local state with currentAssistant when it changes
   useEffect(() => {
@@ -96,25 +97,9 @@ export default function ModelTab({ onChangesMade }: ModelTabProps) {
     setContactBucketId(currentAssistant?.contact_bucket_id || '');
   }, [currentAssistant]);
 
-  // Simple phone number validation (only digits)
-  const validatePhoneNumber = (number: string): boolean => {
-    if (!number) return true; // Allow empty initially
-    const phoneRegex = /^\d+$/; // Only digits, no length limit
-
-    return phoneRegex.test(number);
-  };
-
-  const handlePhoneNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
+  // Handle phone number selection from dropdown
+  const handlePhoneNumberChange = (value: string) => {
     setPhoneNumber(value);
-
-    // Validate the number
-    if (value && !validatePhoneNumber(value)) { // Check only if value is not empty
-      setPhoneError('Invalid format. Please enter only numbers.');
-    } else {
-      setPhoneError(null); // Clear error if valid or empty
-    }
-
     if (currentAssistant) {
       updateAssistantLocally(currentAssistant.id, { phoneNumber: value });
       onChangesMade(); // Mark changes
@@ -179,22 +164,28 @@ export default function ModelTab({ onChangesMade }: ModelTabProps) {
       <div className="border rounded-lg p-6 bg-gray-50">
         <h3 className="text-lg font-medium mb-2">Phone Number</h3>
         <p className="text-sm text-gray-600 mb-6">
-          Enter the phone number to associate with this assistant. This will be used for knowledge base mapping and call functionality.
+          Select a phone number to associate with this assistant. This will be used for outbound calls.
         </p>
         <div className="space-y-2">
           <label htmlFor="assistant-phone-number" className="text-sm font-medium">
             Phone Number
           </label>
-          <input
-            id="assistant-phone-number"
-            type="tel"
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-400"
-            placeholder="e.g. 08047361640"
-            value={phoneNumber}
-            onChange={handlePhoneNumberChange}
-          />
-          {/* Display validation error */}
-          {phoneError && <p className="text-xs text-red-500 mt-1">{phoneError}</p>}
+          <Select value={phoneNumber} onValueChange={handlePhoneNumberChange}>
+            <SelectTrigger className="w-full bg-white">
+              <SelectValue placeholder={phoneNumbersLoading ? 'Loading...' : 'Select phone number'} />
+            </SelectTrigger>
+            <SelectContent>
+              {phoneNumbers.length === 0 ? (
+                <SelectItem value="none" disabled>No phone numbers available</SelectItem>
+              ) : (
+                phoneNumbers.map((phone) => (
+                  <SelectItem key={phone.number} value={phone.number}>
+                    {phone.number}
+                  </SelectItem>
+                ))
+              )}
+            </SelectContent>
+          </Select>
         </div>
       </div>
 

@@ -7,7 +7,9 @@ interface CalleeInfo {
 interface NewCallingParams {
   phone_number: string;
   callee_info: CalleeInfo;
-  assistant_id: string; // Required for the new voice_agents API
+  assistant_id: string;
+  assistant_name?: string; // Actual assistant name for Trunks API script selection
+  from_number?: string; // The trunk phone number to route through (e.g. Twilio number)
 }
 
 export async function initiateNewCall(params: NewCallingParams): Promise<Response> {
@@ -17,7 +19,9 @@ export async function initiateNewCall(params: NewCallingParams): Promise<Respons
     const payload = {
       phone_number: params.phone_number,
       callee_info: params.callee_info || {},
-      assistant_id: params.assistant_id
+      assistant_id: params.assistant_id,
+      assistant_name: params.assistant_name, // Pass actual name for script selection
+      from_number: params.from_number, // Include trunk phone for routing
     };
 
     console.log('[NewCallingService] SENDING POST to /api/calling with body:', JSON.stringify(payload));

@@ -25,7 +25,7 @@ interface Assistant {
 export default function NewAssistantDualButton({ assistant }: AssistantDualButtonProps) {
   const [mode, setMode] = useState<'chat' | 'talk'>('chat');
   const { assistants } = useAssistants();
-  
+
   // Get assistant data if string ID was passed
   const assistantData = typeof assistant === 'string'
     ? assistants.find(a => a.id === assistant) || { id: assistant, name: 'Unknown Assistant' }
@@ -34,7 +34,7 @@ export default function NewAssistantDualButton({ assistant }: AssistantDualButto
   // Dialog states
   const [isPhoneDialogOpen, setIsPhoneDialogOpen] = useState(false);
   const [isWebDialogOpen, setIsWebDialogOpen] = useState(false);
-  
+
   // Use new phone assistant hook
   const {
     isCallInProgress,
@@ -48,6 +48,7 @@ export default function NewAssistantDualButton({ assistant }: AssistantDualButto
   } = useNewPhoneAssistant({
     assistantId: assistantData.id,
     assistantName: assistantData.name,
+    assistantPhoneNumber: assistantData.phoneNumber, // For trunk routing
   });
 
   const handleAction = () => {
@@ -63,7 +64,7 @@ export default function NewAssistantDualButton({ assistant }: AssistantDualButto
   const toggleMode = () => {
     setMode(mode === 'chat' ? 'talk' : 'chat');
   };
-  
+
   const handlePhoneDialogClose = () => {
     setIsPhoneDialogOpen(false);
     if (isCallInProgress) {
@@ -76,28 +77,28 @@ export default function NewAssistantDualButton({ assistant }: AssistantDualButto
 
       <div className="flex relative">
         {/* Primary button with animated content */}
-        <Button 
+        <Button
           onClick={handleAction}
           className="rounded-r-none px-4 bg-amber-500 hover:bg-amber-600 text-[var(--on-primary)] overflow-hidden relative"
         >
-          <div className="flex items-center transition-transform duration-300 ease-in-out" 
+          <div className="flex items-center transition-transform duration-300 ease-in-out"
             style={{ transform: `translateY(${mode === 'chat' ? '0' : '-130%'})` }}>
             <MessageCircle className="h-4 w-4 mr-2" />
             <span>Web assistant</span>
           </div>
-          <div className="flex items-center absolute top-0 left-0 w-full h-full transition-transform duration-300 ease-in-out px-4" 
+          <div className="flex items-center absolute top-0 left-0 w-full h-full transition-transform duration-300 ease-in-out px-4"
             style={{ transform: `translateY(${mode === 'chat' ? '120%' : '0'})` }}>
             <Phone className="h-4 w-4 mr-2" />
             <span>Phone assistant</span>
           </div>
         </Button>
-        
+
         {/* Toggle mode button */}
-        <Button 
+        <Button
           onClick={toggleMode}
           className="rounded-l-none border-l border-amber-600 px-2 bg-amber-500 hover:bg-amber-600 text-[var(--on-primary)]"
         >
-          <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg" 
+          <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg"
             className={cn('h-4 w-4 transition-transform duration-300', {
               'rotate-180': mode === 'talk',
             })}>
@@ -105,9 +106,9 @@ export default function NewAssistantDualButton({ assistant }: AssistantDualButto
           </svg>
         </Button>
       </div>
-      
+
       {/* New Phone Assistant Dialog */}
-      <NewPhoneDialog 
+      <NewPhoneDialog
         assistantName={assistantData.name}
         assistantId={assistantData.id}
         isOpen={isPhoneDialogOpen}
@@ -118,7 +119,7 @@ export default function NewAssistantDualButton({ assistant }: AssistantDualButto
         remainingTime={remainingTime}
         errorMessage={errorMessage}
       />
-      
+
       {/* Web Assistant Dialog */}
       <WebAssistantDialog
         url="wss://api.pipecat.com/v1/rtvi" // Replace with your actual API URL
