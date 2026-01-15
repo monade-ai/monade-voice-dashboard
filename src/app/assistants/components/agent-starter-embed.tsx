@@ -3,9 +3,9 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Mic, MicOff, MessageCircle, PhoneOff } from 'lucide-react';
 import { Room, RoomEvent, Track } from 'livekit-client';
-import { 
-  RoomAudioRenderer, 
-  RoomContext, 
+import {
+  RoomAudioRenderer,
+  RoomContext,
   StartAudio,
   useVoiceAssistant,
   useLocalParticipant,
@@ -51,14 +51,14 @@ function AgentStarterEmbedContent({
     }
   ]);
   const [micPermissionGranted, setMicPermissionGranted] = useState(false);
-  
+
   const {
     state: agentState,
   } = useVoiceAssistant();
-  
+
   const { isMicrophoneEnabled, microphoneTrack, localParticipant } = useLocalParticipant();
   const room = useRoomContext();
-  
+
   // Create mic track reference for visualization
   const micTrackRef = useMemo(() => {
     return {
@@ -67,7 +67,7 @@ function AgentStarterEmbedContent({
       publication: microphoneTrack,
     };
   }, [localParticipant, microphoneTrack]);
-  
+
   // Check microphone permission and track status
   useEffect(() => {
     console.log('[AgentStarterEmbed] Microphone track effect triggered:', {
@@ -80,7 +80,7 @@ function AgentStarterEmbedContent({
         muted: microphoneTrack?.mediaStreamTrack?.muted
       } : null
     });
-    
+
     if (microphoneTrack && microphoneTrack.mediaStreamTrack) {
       console.log('[AgentStarterEmbed] Microphone track available:', {
         enabled: microphoneTrack.mediaStreamTrack.enabled,
@@ -93,16 +93,16 @@ function AgentStarterEmbedContent({
       setMicPermissionGranted(false);
     }
   }, [microphoneTrack]);
-   
+
   // Handle room events
   useEffect(() => {
     if (!room) return;
-    
+
     const onDisconnected = () => {
       console.log('[AgentStarterEmbed] Room disconnected');
       onDisconnect();
     };
-    
+
     const onDataReceived = (payload: Uint8Array, participant: any) => {
       if (participant?.identity?.includes('agent')) {
         try {
@@ -120,20 +120,20 @@ function AgentStarterEmbedContent({
         }
       }
     };
-    
+
     const onMediaDevicesError = (error: Error) => {
       console.error('[AgentStarterEmbed] Media devices error:', error);
     };
-    
+
     const onTrackPublished = (publication: any) => {
       console.log('[AgentStarterEmbed] Track published:', publication.kind);
     };
-    
+
     room.on(RoomEvent.Disconnected, onDisconnected);
     room.on(RoomEvent.DataReceived, onDataReceived);
     room.on(RoomEvent.MediaDevicesError, onMediaDevicesError);
     room.on(RoomEvent.LocalTrackPublished, onTrackPublished);
-     
+
     return () => {
       room.off(RoomEvent.Disconnected, onDisconnected);
       room.off(RoomEvent.DataReceived, onDataReceived);
@@ -144,7 +144,7 @@ function AgentStarterEmbedContent({
 
   const toggleMicrophone = async () => {
     if (!room) return;
-    
+
     try {
       console.log('[AgentStarterEmbed] Toggling microphone:', !isMicrophoneEnabled);
       await room.localParticipant.setMicrophoneEnabled(!isMicrophoneEnabled);
@@ -158,7 +158,7 @@ function AgentStarterEmbedContent({
     <>
       <RoomAudioRenderer />
       <StartAudio label="Click to enable audio" />
-       
+
       <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 w-full md:w-[360px] md:mr-4 mb-4 rounded-t-2xl md:rounded-2xl shadow-xl max-h-[80vh] flex flex-col">
         <div className="p-4 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center justify-between">
@@ -166,8 +166,8 @@ function AgentStarterEmbedContent({
               <MessageCircle className="h-5 w-5 mr-2 text-amber-500" />
               <span className="font-semibold">{agentName}</span>
             </div>
-            <Button 
-              variant="ghost" 
+            <Button
+              variant="ghost"
               size="icon"
               onClick={onDisconnect}
               className="h-8 w-8"
@@ -176,13 +176,13 @@ function AgentStarterEmbedContent({
             </Button>
           </div>
         </div>
-        
+
         <div className="flex-1 overflow-hidden flex flex-col">
           {/* Transcript */}
           <div className="flex-1 overflow-y-auto p-4">
             <Transcript messages={messages} />
           </div>
-          
+
           {/* Audio Visualizer with speech detection using LiveKit's BarVisualizer */}
           <div className="flex justify-center p-4">
             <div className="bg-gray-100 dark:bg-gray-700 rounded-xl p-3 w-full max-w-[200px] h-24 flex flex-col items-center justify-center">
@@ -196,11 +196,10 @@ function AgentStarterEmbedContent({
                     className="flex h-full w-auto items-center justify-center gap-1"
                   >
                     <span
-                      className={`w-2 rounded-t transition-all duration-75 ${
-                        isMicrophoneEnabled 
-                          ? 'bg-amber-500' 
+                      className={`w-2 rounded-t transition-all duration-75 ${isMicrophoneEnabled
+                          ? 'bg-amber-500'
                           : 'bg-gray-300 dark:bg-gray-600'
-                      }`}
+                        }`}
                       style={{ height: '100%' }}
                     />
                   </BarVisualizer>
@@ -217,7 +216,7 @@ function AgentStarterEmbedContent({
                   </div>
                 )}
               </div>
-              
+
               {/* Status indicator */}
               <div className="text-xs text-center">
                 {isMicrophoneEnabled ? (
@@ -236,7 +235,7 @@ function AgentStarterEmbedContent({
               </div>
             </div>
           </div>
-          
+
           {/* Controls */}
           <div className="p-4 pt-0">
             <div className="flex items-center justify-between">
@@ -251,7 +250,7 @@ function AgentStarterEmbedContent({
                   </span>
                 )}
               </div>
-               
+
               <div className="flex gap-2">
                 <Button
                   variant={isMicrophoneEnabled ? 'default' : 'destructive'}
@@ -265,7 +264,7 @@ function AgentStarterEmbedContent({
                     <MicOff className="h-4 w-4" />
                   )}
                 </Button>
-                 
+
                 <Button
                   variant="outline"
                   size="icon"
@@ -297,28 +296,28 @@ export function AgentStarterEmbed({
     try {
       // Create a basic room instance
       const roomInstance = new Room();
-      
+
       // Add comprehensive error handling
       roomInstance.on(RoomEvent.Disconnected, (reason) => {
         console.log('[AgentStarterEmbed] Room disconnected:', reason);
       });
-      
+
       roomInstance.on(RoomEvent.Reconnecting, () => {
         console.log('[AgentStarterEmbed] Room reconnecting...');
       });
-      
+
       roomInstance.on(RoomEvent.Reconnected, () => {
         console.log('[AgentStarterEmbed] Room reconnected');
       });
-      
+
       roomInstance.on(RoomEvent.MediaDevicesError, (error) => {
         console.error('[AgentStarterEmbed] Media devices error:', error);
       });
-      
+
       roomInstance.on(RoomEvent.ConnectionStateChanged, (state) => {
         console.log('[AgentStarterEmbed] Connection state changed:', state);
       });
-      
+
       return roomInstance;
     } catch (error) {
       console.error('[AgentStarterEmbed] Error creating room:', error);
@@ -326,18 +325,18 @@ export function AgentStarterEmbed({
       return new Room();
     }
   }, []);
-  
+
   // Connect to room when component opens
   useEffect(() => {
     if (!isOpen) {
       return;
     }
-    
+
     if (!participantToken) {
       console.error('[AgentStarterEmbed] Error: No participant token provided');
       return;
     }
-    
+
     if (room.state !== 'disconnected') {
       console.log('[AgentStarterEmbed] Room already connected, skipping');
       return;
@@ -346,7 +345,7 @@ export function AgentStarterEmbed({
     const connect = async () => {
       try {
         console.log('[AgentStarterEmbed] Connecting to room...');
-        
+
         // Enable microphone BEFORE connecting to the room (matching original implementation)
         // Use Promise.all to enable microphone and connect simultaneously
         await Promise.all([
@@ -355,14 +354,14 @@ export function AgentStarterEmbed({
           }),
           room.connect(serverUrl, participantToken)
         ]);
-        
+
         console.log('[AgentStarterEmbed] Connected to room and enabled microphone:', {
           roomName: room.name,
           roomSid: room.sid,
           localParticipant: room.localParticipant?.identity,
           localParticipantSid: room.localParticipant?.sid
         });
-        
+
       } catch (error) {
         console.error('[AgentStarterEmbed] Error connecting to agent:', error);
         // Add specific handling for network errors
@@ -377,7 +376,7 @@ export function AgentStarterEmbed({
     };
 
     connect();
-    
+
     // Cleanup on unmount or close
     return () => {
       if (room.state !== 'disconnected') {
@@ -396,7 +395,7 @@ export function AgentStarterEmbed({
     // Don't call onDisconnect here to prevent interference with parent component
     // Just disconnect the room, let the parent handle the UI state
   };
-  
+
   // Prevent accidental closure - only allow closing via disconnect button
   const handleBackgroundClick = (e: React.MouseEvent) => {
     // Don't close if clicking on the popup itself
@@ -412,11 +411,11 @@ export function AgentStarterEmbed({
 
   return (
     <RoomContext.Provider value={room}>
-      <div 
+      <div
         className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-end justify-center md:items-center md:justify-end"
         onClick={handleBackgroundClick}
       >
-        <AgentStarterEmbedContent 
+        <AgentStarterEmbedContent
           agentName={agentName}
           onDisconnect={onDisconnect}
         />

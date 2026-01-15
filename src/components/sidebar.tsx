@@ -14,6 +14,7 @@ import {
   Users,
   Contact2,
   Megaphone,
+  Rocket,
   Sun,
   Moon,
 } from 'lucide-react';
@@ -100,6 +101,7 @@ export function Sidebar() {
             label={t('sidebar.workflows')}
             isActive={pathname === '/workflows'}
           />
+          {/* Commented out - AI Campaigns handles this
           <NavItem
             href="/contacts"
             icon={<Contact2 size={18} />}
@@ -111,6 +113,13 @@ export function Sidebar() {
             icon={<Megaphone size={18} />}
             label="Campaigns"
             isActive={pathname === '/campaigns'}
+          />
+          */}
+          <NavItem
+            href="/ai-campaigns"
+            icon={<Rocket size={18} />}
+            label="AI Campaigns"
+            isActive={pathname === '/ai-campaigns'}
           />
           <NavItem
             href="/phone-numbers"
