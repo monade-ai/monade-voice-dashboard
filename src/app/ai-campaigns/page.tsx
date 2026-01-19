@@ -331,15 +331,69 @@ export default function AICampaignsPage() {
     };
 
     // Download results as CSV
-    const downloadResults = () => {
-        const headers = ['name', 'number', 'call_id', 'call_status', 'transcript'];
-        const rows = results.map(r => [
-            r.name,
-            r.number,
-            r.call_id,
-            r.call_status,
-            `"${r.transcript.replace(/"/g, '""')}"`
-        ]);
+    const downloadResults = async () => {
+        toast.info('Preparing CSV with analytics... This may take a moment.');
+
+        // Fetch analytics for all calls
+        const resultsWithAnalytics = await Promise.all(
+            results.map(async (result) => {
+                if (result.call_status !== 'completed' || !result.call_id) {
+                    return {
+                        ...result,
+                        analytics: null
+                    };
+                }
+
+                try {
+                    const response = await fetch(`/api/proxy/api/analytics/${result.call_id}`);
+                    if (!response.ok) {
+                        return { ...result, analytics: null };
+                    }
+
+                    const data = await response.json();
+                    const analytics = data.analytics || data;
+                    return { ...result, analytics };
+                } catch (err) {
+                    console.error('Failed to fetch analytics for', result.call_id, err);
+                    return { ...result, analytics: null };
+                }
+            })
+        );
+
+        const headers = [
+            'name',
+            'number',
+            'call_id',
+            'call_status',
+            'verdict',
+            'confidence_score',
+            'summary',
+            'call_quality',
+            'customer_name',
+            'customer_location',
+            'price_quoted',
+            'transcript'
+        ];
+
+        const rows = resultsWithAnalytics.map(r => {
+            const analytics = r.analytics;
+            const discoveries = analytics?.key_discoveries || {};
+
+            return [
+                r.name,
+                r.number,
+                r.call_id,
+                r.call_status,
+                analytics?.verdict || '',
+                analytics?.confidence_score || '',
+                analytics?.summary ? `"${analytics.summary.replace(/"/g, '""')}"` : '',
+                analytics?.call_quality || '',
+                discoveries.customer_name || '',
+                discoveries.customer_location || '',
+                discoveries.price_quoted || '',
+                `"${r.transcript.replace(/"/g, '""')}"`
+            ];
+        });
 
         const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
         const blob = new Blob([csv], { type: 'text/csv' });
@@ -351,6 +405,7 @@ export default function AICampaignsPage() {
         a.click();
 
         URL.revokeObjectURL(url);
+        toast.success('CSV downloaded with analytics!');
     };
 
     // Clear campaign

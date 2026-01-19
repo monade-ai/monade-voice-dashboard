@@ -15,6 +15,7 @@ import {
   Contact2,
   Megaphone,
   Rocket,
+  TrendingUp,
   Sun,
   Moon,
 } from 'lucide-react';
@@ -120,6 +121,12 @@ export function Sidebar() {
             icon={<Rocket size={18} />}
             label="AI Campaigns"
             isActive={pathname === '/ai-campaigns'}
+          />
+          <NavItem
+            href="/hot-leads"
+            icon={<TrendingUp size={18} />}
+            label="Hot Leads"
+            isActive={pathname === '/hot-leads'}
           />
           <NavItem
             href="/phone-numbers"

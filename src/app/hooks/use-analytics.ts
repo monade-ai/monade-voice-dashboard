@@ -100,21 +100,78 @@ export function useUserAnalytics() {
             setLoading(true);
             setError(null);
 
+            console.log('[useUserAnalytics] Fetching all analytics for user:', USER_UID);
+
             // Use the /api/analytics?user_uid={user_uid} endpoint
             const response = await fetch(`/api/proxy/api/analytics?user_uid=${USER_UID}`);
 
+            console.log('[useUserAnalytics] Response status:', response.status, response.ok);
+
             if (!response.ok) {
-                console.warn('User analytics not available:', response.status);
+                console.warn('[useUserAnalytics] User analytics not available:', response.status);
+                setAnalytics([]);
                 return [];
             }
 
             const data = await response.json();
-            const analyticsArray = Array.isArray(data) ? data : data.analytics || [];
+            console.log('[useUserAnalytics] Raw response:', data);
+            console.log('[useUserAnalytics] First item structure:', data[0]);
+
+            // Handle different response structures
+            let analyticsArray: CallAnalytics[] = [];
+
+            if (Array.isArray(data)) {
+                // If response is array, each item has structure:
+                // { id, call_id, user_uid, phone_number, created_at, analytics: {...} }
+                analyticsArray = data.map(item => {
+                    if (item.analytics) {
+                        // Merge top-level fields with nested analytics
+                        return {
+                            ...item.analytics,
+                            id: item.id,
+                            call_id: item.call_id,
+                            user_uid: item.user_uid,
+                            phone_number: item.phone_number,
+                            transcript_url: item.transcript_url,
+                            campaign_id: item.campaign_id,
+                            created_at: item.created_at,
+                            updated_at: item.updated_at,
+                        };
+                    }
+                    return item;
+                });
+            } else if (data.analytics) {
+                // If response has analytics property
+                analyticsArray = Array.isArray(data.analytics)
+                    ? data.analytics.map((item: any) => {
+                        if (item.analytics) {
+                            return {
+                                ...item.analytics,
+                                id: item.id,
+                                call_id: item.call_id,
+                                user_uid: item.user_uid,
+                                phone_number: item.phone_number,
+                                transcript_url: item.transcript_url,
+                                campaign_id: item.campaign_id,
+                                created_at: item.created_at,
+                                updated_at: item.updated_at,
+                            };
+                        }
+                        return item;
+                    })
+                    : [data.analytics];
+            }
+
+            console.log('[useUserAnalytics] Extracted analytics array:', analyticsArray);
+            console.log('[useUserAnalytics] Total analytics:', analyticsArray.length);
+            console.log('[useUserAnalytics] First extracted item:', analyticsArray[0]);
+
             setAnalytics(analyticsArray);
             return analyticsArray;
         } catch (err) {
-            console.warn('Failed to fetch user analytics:', err);
+            console.warn('[useUserAnalytics] Failed to fetch user analytics:', err);
             setError(err instanceof Error ? err.message : 'Failed to fetch analytics');
+            setAnalytics([]);
             return [];
         } finally {
             setLoading(false);
