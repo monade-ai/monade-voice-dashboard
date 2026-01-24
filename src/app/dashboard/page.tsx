@@ -69,6 +69,7 @@ export default function DashboardPage() {
   const router = useRouter();
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedTranscript, setSelectedTranscript] = useState<Transcript | null>(null);
+  const [showConnectedOnly, setShowConnectedOnly] = useState(false);
   const callsPerPage = 5;
 
   const {
@@ -115,11 +116,14 @@ export default function DashboardPage() {
     },
   ];
 
-  // Paginate transcripts
+  // Filter and paginate transcripts
+  const filteredTranscripts = showConnectedOnly
+    ? transcripts.filter(t => t.has_conversation === true) // Connected = has actual conversation
+    : transcripts;
   const indexOfLastCall = currentPage * callsPerPage;
   const indexOfFirstCall = indexOfLastCall - callsPerPage;
-  const currentTranscripts = transcripts.slice(indexOfFirstCall, indexOfLastCall);
-  const totalPages = Math.ceil(transcripts.length / callsPerPage);
+  const currentTranscripts = filteredTranscripts.slice(indexOfFirstCall, indexOfLastCall);
+  const totalPages = Math.ceil(filteredTranscripts.length / callsPerPage);
 
   // Calculate wallet data - credits are in rupees, 1 credit = 1 rupee, 12 rupees/min
   const walletBalance = credits?.available_credits || 0;
@@ -196,7 +200,24 @@ export default function DashboardPage() {
           </div>
 
           {/* Recent Calls / Transcripts */}
-          <h3 className="text-base font-semibold text-gray-900 mb-3">Recent Calls</h3>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-base font-semibold text-gray-900">Recent Calls</h3>
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <span className={`text-xs font-medium ${showConnectedOnly ? 'text-green-600' : 'text-gray-500'}`}>
+                Connected Only
+              </span>
+              <div
+                onClick={() => { setShowConnectedOnly(!showConnectedOnly); setCurrentPage(1); }}
+                className={`relative w-10 h-5 rounded-full transition-colors cursor-pointer ${showConnectedOnly ? 'bg-green-500' : 'bg-gray-300'
+                  }`}
+              >
+                <div
+                  className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${showConnectedOnly ? 'translate-x-5' : 'translate-x-0.5'
+                    }`}
+                />
+              </div>
+            </label>
+          </div>
           <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
             {transcriptsLoading ? (
               <div className="p-8 text-center text-gray-500">Loading call logs...</div>

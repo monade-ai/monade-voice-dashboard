@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { MONADE_API_CONFIG } from '@/types/monade-api.types';
+import { useMonadeUser } from './use-monade-user';
 
 interface UserCredits {
     user_uid: string;
@@ -21,11 +22,14 @@ export function useCredits(): UseCreditsReturn {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    const userUid = MONADE_API_CONFIG.DEFAULT_USER_UID;
+    // Use dynamic userUid from MonadeUser context
+    const { userUid, loading: userLoading } = useMonadeUser();
 
     const fetchCredits = useCallback(async () => {
         if (!userUid) {
-            setError('User UID not configured');
+            if (!userLoading) {
+                setError('User not authenticated');
+            }
             setLoading(false);
             return;
         }
@@ -57,18 +61,21 @@ export function useCredits(): UseCreditsReturn {
         } finally {
             setLoading(false);
         }
-    }, [userUid]);
+    }, [userUid, userLoading]);
 
     useEffect(() => {
-        fetchCredits();
-    }, [fetchCredits]);
+        if (userUid) {
+            fetchCredits();
+        }
+    }, [fetchCredits, userUid]);
 
     return {
         credits,
-        loading,
+        loading: loading || userLoading,
         error,
         refetch: fetchCredits,
     };
 }
 
 export default useCredits;
+

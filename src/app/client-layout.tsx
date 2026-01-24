@@ -8,7 +8,8 @@ import { Toaster } from 'sonner';
 
 import { TranslationsProvider } from '@/i18n/translations-context';
 import { ThemeProvider } from '@/components/theme-provider';
-import { AuthProvider, useAuth } from '@/contexts/auth-context'; // Import the new AuthProvider
+import { AuthProvider, useAuth } from '@/contexts/auth-context';
+import { MonadeUserProvider } from '@/app/hooks/use-monade-user';
 
 import { Sidebar } from '../components/sidebar';
 
@@ -49,19 +50,21 @@ export default function ClientLayout({
   return (
     <QueryClientProvider client={queryClient}>
       <TranslationsProvider>
-        <AuthProvider> {/* Wrap with the new AuthProvider */}
+        <AuthProvider>
           <ThemeProvider>
             <AuthWrapper>
-              <div className="flex h-screen">
-                <Toaster richColors position="bottom-center" />
-                {/* Sidebar visibility now handled within Sidebar component */}
-                <Sidebar />
-                <main className="flex-1 overflow-auto">
-                  <AssistantsProvider>
-                    <PipecatProvider>{children}</PipecatProvider>
-                  </AssistantsProvider>
-                </main>
-              </div>
+              <MonadeUserProvider>
+                <div className="flex h-screen">
+                  <Toaster richColors position="bottom-center" />
+                  {/* Sidebar visibility now handled within Sidebar component */}
+                  <Sidebar />
+                  <main className="flex-1 overflow-auto">
+                    <AssistantsProvider>
+                      <PipecatProvider>{children}</PipecatProvider>
+                    </AssistantsProvider>
+                  </main>
+                </div>
+              </MonadeUserProvider>
             </AuthWrapper>
           </ThemeProvider>
         </AuthProvider>

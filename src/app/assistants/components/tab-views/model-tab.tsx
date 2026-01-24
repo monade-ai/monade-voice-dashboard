@@ -5,7 +5,8 @@ import { useState, useEffect } from 'react';
 import { useAssistants } from '@/app/hooks/use-assistants-context';
 import { useKnowledgeBase } from '@/app/hooks/use-knowledge-base';
 import { useContactsContext } from '@/app/contacts/contexts/contacts-context';
-import { useTrunks } from '@/app/hooks/use-trunks';
+import { useTrunks, deallocatePhoneNumber } from '@/app/hooks/use-trunks';
+import { toast } from 'sonner';
 import {
   Select,
   SelectContent,
@@ -13,6 +14,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
+
 
 // Define available providers and their models
 const providerOptions = [
@@ -46,7 +49,6 @@ const modelsByProvider = {
   ],
 };
 
-// Define voice options by provider
 const voicesByProvider = {
   openai: [
     { value: 'alloy', label: 'Alloy' },
@@ -69,6 +71,12 @@ const voicesByProvider = {
   ],
 };
 
+// Call provider options (trunk selection)
+const callProviderOptions = [
+  { value: 'vobiz', label: 'Vobiz', description: 'Indian calls - Best for +91 numbers' },
+  { value: 'twilio', label: 'Twilio', description: 'International calls - Global coverage' },
+];
+
 // Define the props type including the new handler
 interface ModelTabProps {
   onChangesMade: () => void;
@@ -78,12 +86,14 @@ export default function ModelTab({ onChangesMade }: ModelTabProps) {
   const { currentAssistant, updateAssistantLocally } = useAssistants();
   const { knowledgeBases } = useKnowledgeBase();
   const { buckets } = useContactsContext();
-  const { phoneNumbers, loading: phoneNumbersLoading } = useTrunks();
+  const { phoneNumbers, loading: phoneNumbersLoading, checkingAssignments, refreshAssignments } = useTrunks();
+  const [deallocating, setDeallocating] = useState<string | null>(null);
 
   const [provider, setProvider] = useState(currentAssistant?.provider || 'openai');
   const [model, setModel] = useState(currentAssistant?.model || 'tts-1');
   const [voice, setVoice] = useState(currentAssistant?.voice || 'alloy');
   const [phoneNumber, setPhoneNumber] = useState(currentAssistant?.phoneNumber || '');
+  const [callProvider, setCallProvider] = useState(currentAssistant?.callProvider || 'vobiz');
   const [knowledgeBaseId, setKnowledgeBaseId] = useState(currentAssistant?.knowledgeBase || '');
   const [contactBucketId, setContactBucketId] = useState(currentAssistant?.contact_bucket_id || '');
 
@@ -93,6 +103,7 @@ export default function ModelTab({ onChangesMade }: ModelTabProps) {
     setModel(currentAssistant?.model || 'tts-1');
     setVoice(currentAssistant?.voice || 'alloy');
     setPhoneNumber(currentAssistant?.phoneNumber || '');
+    setCallProvider(currentAssistant?.callProvider || 'vobiz');
     setKnowledgeBaseId(currentAssistant?.knowledgeBase || '');
     setContactBucketId(currentAssistant?.contact_bucket_id || '');
   }, [currentAssistant]);
@@ -103,6 +114,36 @@ export default function ModelTab({ onChangesMade }: ModelTabProps) {
     if (currentAssistant) {
       updateAssistantLocally(currentAssistant.id, { phoneNumber: value });
       onChangesMade(); // Mark changes
+    }
+  };
+
+  // Handle call provider change
+  const handleCallProviderChange = (value: string) => {
+    setCallProvider(value);
+    if (currentAssistant) {
+      updateAssistantLocally(currentAssistant.id, { callProvider: value });
+      onChangesMade(); // Mark changes
+    }
+  };
+
+  // Handle deallocating a phone number from another assistant
+  const handleDeallocate = async (assistantId: string, phoneNum: string) => {
+    if (!assistantId) return;
+
+    setDeallocating(assistantId);
+    try {
+      const result = await deallocatePhoneNumber(assistantId);
+      if (result.success) {
+        toast.success(`Phone number ${phoneNum} has been deallocated`);
+        // Refresh the assignments list
+        refreshAssignments();
+      } else {
+        toast.error(result.error || 'Failed to deallocate phone number');
+      }
+    } catch (err) {
+      toast.error('An error occurred while deallocating');
+    } finally {
+      setDeallocating(null);
     }
   };
 
@@ -160,32 +201,161 @@ export default function ModelTab({ onChangesMade }: ModelTabProps) {
 
   return (
     <div className="space-y-8">
-      {/* Phone Number Section */}
+      {/* Phone Number Section - TEMPORARILY COMMENTED OUT
       <div className="border rounded-lg p-6 bg-gray-50">
         <h3 className="text-lg font-medium mb-2">Phone Number</h3>
         <p className="text-sm text-gray-600 mb-6">
           Select a phone number to associate with this assistant. This will be used for outbound calls.
+          {checkingAssignments && <span className="ml-2 text-xs text-blue-500">(Checking assignments...)</span>}
+        </p>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <label htmlFor="assistant-phone-number" className="text-sm font-medium">
+              Select from available numbers
+            </label>
+            <div className="flex gap-2">
+              <Select value={phoneNumber || '__none__'} onValueChange={(v) => handlePhoneNumberChange(v === '__none__' ? '' : v)}>
+                <SelectTrigger className="flex-1 bg-white">
+                  <SelectValue placeholder={phoneNumbersLoading ? 'Loading...' : 'Select phone number'} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">
+                    <span className="text-gray-500">— None (No phone number) —</span>
+                  </SelectItem>
+                  {phoneNumbers.map((phone) => (
+                    <SelectItem key={phone.number} value={phone.number}>
+                      <div className="flex items-center gap-2">
+                        <span>{phone.number}</span>
+                        {phone.assignedAssistantName && phone.assignedAssistantId !== currentAssistant?.id && (
+                          <span className="text-xs text-orange-600 bg-orange-100 px-1.5 py-0.5 rounded">
+                            Used by: {phone.assignedAssistantName}
+                          </span>
+                        )}
+                        {phone.assignedAssistantId === currentAssistant?.id && (
+                          <span className="text-xs text-green-600 bg-green-100 px-1.5 py-0.5 rounded">
+                            Current
+                          </span>
+                        )}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {phoneNumber && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handlePhoneNumberChange('')}
+                  className="text-red-600 border-red-200 hover:bg-red-50 whitespace-nowrap"
+                >
+                  Clear
+                </Button>
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label htmlFor="manual-phone-input" className="text-sm font-medium">
+              Or enter custom number
+            </label>
+            <div className="flex gap-2">
+              <input
+                id="manual-phone-input"
+                type="text"
+                value={phoneNumber}
+                onChange={(e) => handlePhoneNumberChange(e.target.value)}
+                placeholder="Enter phone number (e.g., +919876543210)"
+                className="flex-1 px-3 py-2 border rounded-md bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <p className="text-xs text-gray-500">
+              Enter a phone number manually if it's not in the dropdown. Include country code.
+            </p>
+          </div>
+
+          {phoneNumber && (
+            <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-sm font-medium text-green-800">Current Phone Number</span>
+                  <p className="font-mono text-sm text-green-700">{phoneNumber}</p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handlePhoneNumberChange('')}
+                  className="text-red-600 border-red-200 hover:bg-red-50"
+                >
+                  Remove
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {phoneNumbers.filter(p => p.assignedAssistantId && p.assignedAssistantId !== currentAssistant?.id).length > 0 && (
+            <div className="mt-4">
+              <h4 className="text-sm font-medium text-gray-700 mb-2">Other Assigned Numbers</h4>
+              <div className="space-y-2 max-h-48 overflow-y-auto">
+                {phoneNumbers.filter(p => p.assignedAssistantId && p.assignedAssistantId !== currentAssistant?.id).map((phone) => (
+                  <div
+                    key={phone.number}
+                    className="flex items-center justify-between p-2 bg-white rounded border"
+                  >
+                    <div className="flex flex-col">
+                      <span className="font-mono text-sm">{phone.number}</span>
+                      <span className="text-xs text-gray-500">
+                        Used by: {phone.assignedAssistantName}
+                      </span>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDeallocate(phone.assignedAssistantId!, phone.number)}
+                      disabled={deallocating === phone.assignedAssistantId}
+                      className="text-red-600 border-red-200 hover:bg-red-50"
+                    >
+                      {deallocating === phone.assignedAssistantId ? 'Deallocating...' : 'Deallocate'}
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+      END OF COMMENTED OUT PHONE NUMBER SECTION */}
+
+
+      {/* Call Provider Section */}
+      <div className="border rounded-lg p-6 bg-gray-50">
+        <h3 className="text-lg font-medium mb-2">Call Provider</h3>
+        <p className="text-sm text-gray-600 mb-6">
+          Select the telephony provider for outbound calls made by this assistant.
         </p>
         <div className="space-y-2">
-          <label htmlFor="assistant-phone-number" className="text-sm font-medium">
-            Phone Number
+          <label htmlFor="call-provider" className="text-sm font-medium">
+            Provider
           </label>
-          <Select value={phoneNumber} onValueChange={handlePhoneNumberChange}>
+          <Select value={callProvider} onValueChange={handleCallProviderChange}>
             <SelectTrigger className="w-full bg-white">
-              <SelectValue placeholder={phoneNumbersLoading ? 'Loading...' : 'Select phone number'} />
+              <SelectValue placeholder="Select call provider" />
             </SelectTrigger>
             <SelectContent>
-              {phoneNumbers.length === 0 ? (
-                <SelectItem value="none" disabled>No phone numbers available</SelectItem>
-              ) : (
-                phoneNumbers.map((phone) => (
-                  <SelectItem key={phone.number} value={phone.number}>
-                    {phone.number}
-                  </SelectItem>
-                ))
-              )}
+              {callProviderOptions.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  <div className="flex flex-col">
+                    <span className="font-medium">{option.label}</span>
+                    <span className="text-xs text-gray-500">{option.description}</span>
+                  </div>
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
+          <p className="text-xs text-gray-500 mt-2">
+            {callProvider === 'vobiz'
+              ? '✓ Vobiz is optimized for Indian phone numbers (+91)'
+              : '✓ Twilio provides international coverage for global calls'}
+          </p>
         </div>
       </div>
 

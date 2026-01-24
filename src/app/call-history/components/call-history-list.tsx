@@ -45,9 +45,19 @@ const CallHistoryItem = ({
         </div>
         <div className="flex items-center gap-6">
           <div className="text-right">
-            <span className="px-2 py-1 rounded text-xs font-medium bg-green-50 text-green-600">
-              Completed
-            </span>
+            {transcript.has_conversation === true ? (
+              <span className="px-2 py-1 rounded text-xs font-medium bg-green-50 text-green-600">
+                ✓ Connected
+              </span>
+            ) : transcript.has_conversation === false ? (
+              <span className="px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-500">
+                No Conversation
+              </span>
+            ) : (
+              <span className="px-2 py-1 rounded text-xs font-medium bg-yellow-50 text-yellow-600">
+                Completed
+              </span>
+            )}
             <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
               <Calendar className="w-3 h-3" />
               {formatDate(transcript.created_at)}
@@ -82,9 +92,15 @@ const CallHistoryList: React.FC = () => {
   const { transcripts, loading, error, refetch } = useTranscripts();
   const [search, setSearch] = useState('');
   const [selectedTranscript, setSelectedTranscript] = useState<Transcript | null>(null);
+  const [showConnectedOnly, setShowConnectedOnly] = useState(false);
 
-  // Filter by search
+  // Filter by search and connected status
   const filteredTranscripts = transcripts.filter((transcript) => {
+    // Connected filter - use has_conversation flag for actual User/Agent turns
+    if (showConnectedOnly) {
+      if (transcript.has_conversation !== true) return false;
+    }
+
     if (!search.trim()) return true;
     const searchLower = search.toLowerCase();
     return (
@@ -95,7 +111,7 @@ const CallHistoryList: React.FC = () => {
 
   return (
     <>
-      {/* Search Bar */}
+      {/* Search Bar and Filters */}
       <div className="flex items-center gap-4 mb-6">
         <input
           type="text"
@@ -104,6 +120,24 @@ const CallHistoryList: React.FC = () => {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
+
+        {/* Toggle Switch */}
+        <label className="flex items-center gap-2 cursor-pointer select-none">
+          <span className={`text-sm font-medium ${showConnectedOnly ? 'text-green-600' : 'text-gray-500'}`}>
+            Connected Only
+          </span>
+          <div
+            onClick={() => setShowConnectedOnly(!showConnectedOnly)}
+            className={`relative w-12 h-6 rounded-full transition-colors cursor-pointer ${showConnectedOnly ? 'bg-green-500' : 'bg-gray-300'
+              }`}
+          >
+            <div
+              className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${showConnectedOnly ? 'translate-x-6' : 'translate-x-0.5'
+                }`}
+            />
+          </div>
+        </label>
+
         <button
           onClick={() => refetch()}
           className="px-4 py-3 bg-amber-100 hover:bg-amber-200 text-amber-700 rounded-xl transition-colors text-sm font-medium"

@@ -41,7 +41,6 @@ export const KnowledgeBaseContext = createContext<KnowledgeBaseContextType>({
 
 // Define API base URL (new Monade Voice Config Server API)
 const API_BASE_URL = MONADE_API_CONFIG.BASE_URL;
-const DEFAULT_USER_UID = MONADE_API_CONFIG.DEFAULT_USER_UID;
 
 // Helper to parse API errors (can be shared or duplicated)
 const getApiError = async (res: Response): Promise<string> => {
@@ -54,18 +53,28 @@ const getApiError = async (res: Response): Promise<string> => {
   }
 };
 
+// Import useMonadeUser hook
+import { useMonadeUser } from './use-monade-user';
+
 // Knowledge Base Provider Component
 export const KnowledgeBaseProvider = ({ children }: { children: ReactNode }) => {
   const { toast } = useToast();
-  // Use user_uid from Monade API config
-  const currentUserUid = DEFAULT_USER_UID;
-  const authLoading = false; // Placeholder
+  // Use dynamic user_uid from MonadeUser context
+  const { userUid, loading: authLoading } = useMonadeUser();
   const [knowledgeBases, setKnowledgeBases] = useState<KnowledgeBase[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null); // State for error
 
   // Fetch Knowledge Bases
   const fetchKnowledgeBases = useCallback(async () => {
+    if (!userUid) {
+      if (!authLoading) {
+        setError('User not authenticated');
+      }
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
     setError(null); // Reset error on fetch
     try {
@@ -75,7 +84,7 @@ export const KnowledgeBaseProvider = ({ children }: { children: ReactNode }) => 
       };
 
       // Use user-specific endpoint for new API
-      const res = await fetch(`${API_BASE_URL}/api/users/${currentUserUid}/knowledge-bases`, { headers });
+      const res = await fetch(`${API_BASE_URL}/api/users/${userUid}/knowledge-bases`, { headers });
       if (!res.ok) {
         const errorText = await getApiError(res);
         throw new Error(errorText); // Throw error to be caught below
@@ -97,7 +106,7 @@ export const KnowledgeBaseProvider = ({ children }: { children: ReactNode }) => 
     } finally {
       setIsLoading(false);
     }
-  }, [toast]); // Add toast as dependency
+  }, [toast, userUid, authLoading]); // Add dependencies
 
   // Create Knowledge Base
   const createKnowledgeBase = async (payload: CreateKnowledgeBasePayload): Promise<boolean> => {
@@ -119,7 +128,7 @@ export const KnowledgeBaseProvider = ({ children }: { children: ReactNode }) => 
       // Include user_uid in the payload for new API
       const apiPayload = {
         ...payload,
-        user_uid: currentUserUid,
+        user_uid: userUid,
       };
 
       const res = await fetch(`${API_BASE_URL}/api/knowledge-bases`, {
@@ -196,9 +205,9 @@ export const KnowledgeBaseProvider = ({ children }: { children: ReactNode }) => 
       return;
     }
 
-    console.log('[KnowledgeBase] Auth loaded, proceeding with fetch. User UID:', currentUserUid);
+    console.log('[KnowledgeBase] Auth loaded, proceeding with fetch. User UID:', userUid);
     fetchKnowledgeBases();
-  }, [fetchKnowledgeBases, authLoading]); // Use fetchKnowledgeBases from useCallback and authLoading
+  }, [fetchKnowledgeBases, authLoading, userUid]);
 
   return (
     <KnowledgeBaseContext.Provider

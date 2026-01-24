@@ -48,6 +48,7 @@ async function handleProxy(request: NextRequest, method: string) {
         if (['POST', 'PUT', 'PATCH'].includes(method)) {
             try {
                 const body = await request.json();
+                console.log(`[Proxy] ${method} body:`, JSON.stringify(body));
                 fetchOptions.body = JSON.stringify(body);
             } catch {
                 // No body or invalid JSON
@@ -56,6 +57,11 @@ async function handleProxy(request: NextRequest, method: string) {
 
         const response = await fetch(targetUrl, fetchOptions);
         const responseText = await response.text();
+
+        // Log response for debugging
+        if (!response.ok) {
+            console.error(`[Proxy] Backend returned ${response.status}:`, responseText);
+        }
 
         // Try to parse as JSON
         let data;

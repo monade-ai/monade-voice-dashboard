@@ -8,27 +8,42 @@ interface NewCallingParams {
   phone_number: string;
   callee_info: CalleeInfo;
   assistant_id: string;
-  assistant_name?: string; // Actual assistant name for Trunks API script selection
-  from_number?: string; // The trunk phone number to route through (e.g. Twilio number)
+  trunk_name: string;    // Selected trunk: 'twilio' or 'vobiz'
+  api_key: string;       // User's API key for billing/transcripts
 }
 
 export async function initiateNewCall(params: NewCallingParams): Promise<Response> {
-  console.log('[NewCallingService] initiateNewCall called with params:', params);
+  console.log('[NewCallingService] initiateNewCall called with params:', {
+    ...params,
+    api_key: params.api_key ? `${params.api_key.substring(0, 20)}...` : 'NOT PROVIDED'
+  });
+
+  if (!params.api_key) {
+    throw new Error('API key is required for billing. Please ensure you have an API key configured.');
+  }
+
+  if (!params.trunk_name) {
+    throw new Error('Please select a trunk (Twilio or Vobiz) to make the call.');
+  }
+
   try {
     // Prepare the payload for our proxy API
     const payload = {
       phone_number: params.phone_number,
       callee_info: params.callee_info || {},
       assistant_id: params.assistant_id,
-      assistant_name: params.assistant_name, // Pass actual name for script selection
-      from_number: params.from_number, // Include trunk phone for routing
+      trunk_name: params.trunk_name,  // 'twilio' or 'vobiz'
+      api_key: params.api_key,        // User's API key for billing
     };
 
-    console.log('[NewCallingService] SENDING POST to /api/calling with body:', JSON.stringify(payload));
+    console.log('[NewCallingService] SENDING POST to /api/calling with body:', JSON.stringify({
+      ...payload,
+      api_key: `${payload.api_key.substring(0, 20)}...`
+    }));
 
     // Add timeout to fetch request
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout for calling
 
     const response = await fetch('/api/calling', {
       method: 'POST',
@@ -42,7 +57,6 @@ export async function initiateNewCall(params: NewCallingParams): Promise<Respons
     clearTimeout(timeoutId);
 
     console.log('[NewCallingService] Fetch completed. Response status:', response.status);
-    console.log('[NewCallingService] Response headers:', [...response.headers.entries()]);
 
     // Clone the response to read the body without consuming it
     const responseClone = response.clone();
@@ -64,7 +78,7 @@ export async function initiateNewCall(params: NewCallingParams): Promise<Respons
       } else if (response.status === 400) {
         errorMessage = 'Invalid phone number or request data';
       } else if (response.status === 401 || response.status === 403) {
-        errorMessage = 'Authentication failed';
+        errorMessage = 'Authentication failed. Please check your API key.';
       } else if (response.status >= 500) {
         errorMessage = 'Phone service temporarily unavailable';
       }

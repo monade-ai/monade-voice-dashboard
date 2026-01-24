@@ -17,6 +17,7 @@ export interface Assistant {
   model?: string;
   provider?: string;
   voice?: string;
+  callProvider?: string; // 'twilio' | 'vobiz' - which trunk to use for outbound calls
   costPerMin?: number;
   latencyMs?: number;
   tags: string[]; // Non-optional (defaults to [])
@@ -80,7 +81,6 @@ export const AssistantsContext = createContext<AssistantsContextType>({
 
 // Use new Monade Voice Config Server API
 const API_BASE_URL = MONADE_API_CONFIG.BASE_URL;
-const DEFAULT_USER_UID = MONADE_API_CONFIG.DEFAULT_USER_UID;
 const DRAFT_ASSISTANTS_STORAGE_KEY = 'draftAssistants';
 
 // Helper to get organization-scoped storage key
@@ -144,18 +144,24 @@ const saveDrafts = (drafts: Assistant[], organizationId?: string) => {
 
 let assistantsCache: Assistant[] | null = null;
 
+// Import useMonadeUser hook
+import { useMonadeUser } from './use-monade-user';
+
 export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
   const { toast } = useToast();
-  // Use user_uid from Monade API config
-  const currentUserUid = DEFAULT_USER_UID;
-  const authLoading = false; // Placeholder
+  // Use dynamic user_uid from Monade User context
+  const { userUid, loading: authLoading } = useMonadeUser();
   const [assistants, setAssistants] = useState<Assistant[]>([]);
   const [currentAssistant, setCurrentAssistant] = useState<Assistant | null>(null);
 
   // Combined fetch and merge logic with in-memory cache
   const fetchAssistants = useCallback(async () => {
-    const userUid = currentUserUid;
     console.log('[Assistants] Starting fetchAssistants. User UID:', userUid, 'Auth loading:', authLoading);
+
+    if (!userUid) {
+      console.log('[Assistants] No user_uid available, skipping fetch');
+      return;
+    }
 
     // Check in-memory cache first
     if (assistantsCache && assistantsCache.length > 0) {
@@ -225,7 +231,7 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
 
     console.log('[Assistants] Combined and Sorted list:', combinedAssistants);
     setAssistants(combinedAssistants);
-  }, [currentUserUid, toast]); // Dependencies for useCallback
+  }, [userUid, toast]); // Dependencies for useCallback
 
   // Initial fetch on mount and when organization changes
   useEffect(() => {
@@ -236,15 +242,15 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
-    console.log('[Assistants] Auth loaded, proceeding with fetch. User UID:', currentUserUid);
+    console.log('[Assistants] Auth loaded, proceeding with fetch. User UID:', userUid);
     // Clear cache when user changes
     assistantsCache = null;
     fetchAssistants();
-  }, [currentUserUid, fetchAssistants, authLoading]); // Depend on user UID, fetchAssistants, and authLoading
+  }, [userUid, fetchAssistants, authLoading]); // Depend on user UID, fetchAssistants, and authLoading
 
   // Adds a draft assistant to local state AND localStorage
   const addDraftAssistant = (draftAssistantData: Omit<Assistant, 'id' | 'createdAt'>): Assistant => {
-    const userUid = currentUserUid;
+    // userUid already available from useMonadeUser hook
     const localId = `local-${uuidv4()}`;
     const newDraft: Assistant = {
       ...draftAssistantData,
@@ -268,7 +274,7 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
 
   // UPDATED: Publishes a draft assistant to the backend
   const createAssistant = async (localId: string, assistantData: CreateAssistantData): Promise<Assistant | undefined> => {
-    const userUid = currentUserUid;
+    // userUid already available from useMonadeUser hook
 
     // Payload uses data passed in, which should be validated beforehand
     const { knowledgeBaseId, ...restData } = assistantData;
@@ -332,7 +338,7 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
 
   // Updates assistant state LOCALLY and updates localStorage if it's a draft
   const updateAssistantLocally = (id: string, updatedData: Partial<Assistant>) => {
-    const userUid = currentUserUid;
+    // userUid already available from useMonadeUser hook
     console.log('[Assistants] Update Locally:', id, updatedData);
     let updatedAssistants: Assistant[] | null = null;
 
@@ -434,7 +440,7 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
 
   // UPDATED: Deletes either a local draft or a published assistant via API
   const deleteAssistant = async (id: string): Promise<boolean> => {
-    const userUid = currentUserUid;
+    // userUid already available from useMonadeUser hook
 
     // Handle draft deletion locally
     if (id.startsWith('local-')) {

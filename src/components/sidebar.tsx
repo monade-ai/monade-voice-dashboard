@@ -16,6 +16,7 @@ import {
   Megaphone,
   Rocket,
   TrendingUp,
+  History,
   Sun,
   Moon,
 } from 'lucide-react';
@@ -127,6 +128,12 @@ export function Sidebar() {
             icon={<TrendingUp size={18} />}
             label="Hot Leads"
             isActive={pathname === '/hot-leads'}
+          />
+          <NavItem
+            href="/campaign-history"
+            icon={<History size={18} />}
+            label="Campaign History"
+            isActive={pathname === '/campaign-history'}
           />
           <NavItem
             href="/phone-numbers"

@@ -7,6 +7,7 @@ import { MessageCircle, Phone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useNewPhoneAssistant } from '@/app/hooks/use-new-phone-assistant';
+import { useMonadeUser } from '@/app/hooks/use-monade-user';
 
 import { useAssistants } from '../../hooks/use-assistants-context';
 import { NewPhoneDialog } from '../components/new-phone-dialog';
@@ -25,6 +26,7 @@ interface Assistant {
 export default function NewAssistantDualButton({ assistant }: AssistantDualButtonProps) {
   const [mode, setMode] = useState<'chat' | 'talk'>('chat');
   const { assistants } = useAssistants();
+  const { apiKey } = useMonadeUser();
 
   // Get assistant data if string ID was passed
   const assistantData = typeof assistant === 'string'
@@ -35,7 +37,7 @@ export default function NewAssistantDualButton({ assistant }: AssistantDualButto
   const [isPhoneDialogOpen, setIsPhoneDialogOpen] = useState(false);
   const [isWebDialogOpen, setIsWebDialogOpen] = useState(false);
 
-  // Use new phone assistant hook
+  // Use new phone assistant hook with API key
   const {
     isCallInProgress,
     isCallInitiating,
@@ -48,7 +50,7 @@ export default function NewAssistantDualButton({ assistant }: AssistantDualButto
   } = useNewPhoneAssistant({
     assistantId: assistantData.id,
     assistantName: assistantData.name,
-    assistantPhoneNumber: assistantData.phoneNumber, // For trunk routing
+    apiKey: apiKey, // Pass user's API key for billing
   });
 
   const handleAction = () => {

@@ -1,8 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-
-const USER_UID = 'b08d1d4d-a47d-414b-9360-80264388793f';
+import { useMonadeUser } from './use-monade-user';
 
 // Analytics data structure matching actual API response
 export interface CallAnalytics {
@@ -91,19 +90,26 @@ export function useCallAnalytics() {
 
 // Hook to fetch all analytics for the user
 export function useUserAnalytics() {
+    const { userUid } = useMonadeUser(); // Get logged-in user's ID
     const [analytics, setAnalytics] = useState<CallAnalytics[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     const fetchAll = useCallback(async () => {
+        if (!userUid) {
+            console.warn('[useUserAnalytics] No user UID available');
+            setAnalytics([]);
+            return [];
+        }
+
         try {
             setLoading(true);
             setError(null);
 
-            console.log('[useUserAnalytics] Fetching all analytics for user:', USER_UID);
+            console.log('[useUserAnalytics] Fetching all analytics for user:', userUid);
 
             // Use the /api/analytics?user_uid={user_uid} endpoint
-            const response = await fetch(`/api/proxy/api/analytics?user_uid=${USER_UID}`);
+            const response = await fetch(`/api/proxy/api/analytics?user_uid=${userUid}`);
 
             console.log('[useUserAnalytics] Response status:', response.status, response.ok);
 
@@ -176,7 +182,7 @@ export function useUserAnalytics() {
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [userUid]);
 
     return {
         analytics,

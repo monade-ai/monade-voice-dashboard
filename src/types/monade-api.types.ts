@@ -60,6 +60,7 @@ export interface MonadeAssistant {
   model?: string;
   provider?: string;
   voice?: string;
+  callProvider?: string; // 'twilio' | 'vobiz' - which trunk to use for outbound calls
   costPerMin?: number;
   latencyMs?: number;
   tags: string[];
