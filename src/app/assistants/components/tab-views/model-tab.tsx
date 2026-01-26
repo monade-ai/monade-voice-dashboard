@@ -71,12 +71,6 @@ const voicesByProvider = {
   ],
 };
 
-// Call provider options (trunk selection)
-const callProviderOptions = [
-  { value: 'vobiz', label: 'Vobiz', description: 'Indian calls - Best for +91 numbers' },
-  { value: 'twilio', label: 'Twilio', description: 'International calls - Global coverage' },
-];
-
 // Define the props type including the new handler
 interface ModelTabProps {
   onChangesMade: () => void;
@@ -86,7 +80,7 @@ export default function ModelTab({ onChangesMade }: ModelTabProps) {
   const { currentAssistant, updateAssistantLocally } = useAssistants();
   const { knowledgeBases } = useKnowledgeBase();
   const { buckets } = useContactsContext();
-  const { phoneNumbers, loading: phoneNumbersLoading, checkingAssignments, refreshAssignments } = useTrunks();
+  const { trunks, phoneNumbers, loading: phoneNumbersLoading, checkingAssignments, refreshAssignments } = useTrunks();
   const [deallocating, setDeallocating] = useState<string | null>(null);
 
   const [provider, setProvider] = useState(currentAssistant?.provider || 'openai');
@@ -96,6 +90,21 @@ export default function ModelTab({ onChangesMade }: ModelTabProps) {
   const [callProvider, setCallProvider] = useState(currentAssistant?.callProvider || 'vobiz');
   const [knowledgeBaseId, setKnowledgeBaseId] = useState(currentAssistant?.knowledgeBase || '');
   const [contactBucketId, setContactBucketId] = useState(currentAssistant?.contact_bucket_id || '');
+
+  // Generate provider options from trunks
+  const callProviderOptions = trunks.length > 0 ? trunks.map(trunk => ({
+    value: trunk.name,
+    label: trunk.name.charAt(0).toUpperCase() + trunk.name.slice(1),
+    description: trunk.name.toLowerCase().includes('vobiz')
+      ? 'Indian calls - Best for +91 numbers'
+      : trunk.name.toLowerCase().includes('twilio')
+        ? 'International calls - Global coverage'
+        : `SIP Trunk: ${trunk.address}`
+  })) : [
+    // Fallback if no trunks loaded yet
+    { value: 'vobiz', label: 'Vobiz', description: 'Indian calls - Best for +91 numbers' },
+    { value: 'twilio', label: 'Twilio', description: 'International calls - Global coverage' }
+  ];
 
   // Synchronize local state with currentAssistant when it changes
   useEffect(() => {
@@ -348,18 +357,14 @@ export default function ModelTab({ onChangesMade }: ModelTabProps) {
                 <SelectValue placeholder="Select call provider" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="vobiz">
-                  <div className="flex flex-col">
-                    <span className="font-medium">Vobiz</span>
-                    <span className="text-xs text-gray-500">Indian calls - Best for +91 numbers</span>
-                  </div>
-                </SelectItem>
-                <SelectItem value="twilio">
-                  <div className="flex flex-col">
-                    <span className="font-medium">Twilio</span>
-                    <span className="text-xs text-gray-500">International calls - Global coverage</span>
-                  </div>
-                </SelectItem>
+                {callProviderOptions.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    <div className="flex flex-col">
+                      <span className="font-medium">{option.label}</span>
+                      <span className="text-xs text-gray-500">{option.description}</span>
+                    </div>
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
             {callProvider && (
@@ -375,9 +380,8 @@ export default function ModelTab({ onChangesMade }: ModelTabProps) {
           </div>
           {callProvider ? (
             <p className="text-xs text-gray-500 mt-2">
-              {callProvider === 'vobiz'
-                ? '✓ Vobiz is optimized for Indian phone numbers (+91)'
-                : '✓ Twilio provides international coverage for global calls'}
+              {callProviderOptions.find(opt => opt.value === callProvider)?.description
+                || `✓ Selected provider: ${callProvider}`}
             </p>
           ) : (
             <p className="text-xs text-orange-600 mt-2">

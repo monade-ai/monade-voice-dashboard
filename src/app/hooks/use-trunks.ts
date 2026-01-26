@@ -105,12 +105,15 @@ export function useTrunks() {
 
             const data = await response.json();
 
-            if (Array.isArray(data)) {
-                setTrunks(data);
+            // Handle both array and object response formats
+            const trunksList = Array.isArray(data) ? data : (data.trunks && Array.isArray(data.trunks) ? data.trunks : []);
+
+            if (trunksList.length > 0 || (data.trunks && Array.isArray(data.trunks))) {
+                setTrunks(trunksList);
 
                 // Extract all phone numbers from all trunks
                 const numbers: PhoneNumberOption[] = [];
-                data.forEach((trunk: SipTrunk) => {
+                trunksList.forEach((trunk: SipTrunk) => {
                     trunk.numbers?.forEach((num: string) => {
                         numbers.push({
                             number: num,
@@ -129,6 +132,7 @@ export function useTrunks() {
                 // Check assignments in background (don't block UI)
                 checkAssignmentsForNumbers(phoneList);
             } else {
+                console.log('[useTrunks] No trunks found in response:', data);
                 setPhoneNumbers(FALLBACK_NUMBERS);
             }
         } catch (err) {

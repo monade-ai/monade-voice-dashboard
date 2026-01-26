@@ -41,6 +41,7 @@ type CreateAssistantData = {
   model?: string;
   provider?: string;
   voice?: string;
+  callProvider?: string; // which trunk to use
   costPerMin?: number;
   latencyMs?: number;
   tags?: string[]; // Optional in API request
@@ -192,12 +193,21 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
       } else {
         const data = await res.json();
         console.log('[Assistants] GET /api/assistants Raw fetched:', data);
-        apiAssistants = data.map((a: any) => ({
-          ...a,
-          createdAt: a.createdAt ? new Date(a.createdAt) : new Date(),
-          knowledgeBase: a.knowledgeBase || null,
-          tags: a.tags || [], // Ensure tags array exists
-        }));
+        apiAssistants = data.map((a: any) => {
+          const tags = a.tags || [];
+          // Extract callProvider from "trunk:value" tag
+          const trunkTag = tags.find((t: string) => t.startsWith('trunk:'));
+          // Default to 'vobiz' if no tag found, or use existing property if backend supports it in future
+          const callProvider = trunkTag ? trunkTag.replace('trunk:', '') : (a.callProvider || 'vobiz');
+
+          return {
+            ...a,
+            callProvider,
+            createdAt: a.createdAt ? new Date(a.createdAt) : new Date(),
+            knowledgeBase: a.knowledgeBase || null,
+            tags: tags, // Ensure tags array exists
+          };
+        });
         console.log('[Assistants] Processed API list:', apiAssistants);
       }
     } catch (err) {
@@ -373,11 +383,35 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
     }
 
     // Restore original logic: Destructure knowledgeBaseId from updatedData
-    const { knowledgeBaseId, ...restData } = updatedData;
+    // Restore original logic: Destructure knowledgeBaseId from updatedData
+    const { knowledgeBaseId, callProvider, ...restData } = updatedData;
     const payload: any = { ...restData };
+
     // Send knowledgeBase in payload ONLY if knowledgeBaseId was present in updatedData
     if (knowledgeBaseId !== undefined) {
       payload.knowledgeBase = knowledgeBaseId;
+    }
+
+    // Handle callProvider by saving it to tags (since backend doesn't support callProvider field)
+    if (callProvider !== undefined) {
+      // Find existing assistant to get current tags
+      const current = assistants.find(a => a.id === id);
+      if (current) {
+        // Start with tags from payload (if any) or existing tags
+        // Note: payload.tags might be set if user edited tags simultaneously
+        let tags = Array.isArray(payload.tags) ? [...payload.tags] : [...(current.tags || [])];
+
+        // Remove existing trunk tags
+        tags = tags.filter(t => !t.startsWith('trunk:'));
+
+        // Add new trunk tag
+        if (callProvider) {
+          tags.push(`trunk:${callProvider}`);
+        }
+
+        payload.tags = tags;
+        console.log('[Assistants] Saving callProvider via tags:', tags);
+      }
     }
 
     if (Object.keys(payload).length === 0) {

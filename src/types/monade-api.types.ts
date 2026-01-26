@@ -84,6 +84,7 @@ export interface CreateAssistantRequest {
   model?: string;
   provider?: string;
   voice?: string;
+  callProvider?: string; // which trunk to use
   costPerMin?: number;
   latencyMs?: number;
   tags?: string[];
@@ -104,6 +105,7 @@ export interface UpdateAssistantRequest {
   model?: string;
   provider?: string;
   voice?: string;
+  callProvider?: string; // which trunk to use
   costPerMin?: number;
   latencyMs?: number;
   tags?: string[];

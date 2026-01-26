@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/table';
 
 import { useAssistants } from '@/app/hooks/use-assistants-context';
+import { useTrunks } from '@/app/hooks/use-trunks';
 import { useCampaign, Contact, CampaignResult } from '@/app/contexts/campaign-context';
 
 // Phone number column detection patterns (case-insensitive)
@@ -40,6 +41,7 @@ export default function AICampaignsPage() {
 
     // Hooks - View Data
     const { assistants } = useAssistants();
+    const { trunks } = useTrunks();
     const {
         contacts, results, campaignStatus, progress, currentCallIndex, fetchProgress,
         outputFileName, selectedAssistantId, selectedTrunk,
@@ -329,11 +331,25 @@ export default function AICampaignsPage() {
                                     <SelectValue placeholder="Select provider" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="vobiz">Vobiz (Indian calls)</SelectItem>
-                                    <SelectItem value="twilio">Twilio (International calls)</SelectItem>
+                                    {trunks.length > 0 ? (
+                                        trunks.map((trunk) => (
+                                            <SelectItem key={trunk.id} value={trunk.name}>
+                                                {trunk.name.charAt(0).toUpperCase() + trunk.name.slice(1)} ({
+                                                    trunk.name.toLowerCase().includes('vobiz') ? 'Indian calls' :
+                                                        trunk.name.toLowerCase().includes('twilio') ? 'International calls' :
+                                                            'SIP Trunk'
+                                                })
+                                            </SelectItem>
+                                        ))
+                                    ) : (
+                                        <>
+                                            <SelectItem value="vobiz">Vobiz (Indian calls)</SelectItem>
+                                            <SelectItem value="twilio">Twilio (International calls)</SelectItem>
+                                        </>
+                                    )}
                                 </SelectContent>
                             </Select>
-                            <p className="text-xs text-gray-400 mt-1">Select Vobiz for Indian calls, Twilio for international.</p>
+                            <p className="text-xs text-gray-400 mt-1">Select the provider for these calls.</p>
                         </div>
 
                         {campaignStatus === 'idle' || campaignStatus === 'ready' || campaignStatus === 'completed' || campaignStatus === 'error' ? (

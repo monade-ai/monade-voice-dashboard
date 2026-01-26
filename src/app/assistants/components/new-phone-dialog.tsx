@@ -20,6 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { useTrunks } from '@/app/hooks/use-trunks';
 
 interface CalleeInfo {
   [key: string]: string;
@@ -35,6 +36,7 @@ interface NewPhoneDialogProps {
   callStatus: 'idle' | 'initiating' | 'connecting' | 'connected' | 'failed' | 'completed';
   remainingTime: number;
   errorMessage?: string | null;
+  callProvider?: string; // New prop for saved provider
 }
 
 // Trunk options for the dropdown
@@ -53,13 +55,16 @@ export function NewPhoneDialog({
   callStatus,
   remainingTime,
   errorMessage,
+  callProvider,
 }: NewPhoneDialogProps) {
+  const { trunks } = useTrunks();
   const [phoneNumber, setPhoneNumber] = useState('');
   const [error, setError] = useState('');
   const [calleeInfo, setCalleeInfo] = useState<CalleeInfo>({});
   const [newKey, setNewKey] = useState('');
   const [newValue, setNewValue] = useState('');
-  const [selectedTrunk, setSelectedTrunk] = useState('vobiz'); // Default to Vobiz
+  // Use saved provider if available, otherwise default to vobiz
+  const [selectedTrunk, setSelectedTrunk] = useState(callProvider || 'vobiz');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -180,7 +185,7 @@ export function NewPhoneDialog({
               />
             </div>
 
-            {/* Trunk Selector */}
+            {/* Call Provider Selector */}
             <div className="space-y-2">
               <label className="text-sm font-medium">
                 Call Provider
@@ -190,19 +195,25 @@ export function NewPhoneDialog({
                   <SelectValue placeholder="Select trunk provider" />
                 </SelectTrigger>
                 <SelectContent>
-                  {TRUNK_OPTIONS.map((trunk) => (
-                    <SelectItem key={trunk.value} value={trunk.value}>
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">{trunk.label}</span>
-                        <span className="text-xs text-gray-500">({trunk.description})</span>
-                      </div>
-                    </SelectItem>
-                  ))}
+                  {trunks.length > 0 ? (
+                    trunks.map((trunk) => (
+                      <SelectItem key={trunk.id} value={trunk.name}>
+                        <span className="font-medium">{trunk.name}</span>
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <>
+                      <SelectItem value="vobiz">Vobiz (Indian calls)</SelectItem>
+                      <SelectItem value="twilio">Twilio (International)</SelectItem>
+                    </>
+                  )}
                 </SelectContent>
               </Select>
-              <p className="text-xs text-gray-500">
-                Select Vobiz for Indian numbers, Twilio for international calls.
-              </p>
+              {callProvider && selectedTrunk === callProvider && (
+                <p className="text-xs text-green-600">
+                  ✓ Using saved provider from assistant settings
+                </p>
+              )}
             </div>
 
             {error && <p className="text-sm text-red-500">{error}</p>}
@@ -294,10 +305,11 @@ export function NewPhoneDialog({
       setCalleeInfo({});
       setNewKey('');
       setNewValue('');
-      setSelectedTrunk('vobiz'); // Default to Vobiz
-      console.log('[NewPhoneDialog] Dialog opened for assistant:', assistantName);
+      // Use saved provider if available, otherwise default to vobiz
+      setSelectedTrunk(callProvider || 'vobiz');
+      console.log('[NewPhoneDialog] Dialog opened for assistant:', assistantName, 'provider:', callProvider);
     }
-  }, [isOpen, assistantName]);
+  }, [isOpen, assistantName, callProvider]);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>

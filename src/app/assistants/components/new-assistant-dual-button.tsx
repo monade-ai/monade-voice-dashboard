@@ -113,6 +113,7 @@ export default function NewAssistantDualButton({ assistant }: AssistantDualButto
       <NewPhoneDialog
         assistantName={assistantData.name}
         assistantId={assistantData.id}
+        callProvider={(assistantData as any).callProvider} // Pass saved provider
         isOpen={isPhoneDialogOpen}
         onClose={handlePhoneDialogClose}
         onCall={startCall}
