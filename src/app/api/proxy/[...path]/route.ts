@@ -34,8 +34,8 @@ async function handleProxy(request: NextRequest, method: string) {
         const targetUrl = `${MONADE_API_BASE}${path}${searchParams}`;
         console.log(`[Proxy] ${method} ${targetUrl}`);
 
+        // Build headers - only set Content-Type for methods with body
         const headers: HeadersInit = {
-            'Content-Type': 'application/json',
             'X-API-Key': MONADE_API_KEY,
         };
 
@@ -44,14 +44,16 @@ async function handleProxy(request: NextRequest, method: string) {
             headers,
         };
 
-        // Add body for POST, PUT, PATCH
+        // Add body and Content-Type for POST, PUT, PATCH only
         if (['POST', 'PUT', 'PATCH'].includes(method)) {
             try {
                 const body = await request.json();
                 console.log(`[Proxy] ${method} body:`, JSON.stringify(body));
                 fetchOptions.body = JSON.stringify(body);
+                // Only set Content-Type when we actually have a body
+                (headers as Record<string, string>)['Content-Type'] = 'application/json';
             } catch {
-                // No body or invalid JSON
+                // No body or invalid JSON - don't set Content-Type
             }
         }
 

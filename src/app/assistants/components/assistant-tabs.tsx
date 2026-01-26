@@ -154,11 +154,10 @@ export default function AssistantTabs({ editingAssistantId }: AssistantTabsProps
   const isEditingName = editingAssistantId === currentAssistant.id;
 
   // Determine if save should be disabled
+  // Phone number is now optional - only need provider, script, and changes
   const isSaveDisabled =
     isSaving ||
     isDraft ||
-    !currentAssistant.phoneNumber ||
-    currentAssistant.phoneNumber.trim() === '' ||
     !hasUnsavedChanges; // Disable if no unsaved changes
 
   const handleMarkUnsavedChanges = () => {
@@ -166,7 +165,8 @@ export default function AssistantTabs({ editingAssistantId }: AssistantTabsProps
   };
 
   const handleSaveChanges = async () => {
-    if (!currentAssistant || isDraft || !currentAssistant.phoneNumber || currentAssistant.phoneNumber.trim() === '' || !hasUnsavedChanges) return;
+    // Phone number is now optional
+    if (!currentAssistant || isDraft || !hasUnsavedChanges) return;
 
     setIsSaving(true);
     try {
@@ -208,8 +208,9 @@ export default function AssistantTabs({ editingAssistantId }: AssistantTabsProps
   };
 
   // Function to publish a draft assistant using createAssistant
+  // Phone number is now optional - can publish with just provider + script
   const handlePublish = async () => {
-    if (!currentAssistant || !isDraft || !currentAssistant.phoneNumber || currentAssistant.phoneNumber.trim() === '') return;
+    if (!currentAssistant || !isDraft) return;
 
     setIsSaving(true); // Use isSaving state to indicate processing
     try {
@@ -350,16 +351,16 @@ export default function AssistantTabs({ editingAssistantId }: AssistantTabsProps
       <div className="flex justify-end space-x-2 pt-4 border-t border-[var(--border)] mt-6">
         {/* Delete Button - Only for users with permission */}
         {canDeleteAssistant && (
-<Button
-  variant="destructive"
-  className="text-white border-[var(--destructive)] hover:bg-[var(--destructive)]/10"
-  onClick={() => setIsDeleteModalOpen(true)}
-  disabled={isSaving} // Only disable during save
-  title={isDraft ? 'Delete this draft assistant' : 'Delete this assistant'}
->
-  <Trash2 className="h-4 w-4 mr-2" />
-  Delete Assistant
-</Button>
+          <Button
+            variant="destructive"
+            className="text-white border-[var(--destructive)] hover:bg-[var(--destructive)]/10"
+            onClick={() => setIsDeleteModalOpen(true)}
+            disabled={isSaving} // Only disable during save
+            title={isDraft ? 'Delete this draft assistant' : 'Delete this assistant'}
+          >
+            <Trash2 className="h-4 w-4 mr-2" />
+            Delete Assistant
+          </Button>
         )}
         {/* Reset Button */}
         <Button
@@ -384,14 +385,12 @@ export default function AssistantTabs({ editingAssistantId }: AssistantTabsProps
           ) : (
             <Button
               onClick={handlePublish}
-              disabled={isSaving || !currentAssistant.phoneNumber || currentAssistant.phoneNumber.trim() === '' || isEditingName}
+              disabled={isSaving || isEditingName}
               className="bg-green-600 hover:bg-green-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
               title={
                 isEditingName
                   ? 'Finish editing the assistant name before publishing'
-                  : (!currentAssistant.phoneNumber || currentAssistant.phoneNumber.trim() === '')
-                    ? 'Phone number is required before publishing'
-                    : 'Publish this draft assistant'
+                  : 'Publish this draft assistant'
               }
             >
               {isSaving ? 'Publishing...' : 'Publish Assistant'}
@@ -403,10 +402,9 @@ export default function AssistantTabs({ editingAssistantId }: AssistantTabsProps
             disabled={isSaveDisabled}
             className="bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-[var(--on-primary)] disabled:opacity-50 disabled:cursor-not-allowed"
             title={
-              isDraft ? '(Should not happen - Save button shown for non-drafts)' : // Adjusted title logic slightly
-                (!currentAssistant.phoneNumber || currentAssistant.phoneNumber.trim() === '') ? 'Phone number is required before saving changes' :
-                  !hasUnsavedChanges ? 'No changes to save' :
-                    'Save changes to this assistant'
+              isDraft ? '(Should not happen - Save button shown for non-drafts)' :
+                !hasUnsavedChanges ? 'No changes to save' :
+                  'Save changes to this assistant'
             }
           >
             {isSaving ? 'Saving...' : 'Save Changes'}

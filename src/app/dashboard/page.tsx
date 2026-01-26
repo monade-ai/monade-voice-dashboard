@@ -125,9 +125,9 @@ export default function DashboardPage() {
   const currentTranscripts = filteredTranscripts.slice(indexOfFirstCall, indexOfLastCall);
   const totalPages = Math.ceil(filteredTranscripts.length / callsPerPage);
 
-  // Calculate wallet data - credits are in rupees, 1 credit = 1 rupee, 12 rupees/min
+  // Credits: 1 credit = 1 minute
   const walletBalance = credits?.available_credits || 0;
-  const minutesRemaining = Math.floor(walletBalance / 12); // ₹12 per minute
+  const totalCredits = credits?.total_credits || 0;
 
   if (loading.initial) {
     return <DashboardSkeleton />;
@@ -147,7 +147,7 @@ export default function DashboardPage() {
             <div className="flex items-center gap-3 pr-4">
               <WalletNav
                 balance={walletBalance}
-                minutesRemaining={minutesRemaining}
+                totalCredits={totalCredits}
               />
               <button
                 onClick={() => router.push('/account')}
@@ -194,7 +194,7 @@ export default function DashboardPage() {
                 <TrendingUp className="w-4 h-4 text-amber-500" />
               </div>
               <span className="text-2xl font-bold text-gray-900">
-                {creditsLoading ? '...' : `₹${walletBalance.toLocaleString()}`}
+                {creditsLoading ? '...' : `${Math.round(walletBalance).toLocaleString()} credits`}
               </span>
             </div>
           </div>

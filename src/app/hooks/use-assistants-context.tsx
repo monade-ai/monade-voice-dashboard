@@ -463,8 +463,8 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
     // Handle published assistant deletion via API
     console.log('[Assistants] DELETE /api/assistants/:id', `${API_BASE_URL}/api/assistants/${id}`);
     try {
-      const headers = {
-        'Content-Type': 'application/json',
+      // Note: Don't set Content-Type for DELETE without body, it causes backend errors
+      const headers: Record<string, string> = {
         'X-API-Key': MONADE_API_CONFIG.API_KEY
       };
       const res = await fetch(`${API_BASE_URL}/api/assistants/${id}`, {

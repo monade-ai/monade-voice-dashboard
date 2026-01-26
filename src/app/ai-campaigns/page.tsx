@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useRef, useState, useCallback } from 'react';
 import { Upload, Play, Download, FileSpreadsheet, X, Users, Phone, Loader2, CheckCircle2, XCircle, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -26,39 +26,7 @@ import {
 } from '@/components/ui/table';
 
 import { useAssistants } from '@/app/hooks/use-assistants-context';
-import { useTrunks } from '@/app/hooks/use-trunks';
-import { useCampaignHistory } from '@/app/hooks/use-campaign-history';
-import { useMonadeUser } from '@/app/hooks/use-monade-user';
-
-// Trunk options for campaigns
-const TRUNK_OPTIONS = [
-    { value: 'vobiz', label: 'Vobiz', description: 'Indian calls' },
-    { value: 'twilio', label: 'Twilio', description: 'International calls' },
-];
-
-// Dynamic Contact - stores all CSV columns
-interface Contact {
-    phoneNumber: string;  // The detected phone number
-    calleeInfo: Record<string, string>;  // All other columns for personalization
-}
-
-interface CampaignResult {
-    phoneNumber: string;
-    calleeInfo: Record<string, string>;
-    call_id: string;
-    call_status: 'pending' | 'calling' | 'completed' | 'no_answer' | 'failed';
-    transcript: string;
-    analytics?: {
-        verdict?: string;
-        confidence_score?: number;
-        summary?: string;
-        call_quality?: string;
-        key_discoveries?: Record<string, any>;
-    } | null;
-    analyticsLoaded?: boolean;  // Track if analytics have been fetched
-}
-
-type CampaignStatus = 'idle' | 'ready' | 'running' | 'fetching_results' | 'fetching_analytics' | 'completed' | 'error';
+import { useCampaign, Contact, CampaignResult } from '@/app/contexts/campaign-context';
 
 // Phone number column detection patterns (case-insensitive)
 const PHONE_COLUMN_PATTERNS = [
@@ -68,74 +36,16 @@ const PHONE_COLUMN_PATTERNS = [
 ];
 
 export default function AICampaignsPage() {
-    // State
-    const [contacts, setContacts] = useState<Contact[]>([]);
-    const [results, setResults] = useState<CampaignResult[]>([]);
-    const [outputFileName, setOutputFileName] = useState('campaign_results');
-    const [selectedAssistantId, setSelectedAssistantId] = useState('');
-    const [selectedTrunk, setSelectedTrunk] = useState('vobiz'); // Default to Vobiz
-    const [campaignStatus, setCampaignStatus] = useState<CampaignStatus>('idle');
-    const [progress, setProgress] = useState(0);
-    const [currentCallIndex, setCurrentCallIndex] = useState(0);
-    const [fetchProgress, setFetchProgress] = useState('');
-
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // Hooks
+    // Hooks - View Data
     const { assistants } = useAssistants();
-    const { phoneNumbers, loading: trunksLoading } = useTrunks();
-    const { saveCampaign } = useCampaignHistory();
-    const { apiKey, userUid, loading: userLoading } = useMonadeUser();
-
-    // Get selected assistant name
-    const selectedAssistant = assistants.find(a => a.id === selectedAssistantId);
-
-    // Restore campaign state from sessionStorage on mount
-    useEffect(() => {
-        if (!userUid) return;
-
-        const storageKey = `campaign_state_${userUid}`;
-        const savedState = sessionStorage.getItem(storageKey);
-
-        if (savedState) {
-            try {
-                const state = JSON.parse(savedState);
-                console.log('[Campaign] Restoring state from sessionStorage:', state);
-
-                setContacts(state.contacts || []);
-                setResults(state.results || []);
-                setOutputFileName(state.outputFileName || 'campaign_results');
-                setSelectedAssistantId(state.selectedAssistantId || '');
-                setSelectedTrunk(state.selectedTrunk || 'vobiz');
-                setCampaignStatus(state.campaignStatus || 'idle');
-                setProgress(state.progress || 0);
-                setCurrentCallIndex(state.currentCallIndex || 0);
-                setFetchProgress(state.fetchProgress || '');
-            } catch (err) {
-                console.error('[Campaign] Failed to restore state:', err);
-            }
-        }
-    }, [userUid]);
-
-    // Save campaign state to sessionStorage whenever it changes
-    useEffect(() => {
-        if (!userUid) return;
-
-        const storageKey = `campaign_state_${userUid}`;
-        const state = {
-            contacts,
-            results,
-            outputFileName,
-            selectedAssistantId,
-            selectedTrunk,
-            campaignStatus,
-            progress,
-            currentCallIndex,
-            fetchProgress
-        };
-
-        sessionStorage.setItem(storageKey, JSON.stringify(state));
-    }, [userUid, contacts, results, outputFileName, selectedAssistantId, selectedTrunk, campaignStatus, progress, currentCallIndex, fetchProgress]);
+    const {
+        contacts, results, campaignStatus, progress, currentCallIndex, fetchProgress,
+        outputFileName, selectedAssistantId, selectedTrunk,
+        setContacts, setResults, setOutputFileName, setSelectedAssistantId, setSelectedTrunk,
+        startCampaign, stopCampaign, resetCampaign
+    } = useCampaign();
 
     // Parse CSV file - Dynamic columns with smart phone detection
     const parseCSV = (text: string): Contact[] => {
@@ -160,7 +70,6 @@ export default function AICampaignsPage() {
         }
 
         console.log(`[CSV Parse] Detected phone column: "${rawHeaders[phoneIndex]}" at index ${phoneIndex}`);
-        console.log(`[CSV Parse] All columns: ${rawHeaders.join(', ')}`);
 
         // Parse rows - store all columns as calleeInfo
         const contacts: Contact[] = [];
@@ -182,7 +91,6 @@ export default function AICampaignsPage() {
             contacts.push({ phoneNumber, calleeInfo });
         }
 
-        console.log(`[CSV Parse] Parsed ${contacts.length} contacts with ${rawHeaders.length - 1} info columns`);
         return contacts;
     };
 
@@ -203,7 +111,6 @@ export default function AICampaignsPage() {
             if (parsed.length > 0) {
                 setContacts(parsed);
                 setResults([]);
-                setCampaignStatus('ready');
                 toast.success(`Loaded ${parsed.length} contacts`);
             }
         };
@@ -222,7 +129,6 @@ export default function AICampaignsPage() {
                 if (parsed.length > 0) {
                     setContacts(parsed);
                     setResults([]);
-                    setCampaignStatus('ready');
                     toast.success(`Loaded ${parsed.length} contacts`);
                 }
             };
@@ -230,423 +136,21 @@ export default function AICampaignsPage() {
         } else {
             toast.error('Please drop a CSV file');
         }
-    }, []);
+    }, [setContacts, setResults]);
 
-    // Format phone number
-    const formatPhoneNumber = (number: string): string => {
-        let formatted = number.replace(/[\s\-()]/g, '');
-        if (!formatted.startsWith('+')) {
-            formatted = '+' + formatted;
-        }
-        // Add 91 country code if just 10 digits
-        if (formatted.length === 11 && formatted.startsWith('+')) {
-            formatted = '+91' + formatted.substring(1);
-        }
-        return formatted;
-    };
-
-    // Make a single call - uses dynamic calleeInfo
-    const makeCall = async (contact: Contact): Promise<CampaignResult> => {
-        const phone = formatPhoneNumber(contact.phoneNumber);
-
-        // Validate API key
-        if (!apiKey) {
-            console.error('[Campaign] No API key available for billing');
-            return {
-                phoneNumber: contact.phoneNumber,
-                calleeInfo: contact.calleeInfo,
-                call_id: '',
-                call_status: 'failed',
-                transcript: 'Error: No API key configured for billing',
-                analyticsLoaded: false
-            };
-        }
-
-        try {
-            const response = await fetch('/api/calling', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    phone_number: phone,
-                    assistant_id: selectedAssistantId,
-                    trunk_name: selectedTrunk,
-                    api_key: apiKey,
-                    callee_info: contact.calleeInfo  // Pass ALL dynamic columns for personalization
-                })
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.error || 'Call failed');
-            }
-
-            const data = await response.json();
-            return {
-                phoneNumber: contact.phoneNumber,
-                calleeInfo: contact.calleeInfo,
-                call_id: data.call_id || '',
-                call_status: 'completed',
-                transcript: '',
-                analyticsLoaded: false
-            };
-        } catch (error) {
-            console.error('[Campaign] Call error:', error);
-            return {
-                phoneNumber: contact.phoneNumber,
-                calleeInfo: contact.calleeInfo,
-                call_id: '',
-                call_status: 'failed',
-                transcript: error instanceof Error ? error.message : 'Unknown error',
-                analyticsLoaded: false
-            };
-        }
-    };
-
-    // Fetch transcript for a call
-    const fetchTranscriptForCall = async (phone: string, startTime: Date): Promise<string> => {
-        const formattedPhone = formatPhoneNumber(phone);
-
-        // Subtract 30 seconds to account for timing differences
-        const bufferTime = new Date(startTime.getTime() - 30000);
-        console.log(`[Transcript] Looking for phone: ${formattedPhone}, after: ${bufferTime.toISOString()}`);
-
-        // Poll for transcript (max 30 attempts, 5s each = 2.5 min)
-        for (let attempt = 0; attempt < 30; attempt++) {
-            try {
-                const response = await fetch(`/api/proxy/api/users/${userUid}/transcripts`);
-                if (response.ok) {
-                    const data = await response.json();
-                    const transcripts = Array.isArray(data) ? data : data.transcripts || [];
-
-                    console.log(`[Transcript] Attempt ${attempt + 1}: Found ${transcripts.length} transcripts`);
-
-                    // Find transcript matching phone number created after start time
-                    for (const t of transcripts) {
-                        const transcriptPhone = t.phone_number || '';
-                        const transcriptCreatedAt = t.created_at || '';
-
-                        // Check if phone matches
-                        if (transcriptPhone === formattedPhone) {
-                            // Parse the created_at timestamp (comes as ISO string with Z suffix)
-                            const transcriptTime = new Date(transcriptCreatedAt);
-
-                            console.log(`[Transcript] Found match candidate: ${transcriptPhone}, created: ${transcriptCreatedAt}`);
-
-                            if (transcriptTime > bufferTime) {
-                                console.log(`[Transcript] Match confirmed! Fetching content via proxy...`);
-                                // Fetch transcript content via proxy to avoid CORS
-                                const contentResponse = await fetch('/api/transcript-content', {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ url: t.transcript_url })
-                                });
-
-                                if (contentResponse.ok) {
-                                    const data = await contentResponse.json();
-                                    if (data.transcript) {
-                                        console.log(`[Transcript] Got transcript: ${data.transcript.substring(0, 100)}...`);
-                                        return data.transcript;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            } catch (error) {
-                console.error(`[Transcript] Error on attempt ${attempt + 1}:`, error);
-            }
-
-            await new Promise(resolve => setTimeout(resolve, 5000));
-        }
-
-        console.log(`[Transcript] Not found after 30 attempts for ${formattedPhone}`);
-        return '';
-    };
-
-    // Start campaign with concurrent call pool (max 10 active calls)
-    const startCampaign = async () => {
-        if (!selectedAssistantId) {
-            toast.error('Please select an assistant');
-            return;
-        }
-        if (!selectedTrunk) {
-            toast.error('Please select a trunk provider (Twilio or Vobiz)');
-            return;
-        }
-        if (!apiKey) {
-            toast.error('No API key configured. Please contact admin.');
-            return;
-        }
-        if (!userUid) {
-            toast.error('User not authenticated. Please log in again.');
-            return;
-        }
-        if (contacts.length === 0) {
-            toast.error('No contacts to call');
-            return;
-        }
-
-        // Track campaign start time for transcript filtering
-        const campaignStartTime = new Date();
-
-        setCampaignStatus('running');
-        setProgress(0);
-        setCurrentCallIndex(0);
-
-        // Initialize results with new dynamic Contact structure
-        const newResults: CampaignResult[] = contacts.map(c => ({
-            phoneNumber: c.phoneNumber,
-            calleeInfo: c.calleeInfo,
-            call_id: '',
-            call_status: 'pending',
-            transcript: '',
-            analyticsLoaded: false
-        }));
-        setResults(newResults);
-
-        const totalContacts = contacts.length;
-        const MAX_CONCURRENT_CALLS = 10;
-
-        // Shared state for concurrent call pool
-        let nextContactIndex = 0;
-        let completedCount = 0;
-        const allCallResults: CampaignResult[] = [...newResults];
-        const callStartTimes: Map<number, Date> = new Map();
-
-        // Worker function that processes one contact at a time
-        const processNextContact = async (): Promise<void> => {
-            while (nextContactIndex < totalContacts) {
-                // Atomically get the next contact index
-                const currentIndex = nextContactIndex;
-                nextContactIndex++;
-
-                if (currentIndex >= totalContacts) break;
-
-                const contact = contacts[currentIndex];
-                const startTime = new Date();
-                callStartTimes.set(currentIndex, startTime);
-
-                setCurrentCallIndex(currentIndex);
-
-                // Update status to calling
-                setResults(prev => {
-                    const updated = [...prev];
-                    updated[currentIndex] = { ...updated[currentIndex], call_status: 'calling' };
-                    return updated;
-                });
-
-                const result = await makeCall(contact);
-
-                // Fetch transcript immediately after call completes
-                if (result.call_status === 'completed') {
-                    result.transcript = await fetchTranscriptForCall(contact.phoneNumber, startTime);
-                    if (!result.transcript) {
-                        result.call_status = 'no_answer';
-                    }
-                }
-
-                // Update result in state and local array
-                allCallResults[currentIndex] = result;
-                completedCount++;
-
-                setResults(prev => {
-                    const updated = [...prev];
-                    updated[currentIndex] = result;
-                    return updated;
-                });
-
-                // Update progress
-                setProgress(Math.min(100, Math.round((completedCount / totalContacts) * 100)));
-            }
-        };
-
-        // Start the concurrent call pool - spawn MAX_CONCURRENT_CALLS workers
-        const workers = Array(Math.min(MAX_CONCURRENT_CALLS, totalContacts))
-            .fill(null)
-            .map(() => processNextContact());
-
-        // Wait for all workers to complete
-        await Promise.all(workers);
-
-        // Switch to fetching results state
-        setCampaignStatus('fetching_results');
-        setFetchProgress('Waiting for transcripts to be processed...');
-        toast.info('Calls completed! Now fetching transcripts and analytics...');
-
-        // Wait 30 seconds for backend to process transcripts
-        await new Promise(resolve => setTimeout(resolve, 30000));
-
-        // Now fetch transcripts and analytics with retries
-        // Match by PHONE NUMBER since call initiation returns different ID than session ID
-        const finalResults: CampaignResult[] = [...allCallResults];
-        let fetchedCount = 0;
-        const totalToFetch = finalResults.length;
-
-        // Helper to normalize phone numbers for comparison (strips to digits only)
-        const normalizePhone = (phone: string): string => {
-            const digits = phone.replace(/\D/g, '');
-            // Return last 10 digits for comparison (handles +91 prefix)
-            return digits.slice(-10);
-        };
-
-        console.log('[Campaign] Starting analytics fetch. Total calls:', totalToFetch);
-
-        for (let idx = 0; idx < finalResults.length; idx++) {
-            const result = finalResults[idx];
-            fetchedCount++;
-            setFetchProgress(`Fetching results: ${fetchedCount}/${totalToFetch}`);
-
-            // Skip if already failed
-            if (result.call_status === 'failed') {
-                finalResults[idx] = { ...result, analyticsLoaded: true };
-                continue;
-            }
-
-            const targetPhoneNormalized = normalizePhone(result.phoneNumber);
-            let transcript = result.transcript;
-            let analytics = null;
-            let realCallId = result.call_id; // May be overwritten by transcript's call_id
-
-            // Fetch transcript by matching phone number
-            for (let retry = 0; retry < 5; retry++) {
-                try {
-                    const transcriptsResponse = await fetch(`/api/proxy/api/users/${userUid}/transcripts`);
-                    if (transcriptsResponse.ok) {
-                        const transcriptsData = await transcriptsResponse.json();
-                        const transcripts = Array.isArray(transcriptsData) ? transcriptsData : transcriptsData.transcripts || [];
-
-                        console.log(`[Campaign] Checking ${transcripts.length} transcripts for phone ${targetPhoneNormalized}`);
-
-                        // Find transcript matching phone number AND created after campaign started
-                        // Filter by timestamp to get only transcripts from THIS campaign run
-                        const campaignStartBuffer = new Date(campaignStartTime.getTime() - 60000); // 1 min buffer
-
-                        const matchingTranscript = transcripts.find((t: any) => {
-                            const transcriptPhone = normalizePhone(t.phone_number || '');
-                            const transcriptTime = new Date(t.created_at || 0);
-                            // Must match phone AND be created after campaign start
-                            return transcriptPhone === targetPhoneNormalized && transcriptTime > campaignStartBuffer;
-                        });
-
-                        if (matchingTranscript) {
-                            console.log(`[Campaign] Found transcript match:`, matchingTranscript.call_id);
-                            realCallId = matchingTranscript.call_id; // Use the REAL call ID from transcript
-
-                            // Fetch transcript content
-                            if (matchingTranscript.transcript_url) {
-                                const contentResponse = await fetch('/api/transcript-content', {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ url: matchingTranscript.transcript_url })
-                                });
-                                if (contentResponse.ok) {
-                                    const data = await contentResponse.json();
-                                    transcript = data.transcript || '';
-                                    console.log(`[Campaign] Got transcript: ${transcript.substring(0, 50)}...`);
-                                }
-                            }
-                            break;
-                        }
-                    }
-                } catch (err) {
-                    console.error('Transcript fetch failed:', err);
-                }
-                await new Promise(resolve => setTimeout(resolve, 3000));
-            }
-
-            // Fetch analytics using the REAL call_id from transcript
-            if (realCallId) {
-                for (let retry = 0; retry < 3; retry++) {
-                    try {
-                        const analyticsResponse = await fetch(`/api/proxy/api/analytics/${realCallId}`);
-                        if (analyticsResponse.ok) {
-                            const data = await analyticsResponse.json();
-                            analytics = data.analytics || data;
-                            console.log(`[Campaign] Got analytics for ${realCallId}:`, analytics?.verdict);
-                            break;
-                        }
-                    } catch (err) {
-                        console.error('Analytics fetch failed:', err);
-                    }
-                    await new Promise(resolve => setTimeout(resolve, 2000));
-                }
-            }
-
-            // Update finalResults array with analyticsLoaded flag
-            const finalStatus = transcript ? 'completed' : (result.call_status === 'completed' ? 'no_answer' : result.call_status);
-            finalResults[idx] = {
-                ...result,
-                call_id: realCallId, // Update with real call_id from transcript
-                transcript: transcript || '',
-                analytics,
-                call_status: finalStatus as any,
-                analyticsLoaded: true
-            };
-
-            // Update UI state
-            setResults(prev => {
-                const updated = [...prev];
-                updated[idx] = finalResults[idx];
-                return updated;
-            });
-        }
-
-        // Mark remaining non-completed calls as analyticsLoaded (nothing to fetch)
-        for (let i = 0; i < finalResults.length; i++) {
-            if (!finalResults[i].analyticsLoaded) {
-                finalResults[i] = { ...finalResults[i], analyticsLoaded: true };
-            }
-        }
-
-        // Save campaign to history using collected finalResults
-        console.log('[Campaign] Saving to history:', {
-            totalContacts: contacts.length,
-            completed: finalResults.filter(r => r.call_status === 'completed').length,
-            noAnswer: finalResults.filter(r => r.call_status === 'no_answer').length,
-            failed: finalResults.filter(r => r.call_status === 'failed').length,
-            resultsCount: finalResults.length,
-            sampleResult: finalResults[0]
-        });
-
-        // Truncate transcripts to avoid localStorage size limits
-        const resultsForStorage = finalResults.map(r => ({
-            phoneNumber: r.phoneNumber,
-            calleeInfo: r.calleeInfo,
-            call_id: r.call_id,
-            call_status: r.call_status,
-            transcript: r.transcript?.substring(0, 5000) || '',
-            analytics: r.analytics,
-            analyticsLoaded: r.analyticsLoaded
-        }));
-
-        saveCampaign({
-            name: outputFileName || 'Campaign',
-            assistantName: selectedAssistant?.name || 'Unknown',
-            fromNumber: selectedTrunk === 'twilio' ? 'Twilio' : 'Vobiz',
-            totalContacts: contacts.length,
-            completed: finalResults.filter(r => r.call_status === 'completed').length,
-            noAnswer: finalResults.filter(r => r.call_status === 'no_answer').length,
-            failed: finalResults.filter(r => r.call_status === 'failed').length,
-            results: resultsForStorage,
-        });
-
-        setCampaignStatus('completed');
-        setFetchProgress('');
-        toast.success('Campaign completed! Results ready for download.');
-    };
-
-    // Download results as CSV (dynamic columns from calleeInfo)
+    // Download results CSV
     const downloadResults = async () => {
         // Check if all analytics are loaded
         const allAnalyticsLoaded = results.every(r => r.analyticsLoaded);
-        if (!allAnalyticsLoaded) {
-            toast.warning('Please wait for all analytics to be fetched before downloading.');
+        if (!allAnalyticsLoaded && campaignStatus !== 'completed') {
+            // If completed, we let them download whatever we have
+            // But if running/fetching, warn them
+            toast.warning('Still fetching analytics. Please wait.');
             return;
         }
 
         toast.info('Generating CSV...');
 
-        // Build dynamic headers from calleeInfo keys (from first result)
         const calleeInfoKeys = results.length > 0 ? Object.keys(results[0].calleeInfo) : [];
 
         const headers = [
@@ -664,11 +168,9 @@ export default function AICampaignsPage() {
             'transcript'
         ];
 
-        // Escape function for CSV values
         const escapeCSV = (value: any): string => {
             if (value === null || value === undefined) return '';
             const str = String(value);
-            // If contains comma, newline, or quotes, wrap in quotes and escape quotes
             if (str.includes(',') || str.includes('\n') || str.includes('"')) {
                 return `"${str.replace(/"/g, '""')}"`;
             }
@@ -695,7 +197,6 @@ export default function AICampaignsPage() {
             ].join(',');
         });
 
-        // Add BOM for proper Unicode/Hindi text encoding in Excel
         const BOM = '\uFEFF';
         const csv = BOM + headers.join(',') + '\n' + rows.join('\n');
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
@@ -705,25 +206,13 @@ export default function AICampaignsPage() {
         a.href = url;
         a.download = `${outputFileName || 'campaign_results'}.csv`;
         a.click();
-
         URL.revokeObjectURL(url);
-        toast.success('CSV downloaded!');
     };
 
-    // Clear campaign
-    const clearCampaign = () => {
-        setContacts([]);
-        setResults([]);
-        setCampaignStatus('idle');
-        setProgress(0);
-        if (fileInputRef.current) {
-            fileInputRef.current.value = '';
-        }
-
-        // Clear sessionStorage
-        if (userUid) {
-            sessionStorage.removeItem(`campaign_state_${userUid}`);
-        }
+    // Clear campaign UI
+    const handleClear = () => {
+        resetCampaign();
+        if (fileInputRef.current) fileInputRef.current.value = '';
     };
 
     // Get status icon
@@ -762,7 +251,7 @@ export default function AICampaignsPage() {
                                 accept=".csv"
                                 onChange={handleFileUpload}
                                 className="hidden"
-                                disabled={campaignStatus === 'running'}
+                                disabled={campaignStatus === 'running' || campaignStatus === 'fetching_results'}
                             />
                             <FileSpreadsheet className="w-10 h-10 mx-auto mb-2 text-gray-400" />
                             <p className="text-sm text-gray-600 mb-2">
@@ -770,7 +259,7 @@ export default function AICampaignsPage() {
                                 <button
                                     onClick={() => fileInputRef.current?.click()}
                                     className="text-amber-600 hover:underline"
-                                    disabled={campaignStatus === 'running'}
+                                    disabled={campaignStatus === 'running' || campaignStatus === 'fetching_results'}
                                 >
                                     browse
                                 </button>
@@ -784,36 +273,45 @@ export default function AICampaignsPage() {
                                     <Users className="w-4 h-4 mr-1" />
                                     {contacts.length} contacts loaded
                                 </span>
-                                <button onClick={clearCampaign} className="text-gray-500 hover:text-red-500">
+                                <button
+                                    onClick={handleClear}
+                                    className="text-gray-400 hover:text-red-500"
+                                    disabled={campaignStatus === 'running'}
+                                >
                                     <X className="w-4 h-4" />
                                 </button>
                             </div>
                         )}
                     </Card>
 
-                    {/* Configuration */}
+                    {/* Campaign Config */}
                     <Card className="p-4 space-y-4">
                         <div>
                             <Label>Campaign Name</Label>
                             <Input
                                 value={outputFileName}
                                 onChange={(e) => setOutputFileName(e.target.value)}
-                                placeholder="My Campaign"
+                                placeholder="Enter campaign name"
                                 className="mt-1"
+                                disabled={campaignStatus === 'running'}
                             />
-                            <p className="text-xs text-gray-400 mt-1">Saved in history &amp; used for CSV filename</p>
+                            <p className="text-xs text-gray-500 mt-1">Saved in history & used for CSV filename</p>
                         </div>
 
                         <div>
                             <Label>Select Assistant</Label>
-                            <Select value={selectedAssistantId} onValueChange={setSelectedAssistantId}>
+                            <Select
+                                value={selectedAssistantId}
+                                onValueChange={setSelectedAssistantId}
+                                disabled={campaignStatus === 'running'}
+                            >
                                 <SelectTrigger className="mt-1">
                                     <SelectValue placeholder="Choose an assistant" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {assistants.map((a) => (
-                                        <SelectItem key={a.id} value={a.id}>
-                                            {a.name}
+                                    {assistants.map((assistant) => (
+                                        <SelectItem key={assistant.id} value={assistant.id}>
+                                            {assistant.name}
                                         </SelectItem>
                                     ))}
                                 </SelectContent>
@@ -822,152 +320,195 @@ export default function AICampaignsPage() {
 
                         <div>
                             <Label>Call Provider</Label>
-                            <Select value={selectedTrunk} onValueChange={setSelectedTrunk}>
+                            <Select
+                                value={selectedTrunk}
+                                onValueChange={setSelectedTrunk}
+                                disabled={campaignStatus === 'running'}
+                            >
                                 <SelectTrigger className="mt-1">
-                                    <SelectValue placeholder="Select trunk provider" />
+                                    <SelectValue placeholder="Select provider" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {TRUNK_OPTIONS.map((trunk) => (
-                                        <SelectItem key={trunk.value} value={trunk.value}>
-                                            {trunk.label} ({trunk.description})
-                                        </SelectItem>
-                                    ))}
+                                    <SelectItem value="vobiz">Vobiz (Indian calls)</SelectItem>
+                                    <SelectItem value="twilio">Twilio (International calls)</SelectItem>
                                 </SelectContent>
                             </Select>
                             <p className="text-xs text-gray-400 mt-1">Select Vobiz for Indian calls, Twilio for international.</p>
                         </div>
 
-                        {/* Actions */}
-                        <div className="pt-2 space-y-2">
-                            {campaignStatus !== 'running' && campaignStatus !== 'fetching_results' && campaignStatus !== 'completed' && (
-                                <Button
-                                    onClick={startCampaign}
-                                    disabled={contacts.length === 0 || !selectedAssistantId || !selectedTrunk || !apiKey}
-                                    className="w-full bg-amber-500 hover:bg-amber-600"
-                                >
-                                    <Play className="w-4 h-4 mr-2" />
-                                    Start Campaign ({contacts.length} calls)
-                                </Button>
-                            )}
-
-                            {campaignStatus === 'running' && (
-                                <div className="space-y-2">
-                                    <div className="flex items-center justify-between text-sm">
-                                        <span>Making calls...</span>
-                                        <span>{progress}%</span>
-                                    </div>
-                                    <Progress value={progress} />
-                                    <p className="text-xs text-gray-500 text-center">
-                                        Processing call {currentCallIndex + 1} of {contacts.length}...
-                                    </p>
-                                </div>
-                            )}
-
-                            {campaignStatus === 'fetching_results' && (
-                                <div className="space-y-2 p-3 bg-blue-50 rounded-lg border border-blue-200">
-                                    <div className="flex items-center gap-2 text-blue-700">
-                                        <Loader2 className="w-4 h-4 animate-spin" />
-                                        <span className="font-medium">Fetching Results...</span>
-                                    </div>
-                                    <p className="text-xs text-blue-600">
-                                        {fetchProgress || 'Processing transcripts and analytics...'}
-                                    </p>
-                                    <p className="text-xs text-blue-500">
-                                        Please wait, this ensures accurate data in your CSV.
-                                    </p>
-                                </div>
-                            )}
-
-                            {campaignStatus === 'completed' && (
-                                <Button onClick={downloadResults} className="w-full bg-green-500 hover:bg-green-600">
-                                    <Download className="w-4 h-4 mr-2" />
-                                    Download {outputFileName}.csv
-                                </Button>
-                            )}
-                        </div>
+                        {campaignStatus === 'idle' || campaignStatus === 'ready' || campaignStatus === 'completed' || campaignStatus === 'error' ? (
+                            <Button
+                                className="w-full bg-amber-500 hover:bg-amber-600 text-white"
+                                onClick={campaignStatus === 'completed' ? resetCampaign : startCampaign}
+                                disabled={campaignStatus !== 'completed' && (contacts.length === 0 || !selectedAssistantId)}
+                            >
+                                <Play className="w-4 h-4 mr-2" />
+                                {campaignStatus === 'completed' ? 'Start New Campaign' : `Start Campaign (${contacts.length} calls)`}
+                            </Button>
+                        ) : (
+                            <Button
+                                variant="destructive"
+                                className="w-full"
+                                onClick={stopCampaign}
+                            >
+                                <X className="w-4 h-4 mr-2" />
+                                Stop Campaign
+                            </Button>
+                        )}
                     </Card>
                 </div>
 
-                {/* Right Column - Preview/Results */}
+                {/* Right Column - Results */}
                 <div className="lg:col-span-2">
-                    <Card className="p-4">
-                        <div className="flex items-center justify-between mb-4">
-                            <h3 className="font-semibold">
-                                {results.length > 0 ? 'Campaign Results' : 'Contacts Preview'}
-                            </h3>
-                            {results.length > 0 && (
-                                <div className="flex items-center gap-4 text-sm">
-                                    <span className="flex items-center text-green-600">
-                                        <CheckCircle2 className="w-4 h-4 mr-1" />
-                                        {results.filter(r => r.call_status === 'completed').length} completed
-                                    </span>
-                                    <span className="flex items-center text-yellow-600">
-                                        <Clock className="w-4 h-4 mr-1" />
-                                        {results.filter(r => r.call_status === 'no_answer').length} no answer
-                                    </span>
-                                    <span className="flex items-center text-red-600">
-                                        <XCircle className="w-4 h-4 mr-1" />
-                                        {results.filter(r => r.call_status === 'failed').length} failed
-                                    </span>
+                    <Card className="h-full min-h-[500px] flex flex-col">
+                        <div className="p-4 border-b flex justify-between items-center bg-gray-50 rounded-t-lg">
+                            <h2 className="font-semibold text-gray-800">Campaign Results</h2>
+
+                            <div className="flex space-x-2 text-xs">
+                                <span className="flex items-center text-green-600 bg-green-50 px-2 py-1 rounded border border-green-100">
+                                    <CheckCircle2 className="w-3 h-3 mr-1" />
+                                    {results.filter(r => r.call_status === 'completed').length} completed
+                                </span>
+                                <span className="flex items-center text-yellow-600 bg-yellow-50 px-2 py-1 rounded border border-yellow-100">
+                                    <Clock className="w-3 h-3 mr-1" />
+                                    {results.filter(r => r.call_status === 'no_answer').length} no answer
+                                </span>
+                                <span className="flex items-center text-red-600 bg-red-50 px-2 py-1 rounded border border-red-100">
+                                    <XCircle className="w-3 h-3 mr-1" />
+                                    {results.filter(r => r.call_status === 'failed').length} failed
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* Progress Bar (only when running) */}
+                        {campaignStatus === 'running' && (
+                            <div className="p-4 bg-blue-50 border-b border-blue-100">
+                                <div className="flex justify-between text-xs text-blue-800 mb-1">
+                                    <span>Calling contacts...</span>
+                                    <span>{progress}%</span>
+                                </div>
+                                <Progress value={progress} className="h-2" />
+                                <p className="text-xs text-blue-600 mt-2">
+                                    Currently calling: {contacts[currentCallIndex]?.phoneNumber || '...'}
+                                </p>
+                            </div>
+                        )}
+
+                        {/* Fetching Results Status */}
+                        {campaignStatus === 'fetching_results' && (
+                            <div className="p-4 bg-purple-50 border-b border-purple-100">
+                                <div className="flex items-center justify-center text-purple-800">
+                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                    <span className="text-sm font-medium">{fetchProgress || 'Fetching analytics...'}</span>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Results Table */}
+                        <div className="flex-1 overflow-auto p-0">
+                            {results.length > 0 ? (
+                                <Table>
+                                    <TableHeader className="bg-gray-50 sticky top-0">
+                                        <TableRow>
+                                            <TableHead>Phone Number</TableHead>
+                                            <TableHead>Info</TableHead>
+                                            <TableHead>Status</TableHead>
+                                            <TableHead>Call ID</TableHead>
+                                            <TableHead>Transcript</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {results.map((result, idx) => (
+                                            <TableRow key={idx} className={idx === currentCallIndex && campaignStatus === 'running' ? 'bg-blue-50' : ''}>
+                                                <TableCell className="font-medium">{result.phoneNumber}</TableCell>
+                                                <TableCell className="text-gray-500 text-xs">
+                                                    {Object.entries(result.calleeInfo).map(([k, v]) => (
+                                                        <div key={k}>{k}: {v}</div>
+                                                    ))}
+                                                </TableCell>
+                                                <TableCell>
+                                                    <div className="flex items-center space-x-2">
+                                                        {getStatusIcon(result.call_status)}
+                                                        <span className="capitalize">{result.call_status.replace('_', ' ')}</span>
+                                                    </div>
+                                                    {result.analytics?.verdict && (
+                                                        <div className={`text-xs mt-1 font-medium ${result.analytics.verdict === 'Hot Lead' ? 'text-green-600' :
+                                                            result.analytics.verdict === 'Do Not Call' ? 'text-red-500' : 'text-gray-500'
+                                                            }`}>
+                                                            {result.analytics.verdict}
+                                                        </div>
+                                                    )}
+                                                </TableCell>
+                                                <TableCell className="text-xs font-mono text-gray-400">
+                                                    {result.call_id ? result.call_id.substring(0, 8) + '...' : '-'}
+                                                </TableCell>
+                                                <TableCell className="max-w-xs truncate text-xs text-gray-600">
+                                                    {result.transcript || '-'}
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            ) : contacts.length > 0 ? (
+                                /* Contact Preview - shows when CSV is loaded but campaign not started */
+                                <div className="h-full flex flex-col">
+                                    <div className="bg-amber-50 border-b border-amber-200 p-3">
+                                        <p className="text-sm text-amber-800 font-medium flex items-center">
+                                            <Users className="w-4 h-4 mr-2" />
+                                            Preview: {contacts.length} contact{contacts.length > 1 ? 's' : ''} ready to call
+                                        </p>
+                                        <p className="text-xs text-amber-600 mt-1">
+                                            Review your contacts below before starting the campaign
+                                        </p>
+                                    </div>
+                                    <Table>
+                                        <TableHeader className="bg-gray-50 sticky top-0">
+                                            <TableRow>
+                                                <TableHead className="w-12">#</TableHead>
+                                                <TableHead>Phone Number</TableHead>
+                                                <TableHead>Contact Info</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {contacts.map((contact, idx) => (
+                                                <TableRow key={idx} className="hover:bg-gray-50">
+                                                    <TableCell className="text-gray-400 text-xs">{idx + 1}</TableCell>
+                                                    <TableCell className="font-medium">{contact.phoneNumber}</TableCell>
+                                                    <TableCell className="text-gray-600 text-sm">
+                                                        {Object.entries(contact.calleeInfo).length > 0 ? (
+                                                            Object.entries(contact.calleeInfo).map(([k, v]) => (
+                                                                <span key={k} className="inline-block bg-gray-100 rounded px-2 py-0.5 mr-2 mb-1 text-xs">
+                                                                    <span className="text-gray-500">{k}:</span> {v}
+                                                                </span>
+                                                            ))
+                                                        ) : (
+                                                            <span className="text-gray-400">No additional info</span>
+                                                        )}
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                </div>
+                            ) : (
+                                <div className="h-full flex flex-col items-center justify-center text-gray-400 p-8">
+                                    <Upload className="w-12 h-12 mb-3 opacity-20" />
+                                    <p>Upload a CSV file to see contacts here</p>
                                 </div>
                             )}
                         </div>
 
-                        <div className="border rounded-lg overflow-hidden">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Phone Number</TableHead>
-                                        <TableHead>Info</TableHead>
-                                        {results.length > 0 && (
-                                            <>
-                                                <TableHead>Status</TableHead>
-                                                <TableHead>Call ID</TableHead>
-                                                <TableHead>Transcript</TableHead>
-                                            </>
-                                        )}
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {(results.length > 0 ? results : contacts.map(c => ({ ...c, call_id: '', call_status: 'pending' as const, transcript: '', analyticsLoaded: false }))).slice(0, 50).map((row, i) => {
-                                        // Get first 2 calleeInfo fields for display
-                                        const infoKeys = Object.keys(row.calleeInfo).slice(0, 2);
-                                        const infoDisplay = infoKeys.map(k => `${k}: ${row.calleeInfo[k]}`).join(', ') || '-';
-
-                                        return (
-                                            <TableRow key={i}>
-                                                <TableCell className="font-medium">{row.phoneNumber}</TableCell>
-                                                <TableCell className="text-sm text-gray-600 max-w-xs truncate">{infoDisplay}</TableCell>
-                                                {results.length > 0 && (
-                                                    <>
-                                                        <TableCell>
-                                                            <div className="flex items-center gap-1">
-                                                                {getStatusIcon((row as CampaignResult).call_status)}
-                                                                <span className="capitalize text-sm">{(row as CampaignResult).call_status}</span>
-                                                            </div>
-                                                        </TableCell>
-                                                        <TableCell className="text-xs text-gray-500">{(row as CampaignResult).call_id}</TableCell>
-                                                        <TableCell className="max-w-xs truncate text-xs text-gray-500">
-                                                            {(row as CampaignResult).transcript?.split('\n')[0] || '-'}
-                                                        </TableCell>
-                                                    </>
-                                                )}
-                                            </TableRow>
-                                        );
-                                    })}
-                                    {contacts.length === 0 && results.length === 0 && (
-                                        <TableRow>
-                                            <TableCell colSpan={5} className="text-center text-gray-400 py-8">
-                                                Upload a CSV file to see contacts here
-                                            </TableCell>
-                                        </TableRow>
-                                    )}
-                                </TableBody>
-                            </Table>
-                            {(results.length > 50 || contacts.length > 50) && (
-                                <div className="p-2 text-center text-sm text-gray-500 bg-gray-50">
-                                    Showing first 50 of {results.length || contacts.length} contacts
-                                </div>
+                        {/* Footer / Actions */}
+                        <div className="p-4 border-t bg-gray-50 rounded-b-lg flex justify-end">
+                            {results.length > 0 && (
+                                <Button
+                                    variant="outline"
+                                    onClick={downloadResults}
+                                    disabled={campaignStatus === 'running' && campaignStatus !== 'completed'}
+                                >
+                                    <Download className="w-4 h-4 mr-2" />
+                                    Download CSV
+                                </Button>
                             )}
                         </div>
                     </Card>

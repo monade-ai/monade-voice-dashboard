@@ -31,13 +31,52 @@ export default function HotLeadsPage() {
         fetchAll();
     }, [fetchAll]);
 
-    // Filter for hot leads (>= 50% confidence), apply search, and date filter
+    // Filter for REAL hot leads: >= 50% confidence AND positive verdict
+    // Positive verdicts: interested, callback, booked, success etc.
+    // Negative verdicts (excluded): not_interested, not interested, failed, do not call etc.
     useEffect(() => {
         console.log('[HotLeads] All analytics:', allAnalytics);
         console.log('[HotLeads] Total analytics count:', allAnalytics.length);
 
-        let hotLeads = allAnalytics.filter(a => (a.confidence_score || 0) >= 50);
-        console.log('[HotLeads] Hot leads after filtering (>= 50%):', hotLeads);
+        // Helper to check if verdict is positive
+        const isPositiveVerdict = (verdict: string | undefined): boolean => {
+            if (!verdict) return false;
+            const v = verdict.toLowerCase().replace(/_/g, ' ');
+
+            // Exclude negative verdicts
+            if (v.includes('not interested') ||
+                v.includes('not_interested') ||
+                v.includes('failed') ||
+                v.includes('do not call') ||
+                v.includes('dnc') ||
+                v.includes('wrong number') ||
+                v.includes('no interest') ||
+                v.includes('decline')) {
+                return false;
+            }
+
+            // Include positive verdicts
+            if (v.includes('interested') ||
+                v.includes('callback') ||
+                v.includes('call back') ||
+                v.includes('book') ||
+                v.includes('success') ||
+                v.includes('hot lead') ||
+                v.includes('qualified') ||
+                v.includes('demo') ||
+                v.includes('meeting')) {
+                return true;
+            }
+
+            // Default: exclude unknown verdicts from hot leads
+            return false;
+        };
+
+        // Filter: confidence >= 50 AND positive verdict
+        let hotLeads = allAnalytics.filter(a =>
+            (a.confidence_score || 0) >= 50 && isPositiveVerdict(a.verdict)
+        );
+        console.log('[HotLeads] Hot leads after filtering (>= 50% AND positive verdict):', hotLeads);
         console.log('[HotLeads] Hot leads count:', hotLeads.length);
 
         // Apply date filter
@@ -125,7 +164,7 @@ export default function HotLeadsPage() {
                     <TrendingUp className="w-6 h-6 text-amber-600" />
                     <h1 className="text-2xl font-bold">Hot Leads</h1>
                 </div>
-                <p className="text-gray-600">Calls with confidence score ≥ 50%</p>
+                <p className="text-gray-600">Calls with positive verdict AND confidence score ≥ 50%</p>
             </div>
 
             {/* Stats */}

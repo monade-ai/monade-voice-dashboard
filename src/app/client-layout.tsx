@@ -10,6 +10,8 @@ import { TranslationsProvider } from '@/i18n/translations-context';
 import { ThemeProvider } from '@/components/theme-provider';
 import { AuthProvider, useAuth } from '@/contexts/auth-context';
 import { MonadeUserProvider } from '@/app/hooks/use-monade-user';
+import { TranscriptsProvider } from '@/app/hooks/use-transcripts-context';
+import { CampaignProvider } from '@/app/contexts/campaign-context';
 
 import { Sidebar } from '../components/sidebar';
 
@@ -59,9 +61,13 @@ export default function ClientLayout({
                   {/* Sidebar visibility now handled within Sidebar component */}
                   <Sidebar />
                   <main className="flex-1 overflow-auto">
-                    <AssistantsProvider>
-                      <PipecatProvider>{children}</PipecatProvider>
-                    </AssistantsProvider>
+                    <TranscriptsProvider>
+                      <AssistantsProvider>
+                        <CampaignProvider>
+                          <PipecatProvider>{children}</PipecatProvider>
+                        </CampaignProvider>
+                      </AssistantsProvider>
+                    </TranscriptsProvider>
                   </main>
                 </div>
               </MonadeUserProvider>

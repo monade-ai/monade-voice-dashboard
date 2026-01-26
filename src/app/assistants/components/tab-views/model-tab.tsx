@@ -119,9 +119,12 @@ export default function ModelTab({ onChangesMade }: ModelTabProps) {
 
   // Handle call provider change
   const handleCallProviderChange = (value: string) => {
-    setCallProvider(value);
+    // Convert 'none' to empty string for storage, but keep state for UI
+    const actualValue = value === 'none' ? '' : value;
+    console.log('[ModelTab] Provider changed to:', value, '-> storing:', actualValue);
+    setCallProvider(actualValue);
     if (currentAssistant) {
-      updateAssistantLocally(currentAssistant.id, { callProvider: value });
+      updateAssistantLocally(currentAssistant.id, { callProvider: actualValue });
       onChangesMade(); // Mark changes
     }
   };
@@ -220,7 +223,7 @@ export default function ModelTab({ onChangesMade }: ModelTabProps) {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__none__">
-                    <span className="text-gray-500">— None (No phone number) —</span>
+                    <span className="text-gray-500 italic">— None (Deallocate/Release number) —</span>
                   </SelectItem>
                   {phoneNumbers.map((phone) => (
                     <SelectItem key={phone.number} value={phone.number}>
@@ -336,26 +339,51 @@ export default function ModelTab({ onChangesMade }: ModelTabProps) {
           <label htmlFor="call-provider" className="text-sm font-medium">
             Provider
           </label>
-          <Select value={callProvider} onValueChange={handleCallProviderChange}>
-            <SelectTrigger className="w-full bg-white">
-              <SelectValue placeholder="Select call provider" />
-            </SelectTrigger>
-            <SelectContent>
-              {callProviderOptions.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
+          <div className="flex gap-2">
+            <Select
+              value={callProvider || 'vobiz'}
+              onValueChange={handleCallProviderChange}
+            >
+              <SelectTrigger className="flex-1 bg-white">
+                <SelectValue placeholder="Select call provider" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="vobiz">
                   <div className="flex flex-col">
-                    <span className="font-medium">{option.label}</span>
-                    <span className="text-xs text-gray-500">{option.description}</span>
+                    <span className="font-medium">Vobiz</span>
+                    <span className="text-xs text-gray-500">Indian calls - Best for +91 numbers</span>
                   </div>
                 </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <p className="text-xs text-gray-500 mt-2">
-            {callProvider === 'vobiz'
-              ? '✓ Vobiz is optimized for Indian phone numbers (+91)'
-              : '✓ Twilio provides international coverage for global calls'}
-          </p>
+                <SelectItem value="twilio">
+                  <div className="flex flex-col">
+                    <span className="font-medium">Twilio</span>
+                    <span className="text-xs text-gray-500">International calls - Global coverage</span>
+                  </div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+            {callProvider && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleCallProviderChange('')}
+                className="text-red-600 border-red-200 hover:bg-red-50 whitespace-nowrap"
+              >
+                Clear
+              </Button>
+            )}
+          </div>
+          {callProvider ? (
+            <p className="text-xs text-gray-500 mt-2">
+              {callProvider === 'vobiz'
+                ? '✓ Vobiz is optimized for Indian phone numbers (+91)'
+                : '✓ Twilio provides international coverage for global calls'}
+            </p>
+          ) : (
+            <p className="text-xs text-orange-600 mt-2">
+              ⚠ No provider selected - click a provider to enable calls, or save without one
+            </p>
+          )}
         </div>
       </div>
 

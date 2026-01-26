@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useMonadeUser } from './use-monade-user';
 
 export interface CampaignRecord {
@@ -28,79 +28,114 @@ export interface CampaignRecord {
             key_discoveries?: Record<string, any>;
         } | null;
     }[];
+    // Separated lists for easy retry of not-connected calls
+    connectedResults?: {
+        phoneNumber: string;
+        calleeInfo: Record<string, string>;
+        call_id: string;
+        transcript: string;
+        analytics?: any;
+    }[];
+    notConnectedResults?: {
+        phoneNumber: string;
+        calleeInfo: Record<string, string>;
+        call_status: string; // 'no_answer' or 'failed'
+    }[];
 }
 
+const STORAGE_PREFIX = 'monade_campaign_history_';
+
 export function useCampaignHistory() {
-    const { userUid } = useMonadeUser(); // Get logged-in user's ID
+    const { userUid, loading: userLoading } = useMonadeUser();
     const [campaigns, setCampaigns] = useState<CampaignRecord[]>([]);
     const [loading, setLoading] = useState(true);
 
-    // Create user-specific storage key
-    const getStorageKey = useCallback(() => {
-        if (!userUid) return null;
-        return `monade_campaign_history_${userUid}`;
+    // Use ref to always have current userUid in callbacks
+    const userUidRef = useRef(userUid);
+    useEffect(() => {
+        userUidRef.current = userUid;
     }, [userUid]);
+
+    // Get storage key for current user
+    const getStorageKey = useCallback(() => {
+        const uid = userUidRef.current;
+        if (!uid) {
+            console.warn('[CampaignHistory] No userUid available');
+            return null;
+        }
+        return `${STORAGE_PREFIX}${uid}`;
+    }, []);
 
     // Load campaigns from localStorage
     useEffect(() => {
-        const storageKey = getStorageKey();
-        if (!storageKey) {
+        if (userLoading) return;
+        if (!userUid) {
             setLoading(false);
             return;
         }
 
+        const storageKey = `${STORAGE_PREFIX}${userUid}`;
         try {
             const stored = localStorage.getItem(storageKey);
+            console.log('[CampaignHistory] Loading from:', storageKey, 'found:', !!stored);
             if (stored) {
-                setCampaigns(JSON.parse(stored));
+                const parsed = JSON.parse(stored);
+                console.log('[CampaignHistory] Loaded campaigns:', parsed.length);
+                setCampaigns(parsed);
             }
         } catch (err) {
             console.error('Failed to load campaign history:', err);
         } finally {
             setLoading(false);
         }
-    }, [getStorageKey]);
+    }, [userUid, userLoading]);
 
     // Save campaign
     const saveCampaign = useCallback((campaign: Omit<CampaignRecord, 'id' | 'createdAt'>) => {
+        const uid = userUidRef.current;
+        if (!uid) {
+            console.error('[CampaignHistory] Cannot save - no user ID available');
+            return '';
+        }
+
+        const storageKey = `${STORAGE_PREFIX}${uid}`;
         const newCampaign: CampaignRecord = {
             ...campaign,
             id: `campaign_${Date.now()}`,
             createdAt: new Date().toISOString(),
         };
 
-        console.log('[CampaignHistory] Saving campaign:', {
+        console.log('[CampaignHistory] Saving campaign to:', storageKey, {
             id: newCampaign.id,
             name: newCampaign.name,
             totalContacts: newCampaign.totalContacts,
             completed: newCampaign.completed,
             resultsLength: newCampaign.results?.length || 0,
-            firstResult: newCampaign.results?.[0]
         });
 
-        const storageKey = getStorageKey();
-        if (!storageKey) {
-            console.warn('[CampaignHistory] Cannot save - no user ID');
-            return '';
-        }
-
         setCampaigns(prev => {
-            const updated = [newCampaign, ...prev].slice(0, 50); // Keep last 50 campaigns
+            const updated = [newCampaign, ...prev].slice(0, 50); // Keep last 50
             try {
                 const jsonData = JSON.stringify(updated);
-                console.log('[CampaignHistory] localStorage data size:', jsonData.length, 'bytes');
+                console.log('[CampaignHistory] Saving to localStorage, size:', jsonData.length, 'bytes');
                 localStorage.setItem(storageKey, jsonData);
+                console.log('[CampaignHistory] Save successful!');
             } catch (err) {
-                console.error('[CampaignHistory] Failed to save to localStorage:', err);
-                // If localStorage is full, try removing old campaigns
-                const reduced = [newCampaign, ...prev.slice(0, 10)];
-                localStorage.setItem(storageKey, JSON.stringify(reduced));
+                console.error('[CampaignHistory] Failed to save:', err);
+                // If storage full, try with fewer campaigns
+                try {
+                    const reduced = [newCampaign, ...prev.slice(0, 5)];
+                    localStorage.setItem(storageKey, JSON.stringify(reduced));
+                    return reduced;
+                } catch (e2) {
+                    console.error('[CampaignHistory] Even reduced save failed:', e2);
+                }
             }
             return updated;
         });
 
         return newCampaign.id;
-    }, [getStorageKey]);
+    }, []);
 
     // Delete campaign
     const deleteCampaign = useCallback((id: string) => {
@@ -119,7 +154,7 @@ export function useCampaignHistory() {
         return campaigns.find(c => c.id === id);
     }, [campaigns]);
 
-    // Get connectivity rate for a campaign
+    // Get connectivity rate
     const getConnectivityRate = useCallback((campaign: CampaignRecord) => {
         if (campaign.totalContacts === 0) return 0;
         return Math.round((campaign.completed / campaign.totalContacts) * 100);
@@ -127,7 +162,7 @@ export function useCampaignHistory() {
 
     return {
         campaigns,
-        loading,
+        loading: loading || userLoading,
         saveCampaign,
         deleteCampaign,
         getCampaign,
