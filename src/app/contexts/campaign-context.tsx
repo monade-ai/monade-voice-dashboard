@@ -258,10 +258,10 @@ export function CampaignProvider({ children }: { children: React.ReactNode }) {
             return null;
         };
 
-        // PHASE 1: Quick detection (30s) - for catchin no_answer
-        // 10 attempts × 3 seconds = 30 seconds
+        // PHASE 1: Quick check (15s) - transcripts should already be ready since we use fixed delay
+        // 3 attempts × 5 seconds = 15 seconds
         console.log(`[Campaign] Phase 1: Quick transcript check for ${formattedPhone}`);
-        for (let attempt = 0; attempt < 10; attempt++) {
+        for (let attempt = 0; attempt < 3; attempt++) {
             if (abortControllerRef.current?.signal.aborted) break;
 
             const transcript = await checkForTranscript();
@@ -269,28 +269,25 @@ export function CampaignProvider({ children }: { children: React.ReactNode }) {
                 console.log(`[Campaign] Transcript found in Phase 1 for ${formattedPhone}`);
                 return transcript;
             }
-            await new Promise(resolve => setTimeout(resolve, 3000));
+            await new Promise(resolve => setTimeout(resolve, 5000));
         }
 
-        // PHASE 2: Extended wait (up to 3 minutes) - for connected calls
-        // Poll less frequently (every 10s)
-        // 18 attempts × 10 seconds = 180 seconds (3 minutes)
-        console.log(`[Campaign] Phase 2: Extended wait for ${formattedPhone} (up to 3 min)`);
-        for (let attempt = 0; attempt < 18; attempt++) {
+        // PHASE 2: Brief extended check (10s) - final attempt
+        // 2 attempts × 5 seconds = 10 seconds
+        console.log(`[Campaign] Phase 2: Brief extended check for ${formattedPhone}`);
+        for (let attempt = 0; attempt < 2; attempt++) {
             if (abortControllerRef.current?.signal.aborted) break;
 
             const transcript = await checkForTranscript();
             if (transcript) {
-                console.log(`[Campaign] Transcript found in Phase 2 (attempt ${attempt + 1}) for ${formattedPhone}`);
+                console.log(`[Campaign] Transcript found in Phase 2 for ${formattedPhone}`);
                 return transcript;
             }
-
-            // Less frequent polling in phase 2 (every 10 seconds)
-            await new Promise(resolve => setTimeout(resolve, 10000));
+            await new Promise(resolve => setTimeout(resolve, 5000));
         }
 
-        // Still no transcript after ~2.75 minutes total - mark as no conversation
-        console.log(`[Campaign] No transcript found for ${formattedPhone} after extended wait`);
+        // No transcript after ~25 seconds - mark as no conversation
+        console.log(`[Campaign] No transcript found for ${formattedPhone} after 25s`);
         return '';
     };
 
@@ -320,14 +317,18 @@ export function CampaignProvider({ children }: { children: React.ReactNode }) {
         setResults(newResults);
 
         const totalContacts = contacts.length;
-        const MAX_CONCURRENT_CALLS = 10;
+        // Use 5 concurrent workers (50% of Vobiz's 10 limit for safety)
+        const MAX_CONCURRENT_CALLS = 5;
+        // Fixed delay per call slot (90 seconds) - allows call to complete + transcript to generate
+        const CALL_SLOT_DURATION_MS = 90_000;
         let nextContactIndex = 0;
         let completedCount = 0;
 
-        // This array will hold the latest state for the worker closure
+        // This array will hold call metadata for bulk transcript fetching at end
         const processingResults = [...newResults];
+        const callMetadata: Array<{ index: number; phoneNumber: string; startTime: Date }> = [];
 
-        // Worker function
+        // Worker function - Fire-and-Forget approach
         const processNextContact = async () => {
             while (nextContactIndex < totalContacts) {
                 if (abortControllerRef.current?.signal.aborted) break;
@@ -348,10 +349,9 @@ export function CampaignProvider({ children }: { children: React.ReactNode }) {
 
                 const result = await makeCall(contact);
 
-                // Fetch transcript immediately if completed
+                // Store metadata for bulk transcript fetch later (don't wait for transcript now)
                 if (result.call_status === 'completed') {
-                    result.transcript = await fetchTranscriptForCall(contact.phoneNumber, startTime);
-                    if (!result.transcript) result.call_status = 'no_answer';
+                    callMetadata.push({ index: currentIndex, phoneNumber: contact.phoneNumber, startTime });
                 }
 
                 processingResults[currentIndex] = result;
@@ -359,11 +359,18 @@ export function CampaignProvider({ children }: { children: React.ReactNode }) {
 
                 setResults(prev => {
                     const updated = [...prev];
-                    updated[currentIndex] = result;
+                    // Mark as 'completed' for now - will update to 'no_answer' if no transcript found later
+                    updated[currentIndex] = { ...result, call_status: result.call_status === 'completed' ? 'completed' : result.call_status };
                     return updated;
                 });
 
                 setProgress(Math.round((completedCount / totalContacts) * 100));
+
+                // Fixed delay before picking up next contact (gives call time to complete)
+                // This ensures we don't exceed concurrency limit even if calls run long
+                if (nextContactIndex < totalContacts) {
+                    await new Promise(resolve => setTimeout(resolve, CALL_SLOT_DURATION_MS));
+                }
             }
         };
 
@@ -373,87 +380,149 @@ export function CampaignProvider({ children }: { children: React.ReactNode }) {
 
         await Promise.all(workers);
 
+        // PHASE 2: Bulk transcript fetching for all completed calls
+        if (!abortControllerRef.current?.signal.aborted && callMetadata.length > 0) {
+            setCampaignStatus('fetching_results');
+            setFetchProgress(`Waiting for calls to complete...`);
+
+            // Wait until at least 90s has passed since the MOST RECENT call was made
+            // This ensures even the last call has time to complete before we fetch transcripts
+            const MINIMUM_CALL_DURATION_MS = 90_000;
+            const mostRecentCallTime = callMetadata.reduce((latest, meta) =>
+                meta.startTime > latest ? meta.startTime : latest,
+                callMetadata[0].startTime
+            );
+            const elapsedSinceMostRecentCall = Date.now() - mostRecentCallTime.getTime();
+            const remainingWait = Math.max(0, MINIMUM_CALL_DURATION_MS - elapsedSinceMostRecentCall);
+
+            if (remainingWait > 0) {
+                console.log(`[Campaign] Waiting ${Math.round(remainingWait / 1000)}s for most recent call to complete...`);
+                setFetchProgress(`Waiting ${Math.round(remainingWait / 1000)}s for calls to complete...`);
+                await new Promise(resolve => setTimeout(resolve, remainingWait));
+            }
+
+            setFetchProgress(`Fetching transcripts for ${callMetadata.length} calls...`);
+
+            // Worker pool for parallel transcript fetching (5 concurrent)
+            const TRANSCRIPT_WORKERS = 5;
+            let transcriptNextIndex = 0;
+            let transcriptCompleted = 0;
+
+            const transcriptWorker = async () => {
+                while (transcriptNextIndex < callMetadata.length) {
+                    if (abortControllerRef.current?.signal.aborted) break;
+
+                    const currentIdx = transcriptNextIndex++;
+                    if (currentIdx >= callMetadata.length) break;
+
+                    const meta = callMetadata[currentIdx];
+                    const transcript = await fetchTranscriptForCall(meta.phoneNumber, meta.startTime);
+
+                    if (transcript) {
+                        processingResults[meta.index].transcript = transcript;
+                    } else {
+                        processingResults[meta.index].call_status = 'no_answer';
+                        processingResults[meta.index].transcript = '';
+                    }
+
+                    transcriptCompleted++;
+                    setFetchProgress(`Fetching transcripts: ${transcriptCompleted}/${callMetadata.length}`);
+                    setResults([...processingResults]);
+                }
+            };
+
+            // Start 5 transcript workers
+            const transcriptWorkers = Array(Math.min(TRANSCRIPT_WORKERS, callMetadata.length))
+                .fill(null)
+                .map(() => transcriptWorker());
+            await Promise.all(transcriptWorkers);
+        }
+
         if (abortControllerRef.current?.signal.aborted) {
-            setCampaignStatus('idle'); // or 'axed'
+            setCampaignStatus('idle');
             return;
         }
 
-        // Fetching Analytics Phase
-        setCampaignStatus('fetching_results');
-        setFetchProgress('Waiting for transcripts processing...');
-        toast.info('Calls done. Fetching analytics...');
-
-        await new Promise(resolve => setTimeout(resolve, 15000)); // Wait 15s
+        // Fetching Analytics Phase with Worker Pool
+        setCampaignStatus('fetching_analytics');
+        toast.info('Fetching analytics...');
 
         const finalResults = [...processingResults];
         const normalizePhone = (p: string) => p.replace(/\D/g, '').slice(-10);
-        const campaignStartBuffer = new Date(campaignStartTime.getTime() - 60000); // 1 min buffer
+        const campaignStartBuffer = new Date(campaignStartTime.getTime() - 60000);
 
-        for (let idx = 0; idx < finalResults.length; idx++) {
-            if (abortControllerRef.current?.signal.aborted) break;
+        // Get results that need analytics (completed calls with transcripts)
+        const analyticsQueue = finalResults
+            .map((res, idx) => ({ res, idx }))
+            .filter(item => item.res.call_status === 'completed' && item.res.transcript);
 
-            const res = finalResults[idx];
-            setFetchProgress(`Fetching analytics: ${idx + 1}/${finalResults.length}`);
+        if (analyticsQueue.length > 0) {
+            const ANALYTICS_WORKERS = 5;
+            let analyticsNextIndex = 0;
+            let analyticsCompleted = 0;
 
-            if (res.call_status === 'failed') {
-                finalResults[idx].analyticsLoaded = true;
-                setResults([...finalResults]);
-                continue;
-            }
+            const analyticsWorker = async () => {
+                while (analyticsNextIndex < analyticsQueue.length) {
+                    if (abortControllerRef.current?.signal.aborted) break;
 
-            const targetPhoneNormalized = normalizePhone(res.phoneNumber);
-            let realCallId = '';
+                    const currentIdx = analyticsNextIndex++;
+                    if (currentIdx >= analyticsQueue.length) break;
 
-            // Step 1: Find the transcript by phone number to get REAL call_id (AJ_*)
-            for (let retry = 0; retry < 3; retry++) {
-                try {
-                    const transcriptsResponse = await fetch(`/api/proxy/api/users/${userUid}/transcripts`);
-                    if (transcriptsResponse.ok) {
-                        const transcriptsData = await transcriptsResponse.json();
-                        const transcripts = Array.isArray(transcriptsData) ? transcriptsData : transcriptsData.transcripts || [];
+                    const { res, idx } = analyticsQueue[currentIdx];
+                    const targetPhoneNormalized = normalizePhone(res.phoneNumber);
+                    let realCallId = '';
 
-                        // Find transcript matching phone number AND created after campaign started
-                        const matchingTranscript = transcripts.find((t: any) => {
-                            const transcriptPhone = normalizePhone(t.phone_number || '');
-                            const transcriptTime = new Date(t.created_at || 0);
-                            return transcriptPhone === targetPhoneNormalized && transcriptTime > campaignStartBuffer;
-                        });
-
-                        if (matchingTranscript) {
-                            realCallId = matchingTranscript.call_id; // This is the AJ_* ID
-                            console.log(`[Analytics] Found transcript match for ${targetPhoneNormalized}: ${realCallId}`);
-                            break;
-                        }
-                    }
-                } catch (err) {
-                    console.error('Transcript lookup failed:', err);
-                }
-                await new Promise(r => setTimeout(r, 2000));
-            }
-
-            // Step 2: Fetch analytics using the REAL call_id
-            if (realCallId) {
-                finalResults[idx].call_id = realCallId; // Update to real call_id
-
-                for (let retry = 0; retry < 3; retry++) {
+                    // Find call_id from transcript
                     try {
-                        const aRes = await fetch(`/api/proxy/api/analytics/${realCallId}`);
-                        if (aRes.ok) {
-                            const d = await aRes.json();
-                            finalResults[idx].analytics = d.analytics || d;
-                            console.log(`[Analytics] Got analytics for ${realCallId}:`, finalResults[idx].analytics?.verdict);
-                            break;
+                        const transcriptsResponse = await fetch(`/api/proxy/api/users/${userUid}/transcripts`);
+                        if (transcriptsResponse.ok) {
+                            const transcriptsData = await transcriptsResponse.json();
+                            const transcripts = Array.isArray(transcriptsData) ? transcriptsData : transcriptsData.transcripts || [];
+                            const match = transcripts.find((t: any) => {
+                                const tPhone = normalizePhone(t.phone_number || '');
+                                const tTime = new Date(t.created_at || 0);
+                                return tPhone === targetPhoneNormalized && tTime > campaignStartBuffer;
+                            });
+                            if (match) realCallId = match.call_id;
                         }
-                    } catch (e) {
-                        console.error('Analytics fetch failed:', e);
+                    } catch (err) {
+                        console.error('Transcript lookup failed:', err);
                     }
-                    await new Promise(r => setTimeout(r, 2000));
-                }
-            }
 
-            finalResults[idx].analyticsLoaded = true;
-            setResults([...finalResults]);
+                    // Fetch analytics
+                    if (realCallId) {
+                        finalResults[idx].call_id = realCallId;
+                        try {
+                            const aRes = await fetch(`/api/proxy/api/analytics/${realCallId}`);
+                            if (aRes.ok) {
+                                const d = await aRes.json();
+                                finalResults[idx].analytics = d.analytics || d;
+                            }
+                        } catch (e) {
+                            console.error('Analytics fetch failed:', e);
+                        }
+                    }
+
+                    finalResults[idx].analyticsLoaded = true;
+                    analyticsCompleted++;
+                    setFetchProgress(`Fetching analytics: ${analyticsCompleted}/${analyticsQueue.length}`);
+                    setResults([...finalResults]);
+                }
+            };
+
+            const analyticsWorkers = Array(Math.min(ANALYTICS_WORKERS, analyticsQueue.length))
+                .fill(null)
+                .map(() => analyticsWorker());
+            await Promise.all(analyticsWorkers);
         }
+
+        // Mark any remaining as loaded
+        for (let i = 0; i < finalResults.length; i++) {
+            if (!finalResults[i].analyticsLoaded) {
+                finalResults[i].analyticsLoaded = true;
+            }
+        }
+        setResults([...finalResults]);
 
         // SAVE HISTORY
         // Truncate transcripts for storage
