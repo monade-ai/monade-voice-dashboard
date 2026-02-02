@@ -24,7 +24,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useTranslations } from '@/i18n/translations-context';
 import { LanguageSelector } from '@/components/language-selector';
-import { useTheme } from '@/components/theme-provider';
+import { useTheme } from 'next-themes';
 
 interface NavItemProps {
   href: string;
@@ -53,7 +53,7 @@ function NavItem({ href, icon, label, isActive = false }: NavItemProps) {
 export function Sidebar() {
   const pathname = usePathname();
   const { t } = useTranslations();
-  const { theme, toggleTheme } = useTheme();
+  const { theme, setTheme } = useTheme();
 
   // Routes where sidebar should be hidden
   const noSidebarRoutes = [
@@ -196,7 +196,10 @@ export function Sidebar() {
       <div className="mt-auto p-4 border-t border-sidebar-border">
         <LanguageSelector />
         <div className="mt-4 pt-4 border-t border-sidebar-border flex justify-center">
-          <button onClick={toggleTheme} className="p-2 rounded-full hover:bg-muted">
+          <button 
+            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} 
+            className="p-2 rounded-full hover:bg-muted transition-colors"
+          >
             {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
           </button>
         </div>
