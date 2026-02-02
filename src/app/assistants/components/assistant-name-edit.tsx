@@ -14,6 +14,7 @@ interface AssistantNameEditProps {
   isEditing: boolean;
   onSave: (name: string) => void;
   onCancel: () => void;
+  onStartEdit?: () => void;
   showEditButton?: boolean;
 }
 
@@ -22,6 +23,7 @@ export default function AssistantNameEdit({
   isEditing,
   onSave,
   onCancel,
+  onStartEdit,
   showEditButton = false,
 }: AssistantNameEditProps) {
   const { updateAssistantLocally } = useAssistants();
@@ -120,14 +122,14 @@ export default function AssistantNameEdit({
     return (
       <div className="flex items-center gap-1">
         <div className="font-medium truncate">{assistant.name}</div>
-        {showEditButton && (
+        {showEditButton && onStartEdit && (
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    onSave(assistant.name); // This triggers the edit mode in parent
+                    onStartEdit();
                   }}
                   className="p-1 text-gray-400 hover:text-gray-700 rounded-full"
                 >

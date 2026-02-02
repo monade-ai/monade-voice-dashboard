@@ -166,19 +166,14 @@ export default function AssistantsHeader({ editingAssistantId, setEditingAssista
                 }}
                 className="cursor-pointer pt-2"
               >
-                <div
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setEditingAssistantId(assistant.id);
-                  }}
-                >
-                  <AssistantNameEdit
-                    assistant={assistant}
-                    isEditing={editingAssistantId === assistant.id}
-                    onSave={(newName) => handleSaveName(assistant.id, newName)}
-                    onCancel={() => setEditingAssistantId(null)}
-                  />
-                </div>
+                <AssistantNameEdit
+                  assistant={assistant}
+                  isEditing={editingAssistantId === assistant.id}
+                  onSave={(newName) => handleSaveName(assistant.id, newName)}
+                  onCancel={() => setEditingAssistantId(null)}
+                  onStartEdit={() => setEditingAssistantId(assistant.id)}
+                  showEditButton
+                />
                 <div className="text-sm text-[var(--muted-foreground)] truncate pt-1">{assistant.description || 'No description'}</div>
 
                 <div className="flex flex-wrap gap-1 mt-2">

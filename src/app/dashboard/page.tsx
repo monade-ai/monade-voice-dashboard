@@ -5,16 +5,12 @@ import { useRouter } from 'next/navigation';
 import {
   Users,
   Phone,
-  AudioWaveform,
   TrendingUp,
-  Layers,
-  PhoneCall,
   ChevronLeft,
   ChevronRight,
-  User,
   ExternalLink,
+  ArrowUpRight,
 } from 'lucide-react';
-import { toast } from 'sonner';
 
 import { useDashboardData } from '@/app/hooks/use-dashboard-data';
 import { useCredits } from '@/app/hooks/use-credits';
@@ -22,11 +18,10 @@ import { useTranscripts, Transcript } from '@/app/hooks/use-transcripts';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
 import { Button } from '@/components/ui/button';
 import { TranscriptViewer } from '@/components/transcript-viewer';
-
-import { DashboardSkeleton } from './components/loading-states';
-import { GreetingSection } from './components/greeting-section';
-import { FeatureCardsGrid } from './components/feature-card';
-import { WalletNav } from './components/wallet-nav';
+import { PaperCard, PaperCardContent, PaperCardHeader, PaperCardTitle } from '@/components/ui/paper-card';
+import { DashboardHeader } from '@/components/dashboard-header';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
 
 // Helper to format date
 const formatDate = (dateString: string) => {
@@ -43,22 +38,26 @@ const formatDate = (dateString: string) => {
 // Transcript Row Component
 const TranscriptRow = ({ transcript, onView }: { transcript: Transcript; onView: () => void }) => {
   return (
-    <tr className="border-b border-gray-100 hover:bg-gray-50/50 transition-colors">
-      <td className="py-3 px-4 text-sm text-gray-900 font-medium">{transcript.call_id}</td>
-      <td className="py-3 px-4 text-sm text-gray-500">{transcript.phone_number}</td>
-      <td className="py-3 px-4">
-        <span className="px-2 py-1 rounded text-xs font-medium bg-green-50 text-green-600">
-          Completed
-        </span>
+    <tr className="group border-b border-border hover:bg-muted/30 transition-colors">
+      <td className="py-4 px-4">
+        <div className="flex flex-col">
+            <span className="text-sm font-medium text-foreground">{transcript.phone_number}</span>
+            <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono">{transcript.call_id.substring(0, 8)}</span>
+        </div>
       </td>
-      <td className="py-3 px-4 text-sm text-gray-400">{formatDate(transcript.created_at)}</td>
-      <td className="py-3 px-4">
+      <td className="py-4 px-4">
+        <Badge variant="outline" className="rounded-[2px] bg-green-500/5 text-green-600 border-green-500/20 text-[10px] px-1.5 py-0 font-medium">
+          COMPLETED
+        </Badge>
+      </td>
+      <td className="py-4 px-4 text-xs text-muted-foreground">{formatDate(transcript.created_at)}</td>
+      <td className="py-4 px-4 text-right">
         <button
           onClick={onView}
-          className="text-amber-600 hover:text-amber-700 flex items-center gap-1 hover:underline"
+          className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-[#facc15] transition-colors"
         >
-          <ExternalLink className="w-4 h-4" />
-          View
+          View Transcript
+          <ExternalLink className="w-3 h-3" />
         </button>
       </td>
     </tr>
@@ -70,215 +69,171 @@ export default function DashboardPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedTranscript, setSelectedTranscript] = useState<Transcript | null>(null);
   const [showConnectedOnly, setShowConnectedOnly] = useState(false);
-  const callsPerPage = 5;
+  const callsPerPage = 7;
 
-  const {
-    metrics,
-    loading,
-  } = useDashboardData();
-
-  // Use real credits from API
-  const { credits, loading: creditsLoading } = useCredits();
-
-  // Use real transcripts from API
+  const { metrics, loading } = useDashboardData();
+  const { credits } = useCredits();
   const { transcripts, loading: transcriptsLoading } = useTranscripts();
 
-  // Handle Talk to AI
-  const handleTalkToAI = () => {
-    toast.info('AI Assistant coming soon!');
-  };
-
-  // Feature cards with design-matching icons
-  const features = [
-    {
-      icon: AudioWaveform,
-      title: 'Voice Agents',
-      description: 'Create and manage AI agents.',
-      onClick: () => router.push('/assistants'),
-    },
-    {
-      icon: TrendingUp,
-      title: 'Analytics',
-      description: 'Track performance metrics.',
-      onClick: () => router.push('/analytics'),
-    },
-    {
-      icon: Layers,
-      title: 'Knowledge Base',
-      description: "Build your AI's intelligence.",
-      onClick: () => router.push('/knowledge-base'),
-    },
-    {
-      icon: PhoneCall,
-      title: 'Phone Numbers',
-      description: 'Manage virtual numbers.',
-      onClick: () => router.push('/phone-numbers'),
-    },
-  ];
-
-  // Filter and paginate transcripts
   const filteredTranscripts = showConnectedOnly
-    ? transcripts.filter(t => t.has_conversation === true) // Connected = has actual conversation
+    ? transcripts.filter(t => t.has_conversation === true)
     : transcripts;
+    
   const indexOfLastCall = currentPage * callsPerPage;
   const indexOfFirstCall = indexOfLastCall - callsPerPage;
   const currentTranscripts = filteredTranscripts.slice(indexOfFirstCall, indexOfLastCall);
   const totalPages = Math.ceil(filteredTranscripts.length / callsPerPage);
 
-  // Credits: 1 credit = 1 minute
   const walletBalance = credits?.available_credits || 0;
-  const totalCredits = credits?.total_credits || 0;
-
-  if (loading.initial) {
-    return <DashboardSkeleton />;
-  }
 
   return (
     <ErrorBoundary>
-      <div className="min-h-screen bg-white">
-        {/* Top Nav */}
-        <div className="border-b border-gray-100 sticky top-0 z-10 bg-white">
-          <div className="px-6 py-3 flex items-center justify-between">
-            <div className="flex items-center gap-8">
-              <span className="text-gray-900 font-medium">Home</span>
-              <span className="text-gray-400 hover:text-gray-600 cursor-pointer">Voices</span>
-              <span className="text-gray-400 hover:text-gray-600 cursor-pointer">Agents</span>
-            </div>
-            <div className="flex items-center gap-3 pr-4">
-              <WalletNav
-                balance={walletBalance}
-                totalCredits={totalCredits}
-              />
-              <button
-                onClick={() => router.push('/account')}
-                className="w-9 h-9 bg-amber-100 rounded-full flex items-center justify-center hover:bg-amber-200 transition-colors"
-              >
-                <User className="w-5 h-5 text-amber-700" />
-              </button>
-            </div>
-          </div>
-        </div>
+      <div className="min-h-screen bg-background flex flex-col">
+        
+        <DashboardHeader />
 
-        {/* Main Content */}
-        <div className="px-6 py-6">
-          {/* Greeting */}
-          <GreetingSection userName="User" onTalkToAI={handleTalkToAI} />
-
-          {/* Feature Cards */}
-          <FeatureCardsGrid features={features} />
-
-          {/* Quick Stats */}
-          <h3 className="text-base font-semibold text-gray-900 mb-3">Quick Stats</h3>
-          <div className="grid grid-cols-3 gap-4 mb-6">
-            <div className="bg-white p-4 rounded-xl border border-gray-200">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-sm text-gray-500">Total Agents</span>
-                <Users className="w-4 h-4 text-amber-500" />
-              </div>
-              <span className="text-2xl font-bold text-gray-900">
-                {metrics?.agents?.total || 0}
-              </span>
+        {/* Main Content Area */}
+        <main className="flex-1 p-6 md:p-10 max-w-7xl mx-auto w-full space-y-12">
+          
+          {/* Welcome Section */}
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+            <div className="space-y-1">
+                <p className="text-xs font-medium uppercase tracking-[0.2em] text-[#facc15]">Active Intelligence</p>
+                <h1 className="text-4xl font-medium tracking-tight">Enterprise Overview</h1>
             </div>
-            <div className="bg-white p-4 rounded-xl border border-gray-200">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-sm text-gray-500">Total Calls</span>
-                <Phone className="w-4 h-4 text-amber-500" />
-              </div>
-              <span className="text-2xl font-bold text-gray-900">
-                {transcripts.length}
-              </span>
-            </div>
-            <div className="bg-white p-4 rounded-xl border border-gray-200">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-sm text-gray-500">Available Credits</span>
-                <TrendingUp className="w-4 h-4 text-amber-500" />
-              </div>
-              <span className="text-2xl font-bold text-gray-900">
-                {creditsLoading ? '...' : `${Math.round(walletBalance).toLocaleString()} credits`}
-              </span>
+            <div className="flex gap-3">
+                <Button variant="outline" size="sm" className="gap-2 h-9 text-xs">
+                    Export Report
+                    <ArrowUpRight className="w-3 h-3" />
+                </Button>
             </div>
           </div>
 
-          {/* Recent Calls / Transcripts */}
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-base font-semibold text-gray-900">Recent Calls</h3>
-            <label className="flex items-center gap-2 cursor-pointer select-none">
-              <span className={`text-xs font-medium ${showConnectedOnly ? 'text-green-600' : 'text-gray-500'}`}>
-                Connected Only
-              </span>
-              <div
-                onClick={() => { setShowConnectedOnly(!showConnectedOnly); setCurrentPage(1); }}
-                className={`relative w-10 h-5 rounded-full transition-colors cursor-pointer ${showConnectedOnly ? 'bg-green-500' : 'bg-gray-300'
-                  }`}
-              >
-                <div
-                  className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${showConnectedOnly ? 'translate-x-5' : 'translate-x-0.5'
-                    }`}
-                />
-              </div>
-            </label>
-          </div>
-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-            {transcriptsLoading ? (
-              <div className="p-8 text-center text-gray-500">Loading call logs...</div>
-            ) : transcripts.length === 0 ? (
-              <div className="p-8 text-center text-gray-500">No call logs yet</div>
-            ) : (
-              <>
-                <table className="w-full">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="py-2 px-4 text-left text-xs font-medium text-gray-500">Call ID</th>
-                      <th className="py-2 px-4 text-left text-xs font-medium text-gray-500">Phone Number</th>
-                      <th className="py-2 px-4 text-left text-xs font-medium text-gray-500">Status</th>
-                      <th className="py-2 px-4 text-left text-xs font-medium text-gray-500">Date</th>
-                      <th className="py-2 px-4 text-left text-xs font-medium text-gray-500">Transcript</th>
+          {/* Key Metrics Grid - Using Paper Cards for the 'Printed' feel */}
+          <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <PaperCard className="relative group">
+                <PaperCardHeader className="pb-2">
+                    <div className="flex items-center justify-between">
+                        <PaperCardTitle className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Total Agents</PaperCardTitle>
+                        <Users className="w-4 h-4 text-[#facc15]" />
+                    </div>
+                </PaperCardHeader>
+                <PaperCardContent>
+                    <div className="flex items-baseline gap-2">
+                        <span className="text-4xl font-medium tracking-tight">{metrics?.agents?.total || 0}</span>
+                        <span className="text-xs text-green-500 font-medium">+2 this week</span>
+                    </div>
+                </PaperCardContent>
+            </PaperCard>
+
+            <PaperCard>
+                <PaperCardHeader className="pb-2">
+                     <div className="flex items-center justify-between">
+                        <PaperCardTitle className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Total Calls</PaperCardTitle>
+                        <Phone className="w-4 h-4 text-[#facc15]" />
+                    </div>
+                </PaperCardHeader>
+                <PaperCardContent>
+                    <div className="flex items-baseline gap-2">
+                        <span className="text-4xl font-medium tracking-tight">{transcripts.length}</span>
+                        <span className="text-xs text-muted-foreground font-medium">Across all campaigns</span>
+                    </div>
+                </PaperCardContent>
+            </PaperCard>
+
+            <PaperCard>
+                <PaperCardHeader className="pb-2">
+                     <div className="flex items-center justify-between">
+                        <PaperCardTitle className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Available Credits</PaperCardTitle>
+                        <TrendingUp className="w-4 h-4 text-[#facc15]" />
+                    </div>
+                </PaperCardHeader>
+                <PaperCardContent>
+                    <div className="flex items-baseline gap-2">
+                        <span className="text-4xl font-medium tracking-tight">{Math.round(walletBalance).toLocaleString()}</span>
+                        <span className="text-xs text-muted-foreground font-medium">Minutes left</span>
+                    </div>
+                </PaperCardContent>
+            </PaperCard>
+          </section>
+
+          {/* Logs / Activity Table */}
+          <section className="space-y-6">
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                    <h3 className="text-lg font-medium tracking-tight">Recent Activity</h3>
+                    <Badge variant="secondary" className="bg-muted text-muted-foreground font-mono text-[10px] rounded-[2px]">{filteredTranscripts.length}</Badge>
+                </div>
+                <div className="flex items-center gap-4">
+                    <button 
+                        onClick={() => { setShowConnectedOnly(!showConnectedOnly); setCurrentPage(1); }}
+                        className={`text-xs font-medium transition-colors ${showConnectedOnly ? 'text-[#facc15]' : 'text-muted-foreground hover:text-foreground'}`}
+                    >
+                        {showConnectedOnly ? 'Showing Connected Only' : 'Show Connected Only'}
+                    </button>
+                    <Separator orientation="vertical" className="h-4" />
+                    <button className="text-xs font-medium text-muted-foreground hover:text-foreground transition-colors">View All</button>
+                </div>
+            </div>
+
+            <div className="border border-border rounded-md overflow-hidden bg-card/30 backdrop-blur-sm">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-muted/50 border-b border-border">
+                      <th className="py-3 px-4 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Source</th>
+                      <th className="py-3 px-4 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Status</th>
+                      <th className="py-3 px-4 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Timestamp</th>
+                      <th className="py-3 px-4 text-right text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Action</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {currentTranscripts.map((transcript) => (
-                      <TranscriptRow
-                        key={transcript.id}
-                        transcript={transcript}
-                        onView={() => setSelectedTranscript(transcript)}
-                      />
-                    ))}
+                    {transcriptsLoading ? (
+                      <tr><td colSpan={4} className="py-20 text-center text-xs text-muted-foreground animate-pulse uppercase tracking-widest">Hydrating Logs...</td></tr>
+                    ) : currentTranscripts.length === 0 ? (
+                      <tr><td colSpan={4} className="py-20 text-center text-xs text-muted-foreground uppercase tracking-widest">No Signal Detected</td></tr>
+                    ) : (
+                      currentTranscripts.map((transcript) => (
+                        <TranscriptRow
+                          key={transcript.id}
+                          transcript={transcript}
+                          onView={() => setSelectedTranscript(transcript)}
+                        />
+                      ))
+                    )}
                   </tbody>
                 </table>
+
+                {/* Pagination */}
                 {totalPages > 1 && (
-                  <div className="px-4 py-3 border-t border-gray-100 flex items-center justify-between">
-                    <span className="text-sm text-gray-500">
-                      Showing {indexOfFirstCall + 1} to {Math.min(indexOfLastCall, transcripts.length)} of {transcripts.length}
+                  <div className="px-6 py-4 flex items-center justify-between border-t border-border bg-muted/20">
+                    <span className="text-[10px] font-mono text-muted-foreground">
+                      OFFSET {indexOfFirstCall + 1} — {Math.min(indexOfLastCall, transcripts.length)}
                     </span>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
+                    <div className="flex items-center gap-4">
+                      <button
                         onClick={() => setCurrentPage((p) => p - 1)}
                         disabled={currentPage === 1}
-                        className="h-8"
+                        className="text-muted-foreground hover:text-foreground disabled:opacity-20 transition-colors"
                       >
                         <ChevronLeft className="w-4 h-4" />
-                      </Button>
-                      <span className="text-sm font-medium px-2">
-                        {currentPage} / {totalPages}
+                      </button>
+                      <span className="text-[10px] font-mono font-medium">
+                        PAGE {currentPage} / {totalPages}
                       </span>
-                      <Button
-                        variant="outline"
-                        size="sm"
+                      <button
                         onClick={() => setCurrentPage((p) => p + 1)}
                         disabled={currentPage >= totalPages}
-                        className="h-8"
+                        className="text-muted-foreground hover:text-foreground disabled:opacity-20 transition-colors"
                       >
                         <ChevronRight className="w-4 h-4" />
-                      </Button>
+                      </button>
                     </div>
                   </div>
                 )}
-              </>
-            )}
-          </div>
-        </div>
+            </div>
+          </section>
+
+        </main>
       </div>
 
       {/* Transcript Viewer Modal */}

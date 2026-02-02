@@ -11,7 +11,7 @@ import {
     HelpCircle,
     Globe,
 } from 'lucide-react';
-import { signOut } from '@/app/protected/actions';
+import { signOut } from '@/app/actions/auth';
 import { useAuth } from '@/contexts/auth-context';
 
 export default function AccountPage() {
