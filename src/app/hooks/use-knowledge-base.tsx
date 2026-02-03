@@ -1,16 +1,15 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo } from 'react';
 import { MONADE_API_CONFIG } from '@/types/monade-api.types';
 import { useMonadeUser } from './use-monade-user';
-import { toast } from 'sonner'; // Using sonner for high-end toasts
+import { toast } from 'sonner';
 
 export interface LibraryItem {
   id: string;
   filename: string;
   url: string;
   createdAt: Date;
-  // Metadata for interlinking
   connectedAssistantIds?: string[];
 }
 
@@ -22,6 +21,7 @@ interface CreatePayload {
 
 interface LibraryContextType {
   items: LibraryItem[];
+  groupedItems: Record<string, LibraryItem[]>;
   isLoading: boolean;
   error: string | null;
   refresh: () => Promise<void>;
@@ -58,8 +58,8 @@ export const LibraryProvider = ({ children }: { children: ReactNode }) => {
       const processed = data.map((kb: any) => ({
         ...kb,
         createdAt: new Date(kb.createdAt || Date.now()),
-        connectedAssistantIds: [] // TODO: Map this from Assistant API in the UI layer
-      })).sort((a: any, b: any) => b.createdAt - a.createdAt);
+        connectedAssistantIds: [] 
+      })).sort((a: any, b: any) => b.createdAt.getTime() - a.createdAt.getTime());
       
       setItems(processed);
     } catch (err) {
@@ -69,6 +69,18 @@ export const LibraryProvider = ({ children }: { children: ReactNode }) => {
       setIsLoading(false);
     }
   }, [userUid, authLoading]);
+
+  // Helper to group items by month/year for the timeline
+  const groupedItems = useMemo(() => {
+    const groups: Record<string, LibraryItem[]> = {};
+    items.forEach(item => {
+      const date = new Date(item.createdAt);
+      const key = date.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(item);
+    });
+    return groups;
+  }, [items]);
 
   const addIntelligence = async (payload: CreatePayload): Promise<boolean> => {
     setIsLoading(true);
@@ -84,11 +96,11 @@ export const LibraryProvider = ({ children }: { children: ReactNode }) => {
 
       if (!res.ok) throw new Error('Failed to save intelligence');
 
-      toast.success('Library Updated', { description: `${payload.filename} is now part of the collective memory.` });
+      toast.success('Library Updated', { description: `${payload.filename} is now part of the memory.` });
       await fetchItems();
       return true;
     } catch (err) {
-      toast.error('Sync Failed', { description: 'We could not save this information to the cloud.' });
+      toast.error('Sync Failed');
       return false;
     } finally {
       setIsLoading(false);
@@ -102,14 +114,12 @@ export const LibraryProvider = ({ children }: { children: ReactNode }) => {
         method: 'DELETE',
         headers: { 'X-API-Key': MONADE_API_CONFIG.API_KEY }
       });
-
       if (!res.ok) throw new Error('Deletion failed');
-
-      toast.success('Item Removed', { description: 'Information has been purged from the archive.' });
+      toast.success('Item Removed');
       await fetchItems();
       return true;
     } catch (err) {
-      toast.error('Purge Failed', { description: 'Could not remove item from cloud storage.' });
+      toast.error('Purge Failed');
       return false;
     } finally {
       setIsLoading(false);
@@ -120,40 +130,20 @@ export const LibraryProvider = ({ children }: { children: ReactNode }) => {
     if (!authLoading) fetchItems();
   }, [fetchItems, authLoading]);
 
-    return (
+  return (
+    <LibraryContext.Provider value={{ items, groupedItems, isLoading, error, refresh: fetchItems, addIntelligence, removeIntelligence }}>
+      {children}
+    </LibraryContext.Provider>
+  );
+};
 
-      <LibraryContext.Provider value={{ items, isLoading, error, refresh: fetchItems, addIntelligence, removeIntelligence }}>
+export const useLibrary = () => {
+  const context = useContext(LibraryContext);
+  if (!context) throw new Error('useLibrary must be used within a LibraryProvider');
+  return context;
+};
 
-        {children}
-
-      </LibraryContext.Provider>
-
-    );
-
-  };
-
-  
-
-  // --- New Naming (The Library) ---
-
-  export const useLibrary = () => {
-
-    const context = useContext(LibraryContext);
-
-    if (!context) throw new Error('useLibrary must be used within a LibraryProvider');
-
-    return context;
-
-  };
-
-  
-
-  // --- Backward Compatibility (The Archive) ---
-
-  export const KnowledgeBaseProvider = LibraryProvider;
-
-  export const useKnowledgeBase = useLibrary;
-
-  export type KnowledgeBase = LibraryItem;
-
-  
+// Backward Compatibility
+export const KnowledgeBaseProvider = LibraryProvider;
+export const useKnowledgeBase = useLibrary;
+export type KnowledgeBase = LibraryItem;

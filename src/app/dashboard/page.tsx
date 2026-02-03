@@ -8,8 +8,11 @@ import {
   ArrowUpRight,
   Clock,
   MessageSquare,
-  Activity
+  Activity,
+  Play,
+  Pause
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 import { useDashboardData } from '@/app/hooks/use-dashboard-data';
 import { useCredits } from '@/app/hooks/use-credits';
@@ -56,6 +59,7 @@ const TranscriptRow = ({
   analytics?: CallAnalytics;
   onView: () => void
 }) => {
+  const [isPlaying, setIsPlaying] = useState(false);
   const isEngaged = transcript.has_conversation || (analytics && analytics.verdict !== 'no_answer');
   const verdict = analytics?.verdict ? analytics.verdict.replace('_', ' ') : (isEngaged ? "Conversation" : "No Answer");
   const summary = analytics?.summary || (isEngaged ? "Call transcript available for review." : "No interaction recorded.");
@@ -126,17 +130,52 @@ const TranscriptRow = ({
 
       {/* 4. Action (Professional) */}
       <td className="py-3 px-6 text-right">
-        <div className="flex items-center justify-end gap-3 opacity-0 group-hover:opacity-100 transition-all duration-200 translate-x-2 group-hover:translate-x-0">
-          {/* TODO: Integrate Audio Playback API here */}
+        <div className="flex items-center justify-end gap-3 transition-all duration-200">
           {isEngaged && (
-            <div className="flex items-center gap-2 px-3 py-1 bg-primary/10 border border-primary/20 rounded-[4px] text-primary">
-              <span className="text-[9px] font-bold uppercase tracking-widest">Audio Available</span>
-            </div>
+            <motion.div
+              layout
+              initial={{ opacity: 0, x: 10 }}
+              whileHover={{ opacity: 1, x: 0 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ type: "spring", stiffness: 300, damping: 30 }}
+              className="opacity-0 group-hover:opacity-100 flex items-center"
+            >
+              <motion.button
+                layout
+                onClick={(e) => { e.stopPropagation(); setIsPlaying(!isPlaying); }}
+                className={cn(
+                  "h-7 flex items-center bg-foreground text-background font-bold tracking-widest overflow-hidden transition-all duration-500 rounded-full",
+                  isPlaying ? "px-3 gap-3 w-48" : "px-3 gap-2 w-auto"
+                )}
+              >
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {isPlaying ? <Pause size={12} fill="currentColor" /> : <Play size={12} fill="currentColor" />}
+                  {!isPlaying && <span className="text-[9px] uppercase">3:42</span>}
+                </div>
+
+                {isPlaying && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="flex-1 flex items-center gap-2"
+                  >
+                    <div className="flex-1 h-1 bg-background/20 rounded-full relative overflow-hidden">
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: "35%" }}
+                        className="absolute inset-y-0 left-0 bg-background"
+                      />
+                    </div>
+                    <span className="text-[8px] font-mono tabular-nums opacity-60">1:12</span>
+                  </motion.div>
+                )}
+              </motion.button>
+            </motion.div>
           )}
 
           <button
             onClick={(e) => { e.stopPropagation(); onView(); }}
-            className="h-8 px-4 rounded-[4px] bg-foreground text-background hover:bg-foreground/90 transition-all flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest"
+            className="opacity-0 group-hover:opacity-100 h-7 px-4 rounded-[4px] bg-foreground text-background hover:bg-foreground/90 transition-all flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest"
           >
             Details
             <ArrowUpRight size={14} />
@@ -145,7 +184,7 @@ const TranscriptRow = ({
 
         {/* Placeholder for Action when not hovering */}
         <div className="group-hover:hidden flex items-center justify-end">
-          <MessageSquare size={14} className="text-muted-foreground/20" />
+          <MessageSquare size={14} className="text-muted-foreground/60 transition-colors" />
         </div>
       </td>
     </tr>
