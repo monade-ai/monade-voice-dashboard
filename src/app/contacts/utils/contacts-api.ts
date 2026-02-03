@@ -5,6 +5,7 @@ import { createClient } from '@/utils/supabase/client'; // Import the new client
 // This was pointing to localhost:8764 which is not available in production
 // Using localStorage fallback functions instead (see below)
 const API_BASE_URL = ''; // Disabled - use localStorage functions
+const API_DISABLED = API_BASE_URL === '';
 
 async function getSupabaseToken() {
   try {
@@ -77,14 +78,19 @@ async function fetchWithAuth(url: string, options: RequestInit = {}) {
 }
 
 export async function getBuckets() {
+  if (API_DISABLED) return [];
   return fetchWithAuth(`${API_BASE_URL}/api/buckets`);
 }
 
 export async function getContactsForBucket(bucketId: string) {
+  if (API_DISABLED) return [];
   return fetchWithAuth(`${API_BASE_URL}/api/buckets/${bucketId}/contacts`);
 }
 
 export async function createBucket(data: { name: string; description: string; fields: string[] }) {
+  if (API_DISABLED) {
+    throw new Error('Contacts service is disabled in this environment.');
+  }
   return fetchWithAuth(`${API_BASE_URL}/api/buckets`, {
     method: 'POST',
     body: JSON.stringify(data),
@@ -95,6 +101,9 @@ export async function deleteBucket(bucketId: string) {
   if (!bucketId) {
     throw new Error('deleteBucket called with undefined or empty bucketId');
   }
+  if (API_DISABLED) {
+    throw new Error('Contacts service is disabled in this environment.');
+  }
 
   return fetchWithAuth(`${API_BASE_URL}/api/buckets/${bucketId}`, {
     method: 'DELETE',
@@ -102,6 +111,9 @@ export async function deleteBucket(bucketId: string) {
 }
 
 export async function addContact(bucketId: string, contactData: { phone_number: string, data: Record<string, string> }) {
+  if (API_DISABLED) {
+    throw new Error('Contacts service is disabled in this environment.');
+  }
   return fetchWithAuth(`${API_BASE_URL}/api/buckets/${bucketId}/contacts`, {
     method: 'POST',
     body: JSON.stringify(contactData),
@@ -109,6 +121,9 @@ export async function addContact(bucketId: string, contactData: { phone_number: 
 }
 
 export async function addContactsBulk(bucketId: string, contacts: any[]) {
+  if (API_DISABLED) {
+    throw new Error('Contacts service is disabled in this environment.');
+  }
   return fetchWithAuth(`${API_BASE_URL}/api/buckets/${bucketId}/contacts/bulk`, {
     method: 'POST',
     body: JSON.stringify(contacts),
@@ -116,6 +131,9 @@ export async function addContactsBulk(bucketId: string, contacts: any[]) {
 }
 
 export async function deleteContact(bucketId: string, phoneNumber: string) {
+  if (API_DISABLED) {
+    throw new Error('Contacts service is disabled in this environment.');
+  }
   return fetchWithAuth(`${API_BASE_URL}/api/buckets/${bucketId}/contacts/${phoneNumber}`, {
     method: 'DELETE',
   });

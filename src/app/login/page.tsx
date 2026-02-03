@@ -5,11 +5,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { GrainGradient } from '@paper-design/shaders-react';
 import { useRouter } from 'next/navigation';
 
+import { createClient } from '@/utils/supabase/client';
+
 // --- Types ---
 type OnboardingStep = 'identity' | 'purpose' | 'handover';
 
 interface FormData {
   email: string;
+  password: string;
   useCase: string;
   callVolume: string;
   teamSize: string;
@@ -33,24 +36,38 @@ export default function LoginPage() {
   const [step, setStep] = useState<OnboardingStep>('identity');
   const [formData, setFormData] = useState<FormData>({
     email: '',
+    password: '',
     useCase: '',
     callVolume: '',
     teamSize: '',
     origin: '',
   });
+  const [authError, setAuthError] = useState<string | null>(null);
   const router = useRouter();
 
   const handleIdentitySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // In a real app, we would authenticate here.
-    // For this prototype, we just move to the next step.
-    setStep('purpose');
+    setAuthError(null);
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.auth.signInWithPassword({
+        email: formData.email,
+        password: formData.password,
+      });
+      if (error) {
+        setAuthError(error.message);
+        return;
+      }
+      setStep('purpose');
+    } catch {
+      setAuthError('Unable to sign in. Please try again.');
+    }
   };
 
   const handlePurposeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setStep('handover');
-    
+
     // Simulate AI configuration delay
     setTimeout(() => {
       router.push('/assistants');
@@ -61,7 +78,7 @@ export default function LoginPage() {
     <div className="flex h-screen w-full overflow-hidden bg-background text-foreground font-sans">
       {/* --- Left Panel: The Task (35% - 40%) --- */}
       <div className="w-full lg:w-[40%] h-full flex flex-col justify-center px-8 sm:px-12 lg:px-20 relative z-10 bg-background/95 backdrop-blur-sm lg:bg-background">
-        
+
         {/* Logo / Header */}
         <div className="absolute top-8 left-8 sm:left-12 lg:left-20">
           <div className="flex items-center gap-2">
@@ -72,7 +89,7 @@ export default function LoginPage() {
 
         <div className="max-w-md w-full mx-auto">
           <AnimatePresence mode="wait">
-            
+
             {/* STEP 1: IDENTITY */}
             {step === 'identity' && (
               <motion.div
@@ -95,35 +112,39 @@ export default function LoginPage() {
                   <FadeIn delay={0.1}>
                     <div className="space-y-1">
                       <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Email</label>
-                      <input 
-                        type="email" 
-                        required 
+                      <input
+                        type="email"
+                        required
                         className="w-full px-0 py-2 bg-transparent border-b border-border focus:border-[#facc15] focus:ring-0 transition-colors outline-none rounded-none"
                         placeholder="name@company.com"
                         onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                       />
                     </div>
                   </FadeIn>
-                  
+
                   <FadeIn delay={0.2}>
                     <div className="space-y-1">
                       <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Password</label>
-                      <input 
-                        type="password" 
-                        required 
+                      <input
+                        type="password"
+                        required
                         className="w-full px-0 py-2 bg-transparent border-b border-border focus:border-[#facc15] focus:ring-0 transition-colors outline-none rounded-none"
                         placeholder="••••••••"
+                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                       />
                     </div>
                   </FadeIn>
 
                   <FadeIn delay={0.3}>
-                    <button 
+                    <button
                       type="submit"
                       className="mt-8 w-full bg-foreground text-background hover:bg-foreground/90 h-10 rounded-[4px] font-medium text-sm transition-all"
                     >
                       Continue
                     </button>
+                    {authError && (
+                      <p className="mt-3 text-xs text-red-600">{authError}</p>
+                    )}
                     <div className="mt-4 flex gap-4 text-xs text-muted-foreground justify-center">
                       <button type="button" className="hover:text-foreground transition-colors">Forgot password?</button>
                       <span>|</span>
@@ -162,11 +183,10 @@ export default function LoginPage() {
                           key={opt}
                           type="button"
                           onClick={() => setFormData({ ...formData, useCase: opt })}
-                          className={`text-left px-3 py-2 rounded-[4px] text-sm border transition-all ${
-                            formData.useCase === opt 
-                              ? 'border-[#facc15] bg-[#facc15]/10 text-foreground' 
+                          className={`text-left px-3 py-2 rounded-[4px] text-sm border transition-all ${formData.useCase === opt
+                              ? 'border-[#facc15] bg-[#facc15]/10 text-foreground'
                               : 'border-border text-muted-foreground hover:border-foreground/30'
-                          }`}
+                            }`}
                         >
                           {opt}
                         </button>
@@ -183,18 +203,17 @@ export default function LoginPage() {
                           key={opt}
                           type="button"
                           onClick={() => setFormData({ ...formData, callVolume: opt })}
-                          className={`flex-1 px-3 py-2 rounded-[4px] text-sm border transition-all ${
-                            formData.callVolume === opt 
-                              ? 'border-[#facc15] bg-[#facc15]/10 text-foreground' 
+                          className={`flex-1 px-3 py-2 rounded-[4px] text-sm border transition-all ${formData.callVolume === opt
+                              ? 'border-[#facc15] bg-[#facc15]/10 text-foreground'
                               : 'border-border text-muted-foreground hover:border-foreground/30'
-                          }`}
+                            }`}
                         >
                           {opt}
                         </button>
                       ))}
                     </div>
                   </FadeIn>
-                  
+
                   {/* Team Size */}
                   <FadeIn delay={0.3}>
                     <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground block mb-3">Team Size</label>
@@ -204,11 +223,10 @@ export default function LoginPage() {
                           key={opt}
                           type="button"
                           onClick={() => setFormData({ ...formData, teamSize: opt })}
-                          className={`flex-1 px-3 py-2 rounded-[4px] text-sm border transition-all ${
-                            formData.teamSize === opt 
-                              ? 'border-[#facc15] bg-[#facc15]/10 text-foreground' 
+                          className={`flex-1 px-3 py-2 rounded-[4px] text-sm border transition-all ${formData.teamSize === opt
+                              ? 'border-[#facc15] bg-[#facc15]/10 text-foreground'
                               : 'border-border text-muted-foreground hover:border-foreground/30'
-                          }`}
+                            }`}
                         >
                           {opt}
                         </button>
@@ -217,7 +235,7 @@ export default function LoginPage() {
                   </FadeIn>
 
                   <FadeIn delay={0.4}>
-                    <button 
+                    <button
                       type="submit"
                       className="mt-6 w-full bg-foreground text-background hover:bg-foreground/90 h-10 rounded-[4px] font-medium text-sm transition-all"
                     >
@@ -240,7 +258,7 @@ export default function LoginPage() {
                 <div className="w-12 h-12 border-2 border-border border-t-[#facc15] rounded-full animate-spin mb-6" />
                 <h2 className="text-xl font-medium mb-2">Configuring Workspace...</h2>
                 <p className="text-sm text-muted-foreground">
-                  Creating {formData.useCase || 'General'} Assistant<br/>
+                  Creating {formData.useCase || 'General'} Assistant<br />
                   Optimizing for {formData.callVolume || 'Standard'} throughput...
                 </p>
               </motion.div>
@@ -248,7 +266,7 @@ export default function LoginPage() {
 
           </AnimatePresence>
         </div>
-        
+
         {/* Footer */}
         <div className="absolute bottom-8 left-8 sm:left-12 lg:left-20 text-xs text-muted-foreground">
           © 2026 Monade Inc.
@@ -257,10 +275,12 @@ export default function LoginPage() {
 
       {/* --- Right Panel: The Emotion (60% - 65%) --- */}
       <div className="hidden lg:block lg:w-[60%] h-full relative overflow-hidden bg-[#0e0d16]">
-        
+
         {/* Generative Shader */}
         <div className="absolute inset-0 w-full h-full opacity-90">
           <GrainGradient
+            width="100%"
+            height="100%"
             colors={['#facc15', '#a49c74', '#568b50']}
             colorBack="#0e0d16"
             softness={0}
@@ -273,7 +293,7 @@ export default function LoginPage() {
         </div>
 
         {/* Testimonial Overlay */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 1, duration: 1 }}

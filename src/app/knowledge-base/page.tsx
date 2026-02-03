@@ -137,7 +137,11 @@ export default function LibraryPage() {
   
   const itemsPerPage = 10;
 
-  const getConnectedAssistants = (kbId: string) => assistants.filter(a => a.knowledgeBase === kbId);
+  const getConnectedAssistants = (kbId: string) => assistants.filter(a => {
+    const kb = items.find(item => item.id === kbId);
+    if (!kb) return false;
+    return a.knowledgeBase === kbId || a.knowledgeBase === kb.url;
+  });
 
   const { linkedItems, archiveItems, filteredArchive } = useMemo(() => {
     const all = items.filter(i => i.filename.toLowerCase().includes(search.toLowerCase()));

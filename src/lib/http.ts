@@ -53,6 +53,9 @@ const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 async function parseResponseBody(response: Response) {
   if (response.status === 204) return null;
   const contentType = response.headers.get('content-type') || '';
+  if (contentType.includes('text/html')) {
+    return null;
+  }
   if (contentType.includes('application/json')) {
     try {
       return await response.json();
@@ -62,7 +65,11 @@ async function parseResponseBody(response: Response) {
   }
   try {
     const text = await response.text();
-    return text ? { detail: text } : null;
+    if (!text) return null;
+    if (text.trim().startsWith('<!DOCTYPE html') || text.trim().startsWith('<html')) {
+      return null;
+    }
+    return { detail: text };
   } catch {
     return null;
   }
@@ -78,6 +85,11 @@ function isGenericServerMessage(message: string) {
     'request failed',
     'an error occurred',
   ].includes(normalized);
+}
+
+function isHtmlLike(message: string) {
+  const trimmed = message.trim().toLowerCase();
+  return trimmed.startsWith('<!doctype html') || trimmed.startsWith('<html');
 }
 
 export async function fetchJson<T = unknown>(url: string, options: FetchJsonOptions = {}): Promise<T> {
@@ -109,7 +121,10 @@ export async function fetchJson<T = unknown>(url: string, options: FetchJsonOpti
         const errorData = await parseResponseBody(response);
         const serverMessage = errorData?.detail || errorData?.message || errorData?.error;
         const friendlyMessage = getFriendlyErrorMessage(response.status, response.statusText);
-        const message = serverMessage && response.status < 500 && !isGenericServerMessage(serverMessage)
+        const message = serverMessage
+          && response.status < 500
+          && !isGenericServerMessage(serverMessage)
+          && !isHtmlLike(serverMessage)
           ? serverMessage
           : friendlyMessage;
         const apiError = new ApiError(message, response.status, errorData);

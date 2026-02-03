@@ -23,12 +23,18 @@ interface ModelTabProps {
 
 export default function ModelTab({ onChangesMade }: ModelTabProps) {
   const { currentAssistant, updateAssistantLocally } = useAssistants();
-  const { knowledgeBases } = useKnowledgeBase();
+  const { items: knowledgeBases = [] } = useKnowledgeBase();
   const { buckets } = useContactsContext();
   const { trunks } = useTrunks();
 
   const [callProvider, setCallProvider] = useState(currentAssistant?.callProvider || 'vobiz');
-  const [knowledgeBaseId, setKnowledgeBaseId] = useState(currentAssistant?.knowledgeBase || '');
+  const resolveKnowledgeBaseId = (value?: string | null) => {
+    if (!value) return '';
+    const match = knowledgeBases.find(kb => kb.id === value || kb.url === value);
+    return match ? match.id : value;
+  };
+
+  const [knowledgeBaseId, setKnowledgeBaseId] = useState(resolveKnowledgeBaseId(currentAssistant?.knowledgeBase));
   const [contactBucketId, setContactBucketId] = useState(currentAssistant?.contact_bucket_id || '');
 
   // Generate provider options from trunks
@@ -49,9 +55,9 @@ export default function ModelTab({ onChangesMade }: ModelTabProps) {
   // Synchronize local state with currentAssistant when it changes
   useEffect(() => {
     setCallProvider(currentAssistant?.callProvider || 'vobiz');
-    setKnowledgeBaseId(currentAssistant?.knowledgeBase || '');
+    setKnowledgeBaseId(resolveKnowledgeBaseId(currentAssistant?.knowledgeBase));
     setContactBucketId(currentAssistant?.contact_bucket_id || '');
-  }, [currentAssistant]);
+  }, [currentAssistant, knowledgeBases]);
 
   // Handle call provider change
   const handleCallProviderChange = (value: string) => {

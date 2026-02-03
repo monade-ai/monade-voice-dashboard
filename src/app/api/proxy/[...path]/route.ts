@@ -24,6 +24,12 @@ export async function DELETE(request: NextRequest) {
   return handleProxy(request, 'DELETE');
 }
 
+function isNetworkError(error: unknown) {
+  if (!(error instanceof Error)) return false;
+  const message = error.message.toLowerCase();
+  return message.includes('fetch failed') || message.includes('enotfound') || message.includes('enetunreach') || message.includes('econnrefused');
+}
+
 async function handleProxy(request: NextRequest, method: string) {
   try {
     // Get the path after /api/proxy/
@@ -57,7 +63,10 @@ async function handleProxy(request: NextRequest, method: string) {
       }
     }
 
-    const response = await fetch(targetUrl, fetchOptions);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
+    const response = await fetch(targetUrl, { ...fetchOptions, signal: controller.signal });
+    clearTimeout(timeoutId);
     const responseText = await response.text();
 
     // Log response for debugging
@@ -83,11 +92,13 @@ async function handleProxy(request: NextRequest, method: string) {
     });
   } catch (error) {
     console.error('[Proxy] Error:', error);
+    const isNetwork = isNetworkError(error);
+    const message = isNetwork
+      ? 'Upstream service is unreachable. Please try again later.'
+      : (error instanceof Error ? error.message : 'Proxy error');
+    const status = isNetwork ? 503 : 500;
 
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Proxy error' },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: message }, { status });
   }
 }
 
