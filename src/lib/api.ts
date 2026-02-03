@@ -1,5 +1,7 @@
 // app/lib/api.ts
 
+import { fetchJson } from '@/lib/http';
+
 /**
  * API service for fetching dashboard data with organization context
  */
@@ -31,31 +33,20 @@ function getOrganizationContext(): { organizationId?: string } {
 }
   
 /**
-   * Base fetch function with error handling and organization context
+   * Base fetch function with error handling, retries, and organization context
    */
 async function fetchWithErrorHandling(url: string, options?: RequestInit) {
-  try {
-    const orgContext = getOrganizationContext();
-    const headers = {
-      'Content-Type': 'application/json',
-      ...(orgContext.organizationId && { 'X-Organization-ID': orgContext.organizationId }),
-      ...options?.headers,
-    };
+  const orgContext = getOrganizationContext();
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(orgContext.organizationId && { 'X-Organization-ID': orgContext.organizationId }),
+    ...options?.headers,
+  };
 
-    const response = await fetch(url, {
-      ...options,
-      headers,
-    });
-      
-    if (!response.ok) {
-      throw new Error(`API error: ${response.status} ${response.statusText}`);
-    }
-      
-    return await response.json();
-  } catch (error) {
-    console.error('API fetch error:', error);
-    throw error;
-  }
+  return fetchJson(url, {
+    ...options,
+    headers,
+  });
 }
   
 /**

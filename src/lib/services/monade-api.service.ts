@@ -22,6 +22,7 @@ import {
   HealthCheckResponse,
   ReadyCheckResponse,
 } from '@/types/monade-api.types';
+import { fetchJson } from '@/lib/http';
 
 const { BASE_URL, DEFAULT_USER_UID } = MONADE_API_CONFIG;
 
@@ -35,20 +36,13 @@ async function fetchApi<T>(
   const url = `${BASE_URL}${endpoint}`;
 
   try {
-    const response = await fetch(url, {
+    return await fetchJson<T>(url, {
       ...options,
       headers: {
         'Content-Type': 'application/json',
         ...options?.headers,
       },
     });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || `API error: ${response.status}`);
-    }
-
-    return response.json();
   } catch (error) {
     console.error(`[MonadeAPI] Error fetching ${endpoint}:`, error);
     throw error;

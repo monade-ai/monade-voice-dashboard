@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo } from 'react';
 import { toast } from 'sonner';
 
+import { fetchJson } from '@/lib/http';
 import { MONADE_API_CONFIG } from '@/types/monade-api.types';
 
 import { useMonadeUser } from './use-monade-user';
@@ -51,13 +52,9 @@ export const LibraryProvider = ({ children }: { children: ReactNode }) => {
 
     setIsLoading(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/api/users/${userUid}/knowledge-bases`, {
+      const data = await fetchJson<any[]>(`${API_BASE_URL}/api/users/${userUid}/knowledge-bases`, {
         headers: { 'X-API-Key': MONADE_API_CONFIG.API_KEY },
       });
-      
-      if (!res.ok) throw new Error('Failed to synchronize library');
-      
-      const data = await res.json();
       const processed = data.map((kb: any) => ({
         ...kb,
         createdAt: new Date(kb.createdAt || Date.now()),
@@ -65,8 +62,8 @@ export const LibraryProvider = ({ children }: { children: ReactNode }) => {
       })).sort((a: any, b: any) => b.createdAt.getTime() - a.createdAt.getTime());
       
       setItems(processed);
-    } catch {
-      setError('Could not reach the library archive.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not reach the library archive.');
       setItems([]);
     } finally {
       setIsLoading(false);
@@ -89,16 +86,15 @@ export const LibraryProvider = ({ children }: { children: ReactNode }) => {
   const addIntelligence = async (payload: CreatePayload): Promise<boolean> => {
     setIsLoading(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/api/knowledge-bases`, {
+      await fetchJson(`${API_BASE_URL}/api/knowledge-bases`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
           'X-API-Key': MONADE_API_CONFIG.API_KEY, 
         },
         body: JSON.stringify({ ...payload, user_uid: userUid }),
+        retry: { retries: 0 },
       });
-
-      if (!res.ok) throw new Error('Failed to save intelligence');
 
       toast.success('Library Updated', { description: `${payload.filename} is now part of the memory.` });
       await fetchItems();
@@ -116,11 +112,12 @@ export const LibraryProvider = ({ children }: { children: ReactNode }) => {
   const removeIntelligence = async (id: string): Promise<boolean> => {
     setIsLoading(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/api/knowledge-bases/${id}`, {
+      await fetchJson(`${API_BASE_URL}/api/knowledge-bases/${id}`, {
         method: 'DELETE',
         headers: { 'X-API-Key': MONADE_API_CONFIG.API_KEY },
+        parseJson: false,
+        retry: { retries: 0 },
       });
-      if (!res.ok) throw new Error('Deletion failed');
       toast.success('Item Removed');
       await fetchItems();
 

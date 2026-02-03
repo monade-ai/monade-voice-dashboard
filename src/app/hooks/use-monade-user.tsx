@@ -43,6 +43,13 @@ export function MonadeUserProvider({ children }: MonadeUserProviderProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const getApiErrorMessage = (status: number) => {
+    if (status === 401 || status === 403) return 'You are not authorized to access this account.';
+    if (status === 404) return 'User account not found. Please contact admin.';
+    if (status >= 500) return 'Monade API is currently unavailable. Please try again later.';
+    return 'Failed to fetch user account';
+  };
+
   const fetchMonadeUser = useCallback(async () => {
     try {
       setLoading(true);
@@ -75,25 +82,30 @@ export function MonadeUserProvider({ children }: MonadeUserProviderProps) {
       console.log('[MonadeUser] Fetching user_uid for email:', userEmail);
 
       // Fetch user_uid from Monade API by email
-      const response = await fetch(
-        `${MONADE_API_CONFIG.BASE_URL}/api/users/email/${encodeURIComponent(userEmail)}`,
-        {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
+      let response: Response;
+      try {
+        response = await fetch(
+          `${MONADE_API_CONFIG.BASE_URL}/api/users/email/${encodeURIComponent(userEmail)}`,
+          {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+            },
           },
-        },
-      );
+        );
+      } catch (fetchError) {
+        console.error('[MonadeUser] Failed to reach Monade API:', fetchError);
+        setError('Could not reach Monade API. Please try again later.');
+        return;
+      }
 
       if (!response.ok) {
         if (response.status === 404) {
           console.error('[MonadeUser] User not found in Monade DB for email:', userEmail);
-          setError('User account not found. Please contact admin.');
         } else {
           console.error('[MonadeUser] API error:', response.status);
-          setError('Failed to fetch user account');
         }
-        setLoading(false);
+        setError(getApiErrorMessage(response.status));
 
         return;
       }
@@ -107,15 +119,22 @@ export function MonadeUserProvider({ children }: MonadeUserProviderProps) {
 
         // Now fetch user's API keys
         try {
-          const keysResponse = await fetch(
-            `${MONADE_API_CONFIG.BASE_URL}/api/users/${uid}/api-keys`,
-            {
-              method: 'GET',
-              headers: {
-                'Content-Type': 'application/json',
+          let keysResponse: Response;
+          try {
+            keysResponse = await fetch(
+              `${MONADE_API_CONFIG.BASE_URL}/api/users/${uid}/api-keys`,
+              {
+                method: 'GET',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
               },
-            },
-          );
+            );
+          } catch (keysFetchError) {
+            console.error('[MonadeUser] Failed to reach Monade API (keys):', keysFetchError);
+            setError('Could not reach Monade API to load API keys. Please try again later.');
+            return;
+          }
 
           if (keysResponse.ok) {
             const keysData = await keysResponse.json();
@@ -131,9 +150,13 @@ export function MonadeUserProvider({ children }: MonadeUserProviderProps) {
             }
           } else {
             console.error('[MonadeUser] Failed to fetch API keys:', keysResponse.status);
+            if (keysResponse.status >= 500) {
+              setError('Monade API is currently unavailable. Please try again later.');
+            }
           }
         } catch (keyErr) {
           console.error('[MonadeUser] Error fetching API keys:', keyErr);
+          setError('Could not load API keys. Please try again later.');
         }
       } else {
         console.error('[MonadeUser] No user_uid in response:', data);

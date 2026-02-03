@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 
+import { ApiError, fetchJson } from '@/lib/http';
 import { MONADE_API_CONFIG } from '@/types/monade-api.types';
 
 // Trunk API base URL
@@ -33,25 +34,24 @@ const FALLBACK_NUMBERS: PhoneNumberOption[] = [
 // Helper to check if a phone number is assigned to an assistant
 async function getPhoneAssignment(phoneNumber: string): Promise<{ assistantId: string; assistantName: string } | null> {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/assistants/phone/${encodeURIComponent(phoneNumber)}`, {
-      headers: {
-        'Content-Type': 'application/json',
-        'X-API-Key': MONADE_API_CONFIG.API_KEY,
+    const assistant = await fetchJson<any>(
+      `${API_BASE_URL}/api/assistants/phone/${encodeURIComponent(phoneNumber)}`,
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'X-API-Key': MONADE_API_CONFIG.API_KEY,
+        },
       },
-    });
-
-    if (!response.ok) {
-      // 404 means phone number is not assigned
-      return null;
-    }
-
-    const assistant = await response.json();
+    );
 
     return {
       assistantId: assistant.id,
       assistantName: assistant.name,
     };
-  } catch {
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 404) {
+      return null;
+    }
     console.log('[useTrunks] Phone not assigned:', phoneNumber);
 
     return null;
@@ -62,21 +62,15 @@ async function getPhoneAssignment(phoneNumber: string): Promise<{ assistantId: s
 export async function deallocatePhoneNumber(assistantId: string): Promise<{ success: boolean; error?: string }> {
   try {
     console.log('[useTrunks] Deallocating phone from assistant:', assistantId);
-    const response = await fetch(`${API_BASE_URL}/api/assistants/${assistantId}`, {
+    await fetchJson(`${API_BASE_URL}/api/assistants/${assistantId}`, {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
         'X-API-Key': MONADE_API_CONFIG.API_KEY,
       },
       body: JSON.stringify({ phoneNumber: '' }),
+      retry: { retries: 0 },
     });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      console.error('[useTrunks] Deallocation failed:', response.status, errorData);
-
-      return { success: false, error: errorData.error || `Failed to deallocate: ${response.status}` };
-    }
 
     return { success: true };
   } catch (err) {
@@ -125,18 +119,7 @@ export function useTrunks() {
     setError(null);
 
     try {
-      const response = await fetch(`${TRUNK_API_BASE}/trunks`);
-
-      if (!response.ok) {
-        // API unavailable, use fallback
-        console.log('[useTrunks] API unavailable, using fallback numbers');
-        setPhoneNumbers(FALLBACK_NUMBERS);
-        setLoading(false);
-
-        return;
-      }
-
-      const data = await response.json();
+      const data = await fetchJson<any>(`${TRUNK_API_BASE}/trunks`);
 
       // Handle both array and object response formats
       const trunksList = Array.isArray(data) ? data : (data.trunks && Array.isArray(data.trunks) ? data.trunks : []);
@@ -206,7 +189,7 @@ export async function makeCallViaTrunk(
   metadata?: Record<string, unknown>,
 ): Promise<{ success: boolean; message?: string; error?: string }> {
   try {
-    const response = await fetch(`${TRUNK_API_BASE}/calls`, {
+    const data = await fetchJson<any>(`${TRUNK_API_BASE}/calls`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -217,13 +200,8 @@ export async function makeCallViaTrunk(
         assistant_name: assistantName,
         metadata: metadata || {},
       }),
+      retry: { retries: 0 },
     });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      return { success: false, error: data.error || data.message || 'Failed to initiate call' };
-    }
 
     return { success: true, message: data.message || 'Call initiated' };
   } catch (error) {

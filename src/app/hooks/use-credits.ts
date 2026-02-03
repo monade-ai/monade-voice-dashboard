@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 
+import { fetchJson } from '@/lib/http';
 import { MONADE_API_CONFIG } from '@/types/monade-api.types';
 
 import { useMonadeUser } from './use-monade-user';
@@ -41,7 +42,7 @@ export function useCredits(): UseCreditsReturn {
       setLoading(true);
       setError(null);
 
-      const response = await fetch(
+      const data = await fetchJson<UserCredits>(
         `${MONADE_API_CONFIG.BASE_URL}/api/users/${userUid}/credits`,
         {
           method: 'GET',
@@ -51,12 +52,6 @@ export function useCredits(): UseCreditsReturn {
           },
         },
       );
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch credits: ${response.status}`);
-      }
-
-      const data = await response.json();
       setCredits(data);
     } catch (err) {
       console.error('Error fetching credits:', err);
@@ -81,4 +76,3 @@ export function useCredits(): UseCreditsReturn {
 }
 
 export default useCredits;
-

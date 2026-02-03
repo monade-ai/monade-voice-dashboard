@@ -20,6 +20,7 @@ interface AssistantsHeaderProps {
 export default function AssistantsHeader({ editingAssistantId, setEditingAssistantId }: AssistantsHeaderProps) {
   const {
     assistants,
+    currentAssistant,
     setCurrentAssistant,
     addDraftAssistant,
     updateAssistantLocally,

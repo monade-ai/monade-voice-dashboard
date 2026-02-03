@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 
+import { fetchJson } from '@/lib/http';
 import { MONADE_API_CONFIG } from '@/types/monade-api.types';
 
 import { useMonadeUser } from './use-monade-user';
@@ -33,16 +34,13 @@ const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 // Check if transcript has actual conversation
 async function checkHasConversation(transcriptUrl: string): Promise<boolean> {
   try {
-    const response = await fetch('/api/transcript-content', {
+    const data = await fetchJson<{ messageCount?: number }>('/api/transcript-content', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ url: transcriptUrl }),
+      retry: { retries: 2 },
     });
-    if (response.ok) {
-      const data = await response.json();
-
-      return (data.messageCount || 0) > 0;
-    }
+    return (data.messageCount || 0) > 0;
   } catch (err) {
     console.error('Error checking conversation:', err);
   }
@@ -100,7 +98,7 @@ export function TranscriptsProvider({ children }: { children: React.ReactNode })
     try {
       setError(null);
 
-      const response = await fetch(
+      const data = await fetchJson<any>(
         `${MONADE_API_CONFIG.BASE_URL}/api/users/${userUid}/transcripts`,
         {
           method: 'GET',
@@ -110,12 +108,6 @@ export function TranscriptsProvider({ children }: { children: React.ReactNode })
           },
         },
       );
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch transcripts: ${response.status}`);
-      }
-
-      const data = await response.json();
       const transcriptList: Transcript[] = Array.isArray(data) ? data : data.transcripts || [];
 
       // Check conversation status for first 50 transcripts

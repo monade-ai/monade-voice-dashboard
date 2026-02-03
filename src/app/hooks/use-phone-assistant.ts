@@ -51,27 +51,14 @@ export function usePhoneAssistant({
             ? window.location.origin + '/api/exotel/hook'
             : 'https://your-callback-url.example.com/exotel-hook');
       console.log('[usePhoneAssistant] Calling initiateExotelCall with:', { phone_number: phoneNumber, callback_url: callbackUrl });
-      const response = await initiateExotelCall({
+      const responseData = await initiateExotelCall({
         phone_number: phoneNumber,
         callback_url: callbackUrl,
       });
 
       // Log response
-      console.log('[usePhoneAssistant] initiateExotelCall response:', response);
-
-      if (response.ok) {
-        setCallStatus('connecting');
-        // Optionally, parse response for more status info
-        // const data = await response.json();
-        // handle data if needed
-      } else {
-        setCallStatus('failed');
-        const errorText = await response.text();
-        setError(new Error(errorText));
-        console.error('[usePhoneAssistant] Call failed, response not ok:', errorText);
-
-        return;
-      }
+      console.log('[usePhoneAssistant] initiateExotelCall response:', responseData);
+      setCallStatus('connecting');
 
       setError(null);
     } catch (err) {

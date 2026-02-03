@@ -75,7 +75,7 @@ export function useNewPhoneAssistant({
         api_key: apiKey ? `${apiKey.substring(0, 20)}...` : 'NOT PROVIDED',
       });
 
-      const response = await initiateNewCall({
+      const responseData = await initiateNewCall({
         phone_number: phoneNumber,
         callee_info: calleeInfo,
         assistant_id: assistantId,
@@ -83,25 +83,9 @@ export function useNewPhoneAssistant({
         api_key: apiKey, // User's API key for billing
       });
 
-      console.log('[useNewPhoneAssistant] initiateNewCall response:', response);
-
-      if (response.ok) {
-        setCallStatus('connecting');
-        // Parse response for call details
-        try {
-          const data = await response.json();
-          console.log('[useNewPhoneAssistant] Call initiated successfully:', data);
-        } catch {
-          // Response might not be JSON, that's ok
-        }
-      } else {
-        setCallStatus('failed');
-        const errorText = await response.text();
-        setError(new Error(errorText));
-        console.error('[useNewPhoneAssistant] Call failed, response not ok:', errorText);
-
-        return;
-      }
+      console.log('[useNewPhoneAssistant] initiateNewCall response:', responseData);
+      setCallStatus('connecting');
+      console.log('[useNewPhoneAssistant] Call initiated successfully:', responseData);
 
     } catch (err) {
       setCallStatus('failed');

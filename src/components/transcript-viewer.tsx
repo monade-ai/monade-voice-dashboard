@@ -14,6 +14,7 @@ import { PaperCard, PaperCardContent, PaperCardHeader, PaperCardTitle } from '@/
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { AudioPill } from '@/components/ui/audio-pill';
+import { fetchJson } from '@/lib/http';
 import { cn } from '@/lib/utils';
 
 // --- Types ---
@@ -67,13 +68,12 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
     const fetchTranscript = async () => {
       try {
         setLoading(true);
-        const response = await fetch('/api/transcript-content', {
+        const data = await fetchJson<{ transcript?: string; raw?: string }>('/api/transcript-content', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ url: transcriptUrl }),
+          retry: { retries: 2 },
         });
-        if (!response.ok) throw new Error(`Failed to fetch: ${response.status}`);
-        const data = await response.json();
 
         if (data.transcript) {
           const lines = data.transcript.split('\n');

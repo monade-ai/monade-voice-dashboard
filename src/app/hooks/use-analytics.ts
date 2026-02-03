@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from 'react';
 
+import { ApiError, fetchJson } from '@/lib/http';
 import { useMonadeUser } from './use-monade-user';
 
 // Analytics data structure matching actual API response
@@ -48,24 +49,7 @@ export function useCallAnalytics() {
       console.log('[useCallAnalytics] Fetching analytics for call:', callId);
 
       // Use the /api/analytics/{call_id} endpoint
-      const response = await fetch(`/api/proxy/api/analytics/${callId}`);
-
-      console.log('[useCallAnalytics] Response status:', response.status, response.ok);
-
-      if (!response.ok) {
-        if (response.status === 404) {
-          // No analytics for this call yet - not an error
-          console.log('[useCallAnalytics] No analytics found (404)');
-          setAnalytics(null);
-
-          return null;
-        }
-        console.warn('[useCallAnalytics] Analytics not available:', response.status);
-
-        return null;
-      }
-
-      const data = await response.json();
+      const data = await fetchJson<any>(`/api/proxy/api/analytics/${callId}`);
       console.log('[useCallAnalytics] Fetched analytics data:', data);
 
       // Extract the nested analytics object
@@ -76,6 +60,13 @@ export function useCallAnalytics() {
 
       return analyticsData as CallAnalytics;
     } catch (err) {
+      if (err instanceof ApiError && err.status === 404) {
+        // No analytics for this call yet - not an error
+        console.log('[useCallAnalytics] No analytics found (404)');
+        setAnalytics(null);
+
+        return null;
+      }
       console.warn('[useCallAnalytics] Failed to fetch call analytics:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch analytics');
 
@@ -115,18 +106,7 @@ export function useUserAnalytics() {
       console.log('[useUserAnalytics] Fetching all analytics for user:', userUid);
 
       // Use the /api/analytics?user_uid={user_uid} endpoint
-      const response = await fetch(`/api/proxy/api/analytics?user_uid=${userUid}`);
-
-      console.log('[useUserAnalytics] Response status:', response.status, response.ok);
-
-      if (!response.ok) {
-        console.warn('[useUserAnalytics] User analytics not available:', response.status);
-        setAnalytics([]);
-
-        return [];
-      }
-
-      const data = await response.json();
+      const data = await fetchJson<any>(`/api/proxy/api/analytics?user_uid=${userUid}`);
       console.log('[useUserAnalytics] Raw response:', data);
       console.log('[useUserAnalytics] First item structure:', data[0]);
 

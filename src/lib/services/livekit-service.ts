@@ -2,6 +2,8 @@
  * LiveKit Service - Handles LiveKit voice agent connections
  */
 
+import { fetchJson } from '@/lib/http';
+
 const LIVEKIT_DISPATCH_URL = process.env.LIVEKIT_DISPATCH_URL || 'https://monade-voice-agent-livekit-worker-1098621876975.us-central1.run.app';
 
 export interface LiveKitConnectionDetails {
@@ -23,7 +25,7 @@ export async function dispatchCall(params: DispatchCallParams): Promise<{ succes
   try {
     console.log('[LiveKitService] Dispatching call:', params);
 
-    const response = await fetch(`${LIVEKIT_DISPATCH_URL}/dispatch`, {
+    const data = await fetchJson<any>(`${LIVEKIT_DISPATCH_URL}/dispatch`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -33,24 +35,8 @@ export async function dispatchCall(params: DispatchCallParams): Promise<{ succes
         assistant_id: params.assistant_id,
         callee_info: params.callee_info || {},
       }),
+      retry: { retries: 0 },
     });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('[LiveKitService] Dispatch failed:', response.status, errorText);
-
-      let errorMessage = 'Failed to dispatch call';
-      try {
-        const errorData = JSON.parse(errorText);
-        errorMessage = errorData.error || errorData.message || errorMessage;
-      } catch {
-        errorMessage = errorText || errorMessage;
-      }
-
-      return { success: false, error: errorMessage };
-    }
-
-    const data = await response.json();
     console.log('[LiveKitService] Dispatch successful:', data);
 
     return { success: true, data };
@@ -69,17 +55,9 @@ export async function dispatchCall(params: DispatchCallParams): Promise<{ succes
  */
 export async function getAgentConnectionDetails(roomName: string): Promise<LiveKitConnectionDetails | null> {
   try {
-    const response = await fetch(`${LIVEKIT_DISPATCH_URL}/connection-details?roomName=${encodeURIComponent(roomName)}`);
-
-    if (!response.ok) {
-      console.error('[LiveKitService] Failed to get connection details:', response.status);
-
-      return null;
-    }
-
-    const data = await response.json();
-
-    return data as LiveKitConnectionDetails;
+    return await fetchJson<LiveKitConnectionDetails>(
+      `${LIVEKIT_DISPATCH_URL}/connection-details?roomName=${encodeURIComponent(roomName)}`,
+    );
   } catch (error) {
     console.error('[LiveKitService] Error getting connection details:', error);
 

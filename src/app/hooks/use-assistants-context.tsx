@@ -4,6 +4,7 @@ import { createContext, useContext, useState, useEffect, ReactNode, useCallback 
 import { v4 as uuidv4 } from 'uuid';
 
 import { useToast } from '@/app/knowledge-base/hooks/use-toast';
+import { fetchJson } from '@/lib/http';
 import { MONADE_API_CONFIG } from '@/types/monade-api.types';
 
 // Define the Assistant type - Matches API GET response structure & Prisma Schema
@@ -89,17 +90,6 @@ const getStorageKey = (organizationId?: string): string => {
   return organizationId ? `${DRAFT_ASSISTANTS_STORAGE_KEY}_${organizationId}` : DRAFT_ASSISTANTS_STORAGE_KEY;
 };
 
-// Helper to parse API errors
-const getApiError = async (res: Response): Promise<string> => {
-  try {
-    const body = await res.json();
-
-    return body.error || `Request failed with status ${res.status}`;
-  } catch {
-    return `Request failed with status ${res.status}`;
-  }
-};
-
 // Helper to load drafts from localStorage with organization context
 const loadDrafts = (organizationId?: string): Assistant[] => {
   if (typeof window === 'undefined') return []; // Guard for SSR
@@ -170,34 +160,27 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
       // Use user-specific endpoint for the new API
       console.log('[Assistants] API URL:', `${API_BASE_URL}/api/assistants/user/${userUid}`);
 
-      const res = await fetch(`${API_BASE_URL}/api/assistants/user/${userUid}`, { headers });
-      console.log('[Assistants] API response status:', res.status, 'OK:', res.ok);
+      const data = await fetchJson<any[]>(
+        `${API_BASE_URL}/api/assistants/user/${userUid}`,
+        { headers },
+      );
+      console.log('[Assistants] GET /api/assistants Raw fetched:', data);
+      apiAssistants = data.map((a: any) => {
+        const tags = a.tags || [];
+        // Extract callProvider from "trunk:value" tag
+        const trunkTag = tags.find((t: string) => t.startsWith('trunk:'));
+        // Default to 'vobiz' if no tag found, or use existing property if backend supports it in future
+        const callProvider = trunkTag ? trunkTag.replace('trunk:', '') : (a.callProvider || 'vobiz');
 
-      if (!res.ok) {
-        const errorText = await getApiError(res);
-        console.error('[Assistants] API request failed. Status:', res.status, 'Error:', errorText);
-        toast({ title: 'Error Fetching Assistants', description: errorText });
-        // Don't return, proceed to load drafts
-      } else {
-        const data = await res.json();
-        console.log('[Assistants] GET /api/assistants Raw fetched:', data);
-        apiAssistants = data.map((a: any) => {
-          const tags = a.tags || [];
-          // Extract callProvider from "trunk:value" tag
-          const trunkTag = tags.find((t: string) => t.startsWith('trunk:'));
-          // Default to 'vobiz' if no tag found, or use existing property if backend supports it in future
-          const callProvider = trunkTag ? trunkTag.replace('trunk:', '') : (a.callProvider || 'vobiz');
-
-          return {
-            ...a,
-            callProvider,
-            createdAt: a.createdAt ? new Date(a.createdAt) : new Date(),
-            knowledgeBase: a.knowledgeBase || null,
-            tags: tags, // Ensure tags array exists
-          };
-        });
-        console.log('[Assistants] Processed API list:', apiAssistants);
-      }
+        return {
+          ...a,
+          callProvider,
+          createdAt: a.createdAt ? new Date(a.createdAt) : new Date(),
+          knowledgeBase: a.knowledgeBase || null,
+          tags: tags, // Ensure tags array exists
+        };
+      });
+      console.log('[Assistants] Processed API list:', apiAssistants);
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Could not load assistants.';
       console.error('[Assistants] Fetch error caught:', err);
@@ -289,21 +272,12 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
         'Content-Type': 'application/json',
         'X-API-Key': MONADE_API_CONFIG.API_KEY,
       };
-      const res = await fetch(`${API_BASE_URL}/api/assistants`, {
+      const createdAssistantResponse = await fetchJson<any>(`${API_BASE_URL}/api/assistants`, {
         method: 'POST',
         headers,
         body: JSON.stringify(payload),
+        retry: { retries: 0 },
       });
-
-      if (!res.ok) {
-        const errorText = await getApiError(res);
-        console.error('Failed to create/publish assistant:', res.status, errorText);
-        toast({ title: 'Publish Error', description: errorText });
-
-        return undefined; // Indicate failure
-      }
-
-      const createdAssistantResponse = await res.json();
       const processedAssistant: Assistant = {
         ...createdAssistantResponse,
         createdAt: createdAssistantResponse.createdAt ? new Date(createdAssistantResponse.createdAt) : new Date(),
@@ -414,21 +388,12 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
         'Content-Type': 'application/json',
         'X-API-Key': MONADE_API_CONFIG.API_KEY,
       };
-      const res = await fetch(`${API_BASE_URL}/api/assistants/${id}`, {
+      const updatedAssistantResponse = await fetchJson<any>(`${API_BASE_URL}/api/assistants/${id}`, {
         method: 'PATCH',
         headers,
         body: JSON.stringify(payload),
+        retry: { retries: 0 },
       });
-
-      if (!res.ok) {
-        const errorText = await getApiError(res);
-        console.error('Failed to save assistant updates:', res.status, errorText);
-        toast({ title: 'Save Error', description: errorText });
-
-        return undefined;
-      }
-
-      const updatedAssistantResponse = await res.json();
       const processedAssistant: Assistant = {
         ...updatedAssistantResponse,
         createdAt: updatedAssistantResponse.createdAt ? new Date(updatedAssistantResponse.createdAt) : new Date(),
@@ -489,18 +454,12 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
       const headers: Record<string, string> = {
         'X-API-Key': MONADE_API_CONFIG.API_KEY,
       };
-      const res = await fetch(`${API_BASE_URL}/api/assistants/${id}`, {
+      await fetchJson(`${API_BASE_URL}/api/assistants/${id}`, {
         method: 'DELETE',
         headers,
+        parseJson: false,
+        retry: { retries: 0 },
       });
-
-      if (!res.ok) {
-        const errorText = await getApiError(res);
-        console.error('Failed to delete assistant:', res.status, errorText);
-        toast({ title: 'Delete Error', description: errorText });
-
-        return false; // Indicate failure
-      }
 
       console.log('[Assistants] DELETE Success for ID:', id);
       toast({ title: 'Success', description: 'Assistant deleted.' });

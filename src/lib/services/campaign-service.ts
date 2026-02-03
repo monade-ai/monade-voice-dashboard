@@ -1,5 +1,6 @@
 // Campaign service functions for frontend integration
 
+import { fetchJson } from '@/lib/http';
 import type { 
   CreateCampaignRequest,
   UpdateCampaignRequest,
@@ -18,20 +19,13 @@ export class CampaignService {
    * Create a new campaign
    */
   async createCampaign(data: CreateCampaignRequest): Promise<CampaignResponse> {
-    const response = await fetch(this.baseUrl, {
+    return fetchJson<CampaignResponse>(this.baseUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(data),
     });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to create campaign');
-    }
-
-    return response.json();
   }
 
   /**
@@ -52,28 +46,14 @@ export class CampaignService {
       ? `${this.baseUrl}?${queryParams.toString()}`
       : this.baseUrl;
 
-    const response = await fetch(url);
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to fetch campaigns');
-    }
-
-    return response.json();
+    return fetchJson<CampaignResponse>(url);
   }
 
   /**
    * Get campaign details by ID
    */
   async getCampaign(id: string): Promise<CampaignResponse> {
-    const response = await fetch(`${this.baseUrl}/${id}`);
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to fetch campaign');
-    }
-
-    return response.json();
+    return fetchJson<CampaignResponse>(`${this.baseUrl}/${id}`);
   }
 
   /**
@@ -84,36 +64,22 @@ export class CampaignService {
       campaigns: [{ action }],
     };
 
-    const response = await fetch(`${this.baseUrl}/${id}`, {
+    return fetchJson<CampaignResponse>(`${this.baseUrl}/${id}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(data),
     });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to update campaign');
-    }
-
-    return response.json();
   }
 
   /**
    * Delete campaign
    */
   async deleteCampaign(id: string): Promise<CampaignResponse> {
-    const response = await fetch(`${this.baseUrl}/${id}`, {
+    return fetchJson<CampaignResponse>(`${this.baseUrl}/${id}`, {
       method: 'DELETE',
     });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to delete campaign');
-    }
-
-    return response.json();
   }
 
   /**
@@ -134,14 +100,7 @@ export class CampaignService {
       ? `${this.baseUrl}/${id}/call-details?${queryParams.toString()}`
       : `${this.baseUrl}/${id}/call-details`;
 
-    const response = await fetch(url);
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to fetch campaign call details');
-    }
-
-    return response.json();
+    return fetchJson<any>(url);
   }
 
   /**
