@@ -3,7 +3,6 @@
  */
 
 import { OrganizationService } from './organization.service';
-import { CampaignService } from './campaign-service';
 
 // Service registry to ensure singleton instances
 class ServiceRegistry {
@@ -41,15 +40,8 @@ export function getOrganizationService(): OrganizationService {
   );
 }
 
-export function getCampaignService(): CampaignService {
-  return ServiceRegistry.getInstance().getService(
-    'campaign',
-    () => new CampaignService(),
-  );
-}
-
 // Export service classes for direct instantiation if needed
-export { OrganizationService, CampaignService };
+export { OrganizationService };
 
 // Export types that services might need
 export type {

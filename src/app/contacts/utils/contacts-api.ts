@@ -1,14 +1,10 @@
-import { getFriendlyErrorMessage, isNetworkError } from '@/lib/http';
+import { ApiError, fetchJson } from '@/lib/http';
 import { createClient } from '@/utils/supabase/client'; // Import the new client client
 
 // NOTE: External buckets API is disabled for production
 // This was pointing to localhost:8764 which is not available in production
 // Using localStorage fallback functions instead (see below)
 const API_BASE_URL = ''; // Disabled - use localStorage functions
-
-function getResponseErrorMessage(status: number, statusText: string) {
-  return getFriendlyErrorMessage(status, statusText);
-}
 
 async function getSupabaseToken() {
   try {
@@ -54,43 +50,18 @@ async function fetchWithAuth(url: string, options: RequestInit = {}) {
     console.log(`[fetchWithAuth] Making request to: ${url}`);
     console.log('[fetchWithAuth] Headers:', headers);
 
-    let response: Response;
-    try {
-      response = await fetch(url, { ...options, headers });
-    } catch (fetchError) {
-      console.error('[fetchWithAuth] Network error:', fetchError);
-      throw new Error('Could not reach the service. Please try again later.');
-    }
-
-    console.log(`[fetchWithAuth] Response status: ${response.status}`);
-
-    if (!response.ok) {
-      let errorData: any;
-      try {
-        errorData = await response.json();
-      } catch {
-        errorData = { detail: `HTTP ${response.status}: ${response.statusText}` };
-      }
-      const fallbackMessage = getResponseErrorMessage(response.status, response.statusText);
-      const serverMessage = errorData.detail || errorData.message;
-      const message = serverMessage && response.status < 500 ? serverMessage : fallbackMessage;
-      console.error('[fetchWithAuth] Error response:', errorData);
-      throw new Error(message);
-    }
-
-    const data = await response.json();
+    const data = await fetchJson(url, { ...options, headers });
     console.log('[fetchWithAuth] Success response:', data);
 
     return data;
   } catch (error: any) {
     console.error('[fetchWithAuth] Request failed:', error);
 
-    if (isNetworkError(error)) {
-      throw new Error('Could not reach the service. Please try again later.');
-    }
-
     // If authentication fails, try without auth as fallback
-    if (error.message.includes('Authentication failed') || error.message.includes('No authentication token')) {
+    const authFailed = error.message.includes('Authentication failed')
+      || error.message.includes('No authentication token')
+      || (error instanceof ApiError && (error.status === 401 || error.status === 403));
+    if (authFailed) {
       console.log('[fetchWithAuth] Trying request without authentication...');
 
       const headers = {
@@ -98,28 +69,7 @@ async function fetchWithAuth(url: string, options: RequestInit = {}) {
         ...options.headers,
       };
 
-      let response: Response;
-      try {
-        response = await fetch(url, { ...options, headers });
-      } catch (fetchError) {
-        console.error('[fetchWithAuth] Network error (unauth):', fetchError);
-        throw new Error('Could not reach the service. Please try again later.');
-      }
-
-      if (!response.ok) {
-        let errorData: any;
-        try {
-          errorData = await response.json();
-        } catch {
-          errorData = { detail: `HTTP ${response.status}: ${response.statusText}` };
-        }
-        const fallbackMessage = getResponseErrorMessage(response.status, response.statusText);
-        const serverMessage = errorData.detail || errorData.message;
-        const message = serverMessage && response.status < 500 ? serverMessage : fallbackMessage;
-        throw new Error(message);
-      }
-
-      return response.json();
+      return fetchJson(url, { ...options, headers });
     }
 
     throw error;

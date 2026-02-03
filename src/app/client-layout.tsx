@@ -15,7 +15,6 @@ import { CampaignProvider } from '@/app/contexts/campaign-context';
 
 import { Sidebar } from '../components/sidebar';
 
-import { PipecatProvider } from './assistants/providers/pipcat-provider';
 import { AssistantsProvider } from './hooks/use-assistants-context';
 
 const AuthWrapper = ({ children }: { children: React.ReactNode }) => {
@@ -63,7 +62,7 @@ export default function ClientLayout({
                     <TranscriptsProvider>
                       <AssistantsProvider>
                         <CampaignProvider>
-                          <PipecatProvider>{children}</PipecatProvider>
+                          {children}
                         </CampaignProvider>
                       </AssistantsProvider>
                     </TranscriptsProvider>
