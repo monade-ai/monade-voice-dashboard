@@ -46,7 +46,6 @@ export default function LiveKitAssistantDualButton({ assistant }: AssistantDualB
     remainingTime,
     startCall,
     endCall,
-    error: callError,
     errorMessage,
   } = useNewPhoneAssistant({
     assistantId: assistantData.id,
@@ -56,13 +55,8 @@ export default function LiveKitAssistantDualButton({ assistant }: AssistantDualB
 
   // Use LiveKit web assistant hook
   const {
-    isConnecting: isWebConnecting,
     isConnected: isWebConnected,
-    connectionStatus: webConnectionStatus,
-    startSession,
     endSession,
-    error: webError,
-    errorMessage: webErrorMessage,
   } = useLiveKitWebAssistant({
     assistantId: assistantData.id,
     assistantName: assistantData.name,

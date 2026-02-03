@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect, useRef } from 'react';
+
 import { useMonadeUser } from './use-monade-user';
 
 export interface CampaignRecord {
@@ -46,126 +47,134 @@ export interface CampaignRecord {
 const STORAGE_PREFIX = 'monade_campaign_history_';
 
 export function useCampaignHistory() {
-    const { userUid, loading: userLoading } = useMonadeUser();
-    const [campaigns, setCampaigns] = useState<CampaignRecord[]>([]);
-    const [loading, setLoading] = useState(true);
+  const { userUid, loading: userLoading } = useMonadeUser();
+  const [campaigns, setCampaigns] = useState<CampaignRecord[]>([]);
+  const [loading, setLoading] = useState(true);
 
-    // Use ref to always have current userUid in callbacks
-    const userUidRef = useRef(userUid);
-    useEffect(() => {
-        userUidRef.current = userUid;
-    }, [userUid]);
+  // Use ref to always have current userUid in callbacks
+  const userUidRef = useRef(userUid);
+  useEffect(() => {
+    userUidRef.current = userUid;
+  }, [userUid]);
 
-    // Get storage key for current user
-    const getStorageKey = useCallback(() => {
-        const uid = userUidRef.current;
-        if (!uid) {
-            console.warn('[CampaignHistory] No userUid available');
-            return null;
-        }
-        return `${STORAGE_PREFIX}${uid}`;
-    }, []);
+  // Get storage key for current user
+  const getStorageKey = useCallback(() => {
+    const uid = userUidRef.current;
+    if (!uid) {
+      console.warn('[CampaignHistory] No userUid available');
 
-    // Load campaigns from localStorage
-    useEffect(() => {
-        if (userLoading) return;
-        if (!userUid) {
-            setLoading(false);
-            return;
-        }
+      return null;
+    }
 
-        const storageKey = `${STORAGE_PREFIX}${userUid}`;
-        try {
-            const stored = localStorage.getItem(storageKey);
-            console.log('[CampaignHistory] Loading from:', storageKey, 'found:', !!stored);
-            if (stored) {
-                const parsed = JSON.parse(stored);
-                console.log('[CampaignHistory] Loaded campaigns:', parsed.length);
-                setCampaigns(parsed);
-            }
-        } catch (err) {
-            console.error('Failed to load campaign history:', err);
-        } finally {
-            setLoading(false);
-        }
-    }, [userUid, userLoading]);
+    return `${STORAGE_PREFIX}${uid}`;
+  }, []);
 
-    // Save campaign
-    const saveCampaign = useCallback((campaign: Omit<CampaignRecord, 'id' | 'createdAt'>) => {
-        const uid = userUidRef.current;
-        if (!uid) {
-            console.error('[CampaignHistory] Cannot save - no user ID available');
-            return '';
-        }
+  // Load campaigns from localStorage
+  useEffect(() => {
+    if (userLoading) return;
+    if (!userUid) {
+      setLoading(false);
 
-        const storageKey = `${STORAGE_PREFIX}${uid}`;
-        const newCampaign: CampaignRecord = {
-            ...campaign,
-            id: `campaign_${Date.now()}`,
-            createdAt: new Date().toISOString(),
-        };
+      return;
+    }
 
-        console.log('[CampaignHistory] Saving campaign to:', storageKey, {
-            id: newCampaign.id,
-            name: newCampaign.name,
-            totalContacts: newCampaign.totalContacts,
-            completed: newCampaign.completed,
-            resultsLength: newCampaign.results?.length || 0,
-        });
+    const storageKey = `${STORAGE_PREFIX}${userUid}`;
+    try {
+      const stored = localStorage.getItem(storageKey);
+      console.log('[CampaignHistory] Loading from:', storageKey, 'found:', !!stored);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        console.log('[CampaignHistory] Loaded campaigns:', parsed.length);
+        setCampaigns(parsed);
+      }
+    } catch (err) {
+      console.error('Failed to load campaign history:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [userUid, userLoading]);
 
-        setCampaigns(prev => {
-            const updated = [newCampaign, ...prev].slice(0, 50); // Keep last 50
-            try {
-                const jsonData = JSON.stringify(updated);
-                console.log('[CampaignHistory] Saving to localStorage, size:', jsonData.length, 'bytes');
-                localStorage.setItem(storageKey, jsonData);
-                console.log('[CampaignHistory] Save successful!');
-            } catch (err) {
-                console.error('[CampaignHistory] Failed to save:', err);
-                // If storage full, try with fewer campaigns
-                try {
-                    const reduced = [newCampaign, ...prev.slice(0, 5)];
-                    localStorage.setItem(storageKey, JSON.stringify(reduced));
-                    return reduced;
-                } catch (e2) {
-                    console.error('[CampaignHistory] Even reduced save failed:', e2);
-                }
-            }
-            return updated;
-        });
+  // Save campaign
+  const saveCampaign = useCallback((campaign: Omit<CampaignRecord, 'id' | 'createdAt'>) => {
+    const uid = userUidRef.current;
+    if (!uid) {
+      console.error('[CampaignHistory] Cannot save - no user ID available');
 
-        return newCampaign.id;
-    }, []);
+      return '';
+    }
 
-    // Delete campaign
-    const deleteCampaign = useCallback((id: string) => {
-        const storageKey = getStorageKey();
-        if (!storageKey) return;
-
-        setCampaigns(prev => {
-            const updated = prev.filter(c => c.id !== id);
-            localStorage.setItem(storageKey, JSON.stringify(updated));
-            return updated;
-        });
-    }, [getStorageKey]);
-
-    // Get campaign by ID
-    const getCampaign = useCallback((id: string) => {
-        return campaigns.find(c => c.id === id);
-    }, [campaigns]);
-
-    // Get connectivity rate
-    const getConnectivityRate = useCallback((campaign: CampaignRecord) => {
-        if (campaign.totalContacts === 0) return 0;
-        return Math.round((campaign.completed / campaign.totalContacts) * 100);
-    }, []);
-
-    return {
-        campaigns,
-        loading: loading || userLoading,
-        saveCampaign,
-        deleteCampaign,
-        getCampaign,
-        getConnectivityRate,
+    const storageKey = `${STORAGE_PREFIX}${uid}`;
+    const newCampaign: CampaignRecord = {
+      ...campaign,
+      id: `campaign_${Date.now()}`,
+      createdAt: new Date().toISOString(),
     };
+
+    console.log('[CampaignHistory] Saving campaign to:', storageKey, {
+      id: newCampaign.id,
+      name: newCampaign.name,
+      totalContacts: newCampaign.totalContacts,
+      completed: newCampaign.completed,
+      resultsLength: newCampaign.results?.length || 0,
+    });
+
+    setCampaigns(prev => {
+      const updated = [newCampaign, ...prev].slice(0, 50); // Keep last 50
+      try {
+        const jsonData = JSON.stringify(updated);
+        console.log('[CampaignHistory] Saving to localStorage, size:', jsonData.length, 'bytes');
+        localStorage.setItem(storageKey, jsonData);
+        console.log('[CampaignHistory] Save successful!');
+      } catch (err) {
+        console.error('[CampaignHistory] Failed to save:', err);
+        // If storage full, try with fewer campaigns
+        try {
+          const reduced = [newCampaign, ...prev.slice(0, 5)];
+          localStorage.setItem(storageKey, JSON.stringify(reduced));
+
+          return reduced;
+        } catch (e2) {
+          console.error('[CampaignHistory] Even reduced save failed:', e2);
+        }
+      }
+
+      return updated;
+    });
+
+    return newCampaign.id;
+  }, []);
+
+  // Delete campaign
+  const deleteCampaign = useCallback((id: string) => {
+    const storageKey = getStorageKey();
+    if (!storageKey) return;
+
+    setCampaigns(prev => {
+      const updated = prev.filter(c => c.id !== id);
+      localStorage.setItem(storageKey, JSON.stringify(updated));
+
+      return updated;
+    });
+  }, [getStorageKey]);
+
+  // Get campaign by ID
+  const getCampaign = useCallback((id: string) => {
+    return campaigns.find(c => c.id === id);
+  }, [campaigns]);
+
+  // Get connectivity rate
+  const getConnectivityRate = useCallback((campaign: CampaignRecord) => {
+    if (campaign.totalContacts === 0) return 0;
+
+    return Math.round((campaign.completed / campaign.totalContacts) * 100);
+  }, []);
+
+  return {
+    campaigns,
+    loading: loading || userLoading,
+    saveCampaign,
+    deleteCampaign,
+    getCampaign,
+    getConnectivityRate,
+  };
 }

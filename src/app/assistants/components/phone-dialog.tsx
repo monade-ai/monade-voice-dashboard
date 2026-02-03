@@ -47,6 +47,7 @@ export function PhoneDialog({
     if (cleaned.length < 10) {
       setError('Please enter a valid phone number');
       console.error('[PhoneDialog] Validation failed: invalid phone number:', phoneNumber);
+
       return;
     }
     
@@ -74,7 +75,7 @@ export function PhoneDialog({
               : 'Connecting your call...'}
           </p>
           <p className="text-sm text-slate-500 text-center">
-              You'll be connected with {assistantName} shortly
+            You&apos;ll be connected with {assistantName} shortly
           </p>
         </div>
       );
@@ -137,13 +138,13 @@ export function PhoneDialog({
           </div>
             
           <p className="text-xs text-slate-500">
-              You'll receive a call from {assistantName}. Standard call rates may apply.
+            You&apos;ll receive a call from {assistantName}. Standard call rates may apply.
           </p>
             
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => {
-                console.log('[PhoneDialog] Dialog closed (Cancel button)');
-                onClose();
+              console.log('[PhoneDialog] Dialog closed (Cancel button)');
+              onClose();
             }}>
                 Cancel
             </Button>

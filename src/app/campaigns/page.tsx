@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { Plus, Play, Pause, Square, Archive, Trash2, Eye, Users, Activity, Copy } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Plus, Play, Pause, Square, Archive, Trash2, Activity, Copy } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -26,7 +26,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-
 import { apiService } from '@/lib/api';
 import type { Campaign, CreateCampaignRequest } from '@/types/campaign';
 
@@ -35,9 +34,6 @@ const CampaignManager = () => {
   const [loading, setLoading] = useState(true);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
-
-  const [viewingCampaign, setViewingCampaign] = useState<Campaign | null>(null);
-  const [viewDialogOpen, setViewDialogOpen] = useState(false);
 
   // Form state for creating new campaign
   const [formData, setFormData] = useState<CreateCampaignRequest>({
@@ -54,11 +50,7 @@ const CampaignManager = () => {
   const [phoneNumbers, setPhoneNumbers] = useState('');
 
   // Load campaigns on component mount
-  useEffect(() => {
-    loadCampaigns();
-  }, [selectedStatus]);
-
-  const loadCampaigns = async () => {
+  const loadCampaigns = useCallback(async () => {
     try {
       setLoading(true);
       const params = selectedStatus !== 'all' ? { status: selectedStatus as any } : {};
@@ -79,35 +71,45 @@ const CampaignManager = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedStatus]);
+
+  // Load campaigns on component mount
+  useEffect(() => {
+    loadCampaigns();
+  }, [loadCampaigns]);
 
   const handleCreateCampaign = async () => {
     try {
       if (!formData.caller_id) {
         toast.error('Caller ID is required');
+
         return;
       }
 
       if (!phoneNumbers && !formData.lists?.length) {
         toast.error('Either phone numbers or contact lists must be provided');
+
         return;
       }
 
       // Validate Exotel business rules
       if (formData.url && formData.read_via_text) {
         toast.error('Cannot provide both URL and text content. Please choose either a custom URL flow or text content, not both.');
+
         return;
       }
       
       // Validate message content length if provided
       if (formData.read_via_text && formData.read_via_text.trim() && formData.read_via_text.trim().length < 10) {
         toast.error('Message content must be at least 10 characters long.');
+
         return;
       }
       
       // Validate that we have either URL or text content
       if (!formData.url?.trim() && !formData.read_via_text?.trim()) {
         toast.error('Either URL or message content is required.');
+
         return;
       }
 
@@ -128,6 +130,7 @@ const CampaignManager = () => {
       
       if (invalidNumbers.length > 0) {
         toast.error(`Invalid phone numbers found: ${invalidNumbers.join(', ')}. Please use valid international format (e.g., +919876543210)`);
+
         return;
       }
 
@@ -210,6 +213,7 @@ const CampaignManager = () => {
     const deletableStatuses = ['Created'];
     if (!deletableStatuses.includes(campaign.status)) {
       toast.error(`Cannot delete campaigns with status "${campaign.status}". Only campaigns that have never been started (status: "Created") can be deleted.`);
+
       return;
     }
 
@@ -245,18 +249,18 @@ const CampaignManager = () => {
 
   const getStatusBadgeVariant = (status: string) => {
     switch (status) {
-      case 'Created':
-        return 'secondary';
-      case 'InProgress':
-        return 'default';
-      case 'Completed':
-        return 'default';
-      case 'Failed':
-        return 'destructive';
-      case 'Paused':
-        return 'secondary';
-      default:
-        return 'secondary';
+    case 'Created':
+      return 'secondary';
+    case 'InProgress':
+      return 'default';
+    case 'Completed':
+      return 'default';
+    case 'Failed':
+      return 'destructive';
+    case 'Paused':
+      return 'secondary';
+    default:
+      return 'secondary';
     }
   };
 
@@ -274,7 +278,7 @@ const CampaignManager = () => {
         >
           <Play className="w-3 h-3 mr-1" />
           Start
-        </Button>
+        </Button>,
       );
     }
     
@@ -289,7 +293,7 @@ const CampaignManager = () => {
         >
           <Pause className="w-3 h-3 mr-1" />
           Pause
-        </Button>
+        </Button>,
       );
       buttons.push(
         <Button
@@ -301,7 +305,7 @@ const CampaignManager = () => {
         >
           <Square className="w-3 h-3 mr-1" />
           Stop
-        </Button>
+        </Button>,
       );
     }
     
@@ -315,7 +319,7 @@ const CampaignManager = () => {
       >
         <Copy className="w-3 h-3 mr-1" />
         Clone & Edit
-      </Button>
+      </Button>,
     );
     
     buttons.push(
@@ -328,7 +332,7 @@ const CampaignManager = () => {
       >
         <Archive className="w-3 h-3 mr-1" />
         Archive
-      </Button>
+      </Button>,
     );
     
     // Only show delete button for campaigns that can be deleted
@@ -344,7 +348,7 @@ const CampaignManager = () => {
         >
           <Trash2 className="w-3 h-3 mr-1" />
           Delete
-        </Button>
+        </Button>,
       );
     }
     

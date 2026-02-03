@@ -45,7 +45,6 @@ export default function NewAssistantDualButton({ assistant }: AssistantDualButto
     remainingTime,
     startCall,
     endCall,
-    error: callError,
     errorMessage,
   } = useNewPhoneAssistant({
     assistantId: assistantData.id,

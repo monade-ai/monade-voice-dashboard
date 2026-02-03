@@ -21,7 +21,7 @@ export function AudioMiniPlayer({ url }: AudioMiniPlayerProps) {
     } else {
       setLoading(true);
       audioRef.current.play().catch(err => {
-        console.error("Audio play failed:", err);
+        console.error('Audio play failed:', err);
         setLoading(false);
       });
     }
@@ -54,11 +54,11 @@ export function AudioMiniPlayer({ url }: AudioMiniPlayerProps) {
         className="w-8 h-8 rounded-full bg-primary/20 text-primary hover:bg-primary hover:text-black transition-all flex items-center justify-center"
       >
         {loading ? (
-            <Loader2 className="w-3 h-3 animate-spin" />
+          <Loader2 className="w-3 h-3 animate-spin" />
         ) : isPlaying ? (
-            <Pause className="w-3 h-3 fill-current" />
+          <Pause className="w-3 h-3 fill-current" />
         ) : (
-            <Play className="w-3 h-3 fill-current ml-0.5" />
+          <Play className="w-3 h-3 fill-current ml-0.5" />
         )}
       </button>
     </div>

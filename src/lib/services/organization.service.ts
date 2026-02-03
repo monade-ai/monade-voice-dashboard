@@ -7,7 +7,6 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import {
   Organization,
   OrganizationMember,
-  UserProfile,
   InvitationToken,
   CreateOrganizationData,
   UpdateOrganizationData,
@@ -15,7 +14,6 @@ import {
   AcceptInvitationData,
   OrganizationRole,
   ApiResponse,
-  ApiError,
   API_ERROR_CODES,
   PaginatedResponse,
   validateCreateOrganizationData,

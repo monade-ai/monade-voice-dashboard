@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
 import {
   ChevronLeft,
   ChevronRight,
@@ -10,9 +9,9 @@ import {
   MessageSquare,
   Activity,
   Play,
-  Pause
+  Pause,
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 
 import { useDashboardData } from '@/app/hooks/use-dashboard-data';
 import { useCredits } from '@/app/hooks/use-credits';
@@ -26,25 +25,28 @@ import { DashboardHeader } from '@/components/dashboard-header';
 import { Badge } from '@/components/ui/badge';
 import { LeadIcon } from '@/components/ui/lead-icon';
 import { cn } from '@/lib/utils';
+
 import { FilterBar, FilterState } from './components/filter-bar';
 
 // --- Helpers ---
 
 const getGreeting = () => {
   const hour = new Date().getHours();
-  if (hour < 12) return "Good morning";
-  if (hour < 17) return "Good afternoon";
-  if (hour < 21) return "Good evening";
-  return "It's late! Hope you're having a good night";
+  if (hour < 12) return 'Good morning';
+  if (hour < 17) return 'Good afternoon';
+  if (hour < 21) return 'Good evening';
+
+  return 'It\'s late! Hope you\'re having a good night';
 };
 
 const getRelativeTime = (dateString: string) => {
   const date = new Date(dateString);
   const now = new Date();
   const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / 60000);
-  if (diffInMinutes < 1) return "Just now";
+  if (diffInMinutes < 1) return 'Just now';
   if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
   if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)}h ago`;
+
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 };
 
@@ -53,7 +55,7 @@ const getRelativeTime = (dateString: string) => {
 const TranscriptRow = ({
   transcript,
   analytics,
-  onView
+  onView,
 }: {
   transcript: Transcript;
   analytics?: CallAnalytics;
@@ -61,15 +63,24 @@ const TranscriptRow = ({
 }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const isEngaged = transcript.has_conversation || (analytics && analytics.verdict !== 'no_answer');
-  const verdict = analytics?.verdict ? analytics.verdict.replace('_', ' ') : (isEngaged ? "Conversation" : "No Answer");
-  const summary = analytics?.summary || (isEngaged ? "Call transcript available for review." : "No interaction recorded.");
-  const quality = analytics?.call_quality || "N/A";
+  const verdictRaw = analytics?.verdict || (isEngaged ? 'conversation' : 'no_answer');
+  const verdict = analytics?.verdict ? analytics.verdict.replace('_', ' ') : (isEngaged ? 'Conversation' : 'No Answer');
+  const summary = analytics?.summary || (isEngaged ? 'Call transcript available for review.' : 'No interaction recorded.');
+  const quality = analytics?.call_quality || 'N/A';
+
+  const dotColor = {
+    interested: 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)]',
+    not_interested: 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.4)]',
+    callback: 'bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.4)]',
+    conversation: 'bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.4)]',
+    no_answer: 'bg-gray-500/40',
+  }[verdictRaw] || 'bg-gray-500/40';
 
   return (
     <tr
       className={cn(
-        "group border-b border-border/40 transition-all duration-300",
-        isEngaged ? "bg-[#facc15]/[0.02] hover:bg-[#facc15]/[0.05]" : "hover:bg-muted/30"
+        'group border-b border-border/40 transition-all duration-300',
+        isEngaged ? 'bg-[#facc15]/[0.02] hover:bg-[#facc15]/[0.05]' : 'hover:bg-muted/30',
       )}
     >
       {/* 1. Lead Identity (Who) */}
@@ -111,66 +122,73 @@ const TranscriptRow = ({
       <td className="py-3 px-6">
         <div className="flex flex-col gap-1 max-w-[300px]">
           <div className="flex items-center gap-2">
-            <div className={cn(
-              "w-1.5 h-1.5 rounded-full",
-              isEngaged ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)]" : "bg-muted-foreground/20"
-            )} />
+            <div className={cn('w-1.5 h-1.5 rounded-full transition-colors duration-500', dotColor)} />
             <span className={cn(
-              "text-[11px] font-bold uppercase tracking-widest",
-              isEngaged ? "text-foreground" : "text-muted-foreground/50"
+              'text-[11px] font-bold uppercase tracking-widest',
+              isEngaged ? 'text-foreground' : 'text-muted-foreground/50',
             )}>
               {verdict}
             </span>
           </div>
           <p className="text-[11px] text-muted-foreground line-clamp-1 italic leading-relaxed">
-            "{summary}"
+            &quot;{summary}&quot;
           </p>
         </div>
       </td>
 
       {/* 4. Action (Professional) */}
       <td className="py-3 px-6 text-right">
-        <div className="flex items-center justify-end gap-3 transition-all duration-200">
-          {isEngaged && (
-            <motion.div
-              layout
-              initial={{ opacity: 0, x: 10 }}
-              whileHover={{ opacity: 1, x: 0 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ type: "spring", stiffness: 300, damping: 30 }}
-              className="opacity-0 group-hover:opacity-100 flex items-center"
-            >
-              <motion.button
+        <div className="flex items-center justify-end gap-3">
+          {isEngaged ? (
+            <div className="flex items-center gap-2">
+              <motion.div
                 layout
-                onClick={(e) => { e.stopPropagation(); setIsPlaying(!isPlaying); }}
-                className={cn(
-                  "h-7 flex items-center bg-foreground text-background font-bold tracking-widest overflow-hidden transition-all duration-500 rounded-full",
-                  isPlaying ? "px-3 gap-3 w-48" : "px-3 gap-2 w-auto"
-                )}
+                initial={{ opacity: 0, x: 10 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+                className="flex items-center"
               >
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  {isPlaying ? <Pause size={12} fill="currentColor" /> : <Play size={12} fill="currentColor" />}
-                  {!isPlaying && <span className="text-[9px] uppercase">3:42</span>}
-                </div>
+                <motion.button
+                  layout
+                  onClick={(e) => { e.stopPropagation(); setIsPlaying(!isPlaying); }}
+                  className={cn(
+                    'h-7 flex items-center bg-foreground text-background font-bold tracking-widest overflow-hidden transition-all duration-500 rounded-full',
+                    isPlaying ? 'px-3 gap-3 w-48' : 'px-3 gap-2 w-auto',
+                  )}
+                >
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {isPlaying ? <Pause size={12} fill="currentColor" /> : <Play size={12} fill="currentColor" />}
+                    {!isPlaying && <span className="text-[9px] uppercase">3:42</span>}
+                  </div>
 
-                {isPlaying && (
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="flex-1 flex items-center gap-2"
-                  >
-                    <div className="flex-1 h-1 bg-background/20 rounded-full relative overflow-hidden">
-                      <motion.div
-                        initial={{ width: 0 }}
-                        animate={{ width: "35%" }}
-                        className="absolute inset-y-0 left-0 bg-background"
-                      />
-                    </div>
-                    <span className="text-[8px] font-mono tabular-nums opacity-60">1:12</span>
-                  </motion.div>
-                )}
-              </motion.button>
-            </motion.div>
+                  {isPlaying && (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className="flex-1 flex items-center gap-2"
+                    >
+                      <div className="flex-1 h-1 bg-background/20 rounded-full relative overflow-hidden">
+                        <motion.div
+                          initial={{ width: 0 }}
+                          animate={{ width: '35%' }}
+                          className="absolute inset-y-0 left-0 bg-background"
+                        />
+                      </div>
+                      <span className="text-[8px] font-mono tabular-nums opacity-60">1:12</span>
+                    </motion.div>
+                  )}
+                </motion.button>
+              </motion.div>
+
+              <div className="flex items-center min-w-[14px] group-hover:hidden transition-all">
+                <MessageSquare
+                  size={14}
+                  className="text-muted-foreground/60"
+                />
+              </div>
+            </div>
+          ) : (
+            <MessageSquare size={14} className="text-muted-foreground/60 group-hover:hidden" />
           )}
 
           <button
@@ -181,11 +199,6 @@ const TranscriptRow = ({
             <ArrowUpRight size={14} />
           </button>
         </div>
-
-        {/* Placeholder for Action when not hovering */}
-        <div className="group-hover:hidden flex items-center justify-end">
-          <MessageSquare size={14} className="text-muted-foreground/60 transition-colors" />
-        </div>
       </td>
     </tr>
   );
@@ -194,8 +207,7 @@ const TranscriptRow = ({
 // --- Page Component ---
 
 export default function DashboardPage() {
-  const [greeting, setGreeting] = useState("Hi!");
-  const router = useRouter();
+  const [greeting, setGreeting] = useState('Hi!');
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedTranscript, setSelectedTranscript] = useState<Transcript | null>(null);
   const [filters, setFilters] = useState<FilterState>({
@@ -225,7 +237,7 @@ export default function DashboardPage() {
   const mergedTranscripts = useMemo(() => {
     return transcripts.map(t => ({
       ...t,
-      analytics: allAnalytics.find(a => a.call_id === t.call_id)
+      analytics: allAnalytics.find(a => a.call_id === t.call_id),
     }));
   }, [transcripts, allAnalytics]);
 
@@ -236,7 +248,7 @@ export default function DashboardPage() {
 
       // 2. Verdicts
       if (filters.verdicts.length > 0) {
-        const verdict = t.analytics?.verdict || (t.has_conversation ? "conversation" : "no_answer");
+        const verdict = t.analytics?.verdict || (t.has_conversation ? 'conversation' : 'no_answer');
         if (!filters.verdicts.includes(verdict)) return false;
       }
 
@@ -305,11 +317,11 @@ export default function DashboardPage() {
           <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <PaperCard
               shaderProps={{
-                colors: ["#ffffff", "#f3f4f6", "#b1aa91", "#facc15"],
+                colors: ['#ffffff', '#f3f4f6', '#b1aa91', '#facc15'],
                 positions: 42,
                 waveX: 0.45,
                 waveY: 1,
-                grainMixer: 0.45
+                grainMixer: 0.45,
               }}
             >
               <PaperCardHeader>
@@ -325,11 +337,11 @@ export default function DashboardPage() {
 
             <PaperCard
               shaderProps={{
-                colors: ["#ffffff", "#f9fafb", "#e5e7eb", "#8e8c15"],
+                colors: ['#ffffff', '#f9fafb', '#e5e7eb', '#8e8c15'],
                 positions: 60,
                 waveX: 0.8,
                 waveY: 0.3,
-                mixing: 0.1
+                mixing: 0.1,
               }}
             >
               <PaperCardHeader>
@@ -345,11 +357,11 @@ export default function DashboardPage() {
 
             <PaperCard
               shaderProps={{
-                colors: ["#ffffff", "#f3f4f6", "#b1aa91", "#000000"],
+                colors: ['#ffffff', '#f3f4f6', '#b1aa91', '#000000'],
                 positions: 20,
                 waveX: 0.2,
                 waveY: 0.2,
-                grainOverlay: 0.9
+                grainOverlay: 0.9,
               }}
             >
               <PaperCardHeader>
@@ -389,11 +401,11 @@ export default function DashboardPage() {
             <div className="overflow-hidden">
               <table className="w-full text-left">
                 <thead>
-                  <tr className="border-b border-border/20">
-                    <th className="py-4 px-6 text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/40">Lead Identity</th>
-                    <th className="py-4 px-6 text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/40">Interaction</th>
-                    <th className="py-4 px-6 text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/40">AI Analysis</th>
-                    <th className="py-4 px-6 text-right text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/40">Actions</th>
+                  <tr className="border-b border-border/40">
+                    <th className="py-4 px-6 text-[10px] font-bold uppercase tracking-[0.2em] text-foreground/70">Lead Identity</th>
+                    <th className="py-4 px-6 text-[10px] font-bold uppercase tracking-[0.2em] text-foreground/70">Interaction</th>
+                    <th className="py-4 px-6 text-[10px] font-bold uppercase tracking-[0.2em] text-foreground/70">AI Analysis</th>
+                    <th className="py-4 px-6 text-right text-[10px] font-bold uppercase tracking-[0.2em] text-foreground/70">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/10">

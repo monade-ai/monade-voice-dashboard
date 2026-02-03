@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { z } from 'zod';
 
 import { useTranslations } from '@/i18n/translations-context';
 import { Input } from '@/components/ui/input';

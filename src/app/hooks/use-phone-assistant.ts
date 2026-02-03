@@ -2,6 +2,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
+
 import { initiateExotelCall } from '@/lib/services/exotel-service';
 
 interface UsePhoneAssistantProps {
@@ -34,6 +35,7 @@ export function usePhoneAssistant({
     if (!phoneNumber) {
       setError(new Error('Phone number is required'));
       console.error('[usePhoneAssistant] No phone number provided');
+
       return;
     }
 
@@ -67,6 +69,7 @@ export function usePhoneAssistant({
         const errorText = await response.text();
         setError(new Error(errorText));
         console.error('[usePhoneAssistant] Call failed, response not ok:', errorText);
+
         return;
       }
 

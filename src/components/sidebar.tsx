@@ -17,12 +17,11 @@ import {
   Moon,
   Settings,
   ChevronRight,
-  Globe
+  Globe,
 } from 'lucide-react';
+import { useTheme } from 'next-themes';
 
 import { cn } from '@/lib/utils';
-import { useTranslations } from '@/i18n/translations-context';
-import { useTheme } from 'next-themes';
 import { useAuth } from '@/contexts/auth-context';
 
 interface NavItemProps {
@@ -52,23 +51,23 @@ function NavItem({ href, icon, label, isActive = false, count, isLive = false }:
       
       <div className="flex items-center gap-3">
         <div className={cn(
-            "transition-colors",
-            isActive ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
+          'transition-colors',
+          isActive ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground',
         )}>
-            {React.cloneElement(icon as React.ReactElement, { size: 18 })}
+          {React.cloneElement(icon as React.ReactElement, { size: 18 })}
         </div>
         <span className="text-sm tracking-tight">{label}</span>
       </div>
 
       {isLive && (
         <div className="flex items-center gap-1.5">
-             <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+          <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
         </div>
       )}
 
       {count !== undefined && count > 0 && (
         <span className="text-[10px] font-mono font-bold bg-muted px-1.5 py-0.5 rounded-[2px] text-muted-foreground group-hover:bg-primary/20 group-hover:text-primary transition-colors">
-            {count}
+          {count}
         </span>
       )}
     </Link>
@@ -76,17 +75,16 @@ function NavItem({ href, icon, label, isActive = false, count, isLive = false }:
 }
 
 function CategoryLabel({ children }: { children: React.ReactNode }) {
-    return (
-        <h3 className="px-3 mt-8 mb-2 text-[9px] font-bold uppercase tracking-[0.4em] text-muted-foreground/40 select-none">
-            {children}
-        </h3>
-    );
+  return (
+    <h3 className="px-3 mt-8 mb-2 text-[9px] font-bold uppercase tracking-[0.4em] text-muted-foreground/40 select-none">
+      {children}
+    </h3>
+  );
 }
 
 export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { t } = useTranslations();
   const { theme, setTheme } = useTheme();
   const { user } = useAuth();
 
@@ -107,14 +105,14 @@ export function Sidebar() {
       {/* Header: Brand Logo */}
       <div className="p-6 pb-2">
         <div className="flex items-center mb-4">
-            <Image
-              src="/monade-logo.png"
-              alt="monade logo"
-              width={120}
-              height={40}
-              priority
-              className="dark:invert-0"
-            />
+          <Image
+            src="/monade-logo.png"
+            alt="monade logo"
+            width={120}
+            height={40}
+            priority
+            className="dark:invert-0"
+          />
         </div>
       </div>
 
@@ -158,7 +156,7 @@ export function Sidebar() {
           label="Campaign History"
           isActive={pathname === '/campaign-history'}
         />
-         <NavItem
+        <NavItem
           href="/call-history"
           icon={<PhoneCall />}
           label="Call Logs"
@@ -191,41 +189,41 @@ export function Sidebar() {
         
         {/* User Card: Connects to Settings & Fetches Real Data */}
         <button 
-            onClick={() => router.push('/settings')}
-            className="w-full flex items-center justify-between p-2 rounded-[4px] hover:bg-muted/50 transition-all group border border-transparent hover:border-border/40"
+          onClick={() => router.push('/settings')}
+          className="w-full flex items-center justify-between p-2 rounded-[4px] hover:bg-muted/50 transition-all group border border-transparent hover:border-border/40"
         >
-            <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center overflow-hidden">
-                    <span className="text-xs font-bold text-primary">{initial}</span>
-                </div>
-                <div className="flex flex-col text-left overflow-hidden">
-                    <span className="text-xs font-medium truncate w-32">{displayName}</span>
-                    <span className="text-[9px] text-muted-foreground uppercase tracking-widest truncate w-32">{displayEmail}</span>
-                </div>
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center overflow-hidden">
+              <span className="text-xs font-bold text-primary">{initial}</span>
             </div>
-            <ChevronRight size={14} className="text-muted-foreground group-hover:text-primary transition-colors" />
+            <div className="flex flex-col text-left overflow-hidden">
+              <span className="text-xs font-medium truncate w-32">{displayName}</span>
+              <span className="text-[9px] text-muted-foreground uppercase tracking-widest truncate w-32">{displayEmail}</span>
+            </div>
+          </div>
+          <ChevronRight size={14} className="text-muted-foreground group-hover:text-primary transition-colors" />
         </button>
 
         <div className="grid grid-cols-2 gap-2 mt-4">
-            <button 
-                onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-                className="flex items-center justify-center gap-2 py-1.5 rounded-[4px] border border-border/50 text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-all"
-            >
-                {theme === 'light' ? <Moon size={14} /> : <Sun size={14} />}
-                <span className="text-[10px] font-bold uppercase tracking-wider">{theme === 'dark' ? 'Light' : 'Dark'}</span>
-            </button>
-            <button className="flex items-center justify-center gap-2 py-1.5 rounded-[4px] border border-border/50 text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-all">
-                <Globe size={14} />
-                <span className="text-[10px] font-bold uppercase tracking-wider">EN</span>
-            </button>
+          <button 
+            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            className="flex items-center justify-center gap-2 py-1.5 rounded-[4px] border border-border/50 text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-all"
+          >
+            {theme === 'light' ? <Moon size={14} /> : <Sun size={14} />}
+            <span className="text-[10px] font-bold uppercase tracking-wider">{theme === 'dark' ? 'Light' : 'Dark'}</span>
+          </button>
+          <button className="flex items-center justify-center gap-2 py-1.5 rounded-[4px] border border-border/50 text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-all">
+            <Globe size={14} />
+            <span className="text-[10px] font-bold uppercase tracking-wider">EN</span>
+          </button>
         </div>
 
         <button 
-            onClick={() => router.push('/settings')}
-            className="w-full mt-2 flex items-center justify-center gap-2 py-1.5 rounded-[4px] text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-all"
+          onClick={() => router.push('/settings')}
+          className="w-full mt-2 flex items-center justify-center gap-2 py-1.5 rounded-[4px] text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-all"
         >
-            <Settings size={14} />
-            <span className="text-[10px] font-bold uppercase tracking-widest">Settings</span>
+          <Settings size={14} />
+          <span className="text-[10px] font-bold uppercase tracking-widest">Settings</span>
         </button>
       </div>
     </div>

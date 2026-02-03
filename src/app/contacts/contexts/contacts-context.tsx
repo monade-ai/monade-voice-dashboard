@@ -58,8 +58,6 @@ export const ContactsProvider: React.FC<ContactsProviderProps> = ({ children }) 
   const [selectedBucket, setSelectedBucket] = useState<Bucket | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  // TODO: Replace with new Supabase-based organization context
-  const currentOrganization = { id: 'default-org-id' }; // Placeholder
   const { assistants } = useAssistants();
   const assistantPhoneNumbers = assistants
     .map((a) => a.phoneNumber)
@@ -79,7 +77,7 @@ export const ContactsProvider: React.FC<ContactsProviderProps> = ({ children }) 
       console.error('[ContactsContext] Error details:', {
         message: error.message,
         stack: error.stack,
-        name: error.name
+        name: error.name,
       });
       setBuckets([]);
     } finally {

@@ -11,6 +11,7 @@ export function getClient() {
     // Daily.co is optional - LiveKit is the primary transport
     if (!process.env.NEXT_PUBLIC_DAILY_ROOM_URL) {
       console.warn('[rtviClient] Daily room URL not configured. Daily-based features disabled. Using LiveKit instead.');
+
       return null;
     }
 

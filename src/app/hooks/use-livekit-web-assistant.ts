@@ -42,7 +42,7 @@ export function useLiveKitWebAssistant({
       console.log('[useLiveKitWebAssistant] Calling createLiveKitDispatch with:', { 
         roomName, 
         agentName: assistantName,
-        calleeInfo
+        calleeInfo,
       });
       
       const response = await fetch('/api/livekit-dispatch', {
@@ -54,7 +54,7 @@ export function useLiveKitWebAssistant({
           roomName,
           agentName: assistantName,
           calleeInfo,
-          assistantId
+          assistantId,
         }),
       });
 

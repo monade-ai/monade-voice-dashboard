@@ -10,10 +10,11 @@ import {
   useVoiceAssistant,
   useLocalParticipant,
   useRoomContext,
-  BarVisualizer
+  BarVisualizer,
 } from '@livekit/components-react';
 
 import { Button } from '@/components/ui/button';
+
 import { Transcript } from './embed/transcript';
 
 interface ChatMessage {
@@ -37,7 +38,7 @@ interface AgentStarterEmbedProps {
 // Component that runs inside the RoomContext
 function AgentStarterEmbedContent({
   agentName,
-  onDisconnect
+  onDisconnect,
 }: {
   agentName: string;
   onDisconnect: () => void;
@@ -45,16 +46,14 @@ function AgentStarterEmbedContent({
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: '1',
-      text: `Hi! I'm your Monade assistant. How can I help you today?`,
+      text: 'Hi! I\'m your Monade assistant. How can I help you today?',
       sender: 'assistant',
-      timestamp: new Date()
-    }
+      timestamp: new Date(),
+    },
   ]);
   const [micPermissionGranted, setMicPermissionGranted] = useState(false);
 
-  const {
-    state: agentState,
-  } = useVoiceAssistant();
+  useVoiceAssistant();
 
   const { isMicrophoneEnabled, microphoneTrack, localParticipant } = useLocalParticipant();
   const room = useRoomContext();
@@ -77,15 +76,15 @@ function AgentStarterEmbedContent({
         hasMediaStreamTrack: !!microphoneTrack?.mediaStreamTrack,
         isEnabled: microphoneTrack?.mediaStreamTrack?.enabled,
         readyState: microphoneTrack?.mediaStreamTrack?.readyState,
-        muted: microphoneTrack?.mediaStreamTrack?.muted
-      } : null
+        muted: microphoneTrack?.mediaStreamTrack?.muted,
+      } : null,
     });
 
     if (microphoneTrack && microphoneTrack.mediaStreamTrack) {
       console.log('[AgentStarterEmbed] Microphone track available:', {
         enabled: microphoneTrack.mediaStreamTrack.enabled,
         readyState: microphoneTrack.mediaStreamTrack.readyState,
-        muted: microphoneTrack.mediaStreamTrack.muted
+        muted: microphoneTrack.mediaStreamTrack.muted,
       });
       setMicPermissionGranted(true);
     } else {
@@ -112,7 +111,7 @@ function AgentStarterEmbedContent({
               id: Date.now().toString(),
               text: data.text,
               sender: 'assistant',
-              timestamp: new Date()
+              timestamp: new Date(),
             }]);
           }
         } catch (e) {
@@ -197,9 +196,9 @@ function AgentStarterEmbedContent({
                   >
                     <span
                       className={`w-2 rounded-t transition-all duration-75 ${isMicrophoneEnabled
-                          ? 'bg-amber-500'
-                          : 'bg-gray-300 dark:bg-gray-600'
-                        }`}
+                        ? 'bg-amber-500'
+                        : 'bg-gray-300 dark:bg-gray-600'
+                      }`}
                       style={{ height: '100%' }}
                     />
                   </BarVisualizer>
@@ -282,14 +281,14 @@ function AgentStarterEmbedContent({
 }
 
 export function AgentStarterEmbed({
-  roomName,
+  roomName: _roomName,
   agentName,
   serverUrl,
   participantToken,
   isOpen,
-  onClose,
+  onClose: _onClose,
   onDisconnect,
-  onError // New prop
+  onError,
 }: AgentStarterEmbedProps) {
   // Create room with basic configuration
   const room = useMemo(() => {
@@ -321,6 +320,7 @@ export function AgentStarterEmbed({
       return roomInstance;
     } catch (error) {
       console.error('[AgentStarterEmbed] Error creating room:', error);
+
       // Fallback to basic room if options fail
       return new Room();
     }
@@ -334,11 +334,13 @@ export function AgentStarterEmbed({
 
     if (!participantToken) {
       console.error('[AgentStarterEmbed] Error: No participant token provided');
+
       return;
     }
 
     if (room.state !== 'disconnected') {
       console.log('[AgentStarterEmbed] Room already connected, skipping');
+
       return;
     }
 
@@ -350,16 +352,16 @@ export function AgentStarterEmbed({
         // Use Promise.all to enable microphone and connect simultaneously
         await Promise.all([
           room.localParticipant.setMicrophoneEnabled(true, undefined, {
-            preConnectBuffer: true
+            preConnectBuffer: true,
           }),
-          room.connect(serverUrl, participantToken)
+          room.connect(serverUrl, participantToken),
         ]);
 
         console.log('[AgentStarterEmbed] Connected to room and enabled microphone:', {
           roomName: room.name,
           roomSid: room.sid,
           localParticipant: room.localParticipant?.identity,
-          localParticipantSid: room.localParticipant?.sid
+          localParticipantSid: room.localParticipant?.sid,
         });
 
       } catch (error) {
@@ -384,17 +386,7 @@ export function AgentStarterEmbed({
         room.disconnect();
       }
     };
-  }, [isOpen, room, serverUrl, participantToken]);
-
-  // NOTE: We're NOT calling onDisconnect here to prevent immediate disconnection
-  // The parent component will handle disconnection when needed
-  const handleDisconnect = () => {
-    if (room.state !== 'disconnected') {
-      room.disconnect();
-    }
-    // Don't call onDisconnect here to prevent interference with parent component
-    // Just disconnect the room, let the parent handle the UI state
-  };
+  }, [isOpen, room, serverUrl, participantToken, onError]);
 
   // Prevent accidental closure - only allow closing via disconnect button
   const handleBackgroundClick = (e: React.MouseEvent) => {

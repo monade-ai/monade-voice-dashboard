@@ -1,9 +1,8 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GrainGradient } from '@paper-design/shaders-react';
-import { login, signup } from './actions';
 import { useRouter } from 'next/navigation';
 
 // --- Types ---
@@ -37,9 +36,8 @@ export default function LoginPage() {
     useCase: '',
     callVolume: '',
     teamSize: '',
-    origin: ''
+    origin: '',
   });
-  const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
 
   const handleIdentitySubmit = async (e: React.FormEvent) => {
@@ -55,7 +53,7 @@ export default function LoginPage() {
     
     // Simulate AI configuration delay
     setTimeout(() => {
-        router.push('/assistants');
+      router.push('/assistants');
     }, 2500);
   };
 
@@ -89,7 +87,7 @@ export default function LoginPage() {
                     Welcome to Monade.
                   </h1>
                   <p className="text-muted-foreground mb-8 text-sm">
-                    Let's get to work.
+                    Let&apos;s get to work.
                   </p>
                 </FadeIn>
 
@@ -102,7 +100,7 @@ export default function LoginPage() {
                         required 
                         className="w-full px-0 py-2 bg-transparent border-b border-border focus:border-[#facc15] focus:ring-0 transition-colors outline-none rounded-none"
                         placeholder="name@company.com"
-                        onChange={(e) => setFormData({...formData, email: e.target.value})}
+                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                       />
                     </div>
                   </FadeIn>
@@ -127,9 +125,9 @@ export default function LoginPage() {
                       Continue
                     </button>
                     <div className="mt-4 flex gap-4 text-xs text-muted-foreground justify-center">
-                        <button type="button" className="hover:text-foreground transition-colors">Forgot password?</button>
-                        <span>|</span>
-                        <button type="button" className="hover:text-foreground transition-colors">SSO Login</button>
+                      <button type="button" className="hover:text-foreground transition-colors">Forgot password?</button>
+                      <span>|</span>
+                      <button type="button" className="hover:text-foreground transition-colors">SSO Login</button>
                     </div>
                   </FadeIn>
                 </form>
@@ -150,7 +148,7 @@ export default function LoginPage() {
                     Help us tune your engine.
                   </h1>
                   <p className="text-muted-foreground mb-8 text-sm">
-                    We'll pre-configure your assistant based on your needs.
+                    We&apos;ll pre-configure your assistant based on your needs.
                   </p>
                 </FadeIn>
 
@@ -163,7 +161,7 @@ export default function LoginPage() {
                         <button
                           key={opt}
                           type="button"
-                          onClick={() => setFormData({...formData, useCase: opt})}
+                          onClick={() => setFormData({ ...formData, useCase: opt })}
                           className={`text-left px-3 py-2 rounded-[4px] text-sm border transition-all ${
                             formData.useCase === opt 
                               ? 'border-[#facc15] bg-[#facc15]/10 text-foreground' 
@@ -184,7 +182,7 @@ export default function LoginPage() {
                         <button
                           key={opt}
                           type="button"
-                          onClick={() => setFormData({...formData, callVolume: opt})}
+                          onClick={() => setFormData({ ...formData, callVolume: opt })}
                           className={`flex-1 px-3 py-2 rounded-[4px] text-sm border transition-all ${
                             formData.callVolume === opt 
                               ? 'border-[#facc15] bg-[#facc15]/10 text-foreground' 
@@ -198,14 +196,14 @@ export default function LoginPage() {
                   </FadeIn>
                   
                   {/* Team Size */}
-                   <FadeIn delay={0.3}>
+                  <FadeIn delay={0.3}>
                     <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground block mb-3">Team Size</label>
                     <div className="flex gap-3">
                       {['Solo', 'Startup (2-10)', 'Enterprise'].map((opt) => (
                         <button
                           key={opt}
                           type="button"
-                          onClick={() => setFormData({...formData, teamSize: opt})}
+                          onClick={() => setFormData({ ...formData, teamSize: opt })}
                           className={`flex-1 px-3 py-2 rounded-[4px] text-sm border transition-all ${
                             formData.teamSize === opt 
                               ? 'border-[#facc15] bg-[#facc15]/10 text-foreground' 
@@ -262,16 +260,16 @@ export default function LoginPage() {
         
         {/* Generative Shader */}
         <div className="absolute inset-0 w-full h-full opacity-90">
-             <GrainGradient
-              colors={["#facc15", "#a49c74", "#568b50"]}
-              colorBack="#0e0d16"
-              softness={0}
-              intensity={0.15}
-              noise={0.5}
-              shape="blob"
-              speed={0.8}
-              scale={1.3}
-            />
+          <GrainGradient
+            colors={['#facc15', '#a49c74', '#568b50']}
+            colorBack="#0e0d16"
+            softness={0}
+            intensity={0.15}
+            noise={0.5}
+            shape="blob"
+            speed={0.8}
+            scale={1.3}
+          />
         </div>
 
         {/* Testimonial Overlay */}
@@ -283,7 +281,7 @@ export default function LoginPage() {
         >
           <div className="bg-black/40 backdrop-blur-md p-6 rounded-[4px] border border-white/10">
             <p className="text-lg text-white/90 font-light leading-relaxed mb-4">
-              "We replaced our entire tier-1 support with Monade. It doesn't just answer; it understands."
+              &quot;We replaced our entire tier-1 support with Monade. It doesn&apos;t just answer; it understands.&quot;
             </p>
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-xs font-bold text-white">

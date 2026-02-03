@@ -32,7 +32,7 @@ export function AudioVisualizer({ agentState, audioData }: AudioVisualizerProps)
   };
   
   // Determine bar colors based on agent state
-  const getBarColor = (index: number) => {
+  const getBarColor = (_index: number) => {
     if (agentState === 'speaking') {
       return 'bg-foreground';
     } else if (agentState === 'listening') {

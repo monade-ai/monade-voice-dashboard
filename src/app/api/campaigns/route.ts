@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
-import type { 
-  CreateCampaignRequest, 
-  CampaignResponse, 
+
+import type {
+  CreateCampaignRequest,
   CampaignListRequest,
-  ExotelCampaignCreateRequest
+  ExotelCampaignCreateRequest,
 } from '@/types/campaign';
 import { EXOTEL_ACCOUNT_CONFIG } from '@/types/campaign';
 
@@ -15,6 +15,7 @@ function getExotelApiUrl(path: string): string {
 // Helper function to get Basic Auth header
 function getAuthHeader(): string {
   const credentials = `${EXOTEL_ACCOUNT_CONFIG.API_USERNAME}:${EXOTEL_ACCOUNT_CONFIG.API_PASSWORD}`;
+
   return `Basic ${Buffer.from(credentials).toString('base64')}`;
 }
 
@@ -78,9 +79,10 @@ export async function GET(request: Request) {
     return NextResponse.json(data);
   } catch (error) {
     console.error('[Campaigns API] Error fetching campaigns:', error);
+
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to fetch campaigns' },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -96,14 +98,14 @@ export async function POST(request: Request) {
     if (!body.caller_id) {
       return NextResponse.json(
         { error: 'Missing required field: caller_id' },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (!body.from && !body.lists) {
       return NextResponse.json(
         { error: 'Either "from" (phone numbers) or "lists" (list IDs) must be provided' },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -111,7 +113,7 @@ export async function POST(request: Request) {
     if (body.url && body.read_via_text) {
       return NextResponse.json(
         { error: 'Cannot provide both URL and text content. Please choose either a custom URL flow or text content, not both.' },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -155,7 +157,7 @@ export async function POST(request: Request) {
     if (!campaignData.url && !campaignData.read_via_text) {
       return NextResponse.json(
         { error: 'Either URL or message content (minimum 10 characters) is required' },
-        { status: 400 }
+        { status: 400 },
       );
     }
     
@@ -189,7 +191,7 @@ export async function POST(request: Request) {
 
     // Wrap the campaign data as Exotel expects it
     const requestPayload: ExotelCampaignCreateRequest = {
-      campaigns: [campaignData]
+      campaigns: [campaignData],
     };
     
     console.log('[Campaigns API] ✅ FIXED: Wrapping campaign data in campaigns array');
@@ -205,13 +207,15 @@ export async function POST(request: Request) {
     });
 
     console.log('[Campaigns API] Campaign created successfully:', data);
+
     return NextResponse.json(data);
     
   } catch (error) {
     console.error('[Campaigns API] Error creating campaign:', error);
+
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to create campaign' },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

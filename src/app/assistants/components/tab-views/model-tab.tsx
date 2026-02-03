@@ -5,8 +5,7 @@ import { useState, useEffect } from 'react';
 import { useAssistants } from '@/app/hooks/use-assistants-context';
 import { useKnowledgeBase } from '@/app/hooks/use-knowledge-base';
 import { useContactsContext } from '@/app/contacts/contexts/contacts-context';
-import { useTrunks, deallocatePhoneNumber } from '@/app/hooks/use-trunks';
-import { toast } from 'sonner';
+import { useTrunks } from '@/app/hooks/use-trunks';
 import {
   Select,
   SelectContent,
@@ -17,60 +16,6 @@ import {
 import { Button } from '@/components/ui/button';
 
 
-// Define available providers and their models
-const providerOptions = [
-  { value: 'openai', label: 'OpenAI' },
-  { value: 'anthropic', label: 'Anthropic' },
-  { value: 'google', label: 'Google' },
-  { value: 'mistral', label: 'Mistral AI' },
-];
-
-const modelsByProvider = {
-  openai: [
-    { value: 'gpt-4', label: 'GPT-4' },
-    { value: 'gpt-4-turbo', label: 'GPT-4 Turbo' },
-    { value: 'gpt-4-vision', label: 'GPT-4 Vision' },
-    { value: 'gpt-3.5-turbo', label: 'GPT-3.5 Turbo' },
-    { value: 'tts-1', label: 'TTS-1' },
-  ],
-  anthropic: [
-    { value: 'claude-3-opus', label: 'Claude 3 Opus' },
-    { value: 'claude-3-sonnet', label: 'Claude 3 Sonnet' },
-    { value: 'claude-3-haiku', label: 'Claude 3 Haiku' },
-  ],
-  google: [
-    { value: 'gemini-pro', label: 'Gemini Pro' },
-    { value: 'gemini-ultra', label: 'Gemini Ultra' },
-  ],
-  mistral: [
-    { value: 'mistral-large', label: 'Mistral Large' },
-    { value: 'mistral-medium', label: 'Mistral Medium' },
-    { value: 'mistral-small', label: 'Mistral Small' },
-  ],
-};
-
-const voicesByProvider = {
-  openai: [
-    { value: 'alloy', label: 'Alloy' },
-    { value: 'echo', label: 'Echo' },
-    { value: 'fable', label: 'Fable' },
-    { value: 'onyx', label: 'Onyx' },
-    { value: 'nova', label: 'Nova' },
-    { value: 'shimmer', label: 'Shimmer' },
-  ],
-  anthropic: [
-    { value: 'claude', label: 'Claude' },
-    { value: 'sage', label: 'Sage' },
-  ],
-  google: [
-    { value: 'harmonic', label: 'Harmonic' },
-    { value: 'crystal', label: 'Crystal' },
-  ],
-  mistral: [
-    { value: 'mistral-voice', label: 'Mistral Voice' },
-  ],
-};
-
 // Define the props type including the new handler
 interface ModelTabProps {
   onChangesMade: () => void;
@@ -80,13 +25,8 @@ export default function ModelTab({ onChangesMade }: ModelTabProps) {
   const { currentAssistant, updateAssistantLocally } = useAssistants();
   const { knowledgeBases } = useKnowledgeBase();
   const { buckets } = useContactsContext();
-  const { trunks, phoneNumbers, loading: phoneNumbersLoading, checkingAssignments, refreshAssignments } = useTrunks();
-  const [deallocating, setDeallocating] = useState<string | null>(null);
+  const { trunks } = useTrunks();
 
-  const [provider, setProvider] = useState(currentAssistant?.provider || 'openai');
-  const [model, setModel] = useState(currentAssistant?.model || 'tts-1');
-  const [voice, setVoice] = useState(currentAssistant?.voice || 'alloy');
-  const [phoneNumber, setPhoneNumber] = useState(currentAssistant?.phoneNumber || '');
   const [callProvider, setCallProvider] = useState(currentAssistant?.callProvider || 'vobiz');
   const [knowledgeBaseId, setKnowledgeBaseId] = useState(currentAssistant?.knowledgeBase || '');
   const [contactBucketId, setContactBucketId] = useState(currentAssistant?.contact_bucket_id || '');
@@ -99,32 +39,19 @@ export default function ModelTab({ onChangesMade }: ModelTabProps) {
       ? 'Indian calls - Best for +91 numbers'
       : trunk.name.toLowerCase().includes('twilio')
         ? 'International calls - Global coverage'
-        : `SIP Trunk: ${trunk.address}`
+        : `SIP Trunk: ${trunk.address}`,
   })) : [
     // Fallback if no trunks loaded yet
     { value: 'vobiz', label: 'Vobiz', description: 'Indian calls - Best for +91 numbers' },
-    { value: 'twilio', label: 'Twilio', description: 'International calls - Global coverage' }
+    { value: 'twilio', label: 'Twilio', description: 'International calls - Global coverage' },
   ];
 
   // Synchronize local state with currentAssistant when it changes
   useEffect(() => {
-    setProvider(currentAssistant?.provider || 'openai');
-    setModel(currentAssistant?.model || 'tts-1');
-    setVoice(currentAssistant?.voice || 'alloy');
-    setPhoneNumber(currentAssistant?.phoneNumber || '');
     setCallProvider(currentAssistant?.callProvider || 'vobiz');
     setKnowledgeBaseId(currentAssistant?.knowledgeBase || '');
     setContactBucketId(currentAssistant?.contact_bucket_id || '');
   }, [currentAssistant]);
-
-  // Handle phone number selection from dropdown
-  const handlePhoneNumberChange = (value: string) => {
-    setPhoneNumber(value);
-    if (currentAssistant) {
-      updateAssistantLocally(currentAssistant.id, { phoneNumber: value });
-      onChangesMade(); // Mark changes
-    }
-  };
 
   // Handle call provider change
   const handleCallProviderChange = (value: string) => {
@@ -138,69 +65,6 @@ export default function ModelTab({ onChangesMade }: ModelTabProps) {
     }
   };
 
-  // Handle deallocating a phone number from another assistant
-  const handleDeallocate = async (assistantId: string, phoneNum: string) => {
-    if (!assistantId) return;
-
-    setDeallocating(assistantId);
-    try {
-      const result = await deallocatePhoneNumber(assistantId);
-      if (result.success) {
-        toast.success(`Phone number ${phoneNum} has been deallocated`);
-        // Refresh the assignments list
-        refreshAssignments();
-      } else {
-        toast.error(result.error || 'Failed to deallocate phone number');
-      }
-    } catch (err) {
-      toast.error('An error occurred while deallocating');
-    } finally {
-      setDeallocating(null);
-    }
-  };
-
-  // Get available models for selected provider
-  const availableModels = modelsByProvider[provider as keyof typeof modelsByProvider] || [];
-
-  // Get available voices for selected provider
-  const availableVoices = voicesByProvider[provider as keyof typeof voicesByProvider] || [];
-
-  // Update the assistant when selections change
-  const handleProviderChange = (value: string) => {
-    setProvider(value);
-
-    // Reset model and voice to first options from the new provider
-    const firstModel = modelsByProvider[value as keyof typeof modelsByProvider]?.[0]?.value || '';
-    const firstVoice = voicesByProvider[value as keyof typeof voicesByProvider]?.[0]?.value || '';
-
-    setModel(firstModel);
-    setVoice(firstVoice);
-
-    if (currentAssistant) {
-      updateAssistantLocally(currentAssistant.id, {
-        provider: value,
-        model: firstModel,
-        voice: firstVoice,
-      });
-      onChangesMade(); // Mark changes
-    }
-  };
-
-  const handleModelChange = (value: string) => {
-    setModel(value);
-    if (currentAssistant) {
-      updateAssistantLocally(currentAssistant.id, { model: value });
-      onChangesMade(); // Mark changes
-    }
-  };
-
-  const handleVoiceChange = (value: string) => {
-    setVoice(value);
-    if (currentAssistant) {
-      updateAssistantLocally(currentAssistant.id, { voice: value });
-      onChangesMade(); // Mark changes
-    }
-  };
 
   // Handler for knowledge base change
   const handleKnowledgeBaseChange = (value: string) => {

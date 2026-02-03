@@ -2,6 +2,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
+
 import { initiateNewCall } from '@/lib/services/new-calling-service';
 
 interface CalleeInfo {
@@ -11,7 +12,7 @@ interface CalleeInfo {
 interface UseNewPhoneAssistantProps {
   assistantId: string;
   assistantName: string;
-  apiKey: string | null;  // User's API key for billing
+  apiKey: string | null; // User's API key for billing
 }
 
 interface UseNewPhoneAssistantReturn {
@@ -41,6 +42,7 @@ export function useNewPhoneAssistant({
     if (!phoneNumber) {
       setError(new Error('Phone number is required'));
       console.error('[useNewPhoneAssistant] No phone number provided');
+
       return;
     }
 
@@ -48,6 +50,7 @@ export function useNewPhoneAssistant({
       setError(new Error('API key is required for billing. Please ensure you have an API key configured.'));
       console.error('[useNewPhoneAssistant] No API key provided');
       setCallStatus('failed');
+
       return;
     }
 
@@ -55,6 +58,7 @@ export function useNewPhoneAssistant({
       setError(new Error('Please select a trunk (Twilio or Vobiz) to make the call.'));
       console.error('[useNewPhoneAssistant] No trunk selected');
       setCallStatus('failed');
+
       return;
     }
 
@@ -68,15 +72,15 @@ export function useNewPhoneAssistant({
         callee_info: calleeInfo,
         assistant_id: assistantId,
         trunk_name: trunkName,
-        api_key: apiKey ? `${apiKey.substring(0, 20)}...` : 'NOT PROVIDED'
+        api_key: apiKey ? `${apiKey.substring(0, 20)}...` : 'NOT PROVIDED',
       });
 
       const response = await initiateNewCall({
         phone_number: phoneNumber,
         callee_info: calleeInfo,
         assistant_id: assistantId,
-        trunk_name: trunkName,  // 'twilio' or 'vobiz'
-        api_key: apiKey,        // User's API key for billing
+        trunk_name: trunkName, // 'twilio' or 'vobiz'
+        api_key: apiKey, // User's API key for billing
       });
 
       console.log('[useNewPhoneAssistant] initiateNewCall response:', response);
@@ -95,6 +99,7 @@ export function useNewPhoneAssistant({
         const errorText = await response.text();
         setError(new Error(errorText));
         console.error('[useNewPhoneAssistant] Call failed, response not ok:', errorText);
+
         return;
       }
 

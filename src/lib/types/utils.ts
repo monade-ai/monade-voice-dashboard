@@ -7,7 +7,6 @@ import {
   OrganizationMember, 
   OrganizationRole, 
   Permission,
-  AuthUser, 
 } from '@/types';
 
 // Utility type for making certain fields optional
@@ -208,7 +207,7 @@ export interface DateRange {
   end: Date;
 }
 
-export function getOrganizationTimeZone(organization: Organization): string {
+export function getOrganizationTimeZone(_organization: Organization): string {
   // This would typically come from organization settings
   // For now, return browser timezone
   return Intl.DateTimeFormat().resolvedOptions().timeZone;

@@ -1,13 +1,11 @@
 // Campaign service functions for frontend integration
 
 import type { 
-  Campaign,
   CreateCampaignRequest,
   UpdateCampaignRequest,
   CampaignListRequest,
   CampaignCallDetailsRequest,
   CampaignResponse,
-  CampaignCallDetail
 } from '@/types/campaign';
 
 /**
@@ -83,7 +81,7 @@ export class CampaignService {
    */
   async updateCampaign(id: string, action: 'pause' | 'resume' | 'complete' | 'archive'): Promise<CampaignResponse> {
     const data: UpdateCampaignRequest = {
-      campaigns: [{ action }]
+      campaigns: [{ action }],
     };
 
     const response = await fetch(`${this.baseUrl}/${id}`, {

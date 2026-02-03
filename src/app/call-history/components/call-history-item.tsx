@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { PhoneCall, ArrowDownLeft, ArrowUpRight, CheckCircle2, XCircle, Clock, AlertTriangle } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, CheckCircle2, XCircle, Clock, AlertTriangle } from 'lucide-react';
 
 import { CallLog } from '../../../../types/call-management';
 

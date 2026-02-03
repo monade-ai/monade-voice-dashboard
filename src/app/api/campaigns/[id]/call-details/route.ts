@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+
 import type { CampaignCallDetailsRequest } from '@/types/campaign';
 import { EXOTEL_ACCOUNT_CONFIG } from '@/types/campaign';
 
@@ -10,6 +11,7 @@ function getExotelApiUrl(path: string): string {
 // Helper function to get Basic Auth header
 function getAuthHeader(): string {
   const credentials = `${EXOTEL_ACCOUNT_CONFIG.API_USERNAME}:${EXOTEL_ACCOUNT_CONFIG.API_PASSWORD}`;
+
   return `Basic ${Buffer.from(credentials).toString('base64')}`;
 }
 
@@ -37,7 +39,7 @@ async function makeExotelRequest(url: string, options: RequestInit = {}) {
 // GET - Get call details for campaign
 export async function GET(
   request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id: campaignId } = await params;
@@ -66,9 +68,10 @@ export async function GET(
     return NextResponse.json(data);
   } catch (error) {
     console.error('[Campaign Call Details API] Error fetching call details:', error);
+
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to fetch campaign call details' },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

@@ -30,7 +30,7 @@ export function Transcript({
         }
       }
     },
-    [ref]
+    [ref],
   );
 
   // auto scroll transcript

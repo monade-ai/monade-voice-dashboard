@@ -1,6 +1,6 @@
 // app/dashboard/data/mock-data.ts
 
-import { addDays, format, subDays } from 'date-fns';
+import { format, subDays } from 'date-fns';
 
 // Helper to generate date strings
 const getDateRange = (days: number) => {
@@ -22,23 +22,6 @@ const generatePoints = (baseValue: number, variance: number, dates: string[]) =>
     date,
     value: Math.max(0, baseValue + Math.random() * variance - variance / 2),
   }));
-};
-
-// Generate labeled random data points
-const generateLabeledPoints = (
-  baseValue: number, 
-  variance: number, 
-  dates: string[], 
-  labels: string[],
-) => {
-  return dates.map(date => {
-    const dataPoints: Record<string, number> = { date: date as any };
-    labels.forEach(label => {
-      dataPoints[label] = Math.max(0, baseValue + Math.random() * variance - variance / 2);
-    });
-
-    return dataPoints;
-  });
 };
 
 export const totalCallMinutesData = {

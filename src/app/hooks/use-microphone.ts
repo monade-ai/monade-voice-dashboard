@@ -101,7 +101,7 @@ export function useWebSocketMicrophone({
     }
     
     setIsConnected(false);
-  }, [isRecording]);
+  }, [isRecording, stopRecordingInternal]);
 
   // Internal function to stop recording
   const stopRecordingInternal = useCallback(() => {

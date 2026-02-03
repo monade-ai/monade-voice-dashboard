@@ -8,14 +8,14 @@ interface NewCallingParams {
   phone_number: string;
   callee_info: CalleeInfo;
   assistant_id: string;
-  trunk_name: string;    // Selected trunk: 'twilio' or 'vobiz'
-  api_key: string;       // User's API key for billing/transcripts
+  trunk_name: string; // Selected trunk: 'twilio' or 'vobiz'
+  api_key: string; // User's API key for billing/transcripts
 }
 
 export async function initiateNewCall(params: NewCallingParams): Promise<Response> {
   console.log('[NewCallingService] initiateNewCall called with params:', {
     ...params,
-    api_key: params.api_key ? `${params.api_key.substring(0, 20)}...` : 'NOT PROVIDED'
+    api_key: params.api_key ? `${params.api_key.substring(0, 20)}...` : 'NOT PROVIDED',
   });
 
   if (!params.api_key) {
@@ -32,13 +32,13 @@ export async function initiateNewCall(params: NewCallingParams): Promise<Respons
       phone_number: params.phone_number,
       callee_info: params.callee_info || {},
       assistant_id: params.assistant_id,
-      trunk_name: params.trunk_name,  // 'twilio' or 'vobiz'
-      api_key: params.api_key,        // User's API key for billing
+      trunk_name: params.trunk_name, // 'twilio' or 'vobiz'
+      api_key: params.api_key, // User's API key for billing
     };
 
     console.log('[NewCallingService] SENDING POST to /api/calling with body:', JSON.stringify({
       ...payload,
-      api_key: `${payload.api_key.substring(0, 20)}...`
+      api_key: `${payload.api_key.substring(0, 20)}...`,
     }));
 
     // Add timeout to fetch request
@@ -67,7 +67,7 @@ export async function initiateNewCall(params: NewCallingParams): Promise<Respons
       let errorData;
       try {
         errorData = JSON.parse(responseBody);
-      } catch (parseError) {
+      } catch {
         errorData = { error: responseBody || 'Unknown error' };
       }
       console.error('[NewCallingService] Failed to initiate call. Status:', response.status, 'Error:', errorData);

@@ -1,5 +1,7 @@
-import { createClient } from '@/utils/supabase/server';
 import { redirect } from 'next/navigation';
+
+import { createClient } from '@/utils/supabase/server';
+
 import { signOut } from './actions';
 
 export default async function ProtectedPage() {

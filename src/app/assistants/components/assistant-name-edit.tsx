@@ -6,7 +6,6 @@ import { toast } from 'sonner';
 
 import { Input } from '@/components/ui/input';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Button } from '@/components/ui/button';
 import { Assistant, useAssistants } from '@/app/hooks/use-assistants-context';
 
 interface AssistantNameEditProps {

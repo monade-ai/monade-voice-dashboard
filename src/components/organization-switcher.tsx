@@ -15,7 +15,7 @@ export function OrganizationSwitcher() {
   const currentOrganization = null; // Placeholder
   const organizations = []; // Placeholder
   const userRole = null; // Placeholder
-  const switchOrganization = async (id: string) => { console.warn('Organization switching not implemented yet.'); }; // Placeholder
+  const switchOrganization = async (_id: string) => { console.warn('Organization switching not implemented yet.'); }; // Placeholder
   const [switching, setSwitching] = useState(false);
 
   const handleSwitchOrganization = async (organizationId: string) => {

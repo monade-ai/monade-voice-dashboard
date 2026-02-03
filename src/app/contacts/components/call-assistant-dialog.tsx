@@ -1,16 +1,14 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { Phone, X } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
 } from '@/components/ui/dialog';
 
 interface PhoneAssistant {
@@ -36,7 +34,7 @@ export function CallAssistantDialog({
   isOpen,
   onClose,
   onCall,
-  isCallInitiating,
+  isCallInitiating: _isCallInitiating,
   callStatus,
   remainingTime,
   phoneNumber,
@@ -45,10 +43,9 @@ export function CallAssistantDialog({
   useEffect(() => {
     if (isOpen && callStatus === 'idle') {
       console.log('[CallAssistantDialog] onCall triggered for phone:', phoneNumber, 'Assistant:', assistant);
-      debugger;
       onCall(phoneNumber);
     }
-  }, [isOpen, callStatus, phoneNumber, onCall]);
+  }, [isOpen, callStatus, phoneNumber, onCall, assistant]);
   
   const formatTime = (seconds: number): string => {
     return `0:${seconds.toString().padStart(2, '0')}`;
@@ -116,7 +113,7 @@ export function CallAssistantDialog({
               Preparing to call...
           </p>
           <p className="text-xs text-slate-500 text-center">
-              You'll receive a call from {assistant.name}. Standard call rates may apply.
+            You&apos;ll receive a call from {assistant.name}. Standard call rates may apply.
           </p>
         </div>
       );

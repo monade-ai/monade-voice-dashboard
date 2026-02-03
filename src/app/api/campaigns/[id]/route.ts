@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+
 import type { UpdateCampaignRequest } from '@/types/campaign';
 import { EXOTEL_ACCOUNT_CONFIG } from '@/types/campaign';
 
@@ -10,6 +11,7 @@ function getExotelApiUrl(path: string): string {
 // Helper function to get Basic Auth header
 function getAuthHeader(): string {
   const credentials = `${EXOTEL_ACCOUNT_CONFIG.API_USERNAME}:${EXOTEL_ACCOUNT_CONFIG.API_PASSWORD}`;
+
   return `Basic ${Buffer.from(credentials).toString('base64')}`;
 }
 
@@ -52,7 +54,7 @@ async function makeExotelRequest(url: string, options: RequestInit = {}) {
 // GET - Get campaign details
 export async function GET(
   request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id: campaignId } = await params;
@@ -65,9 +67,10 @@ export async function GET(
     return NextResponse.json(data);
   } catch (error) {
     console.error('[Campaign API] Error fetching campaign details:', error);
+
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to fetch campaign details' },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -75,7 +78,7 @@ export async function GET(
 // PUT - Update/Pause/Resume/Complete/Archive campaign
 export async function PUT(
   request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id: campaignId } = await params;
@@ -87,7 +90,7 @@ export async function PUT(
     if (!body.campaigns || !Array.isArray(body.campaigns) || body.campaigns.length === 0) {
       return NextResponse.json(
         { error: 'Invalid request body. Expected campaigns array with action.' },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -97,7 +100,7 @@ export async function PUT(
     if (!validActions.includes(action)) {
       return NextResponse.json(
         { error: `Invalid action. Must be one of: ${validActions.join(', ')}` },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -110,13 +113,15 @@ export async function PUT(
     });
 
     console.log('[Campaign API] Campaign updated successfully:', data);
+
     return NextResponse.json(data);
     
   } catch (error) {
     console.error('[Campaign API] Error updating campaign:', error);
+
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to update campaign' },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -124,7 +129,7 @@ export async function PUT(
 // DELETE - Delete campaign
 export async function DELETE(
   request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id: campaignId } = await params;
@@ -137,13 +142,15 @@ export async function DELETE(
     });
 
     console.log('[Campaign API] Campaign deleted successfully:', data);
+
     return NextResponse.json(data);
     
   } catch (error) {
     console.error('[Campaign API] Error deleting campaign:', error);
+
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to delete campaign' },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

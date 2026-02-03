@@ -9,11 +9,12 @@ export async function POST(request: Request) {
     if (!body.phone_number || !body.callback_url) {
       console.error('[Exotel API Route] Missing required fields:', { 
         phone_number: !!body.phone_number, 
-        callback_url: !!body.callback_url 
+        callback_url: !!body.callback_url, 
       });
+
       return NextResponse.json(
         { error: 'Missing required fields: phone_number and callback_url' },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -23,9 +24,10 @@ export async function POST(request: Request) {
 
     if (!apiKey || !functionsKey) {
       console.error('[Exotel API Route] Missing API credentials in environment variables');
+
       return NextResponse.json(
         { error: 'Server configuration error' },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -73,7 +75,7 @@ export async function POST(request: Request) {
         if (errorData.error || errorData.message) {
           errorMessage = errorData.error || errorData.message;
         }
-      } catch (e) {
+      } catch {
         // If we can't parse JSON, use the text response
         if (responseBody) {
           errorMessage = responseBody;
@@ -82,7 +84,7 @@ export async function POST(request: Request) {
       
       return NextResponse.json(
         { error: errorMessage },
-        { status: response.status }
+        { status: response.status },
       );
     }
 

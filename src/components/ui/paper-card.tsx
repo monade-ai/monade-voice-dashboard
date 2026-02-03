@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { StaticMeshGradient } from '@paper-design/shaders-react';
+
 import { cn } from '@/lib/utils';
 
 interface PaperCardProps extends React.HTMLAttributes<HTMLDivElement> {
@@ -14,8 +15,8 @@ export function PaperCard({ children, className, variant = 'mesh', shaderProps, 
   return (
     <div 
       className={cn(
-        "relative overflow-hidden rounded-md border border-border bg-card text-card-foreground group transition-colors",
-        className
+        'relative overflow-hidden rounded-md border border-border bg-card text-card-foreground group transition-colors',
+        className,
       )}
       {...props}
     >
@@ -25,7 +26,7 @@ export function PaperCard({ children, className, variant = 'mesh', shaderProps, 
           <StaticMeshGradient
             width="100%"
             height="100%"
-            colors={shaderProps?.colors || ["#facc15", "#e5e7eb", "#ffffff", "#b1aa91"]}
+            colors={shaderProps?.colors || ['#facc15', '#e5e7eb', '#ffffff', '#b1aa91']}
             positions={shaderProps?.positions || 42}
             waveX={shaderProps?.waveX || 0.45}
             waveXShift={shaderProps?.waveXShift || 0}
@@ -47,18 +48,18 @@ export function PaperCard({ children, className, variant = 'mesh', shaderProps, 
 }
 
 export function PaperCardHeader({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("flex flex-col space-y-1 p-5", className)} {...props} />;
+  return <div className={cn('flex flex-col space-y-1 p-5', className)} {...props} />;
 }
 
 export function PaperCardTitle({ className, ...props }: React.HTMLAttributes<HTMLHeadingElement>) {
   // Switched from text-muted-foreground/70 to text-foreground/80 for much higher contrast
-  return <h3 className={cn("text-[10px] font-bold uppercase tracking-[0.3em] text-foreground/80 dark:text-muted-foreground/90", className)} {...props} />;
+  return <h3 className={cn('text-[10px] font-bold uppercase tracking-[0.3em] text-foreground/80 dark:text-muted-foreground/90', className)} {...props} />;
 }
 
 export function PaperCardContent({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("p-5 pt-0", className)} {...props} />;
+  return <div className={cn('p-5 pt-0', className)} {...props} />;
 }
 
 export function PaperCardFooter({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("flex items-center p-5 pt-0 border-t border-border/10", className)} {...props} />;
+  return <div className={cn('flex items-center p-5 pt-0 border-t border-border/10', className)} {...props} />;
 }

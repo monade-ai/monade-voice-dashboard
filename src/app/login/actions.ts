@@ -42,8 +42,8 @@
 
 'use server';
 
-import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
+
 import { createActionClient } from '@/utils/supabase/action';
 
 export async function login(formData: FormData) {
@@ -51,7 +51,6 @@ export async function login(formData: FormData) {
   const password = formData.get('password') as string;
   
   // Create supabase client with proper cookie handling for server actions
-  const cookieStore = await cookies();
   const supabase = await createActionClient();
 
   const { error } = await supabase.auth.signInWithPassword({
@@ -71,7 +70,6 @@ export async function signup(formData: FormData) {
   const password = formData.get('password') as string;
   
   // Create supabase client with proper cookie handling for server actions
-  const cookieStore = await cookies();
   const supabase = await createActionClient();
 
   const { error } = await supabase.auth.signUp({
@@ -87,7 +85,6 @@ export async function signup(formData: FormData) {
 }
 
 export async function logout() {
-  const cookieStore = await cookies();
   const supabase = await createActionClient();
   
   await supabase.auth.signOut();

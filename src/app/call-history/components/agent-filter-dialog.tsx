@@ -10,8 +10,6 @@ import { useAssistants } from '@/app/hooks/use-assistants-context';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { useTranslations } from '@/i18n/translations-context';
 
-import { CallLog } from '../../../../types/call-management';
-
 type AgentFilterDialogProps = {
   open: boolean;
   onClose: () => void;
@@ -23,7 +21,7 @@ type AgentFilterDialogProps = {
 const AgentFilterDialog: React.FC<AgentFilterDialogProps> = ({
   open,
   onClose,
-  agentNames,
+  agentNames: _agentNames,
   selectedAgents,
   onSelect,
 }) => {

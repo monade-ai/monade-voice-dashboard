@@ -1,10 +1,9 @@
 // app/dashboard/components/dashboard-header.tsx
 
 import React from 'react';
-import { CalendarIcon, ChevronDownIcon } from 'lucide-react';
+import { CalendarIcon } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
 import {
   Select,
   SelectContent,
@@ -26,7 +25,7 @@ interface DashboardHeaderProps {
 export function DashboardHeader({
   title,
   dateRange,
-  onDateRangeChange,
+  onDateRangeChange: _onDateRangeChange,
   groupBy,
   onGroupByChange,
   assistantFilter,

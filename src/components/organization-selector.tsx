@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { ChevronDown, Check, Building2, Plus } from 'lucide-react';
 
 import { useAuth } from '@/lib/auth/AuthProvider';
-import { Organization } from '@/types';
 
 interface OrganizationSelectorProps {
   className?: string;

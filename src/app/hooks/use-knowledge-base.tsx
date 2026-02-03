@@ -1,9 +1,11 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo } from 'react';
-import { MONADE_API_CONFIG } from '@/types/monade-api.types';
-import { useMonadeUser } from './use-monade-user';
 import { toast } from 'sonner';
+
+import { MONADE_API_CONFIG } from '@/types/monade-api.types';
+
+import { useMonadeUser } from './use-monade-user';
 
 export interface LibraryItem {
   id: string;
@@ -43,13 +45,14 @@ export const LibraryProvider = ({ children }: { children: ReactNode }) => {
     if (!userUid) {
       if (!authLoading) setError('User not authenticated');
       setIsLoading(false);
+
       return;
     }
 
     setIsLoading(true);
     try {
       const res = await fetch(`${API_BASE_URL}/api/users/${userUid}/knowledge-bases`, {
-        headers: { 'X-API-Key': MONADE_API_CONFIG.API_KEY }
+        headers: { 'X-API-Key': MONADE_API_CONFIG.API_KEY },
       });
       
       if (!res.ok) throw new Error('Failed to synchronize library');
@@ -58,11 +61,11 @@ export const LibraryProvider = ({ children }: { children: ReactNode }) => {
       const processed = data.map((kb: any) => ({
         ...kb,
         createdAt: new Date(kb.createdAt || Date.now()),
-        connectedAssistantIds: [] 
+        connectedAssistantIds: [], 
       })).sort((a: any, b: any) => b.createdAt.getTime() - a.createdAt.getTime());
       
       setItems(processed);
-    } catch (err) {
+    } catch {
       setError('Could not reach the library archive.');
       setItems([]);
     } finally {
@@ -79,6 +82,7 @@ export const LibraryProvider = ({ children }: { children: ReactNode }) => {
       if (!groups[key]) groups[key] = [];
       groups[key].push(item);
     });
+
     return groups;
   }, [items]);
 
@@ -88,8 +92,8 @@ export const LibraryProvider = ({ children }: { children: ReactNode }) => {
       const res = await fetch(`${API_BASE_URL}/api/knowledge-bases`, {
         method: 'POST',
         headers: { 
-            'Content-Type': 'application/json',
-            'X-API-Key': MONADE_API_CONFIG.API_KEY 
+          'Content-Type': 'application/json',
+          'X-API-Key': MONADE_API_CONFIG.API_KEY, 
         },
         body: JSON.stringify({ ...payload, user_uid: userUid }),
       });
@@ -98,9 +102,11 @@ export const LibraryProvider = ({ children }: { children: ReactNode }) => {
 
       toast.success('Library Updated', { description: `${payload.filename} is now part of the memory.` });
       await fetchItems();
+
       return true;
-    } catch (err) {
+    } catch {
       toast.error('Sync Failed');
+
       return false;
     } finally {
       setIsLoading(false);
@@ -112,14 +118,16 @@ export const LibraryProvider = ({ children }: { children: ReactNode }) => {
     try {
       const res = await fetch(`${API_BASE_URL}/api/knowledge-bases/${id}`, {
         method: 'DELETE',
-        headers: { 'X-API-Key': MONADE_API_CONFIG.API_KEY }
+        headers: { 'X-API-Key': MONADE_API_CONFIG.API_KEY },
       });
       if (!res.ok) throw new Error('Deletion failed');
       toast.success('Item Removed');
       await fetchItems();
+
       return true;
-    } catch (err) {
+    } catch {
       toast.error('Purge Failed');
+
       return false;
     } finally {
       setIsLoading(false);
@@ -140,6 +148,7 @@ export const LibraryProvider = ({ children }: { children: ReactNode }) => {
 export const useLibrary = () => {
   const context = useContext(LibraryContext);
   if (!context) throw new Error('useLibrary must be used within a LibraryProvider');
+
   return context;
 };
 

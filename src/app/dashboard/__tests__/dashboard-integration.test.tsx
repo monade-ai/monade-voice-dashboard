@@ -3,7 +3,7 @@
  */
 
 import React from 'react';
-import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { toast } from 'sonner';
 
@@ -296,7 +296,6 @@ describe('Dashboard Integration Tests', () => {
       expect(screen.getByText('Showing 1 to 6 of 12 calls')).toBeInTheDocument();
 
       // Navigate to next page
-      const nextButton = screen.getByRole('button', { name: '' });
       const nextButtons = screen.getAllByRole('button');
       const actualNextButton = nextButtons.find(btn => 
         btn.querySelector('svg') && !btn.disabled && btn !== screen.getByRole('button', { name: /deploy agent/i }),

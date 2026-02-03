@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { 
   Plus, 
   Search, 
@@ -9,8 +9,6 @@ import {
   Users, 
   MoreHorizontal,
   Trash2,
-  Edit,
-  Phone,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
@@ -19,7 +17,6 @@ import {
   DropdownMenuContent, 
   DropdownMenuItem, 
   DropdownMenuTrigger,
-  DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -27,7 +24,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useTranslations } from '@/i18n/translations-context';
 
-import { useContactsContext, Bucket, Contact } from '../contexts/contacts-context';
+import { useContactsContext, Bucket } from '../contexts/contacts-context';
 
 import CreateBucketDialog from './create-bucket-dialog';
 import ContactUploadDialog from './contact-upload-dialog';
@@ -51,7 +48,6 @@ const ContactListView: React.FC = () => {
   const canDeleteBucket = true; // Placeholder
   const canAddContact = true; // Placeholder
   const canBulkUpload = true; // Placeholder
-  const canDeleteContact = true; // Placeholder
 
   const [isCreateBucketOpen, setCreateBucketOpen] = useState(false);
   const [isUploadOpen, setUploadOpen] = useState(false);
@@ -187,6 +183,7 @@ const ContactListView: React.FC = () => {
                               if (!bucket.id) {
                                 console.error('Bucket id is missing for removeBucket:', bucket);
                                 alert('Cannot delete this bucket: missing bucket id.');
+
                                 return;
                               }
                               setBucketToDelete(bucket);
@@ -237,7 +234,7 @@ const ContactListView: React.FC = () => {
           {isLoading && currentContacts.length === 0 ? (
             <div className="flex justify-center items-center h-[400px]"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
           ) : filteredContacts.length === 0 ? (
-            searchQuery ? <p>No results for "{searchQuery}".</p> : <EmptyContactsState />
+            searchQuery ? <p>No results for &quot;{searchQuery}&quot;.</p> : <EmptyContactsState />
           ) : (
             <div className="space-y-4">
               {/* Bulk Actions Bar */}
@@ -367,7 +364,7 @@ const ContactListView: React.FC = () => {
           </DialogHeader>
           <div className="space-y-4 py-4">
             <p className="text-sm text-muted-foreground">
-              This action cannot be undone. This will permanently delete the bucket "{bucketToDelete?.name}" and all {bucketToDelete?.count || 0} contacts in it.
+              This action cannot be undone. This will permanently delete the bucket &quot;{bucketToDelete?.name}&quot; and all {bucketToDelete?.count || 0} contacts in it.
             </p>
             <p className="text-sm font-medium">
               Please type <span className="font-mono bg-muted px-1 rounded">{bucketToDelete?.name}</span> to confirm:

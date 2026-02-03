@@ -20,70 +20,76 @@ export interface DispatchCallParams {
  * Request a LiveKit room connection for a voice call
  */
 export async function dispatchCall(params: DispatchCallParams): Promise<{ success: boolean; data?: any; error?: string }> {
-    try {
-        console.log('[LiveKitService] Dispatching call:', params);
+  try {
+    console.log('[LiveKitService] Dispatching call:', params);
 
-        const response = await fetch(`${LIVEKIT_DISPATCH_URL}/dispatch`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                phone_number: params.phone_number,
-                assistant_id: params.assistant_id,
-                callee_info: params.callee_info || {},
-            }),
-        });
+    const response = await fetch(`${LIVEKIT_DISPATCH_URL}/dispatch`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        phone_number: params.phone_number,
+        assistant_id: params.assistant_id,
+        callee_info: params.callee_info || {},
+      }),
+    });
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error('[LiveKitService] Dispatch failed:', response.status, errorText);
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[LiveKitService] Dispatch failed:', response.status, errorText);
 
-            let errorMessage = 'Failed to dispatch call';
-            try {
-                const errorData = JSON.parse(errorText);
-                errorMessage = errorData.error || errorData.message || errorMessage;
-            } catch {
-                errorMessage = errorText || errorMessage;
-            }
+      let errorMessage = 'Failed to dispatch call';
+      try {
+        const errorData = JSON.parse(errorText);
+        errorMessage = errorData.error || errorData.message || errorMessage;
+      } catch {
+        errorMessage = errorText || errorMessage;
+      }
 
-            return { success: false, error: errorMessage };
-        }
-
-        const data = await response.json();
-        console.log('[LiveKitService] Dispatch successful:', data);
-
-        return { success: true, data };
-    } catch (error) {
-        console.error('[LiveKitService] Error dispatching call:', error);
-        return {
-            success: false,
-            error: error instanceof Error ? error.message : 'Unknown error',
-        };
+      return { success: false, error: errorMessage };
     }
+
+    const data = await response.json();
+    console.log('[LiveKitService] Dispatch successful:', data);
+
+    return { success: true, data };
+  } catch (error) {
+    console.error('[LiveKitService] Error dispatching call:', error);
+
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
 }
 
 /**
  * Get agent connection details for a LiveKit room
  */
 export async function getAgentConnectionDetails(roomName: string): Promise<LiveKitConnectionDetails | null> {
-    try {
-        const response = await fetch(`${LIVEKIT_DISPATCH_URL}/connection-details?roomName=${encodeURIComponent(roomName)}`);
+  try {
+    const response = await fetch(`${LIVEKIT_DISPATCH_URL}/connection-details?roomName=${encodeURIComponent(roomName)}`);
 
-        if (!response.ok) {
-            console.error('[LiveKitService] Failed to get connection details:', response.status);
-            return null;
-        }
+    if (!response.ok) {
+      console.error('[LiveKitService] Failed to get connection details:', response.status);
 
-        const data = await response.json();
-        return data as LiveKitConnectionDetails;
-    } catch (error) {
-        console.error('[LiveKitService] Error getting connection details:', error);
-        return null;
+      return null;
     }
+
+    const data = await response.json();
+
+    return data as LiveKitConnectionDetails;
+  } catch (error) {
+    console.error('[LiveKitService] Error getting connection details:', error);
+
+    return null;
+  }
 }
 
-export default {
-    dispatchCall,
-    getAgentConnectionDetails,
+const livekitService = {
+  dispatchCall,
+  getAgentConnectionDetails,
 };
+
+export default livekitService;

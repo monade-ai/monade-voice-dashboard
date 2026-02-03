@@ -1,10 +1,10 @@
 'use client';
 
 import * as React from 'react';
-import { Area, AreaChart, Line, ComposedChart, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts';
+import { Area, Line, ComposedChart, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts';
 
 import { BaseChart } from '@/components/ui/base-chart';
-import { ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from '@/components/ui/chart';
+import { ChartTooltip, ChartLegend, ChartLegendContent } from '@/components/ui/chart';
 import { voiceAgentChartConfig, formatChartValue, getResponsiveChartHeight } from '@/lib/chart-utils';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';

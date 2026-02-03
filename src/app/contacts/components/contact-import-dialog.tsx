@@ -191,7 +191,7 @@ const ContactImportDialog: React.FC<ContactImportDialogProps> = ({
       setTimeout(() => {
         onClose();
       }, 2000);
-    } catch (error) {
+    } catch {
       setErrorMessage('An error occurred during import. Please try again.');
     } finally {
       setIsImporting(false);
@@ -223,7 +223,7 @@ const ContactImportDialog: React.FC<ContactImportDialogProps> = ({
               <AlertDescription className="text-green-800">
                 <div className="font-medium">Import successful!</div>
                 <div className="text-sm mt-1">
-                  Imported {importStats.successful} of {importStats.total} contacts to "{selectedList?.name}".
+                  Imported {importStats.successful} of {importStats.total} contacts to &quot;{selectedList?.name}&quot;.
                 </div>
               </AlertDescription>
             </Alert>
@@ -409,7 +409,7 @@ const ContactImportDialog: React.FC<ContactImportDialogProps> = ({
                 </div>
                 <h3 className="text-lg font-medium mb-2">Connection Failed</h3>
                 <p className="text-muted-foreground text-sm mb-6 max-w-sm">
-                  We couldn't connect to your {selectedProvider.name} account. 
+                  We couldn&apos;t connect to your {selectedProvider.name} account. 
                   Please check your credentials and try again.
                 </p>
                 <Button onClick={handleRetry}>

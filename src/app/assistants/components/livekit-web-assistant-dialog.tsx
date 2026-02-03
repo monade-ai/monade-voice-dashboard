@@ -1,8 +1,8 @@
 // components/livekit-web-assistant-dialog.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Mic, MicOff, MessageCircle, X, User, Building, Tag } from 'lucide-react';
+import { useState } from 'react';
+import { MessageCircle, X } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,8 +13,8 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
-
 import { useLiveKitWebAssistant } from '@/app/hooks/use-livekit-web-assistant';
+
 import { AgentStarterEmbed } from './agent-starter-embed';
 
 interface CalleeInfo {
@@ -38,7 +38,6 @@ export function LiveKitWebAssistantDialog({
   const [newKey, setNewKey] = useState('');
   const [newValue, setNewValue] = useState('');
   const [isSessionStarted, setIsSessionStarted] = useState(false);
-  const [messages, setMessages] = useState<Array<{text: string, sender: 'user' | 'assistant'}>>([]);
   const [connectionDetails, setConnectionDetails] = useState<{
     serverUrl: string;
     roomName: string;
@@ -48,10 +47,6 @@ export function LiveKitWebAssistantDialog({
   const [submitError, setSubmitError] = useState<string | null>(null); // New state for submission errors
   
   const {
-    isConnecting,
-    isConnected,
-    connectionStatus,
-    startSession,
     endSession,
     error: connectionError,
     errorMessage,
@@ -64,7 +59,7 @@ export function LiveKitWebAssistantDialog({
     if (newKey.trim() && newValue.trim()) {
       setCalleeInfo(prev => ({
         ...prev,
-        [newKey.trim()]: newValue.trim()
+        [newKey.trim()]: newValue.trim(),
       }));
       setNewKey('');
       setNewValue('');
@@ -87,6 +82,7 @@ export function LiveKitWebAssistantDialog({
     // Prevent multi-clicking
     if (isSubmitting) {
       console.log('[LiveKitWebAssistantDialog] Form submission already in progress, ignoring click');
+
       return;
     }
     
@@ -106,7 +102,7 @@ export function LiveKitWebAssistantDialog({
           roomName: roomName,
           agentName: assistantName,
           calleeInfo,
-          assistantId
+          assistantId,
         }),
       });
 
@@ -130,7 +126,7 @@ export function LiveKitWebAssistantDialog({
         body: JSON.stringify({
           roomName: roomName,
           agentName: assistantName,
-          calleeInfo
+          calleeInfo,
         }),
       });
 
@@ -142,14 +138,9 @@ export function LiveKitWebAssistantDialog({
       setConnectionDetails({
         serverUrl: data.serverUrl,
         roomName: data.roomName,
-        participantToken: data.participantToken
+        participantToken: data.participantToken,
       });
       
-      // Add initial message from assistant
-      setMessages([{
-        text: `Hi there! I'm ${assistantName}. How can I help you today?`,
-        sender: 'assistant',
-      }]);
     } catch (err) {
       console.error('[LiveKitWebAssistantDialog] Error starting session:', err);
       setIsSessionStarted(false);
@@ -169,7 +160,6 @@ export function LiveKitWebAssistantDialog({
   const handleEndSession = () => {
     endSession();
     setIsSessionStarted(false);
-    setMessages([]);
     setConnectionDetails(null);
     // Reset submitting state when ending session
     setIsSubmitting(false);
@@ -319,12 +309,12 @@ export function LiveKitWebAssistantDialog({
         </div>
           
         <p className="text-xs text-slate-500">
-            You'll be connected to {assistantName} in a LiveKit session.
+          You&apos;ll be connected to {assistantName} in a LiveKit session.
         </p>
           
         <DialogFooter>
           <Button type="button" variant="outline" onClick={onClose}>
-              Cancel
+            Cancel
           </Button>
           <Button type="submit" disabled={isSubmitting}>
             {isSubmitting ? (

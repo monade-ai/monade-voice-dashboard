@@ -89,26 +89,13 @@ const getStorageKey = (organizationId?: string): string => {
   return organizationId ? `${DRAFT_ASSISTANTS_STORAGE_KEY}_${organizationId}` : DRAFT_ASSISTANTS_STORAGE_KEY;
 };
 
-// Helper to get organization context headers
-const getOrgHeaders = (organizationId?: string): Record<string, string> => {
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  };
-
-  if (organizationId) {
-    headers['X-Organization-ID'] = organizationId;
-  }
-
-  return headers;
-};
-
 // Helper to parse API errors
 const getApiError = async (res: Response): Promise<string> => {
   try {
     const body = await res.json();
 
     return body.error || `Request failed with status ${res.status}`;
-  } catch (e) {
+  } catch {
     return `Request failed with status ${res.status}`;
   }
 };
@@ -161,6 +148,7 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
 
     if (!userUid) {
       console.log('[Assistants] No user_uid available, skipping fetch');
+
       return;
     }
 
@@ -176,7 +164,7 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
     try {
       const headers = {
         'Content-Type': 'application/json',
-        'X-API-Key': MONADE_API_CONFIG.API_KEY
+        'X-API-Key': MONADE_API_CONFIG.API_KEY,
       };
       console.log('[Assistants] Making API request with headers:', headers);
       // Use user-specific endpoint for the new API
@@ -241,7 +229,7 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
 
     console.log('[Assistants] Combined and Sorted list:', combinedAssistants);
     setAssistants(combinedAssistants);
-  }, [userUid, toast]); // Dependencies for useCallback
+  }, [userUid, authLoading, toast]); // Dependencies for useCallback
 
   // Initial fetch on mount and when organization changes
   useEffect(() => {
@@ -299,7 +287,7 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
       payload.user_uid = userUid;
       const headers = {
         'Content-Type': 'application/json',
-        'X-API-Key': MONADE_API_CONFIG.API_KEY
+        'X-API-Key': MONADE_API_CONFIG.API_KEY,
       };
       const res = await fetch(`${API_BASE_URL}/api/assistants`, {
         method: 'POST',
@@ -424,7 +412,7 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
     try {
       const headers = {
         'Content-Type': 'application/json',
-        'X-API-Key': MONADE_API_CONFIG.API_KEY
+        'X-API-Key': MONADE_API_CONFIG.API_KEY,
       };
       const res = await fetch(`${API_BASE_URL}/api/assistants/${id}`, {
         method: 'PATCH',
@@ -499,7 +487,7 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
     try {
       // Note: Don't set Content-Type for DELETE without body, it causes backend errors
       const headers: Record<string, string> = {
-        'X-API-Key': MONADE_API_CONFIG.API_KEY
+        'X-API-Key': MONADE_API_CONFIG.API_KEY,
       };
       const res = await fetch(`${API_BASE_URL}/api/assistants/${id}`, {
         method: 'DELETE',

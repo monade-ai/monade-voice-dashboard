@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
-import { X, Info } from 'lucide-react';
+import Image from 'next/image';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { Info } from 'lucide-react';
 import * as THREE from 'three';
 
-import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 
 interface VoiceOption {
@@ -175,7 +176,7 @@ function VoiceModelCard({ model, showInfo, onInfoClick, onSelect }: VoiceModelCa
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [isHovered, showInfo, model.color, selectedVoice]);
+  }, [isHovered, showInfo, selectedVoice, initThreeJS, playAudio, startVisualization, stopAudio, stopVisualization]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -192,7 +193,7 @@ function VoiceModelCard({ model, showInfo, onInfoClick, onSelect }: VoiceModelCa
     };
   }, []);
 
-  const initThreeJS = () => {
+  const initThreeJS = useCallback(() => {
     if (!mountRef.current) return;
 
     // Ensure element has dimensions
@@ -217,9 +218,9 @@ function VoiceModelCard({ model, showInfo, onInfoClick, onSelect }: VoiceModelCa
     sceneRef.current = scene;
     rendererRef.current = renderer;
     cameraRef.current = camera;
-  };
+  }, []);
 
-  const updateWaveGeometry = (time: number) => {
+  const updateWaveGeometry = useCallback((time: number) => {
     if (!sceneRef.current) return;
 
     const color = new THREE.Color(model.color);
@@ -263,9 +264,9 @@ function VoiceModelCard({ model, showInfo, onInfoClick, onSelect }: VoiceModelCa
     waveGeometryRef.current.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
     waveGeometryRef.current.attributes.position.needsUpdate = true;
     waveGeometryRef.current.attributes.color.needsUpdate = true;
-  };
+  }, [model.color]);
 
-  const updateGridGeometry = (time: number) => {
+  const updateGridGeometry = useCallback((time: number) => {
     if (!sceneRef.current) return;
 
     const color = new THREE.Color(model.color);
@@ -304,9 +305,9 @@ function VoiceModelCard({ model, showInfo, onInfoClick, onSelect }: VoiceModelCa
     gridGeometryRef.current.setAttribute('color', new THREE.Float32BufferAttribute(gridColors, 3));
     gridGeometryRef.current.attributes.position.needsUpdate = true;
     gridGeometryRef.current.attributes.color.needsUpdate = true;
-  };
+  }, [model.color]);
 
-  const startVisualization = () => {
+  const startVisualization = useCallback(() => {
     if (!sceneRef.current || !rendererRef.current || !cameraRef.current) return;
     if (animationRef.current) return; // Already running
 
@@ -330,16 +331,16 @@ function VoiceModelCard({ model, showInfo, onInfoClick, onSelect }: VoiceModelCa
     };
 
     animationRef.current = requestAnimationFrame(animate);
-  };
+  }, [isHovered, showInfo, updateWaveGeometry, updateGridGeometry]);
 
-  const stopVisualization = () => {
+  const stopVisualization = useCallback(() => {
     if (animationRef.current) {
       cancelAnimationFrame(animationRef.current);
       animationRef.current = null;
     }
-  };
+  }, []);
 
-  const playAudio = async () => {
+  const playAudio = useCallback(async () => {
     if (audioRef.current) {
       try {
         audioRef.current.src = `/audio/${model.voices[selectedVoice].id}.wav`;
@@ -348,14 +349,14 @@ function VoiceModelCard({ model, showInfo, onInfoClick, onSelect }: VoiceModelCa
         console.log('Audio play failed:', error);
       }
     }
-  };
+  }, [model.voices, selectedVoice]);
 
-  const stopAudio = () => {
+  const stopAudio = useCallback(() => {
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
     }
-  };
+  }, []);
 
   // "Creative" card: frosted glass, blur, "Coming Soon", no select
   const isComingSoon = model.id === 'creative';
@@ -385,6 +386,20 @@ function VoiceModelCard({ model, showInfo, onInfoClick, onSelect }: VoiceModelCa
         className="absolute inset-0 w-full h-full opacity-30"
         style={{ pointerEvents: 'none' }}
       />
+
+      {!isComingSoon && onInfoClick && (
+        <button
+          type="button"
+          className="absolute top-4 right-4 z-30 rounded-full bg-white/90 p-2 text-[#39594D] shadow-md transition hover:bg-white"
+          onClick={(event) => {
+            event.stopPropagation();
+            onInfoClick();
+          }}
+          aria-label={showInfo ? 'Hide model details' : 'Show model details'}
+        >
+          <Info className="h-4 w-4" />
+        </button>
+      )}
 
       {showInfo && (
         <div className="absolute inset-0 bg-black/80 z-20 flex items-center justify-center p-8 backdrop-blur-sm">
@@ -495,9 +510,11 @@ function VoiceCarousel({ voices, selectedVoice, onVoiceChange, accentColor }: Vo
                   }}
                   aria-label={`Select voice ${voice.name}`}
                 >
-                  <img
+                  <Image
                     src={`/${voice.avatar}`}
                     alt={voice.name}
+                    width={size}
+                    height={size}
                     style={{
                       width: '100%',
                       height: '100%',
@@ -522,9 +539,11 @@ function VoiceCarousel({ voices, selectedVoice, onVoiceChange, accentColor }: Vo
                   }}
                   aria-label={`Select voice ${voice.name}`}
                 >
-                  <img
+                  <Image
                     src={`/${voice.avatar}`}
                     alt={voice.name}
+                    width={size}
+                    height={size}
                     style={{
                       width: '100%',
                       height: '100%',

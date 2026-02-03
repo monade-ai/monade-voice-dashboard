@@ -13,6 +13,7 @@ async function getSupabaseToken() {
     if (error || !session) {
       throw new Error(error?.message || 'No authentication token available');
     }
+
     return session.access_token;
   } catch (error) {
     console.error('Error getting Supabase token:', error);
@@ -46,7 +47,7 @@ async function fetchWithAuth(url: string, options: RequestInit = {}) {
     };
 
     console.log(`[fetchWithAuth] Making request to: ${url}`);
-    console.log(`[fetchWithAuth] Headers:`, headers);
+    console.log('[fetchWithAuth] Headers:', headers);
 
     const response = await fetch(url, { ...options, headers });
 
@@ -56,22 +57,23 @@ async function fetchWithAuth(url: string, options: RequestInit = {}) {
       let errorData: any;
       try {
         errorData = await response.json();
-      } catch (e) {
+      } catch {
         errorData = { detail: `HTTP ${response.status}: ${response.statusText}` };
       }
-      console.error(`[fetchWithAuth] Error response:`, errorData);
+      console.error('[fetchWithAuth] Error response:', errorData);
       throw new Error(errorData.detail || errorData.message || `HTTP ${response.status}: ${response.statusText}`);
     }
 
     const data = await response.json();
-    console.log(`[fetchWithAuth] Success response:`, data);
+    console.log('[fetchWithAuth] Success response:', data);
+
     return data;
   } catch (error: any) {
-    console.error(`[fetchWithAuth] Request failed:`, error);
+    console.error('[fetchWithAuth] Request failed:', error);
 
     // If authentication fails, try without auth as fallback
     if (error.message.includes('Authentication failed') || error.message.includes('No authentication token')) {
-      console.log(`[fetchWithAuth] Trying request without authentication...`);
+      console.log('[fetchWithAuth] Trying request without authentication...');
 
       const headers = {
         'Content-Type': 'application/json',
@@ -84,7 +86,7 @@ async function fetchWithAuth(url: string, options: RequestInit = {}) {
         let errorData: any;
         try {
           errorData = await response.json();
-        } catch (e) {
+        } catch {
           errorData = { detail: `HTTP ${response.status}: ${response.statusText}` };
         }
         throw new Error(errorData.detail || errorData.message || `HTTP ${response.status}: ${response.statusText}`);

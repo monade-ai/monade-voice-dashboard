@@ -14,15 +14,16 @@ const getPalette = (seed: string) => {
   
   // Professional palettes (Lemon, Earth, Ocean, Slate)
   const palettes = [
-    ["#facc15", "#eab308", "#713f12"], // Lemon/Gold
-    ["#3b82f6", "#1d4ed8", "#1e3a8a"], // Blue/Ocean
-    ["#10b981", "#047857", "#064e3b"], // Green/Emerald
-    ["#8b5cf6", "#6d28d9", "#4c1d95"], // Purple/Amethyst
-    ["#f43f5e", "#be123c", "#881337"], // Rose/Deep Red
-    ["#64748b", "#334155", "#0f172a"], // Slate/Obsidian
+    ['#facc15', '#eab308', '#713f12'], // Lemon/Gold
+    ['#3b82f6', '#1d4ed8', '#1e3a8a'], // Blue/Ocean
+    ['#10b981', '#047857', '#064e3b'], // Green/Emerald
+    ['#8b5cf6', '#6d28d9', '#4c1d95'], // Purple/Amethyst
+    ['#f43f5e', '#be123c', '#881337'], // Rose/Deep Red
+    ['#64748b', '#334155', '#0f172a'], // Slate/Obsidian
   ];
   
   const index = Math.abs(hash) % palettes.length;
+
   return palettes[index];
 };
 

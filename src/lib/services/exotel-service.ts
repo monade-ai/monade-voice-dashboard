@@ -43,7 +43,7 @@ export async function initiateExotelCall(params: ExotelCallParams): Promise<Resp
         if (errorData.error) {
           errorMessage = errorData.error;
         }
-      } catch (e) {
+      } catch {
         // If we can't parse JSON, use a generic message
         if (response.status === 400) {
           errorMessage = 'Invalid phone number or request data';

@@ -153,62 +153,69 @@ export function Toolbar() {
   }, [reactFlowInstance]);
 
   return (
-    <div className="w-full flex justify-between items-center p-2">
-      <div className="space-x-2">
-        <Button
-          onClick={() => setNewFlowDialogOpen(true)}
-          variant="outline"
-          size="sm"
-          disabled={!canCreateWorkflow}
-        >
-          <File className="h-4 w-4 mr-1" />
-          New
-        </Button>
-        <Button onClick={handleImport} variant="outline" size="sm">
-          <ArrowDownToLine className="h-4 w-4 mr-1" />
-          Import
-        </Button>
-        <Button onClick={handleExport} variant="outline" size="sm">
-          <ArrowUpFromLine className="h-4 w-4 mr-1" />
-          Export
-        </Button>
-      </div>
-      
-      <div className="font-semibold text-center">Workflow Editor</div>
-      
-      <div className="space-x-2">
-        <div className="inline-flex gap-1">
-          <Button onClick={handleZoomIn} variant="outline" size="sm" id="zoom-in">
-            <ZoomIn className="h-4 w-4" />
+    <div className="w-full">
+      <div className="flex justify-between items-center p-2">
+        <div className="space-x-2">
+          <Button
+            onClick={() => setNewFlowDialogOpen(true)}
+            variant="outline"
+            size="sm"
+            disabled={!canCreateWorkflow}
+          >
+            <File className="h-4 w-4 mr-1" />
+            New
           </Button>
-          <Button onClick={handleZoomOut} variant="outline" size="sm" id="zoom-out">
-            <ZoomOut className="h-4 w-4" />
+          <Button onClick={handleImport} variant="outline" size="sm">
+            <ArrowDownToLine className="h-4 w-4 mr-1" />
+            Import
+          </Button>
+          <Button onClick={handleExport} variant="outline" size="sm">
+            <ArrowUpFromLine className="h-4 w-4 mr-1" />
+            Export
           </Button>
         </div>
         
-        <div className="inline-flex gap-1 ml-4">
-          <Button onClick={() => addNode('startNode')} variant="outline" size="sm" disabled={!canEditWorkflow}>
-            <Plus className="h-4 w-4 mr-1" />
-            Start
-          </Button>
-          <Button onClick={() => addNode('flowNode')} variant="outline" size="sm" disabled={!canEditWorkflow}>
-            <Plus className="h-4 w-4 mr-1" />
-            Flow
-          </Button>
-          <Button onClick={() => addNode('endNode')} variant="outline" size="sm" disabled={!canEditWorkflow}>
-            <Plus className="h-4 w-4 mr-1" />
-            End
-          </Button>
-          <Button onClick={() => addNode('functionNode')} variant="outline" size="sm" disabled={!canEditWorkflow}>
-            <Plus className="h-4 w-4 mr-1" />
-            Function
-          </Button>
-          <Button onClick={() => addNode('mergeNode')} variant="outline" size="sm" disabled={!canEditWorkflow}>
-            <Plus className="h-4 w-4 mr-1" />
-            Merge
-          </Button>
+        <div className="font-semibold text-center">Workflow Editor</div>
+        
+        <div className="space-x-2">
+          <div className="inline-flex gap-1">
+            <Button onClick={handleZoomIn} variant="outline" size="sm" id="zoom-in">
+              <ZoomIn className="h-4 w-4" />
+            </Button>
+            <Button onClick={handleZoomOut} variant="outline" size="sm" id="zoom-out">
+              <ZoomOut className="h-4 w-4" />
+            </Button>
+          </div>
+          
+          <div className="inline-flex gap-1 ml-4">
+            <Button onClick={() => addNode('startNode')} variant="outline" size="sm" disabled={!canEditWorkflow}>
+              <Plus className="h-4 w-4 mr-1" />
+              Start
+            </Button>
+            <Button onClick={() => addNode('flowNode')} variant="outline" size="sm" disabled={!canEditWorkflow}>
+              <Plus className="h-4 w-4 mr-1" />
+              Flow
+            </Button>
+            <Button onClick={() => addNode('endNode')} variant="outline" size="sm" disabled={!canEditWorkflow}>
+              <Plus className="h-4 w-4 mr-1" />
+              End
+            </Button>
+            <Button onClick={() => addNode('functionNode')} variant="outline" size="sm" disabled={!canEditWorkflow}>
+              <Plus className="h-4 w-4 mr-1" />
+              Function
+            </Button>
+            <Button onClick={() => addNode('mergeNode')} variant="outline" size="sm" disabled={!canEditWorkflow}>
+              <Plus className="h-4 w-4 mr-1" />
+              Merge
+            </Button>
+          </div>
         </div>
       </div>
+      {importErrorMessage && (
+        <div className="px-2 pb-2 text-xs text-red-600">
+          {importErrorMessage}
+        </div>
+      )}
       
       {/* Hidden file input for import */}
       <input 

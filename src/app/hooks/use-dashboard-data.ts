@@ -210,7 +210,7 @@ export const useDashboardData = () => {
     };
 
     initializeData();
-  }, []); // Only run once on mount
+  }, [loadMetrics, loadChartData]);
 
   return {
     ...state,

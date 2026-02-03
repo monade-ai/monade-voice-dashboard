@@ -45,7 +45,6 @@ export default function ClientLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const pathname = usePathname();
   // Memoize QueryClient so it's not recreated on every render
   const [queryClient] = React.useState(() => new QueryClient());
 

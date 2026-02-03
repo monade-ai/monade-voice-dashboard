@@ -2,7 +2,7 @@ import { memo } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
 
 import { formatActions } from '../utils/helpers';
-import { Message, Action, PipecatNode } from '../store/workflow-store';
+import { Message, Action } from '../store/workflow-store';
 
 /**
  * Base node component with common styling and content rendering
@@ -10,7 +10,6 @@ import { Message, Action, PipecatNode } from '../store/workflow-store';
 export const BaseNode = memo(({ 
   data, 
   selected, 
-  id, 
   type, 
   sourcePosition = Position.Bottom, 
   targetPosition = Position.Top, 

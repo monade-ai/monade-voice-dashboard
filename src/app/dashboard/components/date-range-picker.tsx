@@ -1,7 +1,7 @@
 // app/dashboard/components/date-range-picker.tsx
 
-import React, { useState, useEffect } from 'react';
-import { format, addDays, subDays } from 'date-fns';
+import React, { useState } from 'react';
+import { format, subDays } from 'date-fns';
 import { Calendar as CalendarIcon } from 'lucide-react';
 import { DateRange } from 'react-day-picker';
 

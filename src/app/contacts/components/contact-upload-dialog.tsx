@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { Upload, X, AlertTriangle, FileSpreadsheet, Download, Check } from 'lucide-react';
+import { Upload, X, AlertTriangle, FileSpreadsheet, Check } from 'lucide-react';
 import { motion } from 'framer-motion';
 import Papa from 'papaparse';
 
@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 
 import { useContactsContext, Bucket } from '../contexts/contacts-context';
@@ -162,7 +161,6 @@ const ContactUploadDialog: React.FC<ContactUploadDialogProps> = ({ isOpen, onClo
       // Workflow 2: Upload to existing bucket (with validation)
       const targetBucket = buckets.find(b => b.id === targetBucketId);
       if (!isCreatingNewBucket && targetBucket) {
-        const bucketFields = new Set(targetBucket.fields);
         const csvFields = new Set(csvHeaders);
         if (targetBucket.fields.some(field => !csvFields.has(field))) {
           setError(`CSV headers do not match bucket fields. Required: ${targetBucket.fields.join(', ')}`);

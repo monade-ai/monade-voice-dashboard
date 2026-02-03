@@ -7,13 +7,13 @@
 import React, { useState } from 'react';
 import { Phone, ExternalLink, MessageSquare, Calendar, Loader2 } from 'lucide-react';
 
-import { useTranslations } from '@/i18n/translations-context';
 import { useTranscripts, Transcript } from '@/app/hooks/use-transcripts';
 import { TranscriptViewer } from '@/components/transcript-viewer';
 
 // Format date helper
 const formatDate = (dateString: string) => {
   const date = new Date(dateString);
+
   return date.toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
@@ -88,7 +88,6 @@ const CallHistoryItem = ({
 };
 
 const CallHistoryList: React.FC = () => {
-  const { t } = useTranslations();
   const { transcripts, loading, error, refetch } = useTranscripts();
   const [search, setSearch] = useState('');
   const [selectedTranscript, setSelectedTranscript] = useState<Transcript | null>(null);
@@ -103,6 +102,7 @@ const CallHistoryList: React.FC = () => {
 
     if (!search.trim()) return true;
     const searchLower = search.toLowerCase();
+
     return (
       transcript.call_id.toLowerCase().includes(searchLower) ||
       transcript.phone_number.toLowerCase().includes(searchLower)
@@ -129,11 +129,11 @@ const CallHistoryList: React.FC = () => {
           <div
             onClick={() => setShowConnectedOnly(!showConnectedOnly)}
             className={`relative w-12 h-6 rounded-full transition-colors cursor-pointer ${showConnectedOnly ? 'bg-green-500' : 'bg-gray-300'
-              }`}
+            }`}
           >
             <div
               className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${showConnectedOnly ? 'translate-x-6' : 'translate-x-0.5'
-                }`}
+              }`}
             />
           </div>
         </label>

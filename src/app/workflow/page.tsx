@@ -1,7 +1,5 @@
 'use client';
 
-import { useEffect } from 'react';
-
 import { WorkflowEditor } from './components/workflow-editor';
 
 export default function WorkflowPage() {

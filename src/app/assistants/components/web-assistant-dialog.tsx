@@ -8,7 +8,7 @@ import {
   useRTVIClientEvent,
   RTVIClientAudio,
 } from '@pipecat-ai/client-react';
-import { LLMFunctionCallData, RTVIEvent, LLMHelper } from '@pipecat-ai/client-js';
+import { RTVIEvent, LLMHelper } from '@pipecat-ai/client-js';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -28,7 +28,7 @@ interface WebAssistantDialogProps {
 }
 
 export function WebAssistantDialog({
-  url,
+  url: _url,
   assistantName,
   isOpen,
   onClose,
@@ -40,7 +40,6 @@ export function WebAssistantDialog({
   const client = useRTVIClient();
   const transportState = useRTVIClientTransportState();
   const isConnected = ['connected', 'ready'].includes(transportState);
-  const [isConnecting, setIsConnecting] = useState(false);
   const [isListening, setIsListening] = useState(false);
   // Using Float32Array for compatibility with AudioVisualizer
   const [audioData, setAudioData] = useState<Float32Array | null>(null);
@@ -127,13 +126,6 @@ export function WebAssistantDialog({
     }, [client, isConnected]),
   );
 
-  // Reset connecting state when transport state changes
-  useEffect(() => {
-    if (isConnected || transportState === 'disconnected') {
-      setIsConnecting(false);
-    }
-  }, [transportState, isConnected]);
-  
   // Connect to PipeCat when dialog opens
   useEffect(() => {
     if (isOpen && client) {
@@ -143,7 +135,6 @@ export function WebAssistantDialog({
       // Connect to the service
       const connectClient = async () => {
         try {
-          setIsConnecting(true);
           await client.connect();
           
           // Add initial message from assistant
@@ -154,7 +145,6 @@ export function WebAssistantDialog({
         } catch (err) {
           console.error('Connection error:', err);
           setError(err instanceof Error ? err : new Error(String(err)));
-          setIsConnecting(false);
         }
       };
       

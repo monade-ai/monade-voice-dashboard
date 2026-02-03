@@ -1,7 +1,9 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+
 import { MONADE_API_CONFIG } from '@/types/monade-api.types';
+
 import { useMonadeUser } from './use-monade-user';
 
 interface UserCredits {
@@ -18,63 +20,64 @@ interface UseCreditsReturn {
 }
 
 export function useCredits(): UseCreditsReturn {
-    const [credits, setCredits] = useState<UserCredits | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+  const [credits, setCredits] = useState<UserCredits | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-    // Use dynamic userUid from MonadeUser context
-    const { userUid, loading: userLoading } = useMonadeUser();
+  // Use dynamic userUid from MonadeUser context
+  const { userUid, loading: userLoading } = useMonadeUser();
 
-    const fetchCredits = useCallback(async () => {
-        if (!userUid) {
-            if (!userLoading) {
-                setError('User not authenticated');
-            }
-            setLoading(false);
-            return;
-        }
+  const fetchCredits = useCallback(async () => {
+    if (!userUid) {
+      if (!userLoading) {
+        setError('User not authenticated');
+      }
+      setLoading(false);
 
-        try {
-            setLoading(true);
-            setError(null);
+      return;
+    }
 
-            const response = await fetch(
-                `${MONADE_API_CONFIG.BASE_URL}/api/users/${userUid}/credits`,
-                {
-                    method: 'GET',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-API-Key': MONADE_API_CONFIG.API_KEY,
-                    },
-                }
-            );
+    try {
+      setLoading(true);
+      setError(null);
 
-            if (!response.ok) {
-                throw new Error(`Failed to fetch credits: ${response.status}`);
-            }
+      const response = await fetch(
+        `${MONADE_API_CONFIG.BASE_URL}/api/users/${userUid}/credits`,
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-API-Key': MONADE_API_CONFIG.API_KEY,
+          },
+        },
+      );
 
-            const data = await response.json();
-            setCredits(data);
-        } catch (err) {
-            console.error('Error fetching credits:', err);
-            setError(err instanceof Error ? err.message : 'Failed to fetch credits');
-        } finally {
-            setLoading(false);
-        }
-    }, [userUid, userLoading]);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch credits: ${response.status}`);
+      }
 
-    useEffect(() => {
-        if (userUid) {
-            fetchCredits();
-        }
-    }, [fetchCredits, userUid]);
+      const data = await response.json();
+      setCredits(data);
+    } catch (err) {
+      console.error('Error fetching credits:', err);
+      setError(err instanceof Error ? err.message : 'Failed to fetch credits');
+    } finally {
+      setLoading(false);
+    }
+  }, [userUid, userLoading]);
 
-    return {
-        credits,
-        loading: loading || userLoading,
-        error,
-        refetch: fetchCredits,
-    };
+  useEffect(() => {
+    if (userUid) {
+      fetchCredits();
+    }
+  }, [fetchCredits, userUid]);
+
+  return {
+    credits,
+    loading: loading || userLoading,
+    error,
+    refetch: fetchCredits,
+  };
 }
 
 export default useCredits;

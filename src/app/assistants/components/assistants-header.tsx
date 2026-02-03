@@ -1,12 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-
-interface AssistantsHeaderProps {
-  editingAssistantId: string | null;
-  setEditingAssistantId: (id: string | null) => void;
-}
 import { Search, Plus } from 'lucide-react';
+import { useState } from 'react';
 
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -17,14 +12,17 @@ import { useAssistants } from '../../hooks/use-assistants-context';
 import AssistantNameEdit from './assistant-name-edit';
 import { VoiceAssistantDialog } from './voice-assistant-dialog';
 
+interface AssistantsHeaderProps {
+  editingAssistantId: string | null;
+  setEditingAssistantId: (id: string | null) => void;
+}
+
 export default function AssistantsHeader({ editingAssistantId, setEditingAssistantId }: AssistantsHeaderProps) {
   const {
     assistants,
-    currentAssistant,
     setCurrentAssistant,
     addDraftAssistant,
     updateAssistantLocally,
-    fetchAssistants,
   } = useAssistants();
 
   const [searchTerm, setSearchTerm] = useState('');

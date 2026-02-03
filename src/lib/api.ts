@@ -256,6 +256,7 @@ export const apiService = {
     type?: string;
   }) => {
     const queryParams = buildQueryParams(options);
+
     return fetchWithErrorHandling(`/api/campaigns${queryParams}`);
   },
 
@@ -298,6 +299,7 @@ export const apiService = {
       });
     }
     const queryString = params.toString() ? `?${params.toString()}` : '';
+
     return fetchWithErrorHandling(`/api/campaigns/${id}/call-details${queryString}`);
   },
 };

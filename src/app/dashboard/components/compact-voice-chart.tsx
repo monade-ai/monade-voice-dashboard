@@ -5,7 +5,7 @@ import { Area, AreaChart, ResponsiveContainer, XAxis, YAxis } from 'recharts';
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
+import { ChartTooltip } from '@/components/ui/chart';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 
