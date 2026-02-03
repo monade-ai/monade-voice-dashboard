@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 
+import { ApiError, fetchJson } from '@/lib/http';
 import { createClient } from '@/utils/supabase/client';
 import { MONADE_API_CONFIG } from '@/types/monade-api.types';
 
@@ -82,9 +83,8 @@ export function MonadeUserProvider({ children }: MonadeUserProviderProps) {
       console.log('[MonadeUser] Fetching user_uid for email:', userEmail);
 
       // Fetch user_uid from Monade API by email
-      let response: Response;
       try {
-        response = await fetch(
+        const data = await fetchJson<any>(
           `${MONADE_API_CONFIG.BASE_URL}/api/users/email/${encodeURIComponent(userEmail)}`,
           {
             method: 'GET',
@@ -93,35 +93,16 @@ export function MonadeUserProvider({ children }: MonadeUserProviderProps) {
             },
           },
         );
-      } catch (fetchError) {
-        console.error('[MonadeUser] Failed to reach Monade API:', fetchError);
-        setError('Could not reach Monade API. Please try again later.');
-        return;
-      }
 
-      if (!response.ok) {
-        if (response.status === 404) {
-          console.error('[MonadeUser] User not found in Monade DB for email:', userEmail);
-        } else {
-          console.error('[MonadeUser] API error:', response.status);
-        }
-        setError(getApiErrorMessage(response.status));
+        const uid = data.user_uid || data.user?.user_uid;
 
-        return;
-      }
+        if (uid) {
+          console.log('[MonadeUser] Successfully fetched user_uid:', uid);
+          setUserUid(uid);
 
-      const data = await response.json();
-      const uid = data.user_uid || data.user?.user_uid;
-
-      if (uid) {
-        console.log('[MonadeUser] Successfully fetched user_uid:', uid);
-        setUserUid(uid);
-
-        // Now fetch user's API keys
-        try {
-          let keysResponse: Response;
+          // Now fetch user's API keys
           try {
-            keysResponse = await fetch(
+            const keysData = await fetchJson<any>(
               `${MONADE_API_CONFIG.BASE_URL}/api/users/${uid}/api-keys`,
               {
                 method: 'GET',
@@ -130,14 +111,7 @@ export function MonadeUserProvider({ children }: MonadeUserProviderProps) {
                 },
               },
             );
-          } catch (keysFetchError) {
-            console.error('[MonadeUser] Failed to reach Monade API (keys):', keysFetchError);
-            setError('Could not reach Monade API to load API keys. Please try again later.');
-            return;
-          }
 
-          if (keysResponse.ok) {
-            const keysData = await keysResponse.json();
             // Get the first active API key
             const keys = Array.isArray(keysData) ? keysData : keysData.api_keys || [];
             if (keys.length > 0) {
@@ -148,19 +122,27 @@ export function MonadeUserProvider({ children }: MonadeUserProviderProps) {
               console.log('[MonadeUser] No API keys found for user');
               setApiKey(null);
             }
-          } else {
-            console.error('[MonadeUser] Failed to fetch API keys:', keysResponse.status);
-            if (keysResponse.status >= 500) {
-              setError('Monade API is currently unavailable. Please try again later.');
-            }
+          } catch (keyErr) {
+            console.error('[MonadeUser] Error fetching API keys:', keyErr);
+            setError('Could not load API keys. Please try again later.');
           }
-        } catch (keyErr) {
-          console.error('[MonadeUser] Error fetching API keys:', keyErr);
-          setError('Could not load API keys. Please try again later.');
+        } else {
+          console.error('[MonadeUser] No user_uid in response:', data);
+          setError('Invalid user data');
         }
-      } else {
-        console.error('[MonadeUser] No user_uid in response:', data);
-        setError('Invalid user data');
+      } catch (fetchError) {
+        if (fetchError instanceof ApiError) {
+          if (fetchError.status === 404) {
+            console.error('[MonadeUser] User not found in Monade DB for email:', userEmail);
+          } else {
+            console.error('[MonadeUser] API error:', fetchError.status);
+          }
+          setError(getApiErrorMessage(fetchError.status ?? 0));
+        } else {
+          console.error('[MonadeUser] Failed to reach Monade API:', fetchError);
+          setError('Could not reach Monade API. Please try again later.');
+        }
+        return;
       }
     } catch (err) {
       console.error('[MonadeUser] Error fetching user:', err);

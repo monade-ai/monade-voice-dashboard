@@ -1,4 +1,10 @@
-import { ChartDataPoint } from '@/components/charts';
+// Chart data types
+export interface ChartDataPoint {
+  timestamp: string
+  callVolume: number
+  successRate: number
+  avgDuration: number
+}
 
 // Generate mock data for different time ranges
 export const generateMockChartData = (timeRange: '24h' | '7d' | '30d'): ChartDataPoint[] => {

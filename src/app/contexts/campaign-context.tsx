@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { useAssistants } from '@/app/hooks/use-assistants-context';
 import { useMonadeUser } from '@/app/hooks/use-monade-user';
 import { useCampaignHistory } from '@/app/hooks/use-campaign-history';
+import { fetchJson } from '@/lib/http';
 
 // Types
 export interface Contact {
@@ -180,7 +181,7 @@ export function CampaignProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      const response = await fetch('/api/calling', {
+      const data = await fetchJson<any>('/api/calling', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -190,14 +191,8 @@ export function CampaignProvider({ children }: { children: React.ReactNode }) {
           api_key: apiKey,
           callee_info: contact.calleeInfo,
         }),
+        retry: { retries: 0 },
       });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Call failed');
-      }
-
-      const data = await response.json();
 
       return {
         phoneNumber: contact.phoneNumber,
@@ -231,28 +226,22 @@ export function CampaignProvider({ children }: { children: React.ReactNode }) {
     // Helper to check for transcript
     const checkForTranscript = async (): Promise<string | null> => {
       try {
-        const response = await fetch(`/api/proxy/api/users/${userUid}/transcripts`);
-        if (response.ok) {
-          const data = await response.json();
-          const transcripts = Array.isArray(data) ? data : data.transcripts || [];
+        const data = await fetchJson<any>(`/api/proxy/api/users/${userUid}/transcripts`);
+        const transcripts = Array.isArray(data) ? data : data.transcripts || [];
 
-          for (const t of transcripts) {
-            const transcriptPhone = t.phone_number || '';
-            const transcriptTime = new Date(t.created_at || '');
+        for (const t of transcripts) {
+          const transcriptPhone = t.phone_number || '';
+          const transcriptTime = new Date(t.created_at || '');
 
-            if (transcriptPhone === formattedPhone && transcriptTime > bufferTime) {
-              const contentResponse = await fetch('/api/transcript-content', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ url: t.transcript_url }),
-              });
-
-              if (contentResponse.ok) {
-                const data = await contentResponse.json();
-                if (data.transcript && data.transcript.trim()) {
-                  return data.transcript;
-                }
-              }
+          if (transcriptPhone === formattedPhone && transcriptTime > bufferTime) {
+            const contentData = await fetchJson<any>('/api/transcript-content', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ url: t.transcript_url }),
+              retry: { retries: 2 },
+            });
+            if (contentData.transcript && contentData.transcript.trim()) {
+              return contentData.transcript;
             }
           }
         }
@@ -486,18 +475,15 @@ export function CampaignProvider({ children }: { children: React.ReactNode }) {
 
           // Find call_id from transcript
           try {
-            const transcriptsResponse = await fetch(`/api/proxy/api/users/${userUid}/transcripts`);
-            if (transcriptsResponse.ok) {
-              const transcriptsData = await transcriptsResponse.json();
-              const transcripts = Array.isArray(transcriptsData) ? transcriptsData : transcriptsData.transcripts || [];
-              const match = transcripts.find((t: any) => {
-                const tPhone = normalizePhone(t.phone_number || '');
-                const tTime = new Date(t.created_at || 0);
+            const transcriptsData = await fetchJson<any>(`/api/proxy/api/users/${userUid}/transcripts`);
+            const transcripts = Array.isArray(transcriptsData) ? transcriptsData : transcriptsData.transcripts || [];
+            const match = transcripts.find((t: any) => {
+              const tPhone = normalizePhone(t.phone_number || '');
+              const tTime = new Date(t.created_at || 0);
 
-                return tPhone === targetPhoneNormalized && tTime > campaignStartBuffer;
-              });
-              if (match) realCallId = match.call_id;
-            }
+              return tPhone === targetPhoneNormalized && tTime > campaignStartBuffer;
+            });
+            if (match) realCallId = match.call_id;
           } catch (err) {
             console.error('Transcript lookup failed:', err);
           }
@@ -506,11 +492,8 @@ export function CampaignProvider({ children }: { children: React.ReactNode }) {
           if (realCallId) {
             finalResults[idx].call_id = realCallId;
             try {
-              const aRes = await fetch(`/api/proxy/api/analytics/${realCallId}`);
-              if (aRes.ok) {
-                const d = await aRes.json();
-                finalResults[idx].analytics = d.analytics || d;
-              }
+              const d = await fetchJson<any>(`/api/proxy/api/analytics/${realCallId}`);
+              finalResults[idx].analytics = d.analytics || d;
             } catch (e) {
               console.error('Analytics fetch failed:', e);
             }

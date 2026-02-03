@@ -23,23 +23,7 @@ jest.mock('sonner', () => ({
   },
 }));
 
-// Mock chart components
-jest.mock('@/components/charts', () => ({
-  VoiceAgentChart: ({ data, timeRange, onTimeRangeChange, loading, error }: any) => (
-    <div data-testid="voice-agent-chart">
-      <div data-testid="chart-loading">{loading ? 'Loading...' : 'Chart loaded'}</div>
-      <div data-testid="chart-error">{error || 'No error'}</div>
-      <div data-testid="chart-time-range">{timeRange}</div>
-      <button 
-        data-testid="change-time-range" 
-        onClick={() => onTimeRangeChange('24h')}
-      >
-        Change to 24h
-      </button>
-      <div data-testid="chart-data-points">{data.length} data points</div>
-    </div>
-  ),
-}));
+// Mock chart components (VoiceAgentChart was removed - dashboard no longer uses charts directly)
 
 // Mock carousel component
 jest.mock('../components/carousel', () => {

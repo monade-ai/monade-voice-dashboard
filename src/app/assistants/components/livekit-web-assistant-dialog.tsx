@@ -14,6 +14,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { useLiveKitWebAssistant } from '@/app/hooks/use-livekit-web-assistant';
+import { fetchJson } from '@/lib/http';
 
 import { AgentStarterEmbed } from './agent-starter-embed';
 
@@ -93,7 +94,7 @@ export function LiveKitWebAssistantDialog({
       const roomName = `assistant-${assistantId}-${Date.now()}`;
       
       // First create the dispatch using the same room name
-      const dispatchResponse = await fetch('/api/livekit-dispatch', {
+      const dispatchData = await fetchJson<any>('/api/livekit-dispatch', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -104,21 +105,14 @@ export function LiveKitWebAssistantDialog({
           calleeInfo,
           assistantId,
         }),
+        retry: { retries: 0 },
       });
-
-      if (!dispatchResponse.ok) {
-        const errorData = await dispatchResponse.json();
-        const errorMessage = errorData.error || 'Failed to create LiveKit dispatch';
-        throw new Error(errorMessage);
-      }
-
-      const dispatchData = await dispatchResponse.json();
       console.log('[LiveKitWebAssistantDialog] LiveKit dispatch created successfully:', dispatchData);
       
       setIsSessionStarted(true);
       
       // Now fetch connection details for the agent starter embed using the same room name
-      const response = await fetch('/api/agent-connection-details', {
+      const data = await fetchJson<any>('/api/agent-connection-details', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -128,13 +122,8 @@ export function LiveKitWebAssistantDialog({
           agentName: assistantName,
           calleeInfo,
         }),
+        retry: { retries: 0 },
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch connection details');
-      }
-
-      const data = await response.json();
       setConnectionDetails({
         serverUrl: data.serverUrl,
         roomName: data.roomName,

@@ -3,6 +3,7 @@
 
 import { useState, useCallback } from 'react';
 
+import { fetchJson } from '@/lib/http';
 interface CalleeInfo {
   [key: string]: string;
 }
@@ -45,7 +46,7 @@ export function useLiveKitWebAssistant({
         calleeInfo,
       });
       
-      const response = await fetch('/api/livekit-dispatch', {
+      const data = await fetchJson('/api/livekit-dispatch', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -56,17 +57,8 @@ export function useLiveKitWebAssistant({
           calleeInfo,
           assistantId,
         }),
+        retry: { retries: 0 },
       });
-
-      console.log('[useLiveKitWebAssistant] LiveKit dispatch response:', response);
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        const errorMessage = errorData.error || 'Failed to create LiveKit dispatch';
-        throw new Error(errorMessage);
-      }
-
-      const data = await response.json();
       console.log('[useLiveKitWebAssistant] LiveKit dispatch created successfully:', data);
       
       setConnectionStatus('connected');

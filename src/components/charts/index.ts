@@ -2,8 +2,8 @@
 export { BaseChart } from '@/components/ui/base-chart';
 export type { BaseChartProps } from '@/components/ui/base-chart';
 
-export { VoiceAgentChart } from './voice-agent-chart';
-export type { VoiceAgentChartProps, ChartDataPoint } from './voice-agent-chart';
+// Chart data types (re-exported for convenience)
+export type { ChartDataPoint } from '@/app/dashboard/data/chart-data';
 
 // Shadcn chart components
 export {

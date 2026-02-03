@@ -2,8 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 
-import { ChartDataPoint } from '@/components/charts';
-import { fetchChartData, defaultChartData } from '@/app/dashboard/data/chart-data';
+import { ChartDataPoint, fetchChartData, defaultChartData } from '@/app/dashboard/data/chart-data';
 
 interface DashboardMetrics {
   agents: {

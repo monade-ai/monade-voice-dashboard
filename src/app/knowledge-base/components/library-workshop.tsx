@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { useLibrary, LibraryItem } from '@/app/hooks/use-knowledge-base';
+import { fetchJson } from '@/lib/http';
 import { cn } from '@/lib/utils';
 
 interface LibraryWorkshopProps {
@@ -41,12 +42,12 @@ export function LibraryWorkshop({ isOpen, onClose, editItem }: LibraryWorkshopPr
   const fetchOriginalContent = async (url: string) => {
     setIsFetchingContent(true);
     try {
-      const res = await fetch('/api/transcript-content', {
+      const data = await fetchJson<any>('/api/transcript-content', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url }),
+        retry: { retries: 2 },
       });
-      const data = await res.json();
       if (data.raw) {
         // Logic to strip JSONL formatting if it was saved as structured data
         setContent(data.transcript || data.raw);
