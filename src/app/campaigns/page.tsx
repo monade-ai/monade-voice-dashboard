@@ -1,50 +1,181 @@
 'use client';
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   Plus,
   RefreshCw,
   Search,
   Filter,
-  CreditCard,
   Activity,
   Loader2,
   FolderOpen,
+  Play,
+  Pause,
+  Square,
+  Trash2,
+  MoreVertical,
+  Clock,
+  ArrowUpRight
 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { PaperCard, PaperCardContent } from '@/components/ui/paper-card';
+import { DashboardHeader } from '@/components/dashboard-header';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { useCampaignApi } from '@/app/hooks/use-campaign-api';
-import { CampaignCard } from './components/campaign-card';
 import { CreateCampaignModal } from './components/create-campaign-modal';
 import {
   Campaign,
   CampaignStatus,
   CAMPAIGN_API_CONFIG,
 } from '@/types/campaign.types';
+import { cn } from '@/lib/utils';
 
-type StatusFilter = CampaignStatus | 'all';
-type SortOption = 'created_at' | 'updated_at' | 'name' | 'status';
+// --- Helpers ---
+
+const getStatusColor = (status: CampaignStatus) => {
+  switch (status) {
+    case 'active': return 'text-green-500 bg-green-500/10 border-green-500/20';
+    case 'paused': return 'text-yellow-500 bg-yellow-500/10 border-yellow-500/20';
+    case 'completed': return 'text-blue-500 bg-blue-500/10 border-blue-500/20';
+    case 'stopped': return 'text-red-500 bg-red-500/10 border-red-500/20';
+    default: return 'text-muted-foreground bg-muted border-border/40';
+  }
+};
+
+const getHumanStatus = (status: CampaignStatus, cps: number) => {
+  switch (status) {
+    case 'active': return `Dialing (${cps}/sec)`;
+    case 'paused': return 'Halted';
+    case 'pending': return 'Queued';
+    case 'completed': return 'Finished';
+    case 'stopped': return 'Terminated';
+    default: return status;
+  }
+};
+
+const calculateProgress = (c: Campaign) => {
+  if (c.total_contacts === 0) return 0;
+  const processed = c.successful_calls + c.failed_calls;
+  return Math.min(100, Math.round((processed / c.total_contacts) * 100));
+};
+
+// --- Component: CampaignRow ---
+
+const CampaignRow = ({ 
+  campaign, 
+  onStart, 
+  onPause, 
+  onStop, 
+  onDelete 
+}: { 
+  campaign: Campaign, 
+  onStart: (c: Campaign) => void, 
+  onPause: (c: Campaign) => void,
+  onStop: (c: Campaign) => void,
+  onDelete: (c: Campaign) => void
+}) => {
+  const progress = calculateProgress(campaign);
+  const successRate = campaign.successful_calls + campaign.failed_calls > 0 
+    ? Math.round((campaign.successful_calls / (campaign.successful_calls + campaign.failed_calls)) * 100) 
+    : 0;
+
+  return (
+    <div className="group flex items-center justify-between p-4 border-b border-border/10 hover:bg-muted/30 transition-all">
+      
+      {/* 1. Identity */}
+      <div className="flex flex-col w-[25%] min-w-[200px]">
+        <div className="flex items-center gap-2 mb-1">
+          <span className="text-sm font-bold text-foreground truncate" title={campaign.name}>
+            {campaign.name}
+          </span>
+          <Badge variant="outline" className={cn("text-[9px] font-bold uppercase tracking-widest px-1.5 py-0 h-5", getStatusColor(campaign.status))}>
+            {campaign.status}
+          </Badge>
+        </div>
+        <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+          <Clock size={10} />
+          <span>Created {new Date(campaign.created_at).toLocaleDateString()}</span>
+        </div>
+      </div>
+
+      {/* 2. Progress Bar */}
+      <div className="flex flex-col w-[20%] gap-1.5">
+        <div className="flex justify-between items-end">
+          <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">Completion</span>
+          <span className="text-[10px] font-mono font-bold text-foreground">{progress}%</span>
+        </div>
+        <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
+          <div 
+            className={cn("h-full transition-all duration-500", campaign.status === 'active' ? "bg-green-500" : "bg-foreground/40")} 
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+      </div>
+
+      {/* 3. Metrics */}
+      <div className="flex flex-col w-[15%]">
+        <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 mb-1">Success Rate</span>
+        <div className="flex items-baseline gap-1">
+          <span className="text-sm font-mono font-bold text-foreground">{successRate}%</span>
+          <span className="text-[10px] text-muted-foreground">({campaign.successful_calls}/{campaign.total_contacts})</span>
+        </div>
+      </div>
+
+      {/* 4. Configuration */}
+      <div className="flex flex-col w-[15%]">
+        <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 mb-1">Throttle</span>
+        <span className="text-sm font-mono text-foreground">{campaign.calls_per_second} CPS</span>
+      </div>
+
+      {/* 5. Actions */}
+      <div className="flex items-center justify-end gap-2 w-[15%]">
+        {campaign.status === 'active' ? (
+          <button onClick={() => onPause(campaign)} className="p-2 rounded-md bg-yellow-500/10 text-yellow-600 hover:bg-yellow-500/20 transition-colors" title="Pause">
+            <Pause size={14} fill="currentColor" />
+          </button>
+        ) : (
+          <button onClick={() => onStart(campaign)} className="p-2 rounded-md bg-green-500/10 text-green-600 hover:bg-green-500/20 transition-colors" title="Start">
+            <Play size={14} fill="currentColor" />
+          </button>
+        )}
+        
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="p-2 text-muted-foreground hover:text-foreground transition-colors">
+              <MoreVertical size={14} />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuLabel>Campaign Actions</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => window.location.href = `/campaigns/${campaign.id}`}>
+              <FolderOpen className="mr-2 h-4 w-4" /> View Details
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onStop(campaign)} className="text-red-600">
+              <Square className="mr-2 h-4 w-4" /> Stop Campaign
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onDelete(campaign)} className="text-red-600">
+              <Trash2 className="mr-2 h-4 w-4" /> Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    </div>
+  );
+};
+
+// --- Main Page ---
 
 export default function CampaignsPage() {
   const {
@@ -64,343 +195,171 @@ export default function CampaignsPage() {
   } = useCampaignApi();
 
   const [createModalOpen, setCreateModalOpen] = useState(false);
-  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-  const [campaignToDelete, setCampaignToDelete] = useState<Campaign | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
-  const [sortBy, setSortBy] = useState<SortOption>('created_at');
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Initial load
+  // Initial & Polling
   useEffect(() => {
-    listCampaigns().catch(console.error);
-    refreshQueueStatus().catch(console.error);
-    refreshCreditStatus().catch(console.error);
-  }, [listCampaigns, refreshQueueStatus, refreshCreditStatus]);
+    listCampaigns();
+    refreshQueueStatus();
+    refreshCreditStatus();
+  }, []);
 
-  // Polling for active campaigns
   useEffect(() => {
-    const hasActiveCampaign = campaigns.some((c) => c.status === 'active');
-    if (!hasActiveCampaign) return;
-
+    const hasActive = campaigns.some(c => c.status === 'active');
+    if (!hasActive) return;
     const interval = setInterval(() => {
-      listCampaigns().catch(console.error);
-      refreshQueueStatus().catch(console.error);
-    }, CAMPAIGN_API_CONFIG.POLL_INTERVALS.CAMPAIGN_LIST);
-
+      listCampaigns();
+      refreshQueueStatus();
+    }, 5000);
     return () => clearInterval(interval);
-  }, [campaigns, listCampaigns, refreshQueueStatus]);
+  }, [campaigns]);
 
-  const handleRefresh = useCallback(async () => {
+  const handleRefresh = async () => {
     setIsRefreshing(true);
-    try {
-      await Promise.all([
-        listCampaigns(),
-        refreshQueueStatus(),
-        refreshCreditStatus(),
-      ]);
-      toast.success('Refreshed');
-    } catch (error) {
-      console.error('Refresh failed:', error);
-    } finally {
-      setIsRefreshing(false);
-    }
-  }, [listCampaigns, refreshQueueStatus, refreshCreditStatus]);
-
-  const handleStart = async (campaign: Campaign) => {
-    try {
-      await startCampaign(campaign.id);
-      toast.success(`Campaign "${campaign.name}" started`);
-    } catch (error) {
-      console.error('Failed to start campaign:', error);
-    }
+    await Promise.all([listCampaigns(), refreshQueueStatus(), refreshCreditStatus()]);
+    setIsRefreshing(false);
+    toast.success('System Status Updated');
   };
 
-  const handlePause = async (campaign: Campaign) => {
-    try {
-      await pauseCampaign(campaign.id);
-      toast.success(`Campaign "${campaign.name}" paused`);
-    } catch (error) {
-      console.error('Failed to pause campaign:', error);
-    }
-  };
-
-  const handleStop = async (campaign: Campaign) => {
-    try {
-      await stopCampaign(campaign.id);
-      toast.success(`Campaign "${campaign.name}" stopped`);
-    } catch (error) {
-      console.error('Failed to stop campaign:', error);
-    }
-  };
-
-  const handleDeleteClick = (campaign: Campaign) => {
-    setCampaignToDelete(campaign);
-    setDeleteConfirmOpen(true);
-  };
-
-  const handleDeleteConfirm = async () => {
-    if (!campaignToDelete) return;
-
-    try {
-      await deleteCampaign(campaignToDelete.id);
-      toast.success(`Campaign "${campaignToDelete.name}" deleted`);
-    } catch (error) {
-      console.error('Failed to delete campaign:', error);
-      // Note: Delete endpoint returns 405, so this will fail
-      toast.error('Delete is not yet supported by the backend');
-    } finally {
-      setCampaignToDelete(null);
-      setDeleteConfirmOpen(false);
-    }
-  };
-
-  const handleCampaignCreated = (campaign: Campaign) => {
-    // Navigate to campaign detail page to upload CSV
-    window.location.href = `/campaigns/${campaign.id}`;
-  };
-
-  // Filter and sort campaigns
-  const filteredCampaigns = campaigns
-    .filter((campaign) => {
-      // Status filter
-      if (statusFilter !== 'all' && campaign.status !== statusFilter) {
-        return false;
-      }
-      // Search filter
-      if (searchQuery) {
-        const query = searchQuery.toLowerCase();
-        return (
-          campaign.name.toLowerCase().includes(query) ||
-          campaign.description.toLowerCase().includes(query)
-        );
-      }
-      return true;
-    })
-    .sort((a, b) => {
-      switch (sortBy) {
-        case 'name':
-          return a.name.localeCompare(b.name);
-        case 'status':
-          return a.status.localeCompare(b.status);
-        case 'updated_at':
-          return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
-        case 'created_at':
-        default:
-          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-      }
-    });
-
-  const activeCampaignCount = campaigns.filter((c) => c.status === 'active').length;
-  const totalContacts = campaigns.reduce((sum, c) => sum + c.total_contacts, 0);
+  const filteredCampaigns = useMemo(() => {
+    return campaigns.filter(c => 
+      c.name.toLowerCase().includes(searchQuery.toLowerCase())
+    ).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  }, [campaigns, searchQuery]);
 
   return (
-    <div className="container mx-auto py-6 space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold">Campaigns</h1>
-          <p className="text-sm text-muted-foreground">
-            Manage your outbound calling campaigns
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleRefresh}
-            disabled={isRefreshing}
-          >
-            <RefreshCw className={`h-4 w-4 mr-1 ${isRefreshing ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
-          <Button onClick={() => setCreateModalOpen(true)}>
-            <Plus className="h-4 w-4 mr-1" />
-            New Campaign
-          </Button>
-        </div>
-      </div>
+    <div className="min-h-screen bg-background flex flex-col font-sans">
+      <DashboardHeader />
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Total Campaigns
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{campaigns.length}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1">
-              <Activity className="h-4 w-4" />
-              Active Campaigns
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">{activeCampaignCount}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1">
-              <CreditCard className="h-4 w-4" />
-              Credits Available
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {creditStatus ? creditStatus.available_credits.toFixed(1) : '—'}
+      <main className="flex-1 p-6 md:p-8 max-w-7xl mx-auto w-full space-y-10">
+        
+        {/* Header Section */}
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 pb-4 border-b border-border/40">
+            <div className="space-y-2">
+                <h1 className="text-5xl font-medium tracking-tighter text-foreground">Operations</h1>
+                <p className="text-muted-foreground text-sm font-medium">High-volume outbound management.</p>
             </div>
-            {creditStatus?.campaign_paused && (
-              <Badge variant="destructive" className="mt-1">
-                Paused - Low Credits
-              </Badge>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Queue Depth
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {queueStatus ? queueStatus.queue_depth : '—'}
+            <div className="flex items-center gap-4">
+                <Button 
+                    variant="outline" 
+                    onClick={handleRefresh}
+                    className="h-10 px-4 gap-2 border-border text-[10px] font-bold uppercase tracking-widest"
+                >
+                    <RefreshCw size={14} className={isRefreshing ? "animate-spin" : ""} />
+                    Sync
+                </Button>
+                <Button 
+                    onClick={() => setCreateModalOpen(true)}
+                    className="h-10 px-4 gap-2 bg-foreground text-background hover:bg-foreground/90 transition-all rounded-[4px] text-[10px] font-bold uppercase tracking-[0.2em]"
+                >
+                    <Plus size={16} />
+                    New Campaign
+                </Button>
             </div>
-            {queueStatus && !queueStatus.time_window_active && (
-              <Badge variant="secondary" className="mt-1">
-                Outside Hours
-              </Badge>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+        </div>
 
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search campaigns..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9"
-          />
-        </div>
-        <div className="flex gap-2">
-          <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
-            <SelectTrigger className="w-[140px]">
-              <Filter className="h-4 w-4 mr-2" />
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="pending">Pending</SelectItem>
-              <SelectItem value="active">Active</SelectItem>
-              <SelectItem value="paused">Paused</SelectItem>
-              <SelectItem value="stopped">Stopped</SelectItem>
-              <SelectItem value="completed">Completed</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
-            <SelectTrigger className="w-[140px]">
-              <SelectValue placeholder="Sort by" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="created_at">Newest First</SelectItem>
-              <SelectItem value="updated_at">Recently Updated</SelectItem>
-              <SelectItem value="name">Name</SelectItem>
-              <SelectItem value="status">Status</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
+        {/* System Status Bar (Control Tower) */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <PaperCard className="bg-muted/5 border-border/40">
+                <PaperCardContent className="p-5 flex items-center justify-between">
+                    <div className="space-y-1">
+                        <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Running</span>
+                        <div className="flex items-center gap-2">
+                            <span className="text-2xl font-bold font-mono">{campaigns.filter(c => c.status === 'active').length}</span>
+                            <span className="text-xs text-muted-foreground">Active</span>
+                        </div>
+                    </div>
+                    <div className={cn("w-2 h-2 rounded-full", campaigns.some(c => c.status === 'active') ? "bg-green-500 animate-pulse" : "bg-muted-foreground/30")} />
+                </PaperCardContent>
+            </PaperCard>
 
-      {/* Error Display */}
-      {error && (
-        <div className="rounded-md bg-destructive/10 p-4 text-destructive flex items-center justify-between">
-          <span>{error}</span>
-          <Button variant="ghost" size="sm" onClick={clearError}>
-            Dismiss
-          </Button>
-        </div>
-      )}
+            <PaperCard className="bg-muted/5 border-border/40">
+                <PaperCardContent className="p-5 flex items-center justify-between">
+                    <div className="space-y-1">
+                        <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Pending</span>
+                        <div className="flex items-center gap-2">
+                            <span className="text-2xl font-bold font-mono">{queueStatus?.queue_depth || 0}</span>
+                            <span className="text-xs text-muted-foreground">In Queue</span>
+                        </div>
+                    </div>
+                    <Activity size={16} className="text-primary" />
+                </PaperCardContent>
+            </PaperCard>
 
-      {/* Campaign List */}
-      {loading && campaigns.length === 0 ? (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            <PaperCard className="bg-muted/5 border-border/40">
+                <PaperCardContent className="p-5 flex items-center justify-between">
+                    <div className="space-y-1">
+                        <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Balance</span>
+                        <div className="flex items-center gap-2">
+                            <span className="text-2xl font-bold font-mono">{creditStatus?.available_credits.toFixed(0) || 0}</span>
+                            <span className="text-xs text-muted-foreground">Credits</span>
+                        </div>
+                    </div>
+                    {creditStatus?.campaign_paused && <Badge variant="destructive" className="text-[8px] h-5">Low Fuel</Badge>}
+                </PaperCardContent>
+            </PaperCard>
         </div>
-      ) : filteredCampaigns.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <FolderOpen className="h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="font-semibold text-lg mb-1">No campaigns found</h3>
-            <p className="text-sm text-muted-foreground mb-4">
-              {searchQuery || statusFilter !== 'all'
-                ? 'Try adjusting your filters'
-                : 'Create your first campaign to get started'}
-            </p>
-            {!searchQuery && statusFilter === 'all' && (
-              <Button onClick={() => setCreateModalOpen(true)}>
-                <Plus className="h-4 w-4 mr-1" />
-                Create Campaign
-              </Button>
-            )}
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredCampaigns.map((campaign) => (
-            <CampaignCard
-              key={campaign.id}
-              campaign={campaign}
-              onStart={handleStart}
-              onPause={handlePause}
-              onStop={handleStop}
-              onDelete={handleDeleteClick}
-              disabled={loading}
-            />
-          ))}
-        </div>
-      )}
 
-      {/* Create Campaign Modal */}
-      <CreateCampaignModal
-        open={createModalOpen}
-        onOpenChange={setCreateModalOpen}
-        onCampaignCreated={handleCampaignCreated}
+        {/* Campaign Ledger */}
+        <section className="space-y-6">
+            <div className="flex items-center justify-between">
+                <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/60" />
+                    <Input 
+                        placeholder="Filter campaigns..." 
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pl-9 h-9 w-64 bg-muted/10 border-border/40 text-xs focus:ring-primary focus:border-primary transition-all rounded-md"
+                    />
+                </div>
+                <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 font-mono">
+                    <FolderOpen size={12} />
+                    <span>{filteredCampaigns.length} Campaigns</span>
+                </div>
+            </div>
+
+            <div className="bg-card rounded-md border border-border/20 overflow-hidden min-h-[400px]">
+                {/* Table Header */}
+                <div className="flex items-center justify-between p-4 border-b border-border/20 bg-muted/5">
+                    <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground w-[25%] pl-1">Campaign</span>
+                    <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground w-[20%]">Status</span>
+                    <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground w-[15%]">Performance</span>
+                    <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground w-[15%]">Config</span>
+                    <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground w-[15%] text-right pr-2">Control</span>
+                </div>
+
+                {loading && campaigns.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-20 gap-4">
+                        <Loader2 className="animate-spin text-primary" />
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Syncing Operations...</span>
+                    </div>
+                ) : filteredCampaigns.length === 0 ? (
+                    <div className="py-20 text-center text-xs text-muted-foreground italic uppercase tracking-widest">No operations found.</div>
+                ) : (
+                    <div className="flex flex-col">
+                        {filteredCampaigns.map(c => (
+                            <CampaignRow 
+                                key={c.id} 
+                                campaign={c} 
+                                onStart={startCampaign}
+                                onPause={pauseCampaign}
+                                onStop={stopCampaign}
+                                onDelete={deleteCampaign}
+                            />
+                        ))}
+                    </div>
+                )}
+            </div>
+        </section>
+
+      </main>
+
+      <CreateCampaignModal 
+        open={createModalOpen} 
+        onOpenChange={setCreateModalOpen} 
+        onCampaignCreated={() => listCampaigns()} 
       />
-
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Campaign</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete "{campaignToDelete?.name}"? This action cannot be
-              undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDeleteConfirm}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }

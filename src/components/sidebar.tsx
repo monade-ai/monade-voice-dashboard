@@ -104,7 +104,7 @@ export function Sidebar() {
 
       {/* Header: Brand Logo */}
       <div className="p-6 pb-2">
-        <div className="flex items-center mb-4">
+        <div className="flex items-center gap-3 mb-4">
           <Image
             src="/monade-logo.png"
             alt="monade logo"
@@ -113,6 +113,7 @@ export function Sidebar() {
             priority
             className="dark:invert-0"
           />
+          <span className="text-lg font-semibold tracking-tight text-foreground">Monade</span>
         </div>
       </div>
 
@@ -135,10 +136,10 @@ export function Sidebar() {
           isLive={true}
         />
         <NavItem
-          href="/ai-campaigns"
+          href="/campaigns"
           icon={<Rocket />}
-          label="AI Campaigns"
-          isActive={pathname === '/ai-campaigns'}
+          label="Campaigns"
+          isActive={pathname === '/campaigns'}
           count={3}
         />
         <NavItem
