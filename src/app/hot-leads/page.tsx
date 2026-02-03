@@ -1,465 +1,369 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { Search, TrendingUp, Phone, Calendar, Filter, X, Lightbulb, MessageSquare, Target, BarChart3, ArrowUpDown } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { 
+  Search, 
+  ArrowUpRight, 
+  CalendarDays,
+  Target,
+  CheckCircle2,
+  Clock,
+  Loader2,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight
+} from 'lucide-react';
 
-import { Card } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { Progress } from '@/components/ui/progress';
-import { TranscriptViewer } from '@/components/transcript-viewer';
 import { useUserAnalytics, CallAnalytics } from '@/app/hooks/use-analytics';
+import { DashboardHeader } from '@/components/dashboard-header';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { TranscriptViewer } from '@/components/transcript-viewer';
+import { LeadIcon } from '@/components/ui/lead-icon';
+import { cn } from '@/lib/utils';
+import { PaperCard, PaperCardContent } from '@/components/ui/paper-card';
+import { HotLeadsGuide } from './components/hot-leads-guide';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+
+// --- Helpers (Memoized externally or stable) ---
+
+const getVerdictConfig = (verdict: string | undefined) => {
+    if (!verdict) return { label: 'Unknown', color: 'text-muted-foreground', bg: 'bg-muted', border: 'border-border' };
+    const v = verdict.toLowerCase();
+    if (v.includes('book') || v.includes('success') || v.includes('demo')) return { label: 'Conversion', color: 'text-green-500', bg: 'bg-green-500/10', border: 'border-green-500/20' };
+    if (v.includes('interest')) return { label: 'Qualified', color: 'text-primary', bg: 'bg-primary/10', border: 'border-primary/20' };
+    if (v.includes('callback')) return { label: 'Follow Up', color: 'text-orange-500', bg: 'bg-orange-500/10', border: 'border-orange-500/20' };
+    return { label: 'Neutral', color: 'text-muted-foreground', bg: 'bg-muted', border: 'border-border' };
+};
+
+const formatCurrency = (val: string | undefined) => {
+    if (!val) return null;
+    return val.includes('$') || val.includes('₹') ? val : `₹${val}`;
+};
+
+// --- Component: DealRow (Memoized for Performance) ---
+
+const DealRow = React.memo(({ lead, onClick }: { lead: CallAnalytics, onClick: () => void }) => {
+    const config = getVerdictConfig(lead.verdict);
+    const confidence = lead.confidence_score || 0;
+    const price = formatCurrency(lead.key_discoveries?.price_quoted as string);
+    const confidenceColor = confidence >= 80 ? "text-green-500" : confidence >= 50 ? "text-yellow-500" : "text-red-500";
+
+    return (
+        <div 
+            onClick={onClick}
+            className="group flex items-center justify-between p-5 border-b border-border/10 hover:bg-muted/30 transition-all cursor-pointer relative overflow-hidden"
+        >
+            <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-primary scale-y-0 group-hover:scale-y-100 transition-transform origin-center" />
+            
+            {/* 1. Lead Identity (30%) */}
+            <div className="flex items-center gap-5 w-[30%]">
+                <div className="shrink-0">
+                    <LeadIcon seed={lead.call_id} size={40} />
+                </div>
+                <div className="flex flex-col">
+                    <span className="text-sm font-bold text-foreground tracking-tight">{lead.phone_number}</span>
+                    <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest">
+                        {new Date(lead.created_at || Date.now()).toLocaleDateString()}
+                    </span>
+                </div>
+            </div>
+
+            {/* 2. Intent & Confidence (25%) */}
+            <div className="w-[25%] flex items-center gap-6">
+                <div className={cn("inline-flex items-center gap-2 px-3 py-1 rounded-full border", config.bg, config.border)}>
+                    <span className={cn("text-[10px] font-bold uppercase tracking-widest", config.color)}>{config.label}</span>
+                </div>
+                <div className="flex items-center gap-1.5 pl-2 border-l border-border/40">
+                    <span className={cn("text-xl font-mono font-bold leading-none", confidenceColor)}>{confidence}%</span>
+                    <span className="text-[8px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60 mt-1">Match</span>
+                </div>
+            </div>
+
+            {/* 3. Intelligence Snippet (25%) */}
+            <div className="w-[25%] pr-6 border-l border-border/10 pl-6">
+                <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed italic">
+                    "{lead.summary}"
+                </p>
+            </div>
+
+            {/* 4. Value & Action (20%) */}
+            <div className="w-[20%] flex items-center justify-end gap-8">
+                {price && (
+                    <div className="flex flex-col items-end">
+                        <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/60">Value</span>
+                        <span className="text-base font-mono font-bold text-foreground">{price}</span>
+                    </div>
+                )}
+                <div className="w-10 h-10 rounded-full bg-foreground text-background flex items-center justify-center group-hover:bg-primary group-hover:text-black transition-all duration-300 shadow-sm">
+                    <ArrowUpRight size={18} />
+                </div>
+            </div>
+        </div>
+    );
+});
+DealRow.displayName = 'DealRow';
+
+// --- Main Page ---
 
 export default function HotLeadsPage() {
   const { analytics: allAnalytics, loading, fetchAll } = useUserAnalytics();
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCall, setSelectedCall] = useState<{ transcriptUrl: string; callId: string } | null>(null);
-  const [selectedAnalytics, setSelectedAnalytics] = useState<CallAnalytics | null>(null);
-  const [filteredLeads, setFilteredLeads] = useState<typeof allAnalytics>([]);
-  const [dateFilter, setDateFilter] = useState<{ start: string; end: string }>({ start: '', end: '' });
-  const [sortBy, setSortBy] = useState<'confidence' | 'date-new' | 'date-old'>('confidence');
+  const [search, setSearch] = useState('');
+  const [selectedLead, setSelectedLead] = useState<CallAnalytics | null>(null);
+  
+  // Filter States
+  const [intentFilter, setIntentFilter] = useState<'all' | 'booked' | 'interested' | 'callback'>('all');
+  const [dateFilter, setDateFilter] = useState<'today' | '7d' | '30d' | 'all'>('all');
+  const [confidenceFilter, setConfidenceFilter] = useState<'all' | 'high'>('all'); 
+  
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
-  // Fetch analytics on mount
-  useEffect(() => {
-    fetchAll();
-  }, [fetchAll]);
+  useEffect(() => { fetchAll(); }, [fetchAll]);
 
-  // Filter for REAL hot leads: >= 50% confidence AND positive verdict
-  // Positive verdicts: interested, callback, booked, success etc.
-  // Negative verdicts (excluded): not_interested, not interested, failed, do not call etc.
-  useEffect(() => {
-    console.log('[HotLeads] All analytics:', allAnalytics);
-    console.log('[HotLeads] Total analytics count:', allAnalytics.length);
-
-    // Helper to check if verdict is positive
-    const isPositiveVerdict = (verdict: string | undefined): boolean => {
-      if (!verdict) return false;
-      const v = verdict.toLowerCase().replace(/_/g, ' ');
-
-      // Exclude negative verdicts
-      if (v.includes('not interested') ||
-                v.includes('not_interested') ||
-                v.includes('failed') ||
-                v.includes('do not call') ||
-                v.includes('dnc') ||
-                v.includes('wrong number') ||
-                v.includes('no interest') ||
-                v.includes('decline')) {
-        return false;
-      }
-
-      // Include positive verdicts
-      if (v.includes('interested') ||
-                v.includes('callback') ||
-                v.includes('call back') ||
-                v.includes('book') ||
-                v.includes('success') ||
-                v.includes('hot lead') ||
-                v.includes('qualified') ||
-                v.includes('demo') ||
-                v.includes('meeting')) {
+  // Memoized Filter Logic (Heavy Calculation)
+  const hotLeads = useMemo(() => {
+    return allAnalytics.filter(a => {
+        if ((a.confidence_score || 0) < 50) return false;
+        const v = (a.verdict || '').toLowerCase();
+        if (v.includes('not') || v.includes('failed') || v.includes('dnc') || v.includes('wrong')) return false;
+        
+        // Search
+        if (search && !a.phone_number?.includes(search) && !a.summary?.toLowerCase().includes(search.toLowerCase())) return false;
+        
+        // Intent
+        if (intentFilter === 'booked' && !(v.includes('book') || v.includes('success'))) return false;
+        if (intentFilter === 'interested' && !v.includes('interest')) return false;
+        if (intentFilter === 'callback' && !v.includes('callback')) return false;
+        
+        // Confidence
+        if (confidenceFilter === 'high' && (a.confidence_score || 0) < 80) return false;
+        
+        // Date
+        const leadDate = new Date(a.created_at || Date.now());
+        const now = new Date();
+        const diffDays = (now.getTime() - leadDate.getTime()) / (1000 * 3600 * 24);
+        if (dateFilter === 'today' && diffDays > 1) return false;
+        if (dateFilter === '7d' && diffDays > 7) return false;
+        if (dateFilter === '30d' && diffDays > 30) return false;
+        
         return true;
-      }
+    }).sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
+  }, [allAnalytics, search, intentFilter, dateFilter, confidenceFilter]);
 
-      // Default: exclude unknown verdicts from hot leads
-      return false;
-    };
+  // Pagination Logic
+  const totalPages = Math.ceil(hotLeads.length / itemsPerPage);
+  const paginatedLeads = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    return hotLeads.slice(start, start + itemsPerPage);
+  }, [hotLeads, currentPage]);
 
-    // Filter: confidence >= 50 AND positive verdict
-    let hotLeads = allAnalytics.filter(a =>
-      (a.confidence_score || 0) >= 50 && isPositiveVerdict(a.verdict),
-    );
-    console.log('[HotLeads] Hot leads after filtering (>= 50% AND positive verdict):', hotLeads);
-    console.log('[HotLeads] Hot leads count:', hotLeads.length);
+  // Stats Logic (Memoized)
+  const stats = useMemo(() => ({
+    total: hotLeads.length,
+    interested: hotLeads.filter(l => l.verdict?.includes('interest')).length,
+    booked: hotLeads.filter(l => l.verdict?.includes('book') || l.verdict?.includes('success')).length,
+    callbacks: hotLeads.filter(l => l.verdict?.includes('callback')).length
+  }), [hotLeads]);
 
-    // Apply date filter
-    if (dateFilter.start || dateFilter.end) {
-      hotLeads = hotLeads.filter(lead => {
-        if (!lead.created_at) return false;
-        const leadDate = new Date(lead.created_at);
-        const startDate = dateFilter.start ? new Date(dateFilter.start) : null;
-        const endDate = dateFilter.end ? new Date(dateFilter.end + 'T23:59:59') : null;
+  // Handlers (Stabilized)
+  const handlePageChange = useCallback((newPage: number) => {
+    setCurrentPage(Math.min(Math.max(1, newPage), totalPages));
+  }, [totalPages]);
 
-        if (startDate && leadDate < startDate) return false;
-        if (endDate && leadDate > endDate) return false;
+  const handleSelectLead = useCallback((lead: CallAnalytics) => {
+    setSelectedLead(lead);
+  }, []);
 
-        return true;
-      });
-    }
-
-    // Apply search filter
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      const searchFiltered = hotLeads.filter(lead =>
-        lead.phone_number?.toLowerCase().includes(query) ||
-                lead.verdict?.toLowerCase().includes(query) ||
-                lead.call_id?.toLowerCase().includes(query),
-      );
-      console.log('[HotLeads] After search filter:', searchFiltered.length);
-      setFilteredLeads(searchFiltered);
-    } else {
-      setFilteredLeads(hotLeads);
-    }
-  }, [allAnalytics, searchQuery, dateFilter]);
-
-  // Sort leads based on selected sort option
-  const sortedLeads = [...filteredLeads].sort((a, b) => {
-    if (sortBy === 'confidence') {
-      return (b.confidence_score || 0) - (a.confidence_score || 0);
-    } else if (sortBy === 'date-new') {
-      // Newest first
-      return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
-    } else {
-      // Oldest first
-      return new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime();
-    }
-  });
-
-  // Get verdict color
-  const getVerdictColor = (verdict: string | undefined) => {
-    if (!verdict) return 'bg-gray-100 text-gray-700';
-    const v = verdict.toLowerCase();
-    if (v === 'interested' || v === 'success' || v.includes('book')) return 'bg-green-100 text-green-700';
-    if (v === 'not_interested' || v === 'failed') return 'bg-red-100 text-red-700';
-    if (v === 'callback' || v === 'partial') return 'bg-yellow-100 text-yellow-700';
-
-    return 'bg-gray-100 text-gray-700';
-  };
-
-  // Get quality color
-  const getQualityColor = (quality: string | undefined) => {
-    if (!quality) return 'bg-gray-100 text-gray-700';
-    const q = quality.toLowerCase();
-    if (q === 'high' || q === 'completed') return 'bg-green-100 text-green-700';
-    if (q === 'medium') return 'bg-yellow-100 text-yellow-700';
-    if (q === 'low' || q === 'abrupt_end') return 'bg-red-100 text-red-700';
-
-    return 'bg-gray-100 text-gray-700';
-  };
-
-  // Format date
-  const formatDate = (dateStr: string | undefined) => {
-    if (!dateStr) return 'N/A';
-    try {
-      return new Date(dateStr).toLocaleString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit',
-      });
-    } catch {
-      return 'N/A';
-    }
-  };
+  // Reset pagination on filter change
+  useEffect(() => { setCurrentPage(1); }, [search, intentFilter, dateFilter, confidenceFilter]);
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="mb-6">
-        <div className="flex items-center gap-2 mb-2">
-          <TrendingUp className="w-6 h-6 text-amber-600" />
-          <h1 className="text-2xl font-bold">Hot Leads</h1>
-        </div>
-        <p className="text-gray-600">Calls with positive verdict AND confidence score ≥ 50%</p>
-      </div>
+    <div className="min-h-screen bg-background flex flex-col font-sans">
+      <DashboardHeader />
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <Card className="p-4">
-          <div className="text-sm text-gray-500 mb-1">Total Hot Leads</div>
-          <div className="text-2xl font-bold text-amber-600">{filteredLeads.length}</div>
-        </Card>
-        <Card className="p-4">
-          <div className="text-sm text-gray-500 mb-1">Interested</div>
-          <div className="text-2xl font-bold text-green-600">
-            {filteredLeads.filter(l => l.verdict?.toLowerCase().includes('interest') || l.verdict?.toLowerCase().includes('book')).length}
-          </div>
-        </Card>
-        <Card className="p-4">
-          <div className="text-sm text-gray-500 mb-1">Callback</div>
-          <div className="text-2xl font-bold text-yellow-600">
-            {filteredLeads.filter(l => l.verdict?.toLowerCase() === 'callback').length}
-          </div>
-        </Card>
-        <Card className="p-4">
-          <div className="text-sm text-gray-500 mb-1">Avg Confidence</div>
-          <div className="text-2xl font-bold text-blue-600">
-            {filteredLeads.length > 0
-              ? Math.round(filteredLeads.reduce((sum, l) => sum + (l.confidence_score || 0), 0) / filteredLeads.length)
-              : 0}%
-          </div>
-        </Card>
-      </div>
-
-      {/* Filters */}
-      <Card className="p-4 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {/* Search */}
-          <div className="md:col-span-1">
-            <div className="flex items-center gap-2">
-              <Search className="w-4 h-4 text-gray-400" />
-              <Input
-                placeholder="Search by phone, verdict..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="border-0 focus-visible:ring-0 focus-visible:ring-offset-0"
-              />
+      <main className="flex-1 p-6 md:p-8 max-w-7xl mx-auto w-full space-y-12">
+        
+        {/* Header Horizon */}
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 pb-4 border-b border-border/40">
+            <div className="space-y-2">
+                <h1 className="text-5xl font-medium tracking-tighter text-foreground">Deal Room</h1>
+                <p className="text-muted-foreground text-sm font-medium">High-value opportunities requiring priority handling.</p>
             </div>
-          </div>
-
-          {/* Sort */}
-          <div className="md:col-span-1">
-            <div className="flex items-center gap-2">
-              <ArrowUpDown className="w-4 h-4 text-gray-400" />
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as any)}
-                className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
-              >
-                <option value="confidence">Sort: Confidence</option>
-                <option value="date-new">Sort: Newest First</option>
-                <option value="date-old">Sort: Oldest First</option>
-              </select>
+            <div className="flex items-center gap-4">
+                <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/60" />
+                    <Input 
+                        placeholder="Search leads..." 
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        className="pl-9 h-10 w-64 bg-muted/10 border-border/40 text-xs focus:ring-primary transition-all rounded-md"
+                    />
+                </div>
+                
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="outline" className="h-10 px-4 gap-2 border-border text-[10px] font-bold uppercase tracking-widest hover:bg-primary hover:text-black transition-all min-w-[120px] justify-between">
+                            <div className="flex items-center gap-2"><CalendarDays size={14} /> {dateFilter === 'all' ? 'All Time' : dateFilter === 'today' ? 'Today' : dateFilter === '7d' ? 'Last 7 Days' : 'Last 30 Days'}</div>
+                            <ChevronDown size={12} />
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => setDateFilter('today')}>Today</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setDateFilter('7d')}>Last 7 Days</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setDateFilter('30d')}>Last 30 Days</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setDateFilter('all')}>All Time</DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
             </div>
-          </div>
-
-          {/* Date Range */}
-          <div className="md:col-span-2 flex items-center gap-2">
-            <Calendar className="w-4 h-4 text-gray-400" />
-            <Input
-              type="date"
-              value={dateFilter.start}
-              onChange={(e) => setDateFilter(prev => ({ ...prev, start: e.target.value }))}
-              className="flex-1"
-              placeholder="Start date"
-            />
-            <span className="text-gray-400">to</span>
-            <Input
-              type="date"
-              value={dateFilter.end}
-              onChange={(e) => setDateFilter(prev => ({ ...prev, end: e.target.value }))}
-              className="flex-1"
-              placeholder="End date"
-            />
-            {(dateFilter.start || dateFilter.end || searchQuery) && (
-              <button
-                onClick={() => {
-                  setDateFilter({ start: '', end: '' });
-                  setSearchQuery('');
-                }}
-                className="text-sm text-gray-500 hover:text-gray-700 whitespace-nowrap"
-              >
-                                Clear All
-              </button>
-            )}
-          </div>
         </div>
-      </Card>
 
-      {/* Table */}
-      <Card className="overflow-hidden">
-        {loading ? (
-          <div className="p-12 text-center text-gray-500">
-            <div className="animate-spin w-8 h-8 border-4 border-amber-500 border-t-transparent rounded-full mx-auto mb-4" />
-                        Loading hot leads...
-          </div>
-        ) : sortedLeads.length === 0 ? (
-          <div className="p-12 text-center text-gray-500">
-            <Filter className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-            <p className="font-medium">No hot leads found</p>
-            <p className="text-sm mt-1">
-              {searchQuery || dateFilter.start || dateFilter.end ? 'Try adjusting your filters' : 'Calls with ≥50% confidence will appear here'}
-            </p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Phone Number</TableHead>
-                  <TableHead>Verdict</TableHead>
-                  <TableHead>Confidence</TableHead>
-                  <TableHead>Summary</TableHead>
-                  <TableHead>Quality</TableHead>
-                  <TableHead>Date</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {sortedLeads.map((lead) => (
-                  <TableRow
-                    key={lead.id || lead.call_id}
-                    className="cursor-pointer hover:bg-gray-50"
-                    onClick={() => setSelectedAnalytics(lead)}
-                  >
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Phone className="w-4 h-4 text-gray-400" />
-                        <span className="font-mono text-sm">{lead.phone_number || 'N/A'}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${getVerdictColor(lead.verdict)}`}>
-                        {lead.verdict ? lead.verdict.replace(/_/g, ' ').toUpperCase() : 'N/A'}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <div className="w-24">
-                        <div className="flex items-center justify-between text-xs mb-1">
-                          <span className="font-semibold">{lead.confidence_score || 0}%</span>
-                        </div>
-                        <Progress value={lead.confidence_score || 0} className="h-2" />
-                      </div>
-                    </TableCell>
-                    <TableCell className="max-w-md">
-                      <p className="text-sm text-gray-700 line-clamp-2">
-                        {lead.summary || 'No summary available'}
-                      </p>
-                    </TableCell>
-                    <TableCell>
-                      <span className={`px-2 py-1 rounded text-xs ${getQualityColor(lead.call_quality)}`}>
-                        {lead.call_quality ? lead.call_quality.replace(/_/g, ' ') : 'N/A'}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1 text-xs text-gray-500">
-                        <Calendar className="w-3 h-3" />
-                        {formatDate(lead.created_at)}
-                      </div>
-                    </TableCell>
-                  </TableRow>
+        {/* Filter Bar */}
+        <div className="flex items-center gap-4 border-b border-border/20 pb-6 overflow-x-auto">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 shrink-0">Target Intent:</span>
+            <div className="flex gap-2">
+                {['all', 'booked', 'interested', 'callback'].map((f) => (
+                    <button 
+                        key={f}
+                        onClick={() => setIntentFilter(f as any)}
+                        className={cn(
+                            "px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all border",
+                            intentFilter === f ? "bg-foreground text-background border-foreground" : "bg-transparent text-muted-foreground border-transparent hover:bg-muted/50"
+                        )}
+                    >
+                        {f}
+                    </button>
                 ))}
-              </TableBody>
-            </Table>
-          </div>
-        )}
-      </Card>
-
-      {/* Analytics Details Modal */}
-      {selectedAnalytics && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
-            {/* Header */}
-            <div className="sticky top-0 bg-gradient-to-r from-amber-50 to-orange-50 px-6 py-4 border-b border-amber-200 flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                  <BarChart3 className="w-5 h-5 text-amber-600" />
-                                    Call Analytics Details
-                </h2>
-                <p className="text-sm text-gray-600">{selectedAnalytics.phone_number}</p>
-              </div>
-              <button
-                onClick={() => setSelectedAnalytics(null)}
-                className="p-2 hover:bg-amber-100 rounded-full transition-colors"
-              >
-                <X className="w-5 h-5 text-gray-500" />
-              </button>
             </div>
-
-            {/* Content */}
-            <div className="p-6 space-y-4">
-              {/* Verdict & Confidence */}
-              <div className="flex items-center gap-3">
-                <span className={`px-3 py-1 rounded-full text-sm font-medium ${getVerdictColor(selectedAnalytics.verdict)}`}>
-                  {selectedAnalytics.verdict ? selectedAnalytics.verdict.replace(/_/g, ' ').toUpperCase() : 'N/A'}
-                </span>
-                <div className="flex items-center gap-1">
-                  <TrendingUp className="w-4 h-4 text-blue-500" />
-                  <span className="text-sm text-gray-600">
-                                        Confidence: <span className="font-semibold">{selectedAnalytics.confidence_score || 0}%</span>
-                  </span>
-                </div>
-                <span className={`px-2 py-0.5 rounded text-xs ${getQualityColor(selectedAnalytics.call_quality)}`}>
-                  {selectedAnalytics.call_quality ? selectedAnalytics.call_quality.replace(/_/g, ' ') : 'unknown'}
-                </span>
-              </div>
-
-              {/* Summary */}
-              <div className="bg-gray-50 rounded-lg p-4">
-                <div className="flex items-center gap-1 text-xs text-gray-500 mb-2">
-                  <MessageSquare className="w-3 h-3" />
-                                    Summary
-                </div>
-                <p className="text-sm text-gray-700 leading-relaxed">{selectedAnalytics.summary || 'No summary available'}</p>
-              </div>
-
-              {/* Key Discoveries */}
-              {selectedAnalytics.key_discoveries && Object.keys(selectedAnalytics.key_discoveries).length > 0 && (
-                <div className="bg-blue-50 rounded-lg p-4">
-                  <div className="flex items-center gap-1 text-xs text-blue-600 mb-3">
-                    <Lightbulb className="w-3 h-3" />
-                                        Key Discoveries
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    {Object.entries(selectedAnalytics.key_discoveries).map(([key, value]) => {
-                      if (!value || (Array.isArray(value) && value.length === 0)) return null;
-
-                      return (
-                        <div key={key} className="bg-white rounded px-3 py-2">
-                          <span className="text-xs text-gray-500 block mb-1">{key.replace(/_/g, ' ')}</span>
-                          <span className="text-sm font-medium text-gray-700">
-                            {Array.isArray(value) ? value.join(', ') : String(value)}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Use Case */}
-              {selectedAnalytics.use_case && (
-                <div className="bg-purple-50 rounded-lg p-4">
-                  <div className="flex items-center gap-1 text-xs text-purple-600 mb-2">
-                    <Target className="w-3 h-3" />
-                                        Use Case
-                  </div>
-                  <p className="text-sm text-gray-700">{selectedAnalytics.use_case}</p>
-                </div>
-              )}
-
-              {/* Metadata */}
-              <div className="pt-4 border-t border-gray-200 grid grid-cols-2 gap-4 text-xs text-gray-500">
-                <div>
-                  <span className="font-medium">Call ID:</span> {selectedAnalytics.call_id}
-                </div>
-                <div>
-                  <span className="font-medium">Created:</span> {formatDate(selectedAnalytics.created_at)}
-                </div>
-              </div>
-
-              {/* View Transcript Button */}
-              {selectedAnalytics.transcript_url && (
-                <button
-                  onClick={() => {
-                    setSelectedCall({
-                      transcriptUrl: selectedAnalytics.transcript_url!,
-                      callId: selectedAnalytics.call_id!,
-                    });
-                    setSelectedAnalytics(null);
-                  }}
-                  className="w-full mt-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg font-medium transition-colors"
-                >
-                                    View Full Transcript
-                </button>
-              )}
-            </div>
-          </div>
+            <div className="h-4 w-px bg-border/40 mx-2" />
+            <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">Confidence:</span>
+            <button 
+                onClick={() => setConfidenceFilter(confidenceFilter === 'all' ? 'high' : 'all')}
+                className={cn(
+                    "px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all border flex items-center gap-2",
+                    confidenceFilter === 'high' ? "bg-green-500/10 text-green-600 border-green-500/20" : "bg-transparent text-muted-foreground border-transparent hover:bg-muted/50"
+                )}
+            >
+                High-Match Only ({'>'}80%)
+            </button>
         </div>
-      )}
 
-      {/* Transcript Viewer Modal */}
-      {selectedCall && (
+        {/* Pipeline Telemetry */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <PaperCard variant="default" className="bg-green-500/[0.02] border-green-500/20">
+                <PaperCardContent className="p-6 flex items-center justify-between">
+                    <div className="space-y-1">
+                        <span className="text-[9px] font-bold uppercase tracking-widest text-green-600">Conversions</span>
+                        <div className="flex items-center gap-2">
+                            <span className="text-3xl font-bold font-mono text-foreground">{stats.booked}</span>
+                            <span className="text-xs text-muted-foreground">Booked</span>
+                        </div>
+                    </div>
+                    <CheckCircle2 size={24} className="text-green-500 opacity-20" />
+                </PaperCardContent>
+            </PaperCard>
+
+            <PaperCard variant="default" className="bg-primary/[0.02] border-primary/20">
+                <PaperCardContent className="p-6 flex items-center justify-between">
+                    <div className="space-y-1">
+                        <span className="text-[9px] font-bold uppercase tracking-widest text-primary">Qualified</span>
+                        <div className="flex items-center gap-2">
+                            <span className="text-3xl font-bold font-mono text-foreground">{stats.interested}</span>
+                            <span className="text-xs text-muted-foreground">Interested</span>
+                        </div>
+                    </div>
+                    <Target size={24} className="text-primary opacity-20" />
+                </PaperCardContent>
+            </PaperCard>
+
+            <PaperCard variant="default" className="bg-orange-500/[0.02] border-orange-500/20">
+                <PaperCardContent className="p-6 flex items-center justify-between">
+                    <div className="space-y-1">
+                        <span className="text-[9px] font-bold uppercase tracking-widest text-orange-500">Pipeline</span>
+                        <div className="flex items-center gap-2">
+                            <span className="text-3xl font-bold font-mono text-foreground">{stats.callbacks}</span>
+                            <span className="text-xs text-muted-foreground">Follow-ups</span>
+                        </div>
+                    </div>
+                    <Clock size={24} className="text-orange-500 opacity-20" />
+                </PaperCardContent>
+            </PaperCard>
+        </div>
+
+        {/* The Deal Ledger */}
+        <section className="space-y-6 pb-32">
+            <div className="bg-card rounded-md border border-border/20 overflow-hidden min-h-[400px] flex flex-col">
+                
+                {/* Table Header */}
+                <div className="flex items-center justify-between p-4 border-b border-border/20 bg-muted/5">
+                    <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-muted-foreground/50 w-[30%] pl-1">Lead Identity</span>
+                    <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-muted-foreground/50 w-[25%]">Intent & Match</span>
+                    <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-muted-foreground/50 w-[25%]">Intelligence Snippet</span>
+                    <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-muted-foreground/50 w-[20%] text-right pr-2">Opportunity Value</span>
+                </div>
+
+                {loading ? (
+                    <div className="flex flex-col items-center justify-center py-32 gap-4">
+                        <Loader2 className="animate-spin text-primary" />
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Synchronizing Deals...</span>
+                    </div>
+                ) : hotLeads.length === 0 ? (
+                    <div className="py-32 text-center text-xs text-muted-foreground italic uppercase tracking-widest">
+                        No opportunities match your current filters.
+                    </div>
+                ) : (
+                    <div className="flex flex-col flex-1">
+                        {paginatedLeads.map((lead) => (
+                            <DealRow 
+                                key={lead.call_id} 
+                                lead={lead} 
+                                onClick={() => handleSelectLead(lead)} 
+                            />
+                        ))}
+                    </div>
+                )}
+
+                {/* Pagination Footer */}
+                {hotLeads.length > 0 && (
+                    <div className="p-4 border-t border-border/10 flex items-center justify-between bg-muted/5 mt-auto">
+                        <span className="text-[9px] font-bold font-mono text-muted-foreground uppercase tracking-widest">
+                            Page {currentPage} of {totalPages} ({hotLeads.length} Total)
+                        </span>
+                        <div className="flex items-center gap-4">
+                            <button 
+                                onClick={() => handlePageChange(currentPage - 1)} 
+                                disabled={currentPage === 1} 
+                                className="p-1.5 text-muted-foreground hover:text-primary disabled:opacity-10 transition-colors"
+                            >
+                                <ChevronLeft size={18} />
+                            </button>
+                            <button 
+                                onClick={() => handlePageChange(currentPage + 1)} 
+                                disabled={currentPage === totalPages} 
+                                className="p-1.5 text-muted-foreground hover:text-primary disabled:opacity-10 transition-colors"
+                            >
+                                <ChevronRight size={18} />
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </div>
+        </section>
+
+      </main>
+
+      {selectedLead && selectedLead.transcript_url && selectedLead.call_id && (
         <TranscriptViewer
-          transcriptUrl={selectedCall.transcriptUrl}
-          callId={selectedCall.callId}
-          onClose={() => setSelectedCall(null)}
+          transcriptUrl={selectedLead.transcript_url}
+          callId={selectedLead.call_id}
+          onClose={() => setSelectedLead(null)}
         />
       )}
     </div>

@@ -34,6 +34,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useCampaignApi } from '@/app/hooks/use-campaign-api';
 import { CreateCampaignModal } from './components/create-campaign-modal';
+import { CampaignsGuide } from './components/campaigns-guide';
 import {
   Campaign,
   CampaignStatus,
@@ -258,6 +259,8 @@ export default function CampaignsPage() {
                 </Button>
             </div>
         </div>
+
+        <CampaignsGuide />
 
         {/* System Status Bar (Control Tower) */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

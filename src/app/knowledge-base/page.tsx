@@ -24,6 +24,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { LibraryWorkshop } from './components/library-workshop';
+import { KnowledgeGuide } from './components/knowledge-guide';
 import { cn } from '@/lib/utils';
 
 // --- Helpers ---
@@ -181,6 +182,8 @@ export default function LibraryPage() {
                 <Button onClick={() => setIsWorkshopOpen(true)} className="h-10 px-4 gap-2 bg-foreground text-background hover:bg-foreground/90 transition-all rounded-[4px] text-[10px] font-bold uppercase tracking-[0.2em]"><Plus size={16} />Add Info</Button>
             </div>
         </div>
+
+        <KnowledgeGuide />
 
         {isLoading && items.length === 0 ? (
             <div className="py-20 flex flex-col items-center justify-center gap-4"><Loader2 size={32} className="animate-spin text-primary/40" /><p className="text-[10px] font-bold uppercase tracking-[0.4em] text-muted-foreground animate-pulse">Loading your files...</p></div>

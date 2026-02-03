@@ -27,6 +27,7 @@ import { LeadIcon } from '@/components/ui/lead-icon';
 import { cn } from '@/lib/utils';
 
 import { FilterBar, FilterState } from './components/filter-bar';
+import { DashboardGuide } from './components/dashboard-guide';
 
 // --- Helpers ---
 
@@ -313,6 +314,8 @@ export default function DashboardPage() {
               </Button>
             </div>
           </div>
+
+          <DashboardGuide />
 
           <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <PaperCard
