@@ -40,9 +40,7 @@ export function AssistantCard({ assistant, onSelect }: AssistantCardProps) {
         <div className="flex items-center gap-5">
             <LeadIcon seed={assistant.id} size={52} />
             <div className="flex flex-col">
-                <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-primary mb-1">
-                    {isDraft ? "Draft Prototype" : "Ready for Traffic"}
-                </span>
+
                 <h3 className="text-3xl font-medium tracking-tighter text-foreground leading-none truncate max-w-[180px]" title={assistant.name}>
                     {assistant.name}
                 </h3>

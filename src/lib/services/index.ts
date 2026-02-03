@@ -43,6 +43,10 @@ export function getOrganizationService(): OrganizationService {
 // Export service classes for direct instantiation if needed
 export { OrganizationService };
 
+// Export Campaign API service
+export { campaignApi, default as campaignApiService } from './campaign-api.service';
+export * from './campaign-api.service';
+
 // Export types that services might need
 export type {
   Organization,

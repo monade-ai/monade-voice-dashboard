@@ -5,6 +5,9 @@
 // Monade Voice Config Server API types
 export * from './monade-api.types';
 
+// Campaign API types
+export * from './campaign.types';
+
 // Organization types
 export type {
   Organization,
