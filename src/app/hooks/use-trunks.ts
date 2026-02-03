@@ -80,7 +80,8 @@ export async function deallocatePhoneNumber(assistantId: string): Promise<{ succ
   }
 }
 
-export function useTrunks() {
+export function useTrunks(options?: { checkAssignments?: boolean }) {
+  const shouldCheckAssignments = options?.checkAssignments !== false;
   const [trunks, setTrunks] = useState<SipTrunk[]>([]);
   const [phoneNumbers, setPhoneNumbers] = useState<PhoneNumberOption[]>(FALLBACK_NUMBERS);
   const [loading, setLoading] = useState(true);
@@ -145,8 +146,10 @@ export function useTrunks() {
         const phoneList = numbers.length > 0 ? numbers : FALLBACK_NUMBERS;
         setPhoneNumbers(phoneList);
 
-        // Check assignments in background (don't block UI)
-        checkAssignmentsForNumbers(phoneList);
+        if (shouldCheckAssignments) {
+          // Check assignments in background (don't block UI)
+          checkAssignmentsForNumbers(phoneList);
+        }
       } else {
         console.log('[useTrunks] No trunks found in response:', data);
         setPhoneNumbers(FALLBACK_NUMBERS);
@@ -163,8 +166,9 @@ export function useTrunks() {
 
   // Refresh assignments only (without re-fetching trunks)
   const refreshAssignments = useCallback(() => {
+    if (!shouldCheckAssignments) return;
     checkAssignmentsForNumbers(phoneNumbers);
-  }, [phoneNumbers, checkAssignmentsForNumbers]);
+  }, [phoneNumbers, checkAssignmentsForNumbers, shouldCheckAssignments]);
 
   useEffect(() => {
     fetchTrunks();

@@ -31,6 +31,7 @@ import {
   CampaignProvider,
   CAMPAIGN_API_CONFIG,
 } from '@/types/campaign.types';
+import { saveCampaignConfig } from '@/lib/utils/campaign-storage';
 
 const { DEFAULTS, LIMITS } = CAMPAIGN_API_CONFIG;
 
@@ -84,7 +85,7 @@ export function CreateCampaignModal({
   onCampaignCreated,
 }: CreateCampaignModalProps) {
   const { assistants } = useAssistants();
-  const { trunks } = useTrunks();
+  const { trunks } = useTrunks({ checkAssignments: false });
   const { createCampaign, loading, error: apiError } = useCampaignApi();
 
   const [formData, setFormData] = useState<FormData>(initialFormData);
@@ -145,6 +146,13 @@ export function CreateCampaignModal({
       });
 
       toast.success('Campaign created successfully');
+      saveCampaignConfig({
+        campaignId: campaign.id,
+        assistantId: formData.assistantId,
+        trunkName: formData.trunkName,
+        provider: formData.provider,
+        updatedAt: new Date().toISOString(),
+      });
       setFormData(initialFormData);
       setErrors({});
       onOpenChange(false);

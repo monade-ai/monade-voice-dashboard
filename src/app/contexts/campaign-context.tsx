@@ -42,6 +42,7 @@ interface CampaignContextType {
     outputFileName: string;
     selectedAssistantId: string;
     selectedTrunk: string;
+    sessionKey: string;
 
     // Actions
     setContacts: (contacts: Contact[]) => void;
@@ -49,6 +50,7 @@ interface CampaignContextType {
     setOutputFileName: (name: string) => void;
     setSelectedAssistantId: (id: string) => void;
     setSelectedTrunk: (trunk: string) => void;
+    setSessionKey: (key: string) => void;
     startCampaign: () => Promise<void>;
     stopCampaign: () => void;
     resetCampaign: () => void;
@@ -63,6 +65,7 @@ export function CampaignProvider({ children }: { children: React.ReactNode }) {
   const [outputFileName, setOutputFileName] = useState('campaign_results');
   const [selectedAssistantId, setSelectedAssistantId] = useState('');
   const [selectedTrunk, setSelectedTrunk] = useState('vobiz');
+  const [sessionKey, setSessionKey] = useState('campaigns');
   const [campaignStatus, setCampaignStatus] = useState<CampaignStatus>('idle');
   const [progress, setProgress] = useState(0);
   const [currentCallIndex, setCurrentCallIndex] = useState(0);
@@ -79,11 +82,24 @@ export function CampaignProvider({ children }: { children: React.ReactNode }) {
 
   const selectedAssistant = assistants.find(a => a.id === selectedAssistantId);
 
+  const resetStateForSession = () => {
+    setContacts([]);
+    setResults([]);
+    setOutputFileName('campaign_results');
+    setSelectedAssistantId('');
+    setSelectedTrunk('vobiz');
+    setCampaignStatus('idle');
+    setProgress(0);
+    setCurrentCallIndex(0);
+    setFetchProgress('');
+  };
+
   // RESTORE STATE
   useEffect(() => {
     if (!userUid) return;
 
-    const storageKey = `campaign_state_${userUid}`;
+    isRestoredRef.current = false;
+    const storageKey = `campaign_state_${userUid}_${sessionKey}`;
     try {
       const saved = sessionStorage.getItem(storageKey);
       if (saved) {
@@ -118,25 +134,29 @@ export function CampaignProvider({ children }: { children: React.ReactNode }) {
         if (state.progress) setProgress(state.progress);
         if (state.currentCallIndex) setCurrentCallIndex(state.currentCallIndex);
         if (state.fetchProgress) setFetchProgress(state.fetchProgress);
+      } else {
+        resetStateForSession();
       }
     } catch (err) {
       console.error('[CampaignContext] Restore failed:', err);
+      resetStateForSession();
     } finally {
       isRestoredRef.current = true;
     }
-  }, [userUid]);
+  }, [userUid, sessionKey]);
 
   // SAVE STATE
   useEffect(() => {
     if (!userUid || !isRestoredRef.current) return;
 
-    const storageKey = `campaign_state_${userUid}`;
+    const storageKey = `campaign_state_${userUid}_${sessionKey}`;
     const state = {
       contacts,
       results,
       outputFileName,
       selectedAssistantId,
       selectedTrunk,
+      sessionKey,
       campaignStatus,
       progress,
       currentCallIndex,
@@ -149,7 +169,7 @@ export function CampaignProvider({ children }: { children: React.ReactNode }) {
       // Sync empty state if restored
       sessionStorage.setItem(storageKey, JSON.stringify(state));
     }
-  }, [userUid, contacts, results, outputFileName, selectedAssistantId, selectedTrunk, campaignStatus, progress, currentCallIndex, fetchProgress]);
+  }, [userUid, sessionKey, contacts, results, outputFileName, selectedAssistantId, selectedTrunk, campaignStatus, progress, currentCallIndex, fetchProgress]);
 
   // Format phone number helper
   const formatPhoneNumber = (number: string): string => {
@@ -583,14 +603,14 @@ export function CampaignProvider({ children }: { children: React.ReactNode }) {
     setCampaignStatus('idle');
     setProgress(0);
     // Clean session storage
-    if (userUid) sessionStorage.removeItem(`campaign_state_${userUid}`);
+    if (userUid) sessionStorage.removeItem(`campaign_state_${userUid}_${sessionKey}`);
   };
 
   return (
     <CampaignContext.Provider value={{
       contacts, results, campaignStatus, progress, currentCallIndex, fetchProgress,
-      outputFileName, selectedAssistantId, selectedTrunk,
-      setContacts, setResults, setOutputFileName, setSelectedAssistantId, setSelectedTrunk,
+      outputFileName, selectedAssistantId, selectedTrunk, sessionKey,
+      setContacts, setResults, setOutputFileName, setSelectedAssistantId, setSelectedTrunk, setSessionKey,
       startCampaign, stopCampaign, resetCampaign,
     }}>
       {children}

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import {
   ArrowLeft,
@@ -27,11 +27,18 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
 import { useCampaignApi } from '@/app/hooks/use-campaign-api';
+import { useCampaign } from '@/app/contexts/campaign-context';
 import { CSVUpload } from '../components/csv-upload';
 import { loadCSVPreview, deleteCSVPreview, ParseCSVResult } from '@/lib/utils/csv-preview';
 import {
+  loadCampaignConfig,
+  saveCampaignContacts,
+  loadCampaignContacts,
+} from '@/lib/utils/campaign-storage';
+import {
   Campaign,
   CampaignStatus,
+  CSVContact,
   CSVPreviewCache,
   CAMPAIGN_API_CONFIG,
   canStartCampaign,
@@ -81,24 +88,42 @@ export default function CampaignDetailPage() {
     error,
     getCampaign,
     uploadCSV,
-    startCampaign,
-    pauseCampaign,
-    stopCampaign,
+    startCampaign: startCampaignApi,
+    pauseCampaign: pauseCampaignApi,
+    stopCampaign: stopCampaignApi,
     refreshQueueStatus,
     refreshCreditStatus,
     clearError,
   } = useCampaignApi();
 
+  const {
+    campaignStatus,
+    setContacts,
+    setResults,
+    setOutputFileName,
+    setSelectedAssistantId,
+    setSelectedTrunk,
+    setSessionKey,
+    startCampaign: startCallingLoop,
+    stopCampaign: stopCallingLoop,
+  } = useCampaign();
+
   const [csvPreview, setCsvPreview] = useState<CSVPreviewCache | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [localConfigMissing, setLocalConfigMissing] = useState(false);
+  const stopSentRef = useRef(false);
 
   // Load campaign and preview
   useEffect(() => {
     getCampaign(campaignId).catch(console.error);
     const preview = loadCSVPreview(campaignId);
     setCsvPreview(preview);
-  }, [campaignId, getCampaign]);
+    setSessionKey(`campaign-${campaignId}`);
+    stopSentRef.current = false;
+    const cfg = loadCampaignConfig(campaignId);
+    setLocalConfigMissing(!cfg);
+  }, [campaignId, getCampaign, setSessionKey]);
 
   // Poll for active campaigns
   useEffect(() => {
@@ -119,6 +144,27 @@ export default function CampaignDetailPage() {
     }
   }, [campaign, csvPreview]);
 
+  // When local runner completes, stop server campaign (best-effort)
+  useEffect(() => {
+    if (!campaign) return;
+    if (campaignStatus === 'completed' && !stopSentRef.current) {
+      stopSentRef.current = true;
+      stopCampaignApi(campaign.id).catch((err) => {
+        console.error('Failed to stop campaign after completion:', err);
+        toast.warning('Campaign completed locally, but server stop failed.');
+      });
+    }
+  }, [campaign, campaignStatus, stopCampaignApi]);
+
+  const mapCSVContacts = (contacts: CSVContact[]) =>
+    contacts.map((contact) => {
+      const { phone_number, ...rest } = contact;
+      return {
+        phoneNumber: phone_number,
+        calleeInfo: rest,
+      };
+    });
+
   const handleCSVUpload = async (file: File, result: ParseCSVResult) => {
     setIsUploading(true);
     setUploadedFile(file);
@@ -127,6 +173,13 @@ export default function CampaignDetailPage() {
       toast.success(`Uploaded ${response.totalRows} contacts`);
       // Refresh campaign to get updated contact count
       await getCampaign(campaignId);
+      if (!saveCampaignContacts(campaignId, result.contacts)) {
+        toast.warning('Contact list too large to store locally. Please keep this tab open.');
+      }
+      if (campaignStatus !== 'running') {
+        setContacts(mapCSVContacts(result.contacts));
+        setResults([]);
+      }
     } catch (error) {
       console.error('Upload failed:', error);
       toast.error('Failed to upload contacts');
@@ -137,12 +190,35 @@ export default function CampaignDetailPage() {
 
   const handlePreviewSaved = (preview: CSVPreviewCache) => {
     setCsvPreview(preview);
+    if (campaignStatus !== 'running') {
+      setContacts(mapCSVContacts(preview.preview));
+      setResults([]);
+    }
   };
 
   const handleStart = async () => {
     if (!campaign) return;
     try {
-      await startCampaign(campaign.id);
+      const cfg = loadCampaignConfig(campaign.id);
+      if (!cfg?.assistantId || !cfg?.trunkName) {
+        setLocalConfigMissing(true);
+        toast.error('Missing assistant or trunk configuration for this campaign.');
+        return;
+      }
+      const storedContacts = loadCampaignContacts<CSVContact>(campaign.id);
+      if (!storedContacts || storedContacts.length === 0) {
+        toast.error('Upload contacts before starting the campaign.');
+        return;
+      }
+
+      setSelectedAssistantId(cfg.assistantId);
+      setSelectedTrunk(cfg.trunkName);
+      setOutputFileName(campaign.name || 'campaign_results');
+      setContacts(mapCSVContacts(storedContacts));
+      setResults([]);
+
+      await startCampaignApi(campaign.id);
+      await startCallingLoop();
       toast.success('Campaign started');
     } catch (error) {
       console.error('Failed to start:', error);
@@ -152,7 +228,8 @@ export default function CampaignDetailPage() {
   const handlePause = async () => {
     if (!campaign) return;
     try {
-      await pauseCampaign(campaign.id);
+      await pauseCampaignApi(campaign.id);
+      stopCallingLoop();
       toast.success('Campaign paused');
     } catch (error) {
       console.error('Failed to pause:', error);
@@ -162,7 +239,8 @@ export default function CampaignDetailPage() {
   const handleStop = async () => {
     if (!campaign) return;
     try {
-      await stopCampaign(campaign.id);
+      await stopCampaignApi(campaign.id);
+      stopCallingLoop();
       toast.success('Campaign stopped');
     } catch (error) {
       console.error('Failed to stop:', error);
@@ -278,6 +356,13 @@ export default function CampaignDetailPage() {
           <Button variant="ghost" size="sm" onClick={clearError}>
             Dismiss
           </Button>
+        </div>
+      )}
+      {localConfigMissing && (
+        <div className="rounded-md bg-amber-500/10 p-4 text-amber-700 flex items-center justify-between">
+          <span>
+            Missing assistant or trunk configuration for this campaign. Please re-create the campaign.
+          </span>
         </div>
       )}
 

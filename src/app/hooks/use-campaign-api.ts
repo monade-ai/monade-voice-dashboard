@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { useAuth } from '@/app/contexts/auth-context';
+import { useMonadeUser } from '@/app/hooks/use-monade-user';
 import { campaignApi } from '@/lib/services/campaign-api.service';
 import {
   Campaign,
@@ -52,7 +52,7 @@ interface UseCampaignApiReturn extends UseCampaignApiState {
 }
 
 export function useCampaignApi(): UseCampaignApiReturn {
-  const { userUid } = useAuth();
+  const { userUid, loading: userLoading } = useMonadeUser();
 
   const [state, setState] = useState<UseCampaignApiState>({
     campaigns: [],
@@ -106,7 +106,13 @@ export function useCampaignApi(): UseCampaignApiReturn {
   );
 
   const listCampaigns = useCallback(async (): Promise<Campaign[]> => {
-    if (!userUid) throw new Error('User not authenticated');
+    if (!userUid) {
+      if (userLoading) {
+        setLoading(false);
+        return [];
+      }
+      throw new Error('User not authenticated');
+    }
     setLoading(true);
     try {
       const campaigns = await campaignApi.list(userUid);
@@ -121,7 +127,13 @@ export function useCampaignApi(): UseCampaignApiReturn {
 
   const getCampaign = useCallback(
     async (campaignId: string): Promise<Campaign> => {
-      if (!userUid) throw new Error('User not authenticated');
+      if (!userUid) {
+        if (userLoading) {
+          setLoading(false);
+          throw new Error('User not ready');
+        }
+        throw new Error('User not authenticated');
+      }
       setLoading(true);
       try {
         const campaign = await campaignApi.get(campaignId, userUid);
@@ -312,7 +324,10 @@ export function useCampaignApi(): UseCampaignApiReturn {
   // ============================================
 
   const refreshQueueStatus = useCallback(async (): Promise<QueueStatus> => {
-    if (!userUid) throw new Error('User not authenticated');
+    if (!userUid) {
+      if (userLoading) throw new Error('User not ready');
+      throw new Error('User not authenticated');
+    }
     try {
       const queueStatus = await campaignApi.getQueueStatus(userUid);
       setState((prev) => ({ ...prev, queueStatus }));
@@ -325,7 +340,10 @@ export function useCampaignApi(): UseCampaignApiReturn {
   }, [userUid]);
 
   const refreshCreditStatus = useCallback(async (): Promise<CreditStatus> => {
-    if (!userUid) throw new Error('User not authenticated');
+    if (!userUid) {
+      if (userLoading) throw new Error('User not ready');
+      throw new Error('User not authenticated');
+    }
     try {
       const creditStatus = await campaignApi.getCreditStatus(userUid);
       setState((prev) => ({ ...prev, creditStatus }));
