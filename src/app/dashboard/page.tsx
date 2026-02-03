@@ -1,242 +1,402 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-  Users,
-  Phone,
-  TrendingUp,
   ChevronLeft,
   ChevronRight,
-  ExternalLink,
   ArrowUpRight,
+  Clock,
+  MessageSquare,
+  Activity
 } from 'lucide-react';
 
 import { useDashboardData } from '@/app/hooks/use-dashboard-data';
 import { useCredits } from '@/app/hooks/use-credits';
 import { useTranscripts, Transcript } from '@/app/hooks/use-transcripts';
+import { useUserAnalytics, CallAnalytics } from '@/app/hooks/use-analytics';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
 import { Button } from '@/components/ui/button';
 import { TranscriptViewer } from '@/components/transcript-viewer';
 import { PaperCard, PaperCardContent, PaperCardHeader, PaperCardTitle } from '@/components/ui/paper-card';
 import { DashboardHeader } from '@/components/dashboard-header';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
+import { LeadIcon } from '@/components/ui/lead-icon';
+import { cn } from '@/lib/utils';
+import { FilterBar, FilterState } from './components/filter-bar';
 
-// Helper to format date
-const formatDate = (dateString: string) => {
-  const date = new Date(dateString);
-  const today = new Date();
-  const isToday = date.toDateString() === today.toDateString();
+// --- Helpers ---
 
-  if (isToday) {
-    return `Today, ${date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`;
-  }
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+const getGreeting = () => {
+  const hour = new Date().getHours();
+  if (hour < 12) return "Good morning";
+  if (hour < 17) return "Good afternoon";
+  if (hour < 21) return "Good evening";
+  return "It's late! Hope you're having a good night";
 };
 
-// Transcript Row Component
-const TranscriptRow = ({ transcript, onView }: { transcript: Transcript; onView: () => void }) => {
+const getRelativeTime = (dateString: string) => {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / 60000);
+  if (diffInMinutes < 1) return "Just now";
+  if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
+  if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)}h ago`;
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+};
+
+// --- Component: TranscriptRow (Strict Real Data) ---
+
+const TranscriptRow = ({
+  transcript,
+  analytics,
+  onView
+}: {
+  transcript: Transcript;
+  analytics?: CallAnalytics;
+  onView: () => void
+}) => {
+  const isEngaged = transcript.has_conversation || (analytics && analytics.verdict !== 'no_answer');
+  const verdict = analytics?.verdict ? analytics.verdict.replace('_', ' ') : (isEngaged ? "Conversation" : "No Answer");
+  const summary = analytics?.summary || (isEngaged ? "Call transcript available for review." : "No interaction recorded.");
+  const quality = analytics?.call_quality || "N/A";
+
   return (
-    <tr className="group border-b border-border hover:bg-muted/30 transition-colors">
-      <td className="py-4 px-4">
-        <div className="flex flex-col">
-            <span className="text-sm font-medium text-foreground">{transcript.phone_number}</span>
-            <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono">{transcript.call_id.substring(0, 8)}</span>
+    <tr
+      className={cn(
+        "group border-b border-border/40 transition-all duration-300",
+        isEngaged ? "bg-[#facc15]/[0.02] hover:bg-[#facc15]/[0.05]" : "hover:bg-muted/30"
+      )}
+    >
+      {/* 1. Lead Identity (Who) */}
+      <td className="py-3 px-6">
+        <div className="flex items-center gap-3">
+          <LeadIcon seed={transcript.call_id} size={28} />
+          <div className="flex flex-col">
+            <span className="text-sm font-semibold text-foreground tracking-tight selection:bg-primary selection:text-black">
+              {transcript.phone_number}
+            </span>
+            <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-mono">
+              ID: {transcript.call_id.substring(0, 8)}
+            </span>
+          </div>
         </div>
       </td>
-      <td className="py-4 px-4">
-        <Badge variant="outline" className="rounded-[2px] bg-green-500/5 text-green-600 border-green-500/20 text-[10px] px-1.5 py-0 font-medium">
-          COMPLETED
-        </Badge>
+
+      {/* 2. Interaction (Real Time) */}
+      <td className="py-3 px-6">
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-1.5">
+            <Clock size={12} className="text-muted-foreground" />
+            <span className="text-xs font-medium text-foreground">
+              {getRelativeTime(transcript.created_at)}
+            </span>
+          </div>
+          {isEngaged && (
+            <div className="flex items-center gap-1.5">
+              <Activity size={12} className="text-primary/60" />
+              <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-bold">
+                {quality}
+              </span>
+            </div>
+          )}
+        </div>
       </td>
-      <td className="py-4 px-4 text-xs text-muted-foreground">{formatDate(transcript.created_at)}</td>
-      <td className="py-4 px-4 text-right">
-        <button
-          onClick={onView}
-          className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-[#facc15] transition-colors"
-        >
-          View Transcript
-          <ExternalLink className="w-3 h-3" />
-        </button>
+
+      {/* 3. Progress (Real AI Analysis) */}
+      <td className="py-3 px-6">
+        <div className="flex flex-col gap-1 max-w-[300px]">
+          <div className="flex items-center gap-2">
+            <div className={cn(
+              "w-1.5 h-1.5 rounded-full",
+              isEngaged ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)]" : "bg-muted-foreground/20"
+            )} />
+            <span className={cn(
+              "text-[11px] font-bold uppercase tracking-widest",
+              isEngaged ? "text-foreground" : "text-muted-foreground/50"
+            )}>
+              {verdict}
+            </span>
+          </div>
+          <p className="text-[11px] text-muted-foreground line-clamp-1 italic leading-relaxed">
+            "{summary}"
+          </p>
+        </div>
+      </td>
+
+      {/* 4. Action (Professional) */}
+      <td className="py-3 px-6 text-right">
+        <div className="flex items-center justify-end gap-3 opacity-0 group-hover:opacity-100 transition-all duration-200 translate-x-2 group-hover:translate-x-0">
+          {/* TODO: Integrate Audio Playback API here */}
+          {isEngaged && (
+            <div className="flex items-center gap-2 px-3 py-1 bg-primary/10 border border-primary/20 rounded-[4px] text-primary">
+              <span className="text-[9px] font-bold uppercase tracking-widest">Audio Available</span>
+            </div>
+          )}
+
+          <button
+            onClick={(e) => { e.stopPropagation(); onView(); }}
+            className="h-8 px-4 rounded-[4px] bg-foreground text-background hover:bg-foreground/90 transition-all flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest"
+          >
+            Details
+            <ArrowUpRight size={14} />
+          </button>
+        </div>
+
+        {/* Placeholder for Action when not hovering */}
+        <div className="group-hover:hidden flex items-center justify-end">
+          <MessageSquare size={14} className="text-muted-foreground/20" />
+        </div>
       </td>
     </tr>
   );
 };
 
+// --- Page Component ---
+
 export default function DashboardPage() {
+  const [greeting, setGreeting] = useState("Hi!");
   const router = useRouter();
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedTranscript, setSelectedTranscript] = useState<Transcript | null>(null);
-  const [showConnectedOnly, setShowConnectedOnly] = useState(false);
-  const callsPerPage = 7;
+  const [filters, setFilters] = useState<FilterState>({
+    verdicts: [],
+    qualities: [],
+    hasConversation: false,
+    search: '',
+    timeRange: 'all',
+  });
+  const callsPerPage = 10;
 
-  const { metrics, loading } = useDashboardData();
+  useEffect(() => {
+    setGreeting(getGreeting());
+  }, []);
+
+  const { metrics } = useDashboardData();
   const { credits } = useCredits();
   const { transcripts, loading: transcriptsLoading } = useTranscripts();
+  const { analytics: allAnalytics, fetchAll: fetchAnalytics } = useUserAnalytics();
 
-  const filteredTranscripts = showConnectedOnly
-    ? transcripts.filter(t => t.has_conversation === true)
-    : transcripts;
-    
+  useEffect(() => {
+    if (transcripts.length > 0) {
+      fetchAnalytics();
+    }
+  }, [transcripts.length, fetchAnalytics]);
+
+  const mergedTranscripts = useMemo(() => {
+    return transcripts.map(t => ({
+      ...t,
+      analytics: allAnalytics.find(a => a.call_id === t.call_id)
+    }));
+  }, [transcripts, allAnalytics]);
+
+  const filteredTranscripts = useMemo(() => {
+    return mergedTranscripts.filter(t => {
+      // 1. Engaged Only
+      if (filters.hasConversation && !(t.has_conversation || t.analytics)) return false;
+
+      // 2. Verdicts
+      if (filters.verdicts.length > 0) {
+        const verdict = t.analytics?.verdict || (t.has_conversation ? "conversation" : "no_answer");
+        if (!filters.verdicts.includes(verdict)) return false;
+      }
+
+      // 3. Qualities
+      if (filters.qualities.length > 0) {
+        const quality = t.analytics?.call_quality;
+        if (!quality || !filters.qualities.includes(quality)) return false;
+      }
+
+      // 4. Search
+      if (filters.search) {
+        const searchLower = filters.search.toLowerCase();
+        const matchesPhone = t.phone_number.toLowerCase().includes(searchLower);
+        const matchesId = t.call_id.toLowerCase().includes(searchLower);
+        const matchesSummary = t.analytics?.summary?.toLowerCase().includes(searchLower);
+        if (!matchesPhone && !matchesId && !matchesSummary) return false;
+      }
+
+      // 5. Time Range
+      if (filters.timeRange !== 'all') {
+        const createdAt = new Date(t.created_at);
+        const now = new Date();
+        if (filters.timeRange === 'today') {
+          if (createdAt.toDateString() !== now.toDateString()) return false;
+        } else if (filters.timeRange === 'yesterday') {
+          const yesterday = new Date(now);
+          yesterday.setDate(now.getDate() - 1);
+          if (createdAt.toDateString() !== yesterday.toDateString()) return false;
+        } else if (filters.timeRange === 'week') {
+          const weekAgo = new Date(now);
+          weekAgo.setDate(now.getDate() - 7);
+          if (createdAt < weekAgo) return false;
+        }
+      }
+
+      return true;
+    });
+  }, [mergedTranscripts, filters]);
+
   const indexOfLastCall = currentPage * callsPerPage;
   const indexOfFirstCall = indexOfLastCall - callsPerPage;
   const currentTranscripts = filteredTranscripts.slice(indexOfFirstCall, indexOfLastCall);
   const totalPages = Math.ceil(filteredTranscripts.length / callsPerPage);
 
-  const walletBalance = credits?.available_credits || 0;
-
   return (
     <ErrorBoundary>
-      <div className="min-h-screen bg-background flex flex-col">
-        
+      <div className="min-h-screen bg-background flex flex-col font-sans">
+
         <DashboardHeader />
 
-        {/* Main Content Area */}
-        <main className="flex-1 p-6 md:p-10 max-w-7xl mx-auto w-full space-y-12">
-          
-          {/* Welcome Section */}
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-            <div className="space-y-1">
-                <p className="text-xs font-medium uppercase tracking-[0.2em] text-[#facc15]">Active Intelligence</p>
-                <h1 className="text-4xl font-medium tracking-tight">Enterprise Overview</h1>
+        <main className="flex-1 p-6 md:p-10 max-w-7xl mx-auto w-full space-y-10">
+
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+            <div className="space-y-0.5">
+              <h1 className="text-3xl font-medium tracking-tight">{greeting}, Friend.</h1>
+              <p className="text-muted-foreground text-sm leading-relaxed">Performance insights and real-time activity log.</p>
             </div>
             <div className="flex gap-3">
-                <Button variant="outline" size="sm" className="gap-2 h-9 text-xs">
-                    Export Report
-                    <ArrowUpRight className="w-3 h-3" />
-                </Button>
+              <Button variant="outline" size="sm" className="gap-2 h-9 text-[10px] font-bold uppercase tracking-widest border-border hover:bg-[#facc15] hover:border-[#facc15] hover:text-black transition-all">
+                Export Archive
+                <ArrowUpRight className="w-3 h-3" />
+              </Button>
             </div>
           </div>
 
-          {/* Key Metrics Grid - Using Paper Cards for the 'Printed' feel */}
           <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <PaperCard className="relative group">
-                <PaperCardHeader className="pb-2">
-                    <div className="flex items-center justify-between">
-                        <PaperCardTitle className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Total Agents</PaperCardTitle>
-                        <Users className="w-4 h-4 text-[#facc15]" />
-                    </div>
-                </PaperCardHeader>
-                <PaperCardContent>
-                    <div className="flex items-baseline gap-2">
-                        <span className="text-4xl font-medium tracking-tight">{metrics?.agents?.total || 0}</span>
-                        <span className="text-xs text-green-500 font-medium">+2 this week</span>
-                    </div>
-                </PaperCardContent>
+            <PaperCard
+              shaderProps={{
+                colors: ["#ffffff", "#f3f4f6", "#b1aa91", "#facc15"],
+                positions: 42,
+                waveX: 0.45,
+                waveY: 1,
+                grainMixer: 0.45
+              }}
+            >
+              <PaperCardHeader>
+                <PaperCardTitle>Active Agents</PaperCardTitle>
+              </PaperCardHeader>
+              <PaperCardContent className="mt-4">
+                <div className="flex flex-col">
+                  <span className="text-6xl font-medium tracking-tighter leading-none">{metrics?.agents?.total || 0}</span>
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-[#d4af37] dark:text-[#facc15] mt-4">Capacity: {metrics?.agents?.active || 0} online</span>
+                </div>
+              </PaperCardContent>
             </PaperCard>
 
-            <PaperCard>
-                <PaperCardHeader className="pb-2">
-                     <div className="flex items-center justify-between">
-                        <PaperCardTitle className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Total Calls</PaperCardTitle>
-                        <Phone className="w-4 h-4 text-[#facc15]" />
-                    </div>
-                </PaperCardHeader>
-                <PaperCardContent>
-                    <div className="flex items-baseline gap-2">
-                        <span className="text-4xl font-medium tracking-tight">{transcripts.length}</span>
-                        <span className="text-xs text-muted-foreground font-medium">Across all campaigns</span>
-                    </div>
-                </PaperCardContent>
+            <PaperCard
+              shaderProps={{
+                colors: ["#ffffff", "#f9fafb", "#e5e7eb", "#8e8c15"],
+                positions: 60,
+                waveX: 0.8,
+                waveY: 0.3,
+                mixing: 0.1
+              }}
+            >
+              <PaperCardHeader>
+                <PaperCardTitle>Interaction Count</PaperCardTitle>
+              </PaperCardHeader>
+              <PaperCardContent className="mt-4">
+                <div className="flex flex-col">
+                  <span className="text-6xl font-medium tracking-tighter leading-none">{transcripts.length}</span>
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mt-4">Calls processed today</span>
+                </div>
+              </PaperCardContent>
             </PaperCard>
 
-            <PaperCard>
-                <PaperCardHeader className="pb-2">
-                     <div className="flex items-center justify-between">
-                        <PaperCardTitle className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Available Credits</PaperCardTitle>
-                        <TrendingUp className="w-4 h-4 text-[#facc15]" />
-                    </div>
-                </PaperCardHeader>
-                <PaperCardContent>
-                    <div className="flex items-baseline gap-2">
-                        <span className="text-4xl font-medium tracking-tight">{Math.round(walletBalance).toLocaleString()}</span>
-                        <span className="text-xs text-muted-foreground font-medium">Minutes left</span>
-                    </div>
-                </PaperCardContent>
+            <PaperCard
+              shaderProps={{
+                colors: ["#ffffff", "#f3f4f6", "#b1aa91", "#000000"],
+                positions: 20,
+                waveX: 0.2,
+                waveY: 0.2,
+                grainOverlay: 0.9
+              }}
+            >
+              <PaperCardHeader>
+                <PaperCardTitle>Account Credits</PaperCardTitle>
+              </PaperCardHeader>
+              <PaperCardContent className="mt-4">
+                <div className="flex flex-col">
+                  <span className="text-6xl font-medium tracking-tighter leading-none">
+                    {Math.round(credits?.available_credits || 0).toLocaleString()}
+                  </span>
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mt-4">Minutes remaining</span>
+                </div>
+              </PaperCardContent>
             </PaperCard>
           </section>
 
-          {/* Logs / Activity Table */}
-          <section className="space-y-6">
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                    <h3 className="text-lg font-medium tracking-tight">Recent Activity</h3>
-                    <Badge variant="secondary" className="bg-muted text-muted-foreground font-mono text-[10px] rounded-[2px]">{filteredTranscripts.length}</Badge>
-                </div>
+          <section className="space-y-6 pb-20">
+            <div className="flex flex-col gap-6 pb-4">
+              <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                    <button 
-                        onClick={() => { setShowConnectedOnly(!showConnectedOnly); setCurrentPage(1); }}
-                        className={`text-xs font-medium transition-colors ${showConnectedOnly ? 'text-[#facc15]' : 'text-muted-foreground hover:text-foreground'}`}
-                    >
-                        {showConnectedOnly ? 'Showing Connected Only' : 'Show Connected Only'}
-                    </button>
-                    <Separator orientation="vertical" className="h-4" />
-                    <button className="text-xs font-medium text-muted-foreground hover:text-foreground transition-colors">View All</button>
+                  <h3 className="text-2xl font-medium tracking-tight">Lead Ledger</h3>
+                  <Badge variant="outline" className="text-[10px] font-bold px-2 py-0.5 rounded-[2px] border-border text-muted-foreground uppercase tracking-widest font-mono">
+                    {filteredTranscripts.length} Active Signals
+                  </Badge>
                 </div>
+              </div>
+
+              <FilterBar
+                filters={filters}
+                onFilterChange={(newFilters) => {
+                  setFilters(newFilters);
+                  setCurrentPage(1);
+                }}
+              />
             </div>
 
-            <div className="border border-border rounded-md overflow-hidden bg-card/30 backdrop-blur-sm">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="bg-muted/50 border-b border-border">
-                      <th className="py-3 px-4 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Source</th>
-                      <th className="py-3 px-4 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Status</th>
-                      <th className="py-3 px-4 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Timestamp</th>
-                      <th className="py-3 px-4 text-right text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {transcriptsLoading ? (
-                      <tr><td colSpan={4} className="py-20 text-center text-xs text-muted-foreground animate-pulse uppercase tracking-widest">Hydrating Logs...</td></tr>
-                    ) : currentTranscripts.length === 0 ? (
-                      <tr><td colSpan={4} className="py-20 text-center text-xs text-muted-foreground uppercase tracking-widest">No Signal Detected</td></tr>
-                    ) : (
-                      currentTranscripts.map((transcript) => (
-                        <TranscriptRow
-                          key={transcript.id}
-                          transcript={transcript}
-                          onView={() => setSelectedTranscript(transcript)}
-                        />
-                      ))
-                    )}
-                  </tbody>
-                </table>
+            <div className="overflow-hidden">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="border-b border-border/20">
+                    <th className="py-4 px-6 text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/40">Lead Identity</th>
+                    <th className="py-4 px-6 text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/40">Interaction</th>
+                    <th className="py-4 px-6 text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/40">AI Analysis</th>
+                    <th className="py-4 px-6 text-right text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/40">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/10">
+                  {transcriptsLoading ? (
+                    <tr><td colSpan={4} className="py-24 text-center text-[11px] font-bold uppercase tracking-[0.6em] text-muted-foreground/20 animate-pulse">Synchronizing Data...</td></tr>
+                  ) : (
+                    currentTranscripts.map((item) => (
+                      <TranscriptRow
+                        key={item.id}
+                        transcript={item}
+                        analytics={item.analytics}
+                        onView={() => setSelectedTranscript(item)}
+                      />
+                    ))
+                  )}
+                </tbody>
+              </table>
 
-                {/* Pagination */}
-                {totalPages > 1 && (
-                  <div className="px-6 py-4 flex items-center justify-between border-t border-border bg-muted/20">
-                    <span className="text-[10px] font-mono text-muted-foreground">
-                      OFFSET {indexOfFirstCall + 1} — {Math.min(indexOfLastCall, transcripts.length)}
+              {totalPages > 1 && (
+                <div className="px-6 py-8 flex items-center justify-between border-t border-border/20">
+                  <span className="text-[10px] font-bold font-mono text-muted-foreground uppercase tracking-widest">
+                    Records {indexOfFirstCall + 1} to {Math.min(indexOfLastCall, transcripts.length)}
+                  </span>
+                  <div className="flex items-center gap-10">
+                    <button onClick={() => setCurrentPage((p) => p - 1)} disabled={currentPage === 1} className="text-muted-foreground hover:text-primary disabled:opacity-10 transition-colors">
+                      <ChevronLeft size={18} />
+                    </button>
+                    <span className="text-[10px] font-bold font-mono uppercase tracking-[0.3em]">
+                      Page {currentPage} of {totalPages}
                     </span>
-                    <div className="flex items-center gap-4">
-                      <button
-                        onClick={() => setCurrentPage((p) => p - 1)}
-                        disabled={currentPage === 1}
-                        className="text-muted-foreground hover:text-foreground disabled:opacity-20 transition-colors"
-                      >
-                        <ChevronLeft className="w-4 h-4" />
-                      </button>
-                      <span className="text-[10px] font-mono font-medium">
-                        PAGE {currentPage} / {totalPages}
-                      </span>
-                      <button
-                        onClick={() => setCurrentPage((p) => p + 1)}
-                        disabled={currentPage >= totalPages}
-                        className="text-muted-foreground hover:text-foreground disabled:opacity-20 transition-colors"
-                      >
-                        <ChevronRight className="w-4 h-4" />
-                      </button>
-                    </div>
+                    <button onClick={() => setCurrentPage((p) => p + 1)} disabled={currentPage >= totalPages} className="text-muted-foreground hover:text-primary disabled:opacity-10 transition-colors">
+                      <ChevronRight size={18} />
+                    </button>
                   </div>
-                )}
+                </div>
+              )}
             </div>
           </section>
 
         </main>
       </div>
 
-      {/* Transcript Viewer Modal */}
       {selectedTranscript && (
         <TranscriptViewer
           transcriptUrl={selectedTranscript.transcript_url}
