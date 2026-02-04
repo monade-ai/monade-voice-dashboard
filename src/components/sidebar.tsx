@@ -85,8 +85,16 @@ function CategoryLabel({ children }: { children: React.ReactNode }) {
 export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { theme, setTheme } = useTheme();
+  const { theme, setTheme, resolvedTheme } = useTheme();
   const { user } = useAuth();
+  const [mounted, setMounted] = React.useState(false);
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const effectiveTheme = mounted ? (resolvedTheme ?? theme) : undefined;
+  const isDark = effectiveTheme === 'dark';
 
   // Get user display info
   const displayName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User';
@@ -207,11 +215,13 @@ export function Sidebar() {
 
         <div className="grid grid-cols-2 gap-2 mt-4">
           <button 
-            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            onClick={() => setTheme(isDark ? 'light' : 'dark')}
             className="flex items-center justify-center gap-2 py-1.5 rounded-[4px] border border-border/50 text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-all"
           >
-            {theme === 'light' ? <Moon size={14} /> : <Sun size={14} />}
-            <span className="text-[10px] font-bold uppercase tracking-wider">{theme === 'dark' ? 'Light' : 'Dark'}</span>
+            {mounted ? (isDark ? <Sun size={14} /> : <Moon size={14} />) : <Sun size={14} />}
+            <span className="text-[10px] font-bold uppercase tracking-wider">
+              {mounted ? (isDark ? 'Light' : 'Dark') : 'Theme'}
+            </span>
           </button>
           <button className="flex items-center justify-center gap-2 py-1.5 rounded-[4px] border border-border/50 text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-all">
             <Globe size={14} />
