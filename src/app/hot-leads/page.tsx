@@ -190,6 +190,8 @@ export default function HotLeadsPage() {
       <DashboardHeader />
 
       <main className="flex-1 p-6 md:p-8 max-w-7xl mx-auto w-full space-y-12">
+
+        <HotLeadsGuide />
         
         {/* Header Horizon */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 pb-4 border-b border-border/40">
