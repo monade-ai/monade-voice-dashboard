@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { ChevronDown, Check, Building2, Plus } from 'lucide-react';
 
 import { useAuth } from '@/lib/auth/AuthProvider';
@@ -11,6 +12,7 @@ interface OrganizationSelectorProps {
 
 export function OrganizationSelector({ className = '' }: OrganizationSelectorProps) {
   const { currentOrganization, organizations, switchOrganization, loading } = useAuth();
+  const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [switching, setSwitching] = useState<string | null>(null);
 
@@ -109,8 +111,7 @@ export function OrganizationSelector({ className = '' }: OrganizationSelectorPro
                 <button
                   onClick={() => {
                     setIsOpen(false);
-                    // Navigate to create organization page
-                    window.location.href = '/org/create';
+                    router.push('/org/create');
                   }}
                   className="flex items-center w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 focus:outline-none focus:bg-gray-50"
                 >
