@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 
 import { createClient } from '@/utils/supabase/server';
+
 import { AppShell } from './app-shell';
 
 export default async function ProtectedAppLayout({

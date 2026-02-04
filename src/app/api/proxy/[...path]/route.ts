@@ -27,7 +27,7 @@ export async function DELETE(request: NextRequest) {
 function isNetworkError(error: unknown) {
   if (!(error instanceof Error)) return false;
   const message = error.message.toLowerCase();
-  return message.includes('fetch failed') || message.includes('enotfound') || message.includes('enetunreach') || message.includes('econnrefused');
+  return message.includes('fetch failed') || message.includes('enotfound') || message.includes('enetunreach') || message.includes('econnrefused') || message.includes('aborted');
 }
 
 async function handleProxy(request: NextRequest, method: string) {
@@ -65,8 +65,8 @@ async function handleProxy(request: NextRequest, method: string) {
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15000);
-    const response = await fetch(targetUrl, { ...fetchOptions, signal: controller.signal });
-    clearTimeout(timeoutId);
+    const response = await fetch(targetUrl, { ...fetchOptions, signal: controller.signal })
+      .finally(() => clearTimeout(timeoutId));
     const responseText = await response.text();
 
     // Log response for debugging
@@ -85,9 +85,7 @@ async function handleProxy(request: NextRequest, method: string) {
     return NextResponse.json(data, {
       status: response.status,
       headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, X-API-Key',
+        'Cache-Control': 'no-store',
       },
     });
   } catch (error) {
@@ -98,17 +96,10 @@ async function handleProxy(request: NextRequest, method: string) {
       : (error instanceof Error ? error.message : 'Proxy error');
     const status = isNetwork ? 503 : 500;
 
-    return NextResponse.json({ error: message }, { status });
+    return NextResponse.json({ error: message }, { status, headers: { 'Cache-Control': 'no-store' } });
   }
 }
 
 export async function OPTIONS() {
-  return new NextResponse(null, {
-    status: 200,
-    headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, X-API-Key',
-    },
-  });
+  return new NextResponse(null, { status: 204 });
 }
