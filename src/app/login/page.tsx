@@ -175,9 +175,9 @@ export default function LoginPage() {
                           type="button"
                           onClick={() => setFormData({ ...formData, useCase: opt })}
                           className={`text-left px-3 py-2 rounded-[4px] text-sm border transition-all ${formData.useCase === opt
-                              ? 'border-[#facc15] bg-[#facc15]/10 text-foreground'
-                              : 'border-border text-muted-foreground hover:border-foreground/30'
-                            }`}
+                            ? 'border-[#facc15] bg-[#facc15]/10 text-foreground'
+                            : 'border-border text-muted-foreground hover:border-foreground/30'
+                          }`}
                         >
                           {opt}
                         </button>
@@ -195,9 +195,9 @@ export default function LoginPage() {
                           type="button"
                           onClick={() => setFormData({ ...formData, callVolume: opt })}
                           className={`flex-1 px-3 py-2 rounded-[4px] text-sm border transition-all ${formData.callVolume === opt
-                              ? 'border-[#facc15] bg-[#facc15]/10 text-foreground'
-                              : 'border-border text-muted-foreground hover:border-foreground/30'
-                            }`}
+                            ? 'border-[#facc15] bg-[#facc15]/10 text-foreground'
+                            : 'border-border text-muted-foreground hover:border-foreground/30'
+                          }`}
                         >
                           {opt}
                         </button>
@@ -215,9 +215,9 @@ export default function LoginPage() {
                           type="button"
                           onClick={() => setFormData({ ...formData, teamSize: opt })}
                           className={`flex-1 px-3 py-2 rounded-[4px] text-sm border transition-all ${formData.teamSize === opt
-                              ? 'border-[#facc15] bg-[#facc15]/10 text-foreground'
-                              : 'border-border text-muted-foreground hover:border-foreground/30'
-                            }`}
+                            ? 'border-[#facc15] bg-[#facc15]/10 text-foreground'
+                            : 'border-border text-muted-foreground hover:border-foreground/30'
+                          }`}
                         >
                           {opt}
                         </button>

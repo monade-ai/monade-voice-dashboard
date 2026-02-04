@@ -50,6 +50,7 @@ export function CSVUpload({
     async (file: File) => {
       if (!file.name.toLowerCase().endsWith('.csv')) {
         toast.error('Please upload a CSV file');
+
         return;
       }
 
@@ -80,7 +81,7 @@ export function CSVUpload({
         setIsProcessing(false);
       }
     },
-    [campaignId, onUploadComplete, onPreviewSaved]
+    [campaignId, onUploadComplete, onPreviewSaved],
   );
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -104,7 +105,7 @@ export function CSVUpload({
         processFile(file);
       }
     },
-    [disabled, isProcessing, processFile]
+    [disabled, isProcessing, processFile],
   );
 
   const handleDragOver = (e: React.DragEvent) => {

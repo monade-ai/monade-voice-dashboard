@@ -70,11 +70,13 @@ export default function CallHistoryPage() {
       const duration = typeof t.analytics?.key_discoveries?.duration_seconds === 'number' 
         ? t.analytics.key_discoveries.duration_seconds 
         : 0;
+
       return acc + duration;
     }, 0) / (total || 1);
     
     const successCount = mergedTranscripts.filter(t => {
       const verdict = t.analytics?.verdict?.toLowerCase() || '';
+
       return verdict.includes('interested') || verdict.includes('book') || verdict.includes('success');
     }).length;
 
@@ -162,6 +164,7 @@ export default function CallHistoryPage() {
   const formatDuration = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
+
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 

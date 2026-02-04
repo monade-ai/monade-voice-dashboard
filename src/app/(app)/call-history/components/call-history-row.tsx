@@ -37,6 +37,7 @@ const formatDuration = (seconds?: number) => {
   if (!seconds) return '0:00';
   const mins = Math.floor(seconds / 60);
   const secs = Math.floor(seconds % 60);
+
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 };
 
@@ -63,6 +64,7 @@ export const CallHistoryRow = React.memo(({
       conversation: 'bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.4)]',
       no_answer: 'bg-gray-500/40',
     };
+
     return colors[verdictRaw] || 'bg-gray-500/40';
   }, [verdictRaw]);
 

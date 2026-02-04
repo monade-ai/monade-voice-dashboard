@@ -73,14 +73,14 @@ async function fetchDbServicesApi<T>(
  * Create a new campaign
  */
 export async function createCampaign(
-  data: CreateCampaignRequest
+  data: CreateCampaignRequest,
 ): Promise<Campaign> {
   return fetchCampaignApi<Campaign>(
     `/campaigns/?user_uid=${encodeURIComponent(data.user_uid)}`,
     {
       method: 'POST',
       body: JSON.stringify(data),
-    }
+    },
   );
 }
 
@@ -89,7 +89,7 @@ export async function createCampaign(
  */
 export async function listCampaigns(userUid: string): Promise<Campaign[]> {
   return fetchCampaignApi<Campaign[]>(
-    `/campaigns/?user_uid=${encodeURIComponent(userUid)}`
+    `/campaigns/?user_uid=${encodeURIComponent(userUid)}`,
   );
 }
 
@@ -98,10 +98,10 @@ export async function listCampaigns(userUid: string): Promise<Campaign[]> {
  */
 export async function getCampaign(
   campaignId: string,
-  userUid: string
+  userUid: string,
 ): Promise<Campaign> {
   return fetchCampaignApi<Campaign>(
-    `/campaigns/${campaignId}?user_uid=${encodeURIComponent(userUid)}`
+    `/campaigns/${campaignId}?user_uid=${encodeURIComponent(userUid)}`,
   );
 }
 
@@ -111,14 +111,14 @@ export async function getCampaign(
 export async function updateCampaign(
   campaignId: string,
   userUid: string,
-  data: UpdateCampaignRequest
+  data: UpdateCampaignRequest,
 ): Promise<Campaign> {
   return fetchCampaignApi<Campaign>(
     `/campaigns/${campaignId}?user_uid=${encodeURIComponent(userUid)}`,
     {
       method: 'PUT',
       body: JSON.stringify(data),
-    }
+    },
   );
 }
 
@@ -128,13 +128,13 @@ export async function updateCampaign(
  */
 export async function deleteCampaign(
   campaignId: string,
-  userUid: string
+  userUid: string,
 ): Promise<void> {
   return fetchCampaignApi<void>(
     `/campaigns/${campaignId}?user_uid=${encodeURIComponent(userUid)}`,
     {
       method: 'DELETE',
-    }
+    },
   );
 }
 
@@ -148,7 +148,7 @@ export async function deleteCampaign(
 export async function uploadCampaignCSV(
   campaignId: string,
   userUid: string,
-  file: File
+  file: File,
 ): Promise<CSVUploadResponse> {
   const formData = new FormData();
   formData.append('file', file);
@@ -167,7 +167,7 @@ export async function uploadCampaignCSV(
       throw new ApiError(
         errorData.detail || 'Failed to upload CSV',
         response.status,
-        errorData
+        errorData,
       );
     }
 
@@ -187,13 +187,13 @@ export async function uploadCampaignCSV(
  */
 export async function startCampaign(
   campaignId: string,
-  userUid: string
+  userUid: string,
 ): Promise<CampaignControlResponse> {
   return fetchCampaignApi<CampaignControlResponse>(
     `/campaigns/${campaignId}/start?user_uid=${encodeURIComponent(userUid)}`,
     {
       method: 'POST',
-    }
+    },
   );
 }
 
@@ -202,13 +202,13 @@ export async function startCampaign(
  */
 export async function pauseCampaign(
   campaignId: string,
-  userUid: string
+  userUid: string,
 ): Promise<CampaignControlResponse> {
   return fetchCampaignApi<CampaignControlResponse>(
     `/campaigns/${campaignId}/pause?user_uid=${encodeURIComponent(userUid)}`,
     {
       method: 'POST',
-    }
+    },
   );
 }
 
@@ -218,13 +218,13 @@ export async function pauseCampaign(
  */
 export async function resumeCampaign(
   campaignId: string,
-  userUid: string
+  userUid: string,
 ): Promise<CampaignControlResponse> {
   return fetchCampaignApi<CampaignControlResponse>(
     `/campaigns/${campaignId}/resume?user_uid=${encodeURIComponent(userUid)}`,
     {
       method: 'POST',
-    }
+    },
   );
 }
 
@@ -233,13 +233,13 @@ export async function resumeCampaign(
  */
 export async function stopCampaign(
   campaignId: string,
-  userUid: string
+  userUid: string,
 ): Promise<CampaignControlResponse> {
   return fetchCampaignApi<CampaignControlResponse>(
     `/campaigns/${campaignId}/stop?user_uid=${encodeURIComponent(userUid)}`,
     {
       method: 'POST',
-    }
+    },
   );
 }
 
@@ -252,7 +252,7 @@ export async function stopCampaign(
  */
 export async function getQueueStatus(userUid: string): Promise<QueueStatus> {
   return fetchCampaignApi<QueueStatus>(
-    `/monitoring/queue-status/${encodeURIComponent(userUid)}`
+    `/monitoring/queue-status/${encodeURIComponent(userUid)}`,
   );
 }
 
@@ -261,7 +261,7 @@ export async function getQueueStatus(userUid: string): Promise<QueueStatus> {
  */
 export async function getCreditStatus(userUid: string): Promise<CreditStatus> {
   return fetchCampaignApi<CreditStatus>(
-    `/monitoring/credit-status/${encodeURIComponent(userUid)}`
+    `/monitoring/credit-status/${encodeURIComponent(userUid)}`,
   );
 }
 
@@ -281,10 +281,10 @@ export async function getSystemConfig(): Promise<SystemConfig> {
  */
 export async function getCampaignAnalytics(
   campaignId: string,
-  userUid: string
+  userUid: string,
 ): Promise<CampaignAnalytics> {
   return fetchCampaignApi<CampaignAnalytics>(
-    `/campaigns/${campaignId}/analytics?user_uid=${encodeURIComponent(userUid)}`
+    `/campaigns/${campaignId}/analytics?user_uid=${encodeURIComponent(userUid)}`,
   );
 }
 
@@ -292,10 +292,10 @@ export async function getCampaignAnalytics(
  * Get user analytics stats (from DB Services)
  */
 export async function getUserAnalyticsStats(
-  userUid: string
+  userUid: string,
 ): Promise<UserAnalyticsStats> {
   return fetchDbServicesApi<UserAnalyticsStats>(
-    `/analytics/stats/${encodeURIComponent(userUid)}`
+    `/analytics/stats/${encodeURIComponent(userUid)}`,
   );
 }
 
@@ -304,10 +304,10 @@ export async function getUserAnalyticsStats(
  */
 export async function getCampaignAnalyticsDetail(
   userUid: string,
-  campaignId: string
+  campaignId: string,
 ): Promise<CampaignAnalyticsDetail> {
   return fetchDbServicesApi<CampaignAnalyticsDetail>(
-    `/analytics/user/${encodeURIComponent(userUid)}/campaign/${encodeURIComponent(campaignId)}`
+    `/analytics/user/${encodeURIComponent(userUid)}/campaign/${encodeURIComponent(campaignId)}`,
   );
 }
 

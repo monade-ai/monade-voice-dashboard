@@ -38,7 +38,7 @@ export interface Campaign {
   max_concurrent: number;
   calls_per_second: number;
   daily_start_time: string; // "HH:MM"
-  daily_end_time: string;   // "HH:MM"
+  daily_end_time: string; // "HH:MM"
   timezone: string;
   total_contacts: number;
   successful_calls: number;
@@ -57,12 +57,12 @@ export interface CreateCampaignRequest {
   description?: string;
   provider: CampaignProvider;
   trunk_name: string;
-  max_concurrent?: number;      // default: 5
-  calls_per_second?: number;    // default: 1
-  daily_start_time?: string;    // default: "10:00"
-  daily_end_time?: string;      // default: "17:00"
-  timezone?: string;            // default: "Asia/Kolkata"
-  max_retries?: number;         // default: 3
+  max_concurrent?: number; // default: 5
+  calls_per_second?: number; // default: 1
+  daily_start_time?: string; // default: "10:00"
+  daily_end_time?: string; // default: "17:00"
+  timezone?: string; // default: "Asia/Kolkata"
+  max_retries?: number; // default: 3
 }
 
 export interface UpdateCampaignRequest {
@@ -218,9 +218,9 @@ export const CAMPAIGN_API_CONFIG = {
   BASE_URL: 'http://35.200.254.189/campaigns/api/v1',
   DB_SERVICES_URL: 'http://35.200.254.189/db_services/api',
   POLL_INTERVALS: {
-    QUEUE_STATUS: 5000,    // 5 seconds during active campaign
-    CREDIT_STATUS: 30000,  // 30 seconds
-    CAMPAIGN_LIST: 10000,  // 10 seconds on dashboard
+    QUEUE_STATUS: 5000, // 5 seconds during active campaign
+    CREDIT_STATUS: 30000, // 30 seconds
+    CAMPAIGN_LIST: 10000, // 10 seconds on dashboard
   },
   DEFAULTS: {
     MAX_CONCURRENT: 5,

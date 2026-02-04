@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+
 import { PageGuide } from '@/components/page-guide';
 
 export function DashboardGuide() {

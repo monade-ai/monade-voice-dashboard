@@ -40,6 +40,7 @@ async function checkHasConversation(transcriptUrl: string): Promise<boolean> {
       body: JSON.stringify({ url: transcriptUrl }),
       retry: { retries: 2 },
     });
+
     return (data.messageCount || 0) > 0;
   } catch (err) {
     console.error('Error checking conversation:', err);

@@ -3,6 +3,7 @@
 import { useState, useCallback } from 'react';
 
 import { ApiError, fetchJson } from '@/lib/http';
+
 import { useMonadeUser } from './use-monade-user';
 
 // Analytics data structure matching actual API response

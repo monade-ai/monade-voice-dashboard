@@ -43,6 +43,7 @@ export function saveCampaignContacts(campaignId: string, contacts: unknown[]): b
   const key = `${CONTACTS_PREFIX}${campaignId}`;
   try {
     sessionStorage.setItem(key, JSON.stringify(contacts));
+
     return true;
   } catch {
     return false;

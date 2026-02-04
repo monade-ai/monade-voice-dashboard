@@ -37,11 +37,13 @@ export function getFriendlyErrorMessage(status?: number, statusText?: string) {
   if (status === 408) return 'The request timed out. Please try again.';
   if (status === 429) return 'Too many requests. Please wait and try again.';
   if (status !== undefined && status >= 500) return 'Service is currently unavailable. Please try again later.';
+
   return status !== undefined ? `HTTP ${status}: ${statusText || 'Request failed'}` : 'Request failed';
 }
 
 export function isNetworkError(error: unknown) {
   if (!(error instanceof Error)) return false;
+
   return error.name === 'TypeError'
     || error.message.includes('Failed to fetch')
     || error.message.includes('NetworkError')
@@ -69,6 +71,7 @@ async function parseResponseBody(response: Response) {
     if (text.trim().startsWith('<!DOCTYPE html') || text.trim().startsWith('<html')) {
       return null;
     }
+
     return { detail: text };
   } catch {
     return null;
@@ -77,6 +80,7 @@ async function parseResponseBody(response: Response) {
 
 function isGenericServerMessage(message: string) {
   const normalized = message.trim().toLowerCase();
+
   return [
     'bad request',
     'unauthorized',
@@ -89,6 +93,7 @@ function isGenericServerMessage(message: string) {
 
 function isHtmlLike(message: string) {
   const trimmed = message.trim().toLowerCase();
+
   return trimmed.startsWith('<!doctype html') || trimmed.startsWith('<html');
 }
 
@@ -143,6 +148,7 @@ export async function fetchJson<T = unknown>(url: string, options: FetchJsonOpti
       }
 
       const data = await parseResponseBody(response);
+
       return data as T;
     } catch (error) {
       if (error instanceof ApiError) throw error;

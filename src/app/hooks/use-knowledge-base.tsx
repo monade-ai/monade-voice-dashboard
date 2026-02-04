@@ -1,9 +1,11 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo } from 'react';
-import { MONADE_API_CONFIG } from '@/types/monade-api.types';
-import { useMonadeUser } from './use-monade-user';
 import { toast } from 'sonner';
+
+import { MONADE_API_CONFIG } from '@/types/monade-api.types';
+
+import { useMonadeUser } from './use-monade-user';
 
 export interface LibraryItem {
   id: string;
@@ -46,13 +48,14 @@ export const LibraryProvider = ({ children }: { children: ReactNode }) => {
     if (!userUid) {
       if (!authLoading) setError('User not authenticated');
       setIsLoading(false);
+
       return;
     }
 
     setIsLoading(true);
     try {
       const res = await fetch(`${API_BASE_URL}/api/users/${userUid}/knowledge-bases`, {
-        headers: { 'X-API-Key': MONADE_API_CONFIG.API_KEY }
+        headers: { 'X-API-Key': MONADE_API_CONFIG.API_KEY },
       });
       if (!res.ok) throw new Error('Sync failed');
       const data = await res.json();
@@ -72,18 +75,19 @@ export const LibraryProvider = ({ children }: { children: ReactNode }) => {
     if (contentCache[url]) return contentCache[url];
     
     try {
-        const res = await fetch('/api/transcript-content', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ url })
-        });
-        const data = await res.json();
-        const snippet = data.transcript || data.raw || "No content found.";
-        const trimmed = snippet.substring(0, 500); // Fetch first 500 chars
-        setContentCache(prev => ({ ...prev, [url]: trimmed }));
-        return trimmed;
+      const res = await fetch('/api/transcript-content', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+      });
+      const data = await res.json();
+      const snippet = data.transcript || data.raw || 'No content found.';
+      const trimmed = snippet.substring(0, 500); // Fetch first 500 chars
+      setContentCache(prev => ({ ...prev, [url]: trimmed }));
+
+      return trimmed;
     } catch (err) {
-        return "Failed to load preview.";
+      return 'Failed to load preview.';
     }
   }, [contentCache]);
 
@@ -98,9 +102,11 @@ export const LibraryProvider = ({ children }: { children: ReactNode }) => {
       if (!res.ok) throw new Error('Save failed');
       toast.success('Library Updated');
       await fetchItems();
+
       return true;
     } catch (err) {
       toast.error('Sync Error');
+
       return false;
     } finally {
       setIsLoading(false);
@@ -112,14 +118,16 @@ export const LibraryProvider = ({ children }: { children: ReactNode }) => {
     try {
       const res = await fetch(`${API_BASE_URL}/api/knowledge-bases/${id}`, {
         method: 'DELETE',
-        headers: { 'X-API-Key': MONADE_API_CONFIG.API_KEY }
+        headers: { 'X-API-Key': MONADE_API_CONFIG.API_KEY },
       });
       if (!res.ok) throw new Error('Deletion failed');
       toast.success('Purged from memory');
       await fetchItems();
+
       return true;
     } catch (err) {
       toast.error('Purge Error');
+
       return false;
     } finally {
       setIsLoading(false);
@@ -137,6 +145,7 @@ export const LibraryProvider = ({ children }: { children: ReactNode }) => {
       if (!groups[key]) groups[key] = [];
       groups[key].push(item);
     });
+
     return groups;
   }, [items]);
 
@@ -150,6 +159,7 @@ export const LibraryProvider = ({ children }: { children: ReactNode }) => {
 export const useLibrary = () => {
   const context = useContext(LibraryContext);
   if (!context) throw new Error('useLibrary error');
+
   return context;
 };
 

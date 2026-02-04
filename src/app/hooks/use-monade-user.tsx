@@ -48,6 +48,7 @@ export function MonadeUserProvider({ children }: MonadeUserProviderProps) {
     if (status === 401 || status === 403) return 'You are not authorized to access this account.';
     if (status === 404) return 'User account not found. Please contact admin.';
     if (status >= 500) return 'Monade API is currently unavailable. Please try again later.';
+
     return 'Failed to fetch user account';
   };
 
@@ -142,6 +143,7 @@ export function MonadeUserProvider({ children }: MonadeUserProviderProps) {
           console.error('[MonadeUser] Failed to reach Monade API:', fetchError);
           setError('Could not reach Monade API. Please try again later.');
         }
+
         return;
       }
     } catch (err) {

@@ -31,6 +31,7 @@ export default function ModelTab({ onChangesMade }: ModelTabProps) {
   const resolveKnowledgeBaseId = (value?: string | null) => {
     if (!value) return '';
     const match = knowledgeBases.find(kb => kb.id === value || kb.url === value);
+
     return match ? match.id : value;
   };
 

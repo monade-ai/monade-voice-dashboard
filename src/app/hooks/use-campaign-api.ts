@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
+
 import { useMonadeUser } from '@/app/hooks/use-monade-user';
 import { campaignApi } from '@/lib/services/campaign-api.service';
 import {
@@ -76,6 +77,7 @@ export function useCampaignApi(): UseCampaignApiReturn {
     if (error instanceof Error) {
       return error.message;
     }
+
     return 'An unexpected error occurred';
   };
 
@@ -95,6 +97,7 @@ export function useCampaignApi(): UseCampaignApiReturn {
           currentCampaign: campaign,
           loading: false,
         }));
+
         return campaign;
       } catch (error) {
         const message = handleError(error);
@@ -102,13 +105,14 @@ export function useCampaignApi(): UseCampaignApiReturn {
         throw error;
       }
     },
-    [userUid]
+    [userUid],
   );
 
   const listCampaigns = useCallback(async (): Promise<Campaign[]> => {
     if (!userUid) {
       if (userLoading) {
         setLoading(false);
+
         return [];
       }
       throw new Error('User not authenticated');
@@ -117,6 +121,7 @@ export function useCampaignApi(): UseCampaignApiReturn {
     try {
       const campaigns = await campaignApi.list(userUid);
       setState((prev) => ({ ...prev, campaigns, loading: false }));
+
       return campaigns;
     } catch (error) {
       const message = handleError(error);
@@ -138,6 +143,7 @@ export function useCampaignApi(): UseCampaignApiReturn {
       try {
         const campaign = await campaignApi.get(campaignId, userUid);
         setState((prev) => ({ ...prev, currentCampaign: campaign, loading: false }));
+
         return campaign;
       } catch (error) {
         const message = handleError(error);
@@ -145,7 +151,7 @@ export function useCampaignApi(): UseCampaignApiReturn {
         throw error;
       }
     },
-    [userUid]
+    [userUid],
   );
 
   const updateCampaign = useCallback(
@@ -161,6 +167,7 @@ export function useCampaignApi(): UseCampaignApiReturn {
             prev.currentCampaign?.id === campaignId ? updated : prev.currentCampaign,
           loading: false,
         }));
+
         return updated;
       } catch (error) {
         const message = handleError(error);
@@ -168,7 +175,7 @@ export function useCampaignApi(): UseCampaignApiReturn {
         throw error;
       }
     },
-    [userUid]
+    [userUid],
   );
 
   const deleteCampaign = useCallback(
@@ -190,7 +197,7 @@ export function useCampaignApi(): UseCampaignApiReturn {
         throw error;
       }
     },
-    [userUid]
+    [userUid],
   );
 
   // ============================================
@@ -212,6 +219,7 @@ export function useCampaignApi(): UseCampaignApiReturn {
             prev.currentCampaign?.id === campaignId ? updated : prev.currentCampaign,
           loading: false,
         }));
+
         return { totalRows: response.total_rows };
       } catch (error) {
         const message = handleError(error);
@@ -219,7 +227,7 @@ export function useCampaignApi(): UseCampaignApiReturn {
         throw error;
       }
     },
-    [userUid]
+    [userUid],
   );
 
   // ============================================
@@ -246,7 +254,7 @@ export function useCampaignApi(): UseCampaignApiReturn {
         throw error;
       }
     },
-    [userUid]
+    [userUid],
   );
 
   const pauseCampaign = useCallback(
@@ -269,7 +277,7 @@ export function useCampaignApi(): UseCampaignApiReturn {
         throw error;
       }
     },
-    [userUid]
+    [userUid],
   );
 
   const resumeCampaign = useCallback(
@@ -293,7 +301,7 @@ export function useCampaignApi(): UseCampaignApiReturn {
         throw error;
       }
     },
-    [userUid]
+    [userUid],
   );
 
   const stopCampaign = useCallback(
@@ -316,7 +324,7 @@ export function useCampaignApi(): UseCampaignApiReturn {
         throw error;
       }
     },
-    [userUid]
+    [userUid],
   );
 
   // ============================================
@@ -331,6 +339,7 @@ export function useCampaignApi(): UseCampaignApiReturn {
     try {
       const queueStatus = await campaignApi.getQueueStatus(userUid);
       setState((prev) => ({ ...prev, queueStatus }));
+
       return queueStatus;
     } catch (error) {
       const message = handleError(error);
@@ -347,6 +356,7 @@ export function useCampaignApi(): UseCampaignApiReturn {
     try {
       const creditStatus = await campaignApi.getCreditStatus(userUid);
       setState((prev) => ({ ...prev, creditStatus }));
+
       return creditStatus;
     } catch (error) {
       const message = handleError(error);
@@ -370,7 +380,7 @@ export function useCampaignApi(): UseCampaignApiReturn {
         throw error;
       }
     },
-    [userUid]
+    [userUid],
   );
 
   // ============================================

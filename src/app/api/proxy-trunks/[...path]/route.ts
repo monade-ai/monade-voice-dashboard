@@ -22,6 +22,7 @@ export async function DELETE(request: NextRequest) {
 function isNetworkError(error: unknown) {
   if (!(error instanceof Error)) return false;
   const message = error.message.toLowerCase();
+
   return message.includes('fetch failed') || message.includes('enotfound') || message.includes('enetunreach') || message.includes('econnrefused') || message.includes('aborted');
 }
 
