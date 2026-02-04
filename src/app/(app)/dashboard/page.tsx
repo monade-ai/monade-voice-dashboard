@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
+import dynamic from 'next/dynamic';
 import {
   ChevronLeft,
   ChevronRight,
@@ -19,7 +20,6 @@ import { useTranscripts, Transcript } from '@/app/hooks/use-transcripts';
 import { useUserAnalytics, CallAnalytics } from '@/app/hooks/use-analytics';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
 import { Button } from '@/components/ui/button';
-import { TranscriptViewer } from '@/components/transcript-viewer';
 import { PaperCard, PaperCardContent, PaperCardHeader, PaperCardTitle } from '@/components/ui/paper-card';
 import { DashboardHeader } from '@/components/dashboard-header';
 import { Badge } from '@/components/ui/badge';
@@ -28,6 +28,11 @@ import { cn } from '@/lib/utils';
 
 import { FilterBar, FilterState } from './components/filter-bar';
 import { DashboardGuide } from './components/dashboard-guide';
+
+const TranscriptViewer = dynamic(
+  () => import('@/components/transcript-viewer'),
+  { ssr: false },
+);
 
 // --- Helpers ---
 

@@ -36,6 +36,15 @@ interface LibraryContextType {
 export const LibraryContext = createContext<LibraryContextType | undefined>(undefined);
 
 const API_BASE_URL = MONADE_API_CONFIG.BASE_URL;
+const LIBRARY_CACHE_TTL_MS = 60_000;
+
+interface LibraryCacheEntry {
+  items: LibraryItem[];
+  contentCache: Record<string, string>;
+  cachedAt: number;
+}
+
+const libraryCacheByUser = new Map<string, LibraryCacheEntry>();
 
 export const LibraryProvider = ({ children }: { children: ReactNode }) => {
   const { userUid, loading: authLoading } = useMonadeUser();
@@ -44,12 +53,30 @@ export const LibraryProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchItems = useCallback(async () => {
+  const updateUserCache = useCallback((updater: (current: LibraryCacheEntry) => LibraryCacheEntry) => {
+    if (!userUid) return;
+    const current = libraryCacheByUser.get(userUid) ?? { items: [], contentCache: {}, cachedAt: 0 };
+    libraryCacheByUser.set(userUid, updater(current));
+  }, [userUid]);
+
+  const fetchItems = useCallback(async (forceRefresh = false) => {
     if (!userUid) {
       if (!authLoading) setError('User not authenticated');
       setIsLoading(false);
 
       return;
+    }
+
+    if (!forceRefresh) {
+      const cached = libraryCacheByUser.get(userUid);
+      if (cached && Date.now() - cached.cachedAt < LIBRARY_CACHE_TTL_MS) {
+        setItems(cached.items);
+        setContentCache(cached.contentCache);
+        setError(null);
+        setIsLoading(false);
+
+        return;
+      }
     }
 
     setIsLoading(true);
@@ -64,16 +91,28 @@ export const LibraryProvider = ({ children }: { children: ReactNode }) => {
         createdAt: new Date(kb.createdAt || Date.now()),
       })).sort((a: any, b: any) => b.createdAt.getTime() - a.createdAt.getTime());
       setItems(processed);
+      setError(null);
+      updateUserCache((current) => ({
+        ...current,
+        items: processed,
+        cachedAt: Date.now(),
+      }));
     } catch (err) {
       setError('Archive unreachable.');
     } finally {
       setIsLoading(false);
     }
-  }, [userUid, authLoading]);
+  }, [userUid, authLoading, updateUserCache]);
 
   const fetchSnippet = useCallback(async (url: string) => {
     if (contentCache[url]) return contentCache[url];
-    
+    const cachedSnippet = userUid ? libraryCacheByUser.get(userUid)?.contentCache[url] : undefined;
+    if (cachedSnippet) {
+      setContentCache((prev) => (prev[url] ? prev : { ...prev, [url]: cachedSnippet }));
+
+      return cachedSnippet;
+    }
+
     try {
       const res = await fetch('/api/transcript-content', {
         method: 'POST',
@@ -83,13 +122,17 @@ export const LibraryProvider = ({ children }: { children: ReactNode }) => {
       const data = await res.json();
       const snippet = data.transcript || data.raw || 'No content found.';
       const trimmed = snippet.substring(0, 500); // Fetch first 500 chars
-      setContentCache(prev => ({ ...prev, [url]: trimmed }));
+      setContentCache((prev) => ({ ...prev, [url]: trimmed }));
+      updateUserCache((current) => ({
+        ...current,
+        contentCache: { ...current.contentCache, [url]: trimmed },
+      }));
 
       return trimmed;
     } catch (err) {
       return 'Failed to load preview.';
     }
-  }, [contentCache]);
+  }, [contentCache, userUid, updateUserCache]);
 
   const addIntelligence = async (payload: CreatePayload): Promise<boolean> => {
     setIsLoading(true);
@@ -101,7 +144,7 @@ export const LibraryProvider = ({ children }: { children: ReactNode }) => {
       });
       if (!res.ok) throw new Error('Save failed');
       toast.success('Library Updated');
-      await fetchItems();
+      await fetchItems(true);
 
       return true;
     } catch (err) {
@@ -122,7 +165,7 @@ export const LibraryProvider = ({ children }: { children: ReactNode }) => {
       });
       if (!res.ok) throw new Error('Deletion failed');
       toast.success('Purged from memory');
-      await fetchItems();
+      await fetchItems(true);
 
       return true;
     } catch (err) {
@@ -150,7 +193,7 @@ export const LibraryProvider = ({ children }: { children: ReactNode }) => {
   }, [items]);
 
   return (
-    <LibraryContext.Provider value={{ items, groupedItems, contentCache, isLoading, error, refresh: fetchItems, fetchSnippet, addIntelligence, removeIntelligence }}>
+    <LibraryContext.Provider value={{ items, groupedItems, contentCache, isLoading, error, refresh: () => fetchItems(true), fetchSnippet, addIntelligence, removeIntelligence }}>
       {children}
     </LibraryContext.Provider>
   );

@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 
 import { useLibrary, LibraryItem } from '@/app/hooks/use-knowledge-base';
-import { useAssistants } from '@/app/hooks/use-assistants-context';
+import { useAssistants, type Assistant } from '@/app/hooks/use-assistants-context';
 import { PaperCard, PaperCardContent, PaperCardHeader } from '@/components/ui/paper-card';
 import { DashboardHeader } from '@/components/dashboard-header';
 import { Badge } from '@/components/ui/badge';
@@ -55,7 +55,7 @@ const LinkedMemoryCard = ({
 }: { 
     item: LibraryItem, 
     onEdit: (item: LibraryItem) => void,
-    connectedAssistants: any[]
+    connectedAssistants: Assistant[]
 }) => {
   const { fetchSnippet, contentCache } = useLibrary();
   const [snippet, setSnippet] = useState<string>(contentCache[item.url] || '');
@@ -203,32 +203,62 @@ export default function LibraryPage() {
   
   const itemsPerPage = 8;
 
-  const getConnectedAssistants = useCallback((item: LibraryItem) => {
-    const isLinkedToItem = (knowledgeBase: unknown) => {
-      if (!knowledgeBase) return false;
+  const assistantLinksByKnowledgeKey = useMemo(() => {
+    const lookup = new Map<string, Assistant[]>();
 
+    assistants.forEach((assistant) => {
+      const knowledgeBase = assistant.knowledgeBase;
+      if (!knowledgeBase) return;
+
+      const keys: string[] = [];
       if (typeof knowledgeBase === 'string') {
-        return knowledgeBase === item.id || knowledgeBase === item.url;
-      }
-
-      if (typeof knowledgeBase === 'object') {
+        keys.push(knowledgeBase);
+      } else if (typeof knowledgeBase === 'object') {
         const kb = knowledgeBase as { id?: string; url?: string };
-
-        return kb.id === item.id || kb.url === item.url;
+        if (kb.id) keys.push(kb.id);
+        if (kb.url) keys.push(kb.url);
       }
 
-      return false;
-    };
+      keys.forEach((key) => {
+        const existing = lookup.get(key) ?? [];
+        existing.push(assistant);
+        lookup.set(key, existing);
+      });
+    });
 
-    return assistants.filter((assistant) => isLinkedToItem(assistant.knowledgeBase));
+    return lookup;
   }, [assistants]);
+
+  const getConnectedAssistants = useCallback((item: LibraryItem) => {
+    const byId = assistantLinksByKnowledgeKey.get(item.id) ?? [];
+    const byUrl = assistantLinksByKnowledgeKey.get(item.url) ?? [];
+
+    if (byId.length === 0) return byUrl;
+    if (byUrl.length === 0) return byId;
+
+    const merged = [...byId];
+    const existingIds = new Set(byId.map((assistant) => assistant.id));
+    byUrl.forEach((assistant) => {
+      if (!existingIds.has(assistant.id)) {
+        merged.push(assistant);
+      }
+    });
+
+    return merged;
+  }, [assistantLinksByKnowledgeKey]);
 
   const { linkedItems, filteredArchive } = useMemo(() => {
     const all = items.filter(i => i.filename.toLowerCase().includes(search.toLowerCase()));
-    
-    // Use items directly instead of groupedItems.flat() to fix regression
-    const linked = all.filter(i => getConnectedAssistants(i).length > 0);
-    const unlinked = all.filter(i => getConnectedAssistants(i).length === 0);
+    const linked: LibraryItem[] = [];
+    const unlinked: LibraryItem[] = [];
+
+    all.forEach((item) => {
+      if (getConnectedAssistants(item).length > 0) {
+        linked.push(item);
+      } else {
+        unlinked.push(item);
+      }
+    });
     
     const now = new Date();
     const filtered = unlinked.filter(i => {

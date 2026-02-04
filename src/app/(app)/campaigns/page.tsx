@@ -1,12 +1,12 @@
 'use client';
 
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import {
   Plus,
   RefreshCw,
   Search,
-  Filter,
   Activity,
   Loader2,
   FolderOpen,
@@ -16,7 +16,6 @@ import {
   Trash2,
   MoreVertical,
   Clock,
-  ArrowUpRight,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -37,12 +36,15 @@ import { useCampaignApi } from '@/app/hooks/use-campaign-api';
 import {
   Campaign,
   CampaignStatus,
-  CAMPAIGN_API_CONFIG,
 } from '@/types/campaign.types';
 import { cn } from '@/lib/utils';
 
-import { CreateCampaignModal } from './components/create-campaign-modal';
 import { CampaignsGuide } from './components/campaigns-guide';
+
+const CreateCampaignModal = dynamic(
+  () => import('./components/create-campaign-modal').then((mod) => mod.CreateCampaignModal),
+  { ssr: false },
+);
 
 // --- Helpers ---
 
@@ -53,17 +55,6 @@ const getStatusColor = (status: CampaignStatus) => {
   case 'completed': return 'text-blue-500 bg-blue-500/10 border-blue-500/20';
   case 'stopped': return 'text-red-500 bg-red-500/10 border-red-500/20';
   default: return 'text-muted-foreground bg-muted border-border/40';
-  }
-};
-
-const getHumanStatus = (status: CampaignStatus, cps: number) => {
-  switch (status) {
-  case 'active': return `Dialing (${cps}/sec)`;
-  case 'paused': return 'Halted';
-  case 'pending': return 'Queued';
-  case 'completed': return 'Finished';
-  case 'stopped': return 'Terminated';
-  default: return status;
   }
 };
 
@@ -204,29 +195,42 @@ export default function CampaignsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  useEffect(() => {
+    if (!error) return;
+    toast.error(error);
+    clearError();
+  }, [error, clearError]);
+
   // Initial & Polling
   useEffect(() => {
-    listCampaigns();
-    refreshQueueStatus();
-    refreshCreditStatus();
-  }, []);
+    void Promise.all([
+      listCampaigns(),
+      refreshQueueStatus(),
+      refreshCreditStatus(),
+    ]).catch(() => {});
+  }, [listCampaigns, refreshQueueStatus, refreshCreditStatus]);
 
   useEffect(() => {
     const hasActive = campaigns.some(c => c.status === 'active');
     if (!hasActive) return;
     const interval = setInterval(() => {
-      listCampaigns();
-      refreshQueueStatus();
+      void Promise.all([
+        listCampaigns(),
+        refreshQueueStatus(),
+      ]).catch(() => {});
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [campaigns]);
+  }, [campaigns, listCampaigns, refreshQueueStatus]);
 
   const handleRefresh = async () => {
-    setIsRefreshing(true);
-    await Promise.all([listCampaigns(), refreshQueueStatus(), refreshCreditStatus()]);
-    setIsRefreshing(false);
-    toast.success('System Status Updated');
+    try {
+      setIsRefreshing(true);
+      await Promise.all([listCampaigns(), refreshQueueStatus(), refreshCreditStatus()]);
+      toast.success('System Status Updated');
+    } finally {
+      setIsRefreshing(false);
+    }
   };
 
   const filteredCampaigns = useMemo(() => {
@@ -364,11 +368,15 @@ export default function CampaignsPage() {
 
       </main>
 
-      <CreateCampaignModal 
-        open={createModalOpen} 
-        onOpenChange={setCreateModalOpen} 
-        onCampaignCreated={() => listCampaigns()} 
-      />
+      {createModalOpen && (
+        <CreateCampaignModal 
+          open={createModalOpen} 
+          onOpenChange={setCreateModalOpen} 
+          onCampaignCreated={() => {
+            void listCampaigns();
+          }} 
+        />
+      )}
     </div>
   );
 }

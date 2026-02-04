@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import dynamic from 'next/dynamic';
 import { 
   Search, 
   ArrowUpRight, 
@@ -19,7 +20,6 @@ import { DashboardHeader } from '@/components/dashboard-header';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { TranscriptViewer } from '@/components/transcript-viewer';
 import { LeadIcon } from '@/components/ui/lead-icon';
 import { cn } from '@/lib/utils';
 import { PaperCard, PaperCardContent } from '@/components/ui/paper-card';
@@ -31,6 +31,11 @@ import {
 } from '@/components/ui/dropdown-menu';
 
 import { HotLeadsGuide } from './components/hot-leads-guide';
+
+const TranscriptViewer = dynamic(
+  () => import('@/components/transcript-viewer'),
+  { ssr: false },
+);
 
 // --- Helpers (Memoized externally or stable) ---
 

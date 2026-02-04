@@ -44,7 +44,7 @@ export async function parseCSV(file: File): Promise<ParseCSVResult> {
 
   if (!phoneColumnName) {
     throw new Error(
-      'Could not detect phone number column. Please ensure your CSV has a column with "phone" in the name.'
+      'Could not detect phone number column. Please ensure your CSV has a column with "phone" in the name.',
     );
   }
 
@@ -119,6 +119,7 @@ function parseCSVLine(line: string): string[] {
   }
 
   result.push(current.trim());
+
   return result;
 }
 
@@ -153,7 +154,7 @@ function detectPhoneColumn(headers: string[]): string | null {
  */
 function normalizePhoneNumber(phone: string): string {
   // Remove all non-digit characters except leading +
-  let normalized = phone.replace(/[^\d+]/g, '');
+  const normalized = phone.replace(/[^\d+]/g, '');
 
   // If it starts with +, keep it
   if (normalized.startsWith('+')) {
@@ -183,7 +184,7 @@ function normalizePhoneNumber(phone: string): string {
 export function saveCSVPreview(
   campaignId: string,
   fileName: string,
-  parseResult: ParseCSVResult
+  parseResult: ParseCSVResult,
 ): CSVPreviewCache {
   const cache: CSVPreviewCache = {
     campaignId,
@@ -293,9 +294,10 @@ export function generateCSV(contacts: ExportContact[], fields?: string[]): strin
         const value = contact[field];
         if (value === undefined || value === null) return '';
         if (Array.isArray(value)) return escapeCSVField(value.join('; '));
+
         return escapeCSVField(String(value));
       })
-      .join(',')
+      .join(','),
   );
 
   return [header, ...rows].join('\n');
@@ -308,6 +310,7 @@ function escapeCSVField(value: string): string {
   if (value.includes(',') || value.includes('"') || value.includes('\n')) {
     return `"${value.replace(/"/g, '""')}"`;
   }
+
   return value;
 }
 
@@ -339,11 +342,13 @@ export function downloadCSV(content: string, filename: string): void {
  */
 export function removeDuplicates(contacts: CSVContact[]): CSVContact[] {
   const seen = new Set<string>();
+
   return contacts.filter((contact) => {
     if (seen.has(contact.phone_number)) {
       return false;
     }
     seen.add(contact.phone_number);
+
     return true;
   });
 }

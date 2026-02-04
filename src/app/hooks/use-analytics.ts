@@ -6,6 +6,23 @@ import { ApiError, fetchJson } from '@/lib/http';
 
 import { useMonadeUser } from './use-monade-user';
 
+const ANALYTICS_CACHE_TTL_MS = 60_000;
+
+interface CachedCallAnalytics {
+  data: CallAnalytics | null;
+  cachedAt: number;
+}
+
+interface CachedUserAnalytics {
+  data: CallAnalytics[];
+  cachedAt: number;
+}
+
+const callAnalyticsCache = new Map<string, CachedCallAnalytics>();
+const callAnalyticsInFlight = new Map<string, Promise<CallAnalytics | null>>();
+const userAnalyticsCache = new Map<string, CachedUserAnalytics>();
+const userAnalyticsInFlight = new Map<string, Promise<CallAnalytics[]>>();
+
 // Analytics data structure matching actual API response
 export interface CallAnalytics {
     id?: string;
@@ -40,30 +57,62 @@ export function useCallAnalytics() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchByCallId = useCallback(async (callId: string) => {
+  const fetchByCallId = useCallback(async (callId: string, forceRefresh = false) => {
     if (!callId) return null;
+
+    if (!forceRefresh) {
+      const cached = callAnalyticsCache.get(callId);
+      if (cached && Date.now() - cached.cachedAt < ANALYTICS_CACHE_TTL_MS) {
+        setAnalytics(cached.data);
+        setError(null);
+        setLoading(false);
+
+        return cached.data;
+      }
+    }
+
+    if (!forceRefresh) {
+      const inFlight = callAnalyticsInFlight.get(callId);
+      if (inFlight) {
+        const result = await inFlight;
+        setAnalytics(result);
+        setError(null);
+        setLoading(false);
+
+        return result;
+      }
+    }
+
+    const request = (async () => {
+      try {
+        const data = await fetchJson<any>(`/api/proxy/api/analytics/${callId}`);
+        const analyticsData = (data.analytics || data) as CallAnalytics;
+        callAnalyticsCache.set(callId, { data: analyticsData, cachedAt: Date.now() });
+
+        return analyticsData;
+      } catch (err) {
+        if (err instanceof ApiError && err.status === 404) {
+          callAnalyticsCache.set(callId, { data: null, cachedAt: Date.now() });
+
+          return null;
+        }
+        throw err;
+      } finally {
+        callAnalyticsInFlight.delete(callId);
+      }
+    })();
+
+    callAnalyticsInFlight.set(callId, request);
 
     try {
       setLoading(true);
       setError(null);
-
-      console.log('[useCallAnalytics] Fetching analytics for call:', callId);
-
-      // Use the /api/analytics/{call_id} endpoint
-      const data = await fetchJson<any>(`/api/proxy/api/analytics/${callId}`);
-      console.log('[useCallAnalytics] Fetched analytics data:', data);
-
-      // Extract the nested analytics object
-      const analyticsData = data.analytics || data;
-      console.log('[useCallAnalytics] Extracted analytics:', analyticsData);
-
+      const analyticsData = await request;
       setAnalytics(analyticsData);
 
-      return analyticsData as CallAnalytics;
+      return analyticsData;
     } catch (err) {
       if (err instanceof ApiError && err.status === 404) {
-        // No analytics for this call yet - not an error
-        console.log('[useCallAnalytics] No analytics found (404)');
         setAnalytics(null);
 
         return null;
@@ -92,53 +141,43 @@ export function useUserAnalytics() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchAll = useCallback(async () => {
+  const fetchAll = useCallback(async (forceRefresh = false) => {
     if (!userUid) {
-      console.warn('[useUserAnalytics] No user UID available');
       setAnalytics([]);
 
       return [];
     }
 
-    try {
-      setLoading(true);
-      setError(null);
+    if (!forceRefresh) {
+      const cached = userAnalyticsCache.get(userUid);
+      if (cached && Date.now() - cached.cachedAt < ANALYTICS_CACHE_TTL_MS) {
+        setAnalytics(cached.data);
+        setError(null);
+        setLoading(false);
 
-      console.log('[useUserAnalytics] Fetching all analytics for user:', userUid);
+        return cached.data;
+      }
+    }
 
-      // Use the /api/analytics?user_uid={user_uid} endpoint
-      const data = await fetchJson<any>(`/api/proxy/api/analytics?user_uid=${userUid}`);
-      console.log('[useUserAnalytics] Raw response:', data);
-      console.log('[useUserAnalytics] First item structure:', data[0]);
+    if (!forceRefresh) {
+      const inFlight = userAnalyticsInFlight.get(userUid);
+      if (inFlight) {
+        const result = await inFlight;
+        setAnalytics(result);
+        setError(null);
+        setLoading(false);
 
-      // Handle different response structures
-      let analyticsArray: CallAnalytics[] = [];
+        return result;
+      }
+    }
 
-      if (Array.isArray(data)) {
-        // If response is array, each item has structure:
-        // { id, call_id, user_uid, phone_number, created_at, analytics: {...} }
-        analyticsArray = data.map(item => {
-          if (item.analytics) {
-            // Merge top-level fields with nested analytics
-            return {
-              ...item.analytics,
-              id: item.id,
-              call_id: item.call_id,
-              user_uid: item.user_uid,
-              phone_number: item.phone_number,
-              transcript_url: item.transcript_url,
-              campaign_id: item.campaign_id,
-              created_at: item.created_at,
-              updated_at: item.updated_at,
-            };
-          }
+    const request = (async () => {
+      try {
+        const data = await fetchJson<any>(`/api/proxy/api/analytics?user_uid=${userUid}`);
 
-          return item;
-        });
-      } else if (data.analytics) {
-        // If response has analytics property
-        analyticsArray = Array.isArray(data.analytics)
-          ? data.analytics.map((item: any) => {
+        let analyticsArray: CallAnalytics[] = [];
+        if (Array.isArray(data)) {
+          analyticsArray = data.map(item => {
             if (item.analytics) {
               return {
                 ...item.analytics,
@@ -154,14 +193,43 @@ export function useUserAnalytics() {
             }
 
             return item;
-          })
-          : [data.analytics];
+          });
+        } else if (data.analytics) {
+          analyticsArray = Array.isArray(data.analytics)
+            ? data.analytics.map((item: any) => {
+              if (item.analytics) {
+                return {
+                  ...item.analytics,
+                  id: item.id,
+                  call_id: item.call_id,
+                  user_uid: item.user_uid,
+                  phone_number: item.phone_number,
+                  transcript_url: item.transcript_url,
+                  campaign_id: item.campaign_id,
+                  created_at: item.created_at,
+                  updated_at: item.updated_at,
+                };
+              }
+
+              return item;
+            })
+            : [data.analytics];
+        }
+
+        userAnalyticsCache.set(userUid, { data: analyticsArray, cachedAt: Date.now() });
+
+        return analyticsArray;
+      } finally {
+        userAnalyticsInFlight.delete(userUid);
       }
+    })();
 
-      console.log('[useUserAnalytics] Extracted analytics array:', analyticsArray);
-      console.log('[useUserAnalytics] Total analytics:', analyticsArray.length);
-      console.log('[useUserAnalytics] First extracted item:', analyticsArray[0]);
+    userAnalyticsInFlight.set(userUid, request);
 
+    try {
+      setLoading(true);
+      setError(null);
+      const analyticsArray = await request;
       setAnalytics(analyticsArray);
 
       return analyticsArray;
