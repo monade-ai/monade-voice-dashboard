@@ -4,9 +4,18 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { SUPABASE_ANON_KEY, SUPABASE_URL } from './config';
 
 export async function updateSession(request: NextRequest) {
+  const pathname = request.nextUrl.pathname;
+  const isPublicAuthPath = pathname === '/login' || pathname.startsWith('/auth');
+
   let supabaseResponse = NextResponse.next({
     request,
   });
+
+  // Public auth pages don't require user validation in middleware.
+  // This keeps login/signup flows resilient if auth provider is slow.
+  if (isPublicAuthPath) {
+    return supabaseResponse;
+  }
 
   const supabase = createServerClient(
     SUPABASE_URL,
@@ -38,11 +47,7 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   if (
-    !user &&
-        !request.nextUrl.pathname.startsWith('/login') &&
-        !request.nextUrl.pathname.startsWith('/auth') &&
-        !request.nextUrl.pathname.startsWith('/api') &&
-        request.nextUrl.pathname !== '/'
+    !user
   ) {
     // no user, potentially respond by redirecting the user to the login page
     const url = request.nextUrl.clone();

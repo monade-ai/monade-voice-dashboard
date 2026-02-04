@@ -19,6 +19,12 @@ export async function DELETE(request: NextRequest) {
   return handleProxy(request, 'DELETE');
 }
 
+function isNetworkError(error: unknown) {
+  if (!(error instanceof Error)) return false;
+  const message = error.message.toLowerCase();
+  return message.includes('fetch failed') || message.includes('enotfound') || message.includes('enetunreach') || message.includes('econnrefused') || message.includes('aborted');
+}
+
 async function handleProxy(request: NextRequest, method: string) {
   try {
     // Get the path after /api/proxy-trunks/
@@ -29,9 +35,7 @@ async function handleProxy(request: NextRequest, method: string) {
     const targetUrl = `${TRUNKS_API_BASE}${path}${searchParams}`;
     console.log(`[TrunksProxy] ${method} ${targetUrl}`);
 
-    const headers: HeadersInit = {
-      'Content-Type': 'application/json',
-    };
+    const headers: HeadersInit = {};
 
     const fetchOptions: RequestInit = {
       method,
@@ -43,12 +47,16 @@ async function handleProxy(request: NextRequest, method: string) {
       try {
         const body = await request.json();
         fetchOptions.body = JSON.stringify(body);
+        (headers as Record<string, string>)['Content-Type'] = 'application/json';
       } catch {
         // No body or invalid JSON
       }
     }
 
-    const response = await fetch(targetUrl, fetchOptions);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
+    const response = await fetch(targetUrl, { ...fetchOptions, signal: controller.signal })
+      .finally(() => clearTimeout(timeoutId));
     const responseText = await response.text();
 
     // Try to parse as JSON
@@ -62,28 +70,24 @@ async function handleProxy(request: NextRequest, method: string) {
     return NextResponse.json(data, {
       status: response.status,
       headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type',
+        'Cache-Control': 'no-store',
       },
     });
   } catch (error) {
     console.error('[TrunksProxy] Error:', error);
+    const isNetwork = isNetworkError(error);
+    const message = isNetwork
+      ? 'Upstream trunk service is unreachable. Please try again later.'
+      : (error instanceof Error ? error.message : 'Proxy error');
+    const status = isNetwork ? 503 : 500;
 
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Proxy error' },
-      { status: 500 },
+      { error: message },
+      { status, headers: { 'Cache-Control': 'no-store' } },
     );
   }
 }
 
 export async function OPTIONS() {
-  return new NextResponse(null, {
-    status: 200,
-    headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
-    },
-  });
+  return new NextResponse(null, { status: 204 });
 }
