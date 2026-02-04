@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
+import dynamic from 'next/dynamic';
 import { 
   Plus, 
   Search, 
@@ -9,17 +10,30 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-import { AssistantsProvider, useAssistants } from '@/app/hooks/use-assistants-context';
+import { useAssistants } from '@/app/hooks/use-assistants-context';
 import { LibraryProvider } from '@/app/hooks/use-knowledge-base';
 import { DashboardHeader } from '@/components/dashboard-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 
 import { ContactsProvider } from '../contacts/contexts/contacts-context';
 
-import AssistantStudio from './components/assistant-studio';
 import { AssistantCard } from './components/assistant-card';
+
+const AssistantStudio = dynamic(
+  () => import('./components/assistant-studio'),
+  { ssr: false },
+);
+
+function AssistantStudioWorkspace() {
+  return (
+    <LibraryProvider>
+      <ContactsProvider>
+        <AssistantStudio />
+      </ContactsProvider>
+    </LibraryProvider>
+  );
+}
 
 function AssistantsGallery() {
   const { assistants, currentAssistant, setCurrentAssistant, addDraftAssistant } = useAssistants();
@@ -147,20 +161,12 @@ function AssistantsGallery() {
       </main>
 
       <AnimatePresence>
-        {currentAssistant && <AssistantStudio />}
+        {currentAssistant && <AssistantStudioWorkspace />}
       </AnimatePresence>
     </div>
   );
 }
 
 export default function AssistantsPage() {
-  return (
-    <LibraryProvider>
-      <ContactsProvider>
-        <AssistantsProvider>
-          <AssistantsGallery />
-        </AssistantsProvider>
-      </ContactsProvider>
-    </LibraryProvider>
-  );
+  return <AssistantsGallery />;
 }
