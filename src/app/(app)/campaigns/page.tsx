@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import Link from 'next/link';
 import {
   Plus,
   RefreshCw,
@@ -160,8 +161,10 @@ const CampaignRow = ({
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>Campaign Actions</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => window.location.href = `/campaigns/${campaign.id}`}>
-              <FolderOpen className="mr-2 h-4 w-4" /> View Details
+            <DropdownMenuItem asChild>
+              <Link href={`/campaigns/${campaign.id}`}>
+                <FolderOpen className="mr-2 h-4 w-4" /> View Details
+              </Link>
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => onStop(campaign)} className="text-red-600">
               <Square className="mr-2 h-4 w-4" /> Stop Campaign
