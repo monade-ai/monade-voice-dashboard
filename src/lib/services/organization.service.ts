@@ -2,8 +2,7 @@
  * Organization Service - Handles all organization-related operations
  */
 
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
-
+import { createClient } from '@/utils/supabase/client';
 import {
   Organization,
   OrganizationMember,
@@ -25,7 +24,7 @@ import {
 } from '@/types';
 
 export class OrganizationService {
-  private supabase = createClientComponentClient();
+  private supabase = createClient();
 
   /**
    * Create a new organization with the current user as owner

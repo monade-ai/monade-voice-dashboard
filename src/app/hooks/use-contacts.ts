@@ -22,7 +22,7 @@ import {
   deleteContactListFromStorage,
   removeContactFromListInStorage,
   searchContactsInStorage,
-} from '@/app/contacts/utils/contacts-api';
+} from '@/app/(app)/contacts/utils/contacts-api';
 // Removed useAuth dependency - contacts are localStorage-based
 
 export interface Contact {

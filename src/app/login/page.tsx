@@ -1,16 +1,16 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useActionState, useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GrainGradient } from '@paper-design/shaders-react';
 import { useRouter } from 'next/navigation';
 
-import { createClient } from '@/utils/supabase/client';
+import { login, type LoginActionState } from './actions';
 
 // --- Types ---
 type OnboardingStep = 'identity' | 'purpose' | 'handover';
 
-interface FormData {
+interface OnboardingFormData {
   email: string;
   password: string;
   useCase: string;
@@ -34,7 +34,7 @@ const FadeIn = ({ children, delay = 0 }: { children: React.ReactNode, delay?: nu
 
 export default function LoginPage() {
   const [step, setStep] = useState<OnboardingStep>('identity');
-  const [formData, setFormData] = useState<FormData>({
+  const [formData, setFormData] = useState<OnboardingFormData>({
     email: '',
     password: '',
     useCase: '',
@@ -42,27 +42,15 @@ export default function LoginPage() {
     teamSize: '',
     origin: '',
   });
-  const [authError, setAuthError] = useState<string | null>(null);
   const router = useRouter();
+  const initialLoginState: LoginActionState = { success: false, error: null };
+  const [loginState, loginAction, isLoggingIn] = useActionState(login, initialLoginState);
 
-  const handleIdentitySubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setAuthError(null);
-    try {
-      const supabase = createClient();
-      const { error } = await supabase.auth.signInWithPassword({
-        email: formData.email,
-        password: formData.password,
-      });
-      if (error) {
-        setAuthError(error.message);
-        return;
-      }
+  useEffect(() => {
+    if (loginState.success && step === 'identity') {
       setStep('purpose');
-    } catch {
-      setAuthError('Unable to sign in. Please try again.');
     }
-  };
+  }, [loginState.success, step]);
 
   const handlePurposeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -108,12 +96,13 @@ export default function LoginPage() {
                   </p>
                 </FadeIn>
 
-                <form className="space-y-4" onSubmit={handleIdentitySubmit}>
+                <form className="space-y-4" action={loginAction}>
                   <FadeIn delay={0.1}>
                     <div className="space-y-1">
                       <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Email</label>
                       <input
                         type="email"
+                        name="email"
                         required
                         className="w-full px-0 py-2 bg-transparent border-b border-border focus:border-[#facc15] focus:ring-0 transition-colors outline-none rounded-none"
                         placeholder="name@company.com"
@@ -127,6 +116,7 @@ export default function LoginPage() {
                       <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Password</label>
                       <input
                         type="password"
+                        name="password"
                         required
                         className="w-full px-0 py-2 bg-transparent border-b border-border focus:border-[#facc15] focus:ring-0 transition-colors outline-none rounded-none"
                         placeholder="••••••••"
@@ -138,12 +128,13 @@ export default function LoginPage() {
                   <FadeIn delay={0.3}>
                     <button
                       type="submit"
+                      disabled={isLoggingIn}
                       className="mt-8 w-full bg-foreground text-background hover:bg-foreground/90 h-10 rounded-[4px] font-medium text-sm transition-all"
                     >
-                      Continue
+                      {isLoggingIn ? 'Signing in...' : 'Continue'}
                     </button>
-                    {authError && (
-                      <p className="mt-3 text-xs text-red-600">{authError}</p>
+                    {loginState.error && (
+                      <p className="mt-3 text-xs text-red-600">{loginState.error}</p>
                     )}
                     <div className="mt-4 flex gap-4 text-xs text-muted-foreground justify-center">
                       <button type="button" className="hover:text-foreground transition-colors">Forgot password?</button>

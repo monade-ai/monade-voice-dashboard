@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 
 import { useAssistants } from '@/app/hooks/use-assistants-context';
 import { useKnowledgeBase } from '@/app/hooks/use-knowledge-base';
-import { useContactsContext } from '@/app/contacts/contexts/contacts-context';
+import { useContactsContext } from '@/app/(app)/contacts/contexts/contacts-context';
 import { useTrunks } from '@/app/hooks/use-trunks';
 import {
   Select,

@@ -46,23 +46,30 @@ import { redirect } from 'next/navigation';
 
 import { createActionClient } from '@/utils/supabase/action';
 
-export async function login(formData: FormData) {
-  const email = formData.get('email') as string;
-  const password = formData.get('password') as string;
-  
-  // Create supabase client with proper cookie handling for server actions
-  const supabase = await createActionClient();
+export interface LoginActionState {
+  success: boolean;
+  error: string | null;
+}
 
-  const { error } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  });
+export async function login(
+  _prevState: LoginActionState,
+  formData: FormData,
+): Promise<LoginActionState> {
+  const email = String(formData.get('email') || '').trim();
+  const password = String(formData.get('password') || '');
 
-  if (error) {
-    redirect('/login?message=' + encodeURIComponent(error.message));
+  if (!email || !password) {
+    return { success: false, error: 'Email and password are required.' };
   }
 
-  redirect('/protected');
+  const supabase = await createActionClient();
+  const { error } = await supabase.auth.signInWithPassword({ email, password });
+
+  if (error) {
+    return { success: false, error: error.message };
+  }
+
+  return { success: true, error: null };
 }
 
 export async function signup(formData: FormData) {

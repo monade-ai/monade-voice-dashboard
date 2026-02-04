@@ -10,7 +10,7 @@ import { useNewPhoneAssistant } from '@/app/hooks/use-new-phone-assistant';
 import { useLiveKitWebAssistant } from '@/app/hooks/use-livekit-web-assistant';
 import { useMonadeUser } from '@/app/hooks/use-monade-user';
 
-import { useAssistants } from '../../hooks/use-assistants-context';
+import { useAssistants } from '@/app/hooks/use-assistants-context';
 import { NewPhoneDialog } from '../components/new-phone-dialog';
 import { LiveKitWebAssistantDialog } from '../components/livekit-web-assistant-dialog';
 

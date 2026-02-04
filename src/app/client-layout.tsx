@@ -21,7 +21,7 @@ const AuthWrapper = ({ children }: { children: React.ReactNode }) => {
   const { user, isLoading } = useAuth();
   const pathname = usePathname();
 
-  const isPublicPath = pathname === '/login';
+  const isPublicPath = pathname === '/login' || pathname.startsWith('/auth');
 
   if (isLoading) {
     return (

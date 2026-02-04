@@ -8,7 +8,7 @@ import {
   addContact as apiAddContact,
   addContactsBulk as apiAddContactsBulk,
   deleteContact as apiDeleteContact,
-} from '@/app/contacts/utils/contacts-api';
+} from '@/app/(app)/contacts/utils/contacts-api';
 import { useAssistants, Assistant } from '@/app/hooks/use-assistants-context';
 
 // Define the new data structures based on the API

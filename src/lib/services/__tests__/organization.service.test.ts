@@ -15,9 +15,9 @@ const mockSupabase = {
   },
 };
 
-// Mock createClientComponentClient
-jest.mock('@supabase/auth-helpers-nextjs', () => ({
-  createClientComponentClient: () => mockSupabase,
+// Mock shared browser supabase client
+jest.mock('@/utils/supabase/client', () => ({
+  createClient: () => mockSupabase,
 }));
 
 describe('OrganizationService', () => {

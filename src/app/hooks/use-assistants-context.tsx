@@ -3,7 +3,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 
-import { useToast } from '@/app/knowledge-base/hooks/use-toast';
+import { useToast } from '@/app/(app)/knowledge-base/hooks/use-toast';
 import { fetchJson } from '@/lib/http';
 import { MONADE_API_CONFIG } from '@/types/monade-api.types';
 

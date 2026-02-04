@@ -14,7 +14,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 
-import { useAssistants } from '../../hooks/use-assistants-context';
+import { useAssistants } from '@/app/hooks/use-assistants-context';
 import DeleteConfirmationModal from '../delete-confirmation-modal';
 
 import ModelTab from './tab-views/model-tab';

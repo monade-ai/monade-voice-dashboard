@@ -73,7 +73,6 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User } from '@supabase/supabase-js';
-import { useRouter } from 'next/navigation';
 
 import { createClient } from '@/utils/supabase/client';
 
@@ -87,19 +86,35 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const supabase = createClient();
-  const router = useRouter();
+  const [supabase] = useState(() => createClient());
 
   useEffect(() => {
+    let isMounted = true;
+
+    const bootstrap = async () => {
+      const { data, error } = await supabase.auth.getSession();
+      if (!isMounted) return;
+      if (error) {
+        setUser(null);
+      } else {
+        setUser(data.session?.user ?? null);
+      }
+      setIsLoading(false);
+    };
+
+    bootstrap();
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!isMounted) return;
       setUser(session?.user ?? null);
       setIsLoading(false);
     });
 
     return () => {
+      isMounted = false;
       subscription.unsubscribe();
     };
-  }, [supabase, router]);
+  }, [supabase]);
 
   return (
     <AuthContext.Provider value={{ user, isLoading }}>

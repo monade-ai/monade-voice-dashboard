@@ -6,9 +6,6 @@ import {
   ChevronRight,
   ArrowUpRight,
   Phone,
-  MessageCircle,
-  Clock,
-  TrendingUp,
   Download,
 } from 'lucide-react';
 
@@ -25,20 +22,11 @@ import { cn } from '@/lib/utils';
 import { CallHistoryFilterBar, CallHistoryFilterState } from './components/call-history-filter-bar';
 import { CallHistoryRow } from './components/call-history-row';
 
-const getGreeting = () => {
-  const hour = new Date().getHours();
-  if (hour < 12) return 'Good morning';
-  if (hour < 17) return 'Good afternoon';
-  if (hour < 21) return 'Good evening';
-  return 'Good evening';
-};
-
 interface MergedTranscript extends Transcript {
   analytics?: CallAnalytics;
 }
 
 export default function CallHistoryPage() {
-  const [greeting, setGreeting] = useState('Hi!');
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedTranscript, setSelectedTranscript] = useState<MergedTranscript | null>(null);
   const [filters, setFilters] = useState<CallHistoryFilterState>({
@@ -51,10 +39,6 @@ export default function CallHistoryPage() {
     campaigns: [],
   });
   const callsPerPage = 10;
-
-  useEffect(() => {
-    setGreeting(getGreeting());
-  }, []);
 
   const { transcripts, loading: transcriptsLoading } = useTranscripts();
   const { analytics: allAnalytics, fetchAll: fetchAnalytics } = useUserAnalytics();
@@ -190,9 +174,13 @@ export default function CallHistoryPage() {
 
           {/* Header */}
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-            <div className="space-y-0.5">
-              <h1 className="text-3xl font-medium tracking-tight">{greeting}, Friend.</h1>
-              <p className="text-muted-foreground text-sm leading-relaxed">Complete call archive with AI analysis and insights.</p>
+            <div className="space-y-2">
+              <h1 className="text-3xl font-medium tracking-tight">Call Archive</h1>
+              <p className="text-muted-foreground text-sm leading-relaxed max-w-xl">
+                Your complete conversation history with AI-powered insights. Review call transcripts, 
+                track engagement quality, and analyze outcomes. Filter by time, verdict, or connection 
+                status to find exactly what you need.
+              </p>
             </div>
             <div className="flex gap-3">
               <Button variant="outline" size="sm" className="gap-2 h-9 text-[10px] font-bold uppercase tracking-widest border-border hover:bg-[#facc15] hover:border-[#facc15] hover:text-black transition-all">
@@ -326,13 +314,13 @@ export default function CallHistoryPage() {
                 <tbody className="divide-y divide-border/10">
                   {transcriptsLoading ? (
                     <tr>
-                      <td colSpan={5} className="py-24 text-center text-[11px] font-bold uppercase tracking-[0.6em] text-muted-foreground/20 animate-pulse">
+                      <td colSpan={4} className="py-24 text-center text-[11px] font-bold uppercase tracking-[0.6em] text-muted-foreground/20 animate-pulse">
                         Synchronizing Data...
                       </td>
                     </tr>
                   ) : currentTranscripts.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="py-24 text-center">
+                      <td colSpan={4} className="py-24 text-center">
                         <div className="flex flex-col items-center gap-4">
                           <Phone className="w-12 h-12 text-muted-foreground/20" />
                           <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-muted-foreground/40">

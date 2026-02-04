@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
-import { useAssistants } from '../hooks/use-assistants-context';
+import { useAssistants } from '@/app/hooks/use-assistants-context';
 
 interface DeleteConfirmationModalProps {
   isOpen: boolean;

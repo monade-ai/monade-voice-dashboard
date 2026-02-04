@@ -1,12 +1,9 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo } from 'react';
-import { toast } from 'sonner';
-
-import { fetchJson } from '@/lib/http';
 import { MONADE_API_CONFIG } from '@/types/monade-api.types';
-
 import { useMonadeUser } from './use-monade-user';
+import { toast } from 'sonner';
 
 export interface LibraryItem {
   id: string;
@@ -25,9 +22,11 @@ interface CreatePayload {
 interface LibraryContextType {
   items: LibraryItem[];
   groupedItems: Record<string, LibraryItem[]>;
+  contentCache: Record<string, string>; // URL -> Content
   isLoading: boolean;
   error: string | null;
   refresh: () => Promise<void>;
+  fetchSnippet: (url: string) => Promise<string>;
   addIntelligence: (payload: CreatePayload) => Promise<boolean>;
   removeIntelligence: (id: string) => Promise<boolean>;
 }
@@ -39,6 +38,7 @@ const API_BASE_URL = MONADE_API_CONFIG.BASE_URL;
 export const LibraryProvider = ({ children }: { children: ReactNode }) => {
   const { userUid, loading: authLoading } = useMonadeUser();
   const [items, setItems] = useState<LibraryItem[]>([]);
+  const [contentCache, setContentCache] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -46,63 +46,61 @@ export const LibraryProvider = ({ children }: { children: ReactNode }) => {
     if (!userUid) {
       if (!authLoading) setError('User not authenticated');
       setIsLoading(false);
-
       return;
     }
 
     setIsLoading(true);
     try {
-      const data = await fetchJson<any[]>(`${API_BASE_URL}/api/users/${userUid}/knowledge-bases`, {
-        headers: { 'X-API-Key': MONADE_API_CONFIG.API_KEY },
+      const res = await fetch(`${API_BASE_URL}/api/users/${userUid}/knowledge-bases`, {
+        headers: { 'X-API-Key': MONADE_API_CONFIG.API_KEY }
       });
+      if (!res.ok) throw new Error('Sync failed');
+      const data = await res.json();
       const processed = data.map((kb: any) => ({
         ...kb,
         createdAt: new Date(kb.createdAt || Date.now()),
-        connectedAssistantIds: [], 
       })).sort((a: any, b: any) => b.createdAt.getTime() - a.createdAt.getTime());
-      
       setItems(processed);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not reach the library archive.');
-      setItems([]);
+      setError('Archive unreachable.');
     } finally {
       setIsLoading(false);
     }
   }, [userUid, authLoading]);
 
-  // Helper to group items by month/year for the timeline
-  const groupedItems = useMemo(() => {
-    const groups: Record<string, LibraryItem[]> = {};
-    items.forEach(item => {
-      const date = new Date(item.createdAt);
-      const key = date.toLocaleString('en-US', { month: 'long', year: 'numeric' });
-      if (!groups[key]) groups[key] = [];
-      groups[key].push(item);
-    });
-
-    return groups;
-  }, [items]);
+  const fetchSnippet = useCallback(async (url: string) => {
+    if (contentCache[url]) return contentCache[url];
+    
+    try {
+        const res = await fetch('/api/transcript-content', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url })
+        });
+        const data = await res.json();
+        const snippet = data.transcript || data.raw || "No content found.";
+        const trimmed = snippet.substring(0, 500); // Fetch first 500 chars
+        setContentCache(prev => ({ ...prev, [url]: trimmed }));
+        return trimmed;
+    } catch (err) {
+        return "Failed to load preview.";
+    }
+  }, [contentCache]);
 
   const addIntelligence = async (payload: CreatePayload): Promise<boolean> => {
     setIsLoading(true);
     try {
-      await fetchJson(`${API_BASE_URL}/api/knowledge-bases`, {
+      const res = await fetch(`${API_BASE_URL}/api/knowledge-bases`, {
         method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'X-API-Key': MONADE_API_CONFIG.API_KEY, 
-        },
+        headers: { 'Content-Type': 'application/json', 'X-API-Key': MONADE_API_CONFIG.API_KEY },
         body: JSON.stringify({ ...payload, user_uid: userUid }),
-        retry: { retries: 0 },
       });
-
-      toast.success('Library Updated', { description: `${payload.filename} is now part of the memory.` });
+      if (!res.ok) throw new Error('Save failed');
+      toast.success('Library Updated');
       await fetchItems();
-
       return true;
-    } catch {
-      toast.error('Sync Failed');
-
+    } catch (err) {
+      toast.error('Sync Error');
       return false;
     } finally {
       setIsLoading(false);
@@ -112,19 +110,16 @@ export const LibraryProvider = ({ children }: { children: ReactNode }) => {
   const removeIntelligence = async (id: string): Promise<boolean> => {
     setIsLoading(true);
     try {
-      await fetchJson(`${API_BASE_URL}/api/knowledge-bases/${id}`, {
+      const res = await fetch(`${API_BASE_URL}/api/knowledge-bases/${id}`, {
         method: 'DELETE',
-        headers: { 'X-API-Key': MONADE_API_CONFIG.API_KEY },
-        parseJson: false,
-        retry: { retries: 0 },
+        headers: { 'X-API-Key': MONADE_API_CONFIG.API_KEY }
       });
-      toast.success('Item Removed');
+      if (!res.ok) throw new Error('Deletion failed');
+      toast.success('Purged from memory');
       await fetchItems();
-
       return true;
-    } catch {
-      toast.error('Purge Failed');
-
+    } catch (err) {
+      toast.error('Purge Error');
       return false;
     } finally {
       setIsLoading(false);
@@ -135,8 +130,18 @@ export const LibraryProvider = ({ children }: { children: ReactNode }) => {
     if (!authLoading) fetchItems();
   }, [fetchItems, authLoading]);
 
+  const groupedItems = useMemo(() => {
+    const groups: Record<string, LibraryItem[]> = {};
+    items.forEach(item => {
+      const key = new Date(item.createdAt).toLocaleString('en-US', { month: 'long', year: 'numeric' });
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(item);
+    });
+    return groups;
+  }, [items]);
+
   return (
-    <LibraryContext.Provider value={{ items, groupedItems, isLoading, error, refresh: fetchItems, addIntelligence, removeIntelligence }}>
+    <LibraryContext.Provider value={{ items, groupedItems, contentCache, isLoading, error, refresh: fetchItems, fetchSnippet, addIntelligence, removeIntelligence }}>
       {children}
     </LibraryContext.Provider>
   );
@@ -144,12 +149,10 @@ export const LibraryProvider = ({ children }: { children: ReactNode }) => {
 
 export const useLibrary = () => {
   const context = useContext(LibraryContext);
-  if (!context) throw new Error('useLibrary must be used within a LibraryProvider');
-
+  if (!context) throw new Error('useLibrary error');
   return context;
 };
 
-// Backward Compatibility
 export const KnowledgeBaseProvider = LibraryProvider;
 export const useKnowledgeBase = useLibrary;
 export type KnowledgeBase = LibraryItem;

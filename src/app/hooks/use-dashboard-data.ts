@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 
-import { ChartDataPoint, fetchChartData, defaultChartData } from '@/app/dashboard/data/chart-data';
+import { ChartDataPoint, fetchChartData, defaultChartData } from '@/app/(app)/dashboard/data/chart-data';
 
 interface DashboardMetrics {
   agents: {
@@ -163,7 +163,7 @@ export const useDashboardData = () => {
     } catch (error) {
       console.error('Failed to load chart data:', error);
       // Provide fallback chart data instead of showing error
-      const { generateMockChartData } = await import('@/app/dashboard/data/chart-data');
+      const { generateMockChartData } = await import('@/app/(app)/dashboard/data/chart-data');
       const fallbackData = generateMockChartData(timeRange);
       
       setState(prev => ({

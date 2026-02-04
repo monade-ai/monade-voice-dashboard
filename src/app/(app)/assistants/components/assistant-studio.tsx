@@ -32,7 +32,7 @@ import { PaperCard, PaperCardContent, PaperCardHeader } from '@/components/ui/pa
 import { cn } from '@/lib/utils';
 import LiveKitAssistantDualButton from './livekit-assistant-dual-button';
 import DeleteConfirmationModal from '../delete-confirmation-modal';
-import { LibraryWorkshop } from '@/app/knowledge-base/components/library-workshop';
+import { LibraryWorkshop } from '@/app/(app)/knowledge-base/components/library-workshop';
 
 // --- Sub-Components: Compressed Scandinavian Design ---
 

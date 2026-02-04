@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 
-import { useAssistants } from '../../hooks/use-assistants-context';
+import { useAssistants } from '@/app/hooks/use-assistants-context';
 
 import AssistantNameEdit from './assistant-name-edit';
 import { VoiceAssistantDialog } from './voice-assistant-dialog';
