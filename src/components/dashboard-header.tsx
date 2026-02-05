@@ -24,27 +24,48 @@
  *    - Needs: An 'activity_log' table listener for high-priority alerts.
  */
 
-import React from 'react';
-import { Plus, Search, ChevronDown, Sparkles } from 'lucide-react';
+'use client';
+
+import React, { useState } from 'react';
+import { Plus, Search, ChevronDown, Sparkles, User, Phone, BookOpen } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useCredits } from '@/app/hooks/use-credits';
 import { PaperCard, PaperCardContent, PaperCardHeader } from '@/components/ui/paper-card';
 import { cn } from '@/lib/utils';
+import { CreateCampaignModal } from '@/app/(app)/campaigns/components/create-campaign-modal';
+import { LibraryWorkshop } from '@/app/(app)/knowledge-base/components/library-workshop';
 
 export function DashboardHeader() {
   const router = useRouter();
   const { credits, loading: creditsLoading } = useCredits();
   const balance = credits?.available_credits || 0;
+  const [showCampaignModal, setShowCampaignModal] = useState(false);
+  const [showKnowledgeBaseModal, setShowKnowledgeBaseModal] = useState(false);
+
+  const handleCreateAssistant = () => {
+    // Navigate to assistant studio or open simplified modal
+    router.push('/assistants?create=true');
+  };
+
+  const handleCreateCampaign = () => {
+    setShowCampaignModal(true);
+  };
+
+  const handleCreateKnowledgeBase = () => {
+    setShowKnowledgeBaseModal(true);
+  };
 
   return (
-    <header className="sticky top-0 z-30 w-full bg-background/50 backdrop-blur-xl border-b border-border/20">
+    <>
+      <header className="sticky top-0 z-30 w-full bg-background/50 backdrop-blur-xl border-b border-border/20">
       <div className="flex h-14 items-center px-8 justify-between">
 
         {/* Left: Brand / Section (Clean) */}
@@ -139,17 +160,57 @@ export function DashboardHeader() {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <Button
-            size="sm"
-            onClick={() => {/* Trigger Omni-Creation */ }}
-            className="h-8 px-3 bg-foreground text-background hover:bg-foreground/90 rounded-[4px] text-[10px] font-bold uppercase tracking-widest transition-all"
-          >
-            <Plus className="h-3.5 w-3.5 mr-1" />
-                        Create
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                size="sm"
+                className="h-8 px-3 bg-foreground text-background hover:bg-foreground/90 rounded-[4px] text-[10px] font-bold uppercase tracking-widest transition-all"
+              >
+                <Plus className="h-3.5 w-3.5 mr-1" />
+                Create
+                <ChevronDown className="h-3.5 w-3.5 ml-1" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-52 border-border/40 bg-background/95 backdrop-blur-xl">
+              <DropdownMenuItem 
+                onClick={handleCreateAssistant}
+                className="py-2 px-3 hover:bg-muted/50 cursor-pointer"
+              >
+                <User className="mr-3 h-4 w-4 text-muted-foreground" />
+                <span className="text-sm">Create Assistant</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem 
+                onClick={handleCreateCampaign}
+                className="py-2 px-3 hover:bg-muted/50 cursor-pointer"
+              >
+                <Phone className="mr-3 h-4 w-4 text-muted-foreground" />
+                <span className="text-sm">Create Campaign</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem 
+                onClick={handleCreateKnowledgeBase}
+                className="py-2 px-3 hover:bg-muted/50 cursor-pointer"
+              >
+                <BookOpen className="mr-3 h-4 w-4 text-muted-foreground" />
+                <span className="text-sm">Create Knowledge Base</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
     </header>
+    
+    {/* Campaign Creation Modal */}
+    <CreateCampaignModal
+      open={showCampaignModal}
+      onOpenChange={setShowCampaignModal}
+    />
+    
+    {/* Knowledge Base Creation Modal */}
+    <LibraryWorkshop
+      isOpen={showKnowledgeBaseModal}
+      onClose={() => setShowKnowledgeBaseModal(false)}
+    />
+    </>
   );
 }
 

@@ -6,8 +6,8 @@ export default function KnowledgeBaseLayout({
   children: React.ReactNode;
 }) {
   return (
-    <KnowledgeBaseProvider>
+    <>
       {children}
-    </KnowledgeBaseProvider>
+    </>
   );
 }

@@ -24,10 +24,18 @@ import {
 
 import { useAssistants, Assistant } from '@/app/hooks/use-assistants-context';
 import { useLibrary } from '@/app/hooks/use-knowledge-base';
+import { useTrunks } from '@/app/hooks/use-trunks';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { PaperCard, PaperCardContent, PaperCardHeader } from '@/components/ui/paper-card';
 import { cn } from '@/lib/utils';
 import { LibraryWorkshop } from '@/app/(app)/knowledge-base/components/library-workshop';
@@ -66,6 +74,7 @@ export default function AssistantStudio() {
     updateAssistantLocally, 
   } = useAssistants();
   const { items: libraryItems } = useLibrary();
+  const { trunks } = useTrunks({ checkAssignments: false });
   
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'saved' | 'error'>('idle');
@@ -124,6 +133,19 @@ export default function AssistantStudio() {
   };
 
   if (!currentAssistant) return null;
+
+  const trunkOptions = trunks.length > 0 ? trunks.map((trunk) => ({
+    value: trunk.name,
+    label: trunk.name,
+    description: trunk.name.toLowerCase().includes('vobiz')
+      ? 'Best for +91 numbers'
+      : trunk.name.toLowerCase().includes('twilio')
+        ? 'Global coverage'
+        : `SIP Trunk: ${trunk.address}`,
+  })) : [
+    { value: 'vobiz', label: 'Vobiz', description: 'Best for +91 numbers' },
+    { value: 'twilio', label: 'Twilio', description: 'Global coverage' },
+  ];
 
   return (
     <motion.div 
@@ -316,6 +338,34 @@ export default function AssistantStudio() {
                     <span className="text-xs font-bold text-foreground">{spec.value}</span>
                   </div>
                 ))}
+              </div>
+
+              <div className="pt-2">
+                <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/70">Trunk</label>
+                <Select
+                  value={currentAssistant.callProvider || '__none__'}
+                  onValueChange={(value) => {
+                    const nextValue = value === '__none__' ? '' : value;
+                    handleUpdate('callProvider', nextValue);
+                  }}
+                >
+                  <SelectTrigger className="mt-2 h-9 w-full bg-background border-border/40 text-xs">
+                    <SelectValue placeholder="Select trunk" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">
+                      <span className="text-muted-foreground">None</span>
+                    </SelectItem>
+                    {trunkOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        <div className="flex flex-col">
+                          <span className="font-medium">{option.label}</span>
+                          <span className="text-[10px] text-muted-foreground">{option.description}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           </aside>

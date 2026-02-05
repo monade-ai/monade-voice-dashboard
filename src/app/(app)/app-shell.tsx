@@ -10,6 +10,7 @@ import { CampaignProvider } from '@/app/contexts/campaign-context';
 import { MonadeUserProvider } from '@/app/hooks/use-monade-user';
 import { TranscriptsProvider } from '@/app/hooks/use-transcripts-context';
 import { AssistantsProvider } from '@/app/hooks/use-assistants-context';
+import { KnowledgeBaseProvider } from '@/app/hooks/use-knowledge-base';
 
 interface RouteSample {
   route: string;
@@ -93,9 +94,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <Sidebar />
           <main className="flex-1 overflow-auto">
             <TranscriptsProvider>
-              <AssistantsProvider>
-                <CampaignProvider>{children}</CampaignProvider>
-              </AssistantsProvider>
+              <KnowledgeBaseProvider>
+                <AssistantsProvider>
+                  <CampaignProvider>{children}</CampaignProvider>
+                </AssistantsProvider>
+              </KnowledgeBaseProvider>
             </TranscriptsProvider>
           </main>
         </div>
