@@ -17,6 +17,7 @@ export interface Assistant {
   model?: string;
   provider?: string;
   voice?: string;
+  speakingAccent?: string; // Speaking accent (e.g., 'Indian', 'American', 'British')
   callProvider?: string; // 'twilio' | 'vobiz' - which trunk to use for outbound calls
   costPerMin?: number;
   latencyMs?: number;
@@ -384,8 +385,33 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
 
     // Restore original logic: Destructure knowledgeBaseId from updatedData
     // Restore original logic: Destructure knowledgeBaseId from updatedData
-    const { knowledgeBaseId, callProvider, ...restData } = updatedData;
+    const { knowledgeBaseId, callProvider, speakingAccent, ...restData } = updatedData;
     const payload: any = { ...restData };
+
+    // Handle speakingAccent separately via dedicated endpoint
+    if (speakingAccent !== undefined) {
+      try {
+        console.log('[Assistants] PATCH /api/assistants/:id/accent', `${API_BASE_URL}/api/assistants/${id}/accent`, 'Payload:', { speakingAccent });
+        const accentRes = await fetch(`${API_BASE_URL}/api/assistants/${id}/accent`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-API-Key': MONADE_API_CONFIG.API_KEY
+          },
+          body: JSON.stringify({ speakingAccent }),
+        });
+        if (!accentRes.ok) {
+          const errorText = await getApiError(accentRes);
+          console.error('Failed to update accent:', accentRes.status, errorText);
+          // Continue with other updates, don't block
+        } else {
+          console.log('[Assistants] Accent updated successfully');
+        }
+      } catch (err) {
+        console.error('Error updating accent:', err);
+        // Non-blocking - continue with other updates
+      }
+    }
 
     // Send knowledgeBase in payload ONLY if knowledgeBaseId was present in updatedData
     if (knowledgeBaseId !== undefined) {

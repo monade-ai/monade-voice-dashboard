@@ -71,6 +71,15 @@ const voicesByProvider = {
   ],
 };
 
+// Define available speaking accents
+const accentOptions = [
+  { value: 'Indian', label: 'Indian', description: 'Indian English accent' },
+  { value: 'American', label: 'American', description: 'American English accent' },
+  { value: 'British', label: 'British', description: 'British English accent' },
+  { value: 'Australian', label: 'Australian', description: 'Australian English accent' },
+  { value: 'Neutral', label: 'Neutral', description: 'Neutral/Standard accent' },
+];
+
 // Define the props type including the new handler
 interface ModelTabProps {
   onChangesMade: () => void;
@@ -86,6 +95,7 @@ export default function ModelTab({ onChangesMade }: ModelTabProps) {
   const [provider, setProvider] = useState(currentAssistant?.provider || 'openai');
   const [model, setModel] = useState(currentAssistant?.model || 'tts-1');
   const [voice, setVoice] = useState(currentAssistant?.voice || 'alloy');
+  const [speakingAccent, setSpeakingAccent] = useState(currentAssistant?.speakingAccent || 'Indian');
   const [phoneNumber, setPhoneNumber] = useState(currentAssistant?.phoneNumber || '');
   const [callProvider, setCallProvider] = useState(currentAssistant?.callProvider || 'vobiz');
   const [knowledgeBaseId, setKnowledgeBaseId] = useState(currentAssistant?.knowledgeBase || '');
@@ -111,6 +121,7 @@ export default function ModelTab({ onChangesMade }: ModelTabProps) {
     setProvider(currentAssistant?.provider || 'openai');
     setModel(currentAssistant?.model || 'tts-1');
     setVoice(currentAssistant?.voice || 'alloy');
+    setSpeakingAccent(currentAssistant?.speakingAccent || 'Indian');
     setPhoneNumber(currentAssistant?.phoneNumber || '');
     setCallProvider(currentAssistant?.callProvider || 'vobiz');
     setKnowledgeBaseId(currentAssistant?.knowledgeBase || '');
@@ -198,6 +209,15 @@ export default function ModelTab({ onChangesMade }: ModelTabProps) {
     setVoice(value);
     if (currentAssistant) {
       updateAssistantLocally(currentAssistant.id, { voice: value });
+      onChangesMade(); // Mark changes
+    }
+  };
+
+  // Handler for speaking accent change
+  const handleAccentChange = (value: string) => {
+    setSpeakingAccent(value);
+    if (currentAssistant) {
+      updateAssistantLocally(currentAssistant.id, { speakingAccent: value });
       onChangesMade(); // Mark changes
     }
   };
@@ -388,6 +408,37 @@ export default function ModelTab({ onChangesMade }: ModelTabProps) {
               ⚠ No provider selected - click a provider to enable calls, or save without one
             </p>
           )}
+        </div>
+      </div>
+
+      {/* Speaking Accent Section */}
+      <div className="border rounded-lg p-6 bg-gray-50">
+        <h3 className="text-lg font-medium mb-2">Speaking Accent</h3>
+        <p className="text-sm text-gray-600 mb-6">
+          Select the speaking accent for the voice. This determines how the assistant speaks.
+        </p>
+        <div className="space-y-2">
+          <label htmlFor="speaking-accent" className="text-sm font-medium">
+            Accent
+          </label>
+          <Select value={speakingAccent} onValueChange={handleAccentChange}>
+            <SelectTrigger className="w-full bg-white">
+              <SelectValue placeholder="Select accent" />
+            </SelectTrigger>
+            <SelectContent>
+              {accentOptions.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  <div className="flex flex-col">
+                    <span className="font-medium">{option.label}</span>
+                    <span className="text-xs text-gray-500">{option.description}</span>
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-gray-500 mt-2">
+            The accent affects speech patterns and pronunciation style.
+          </p>
         </div>
       </div>
 

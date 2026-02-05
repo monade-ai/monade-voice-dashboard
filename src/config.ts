@@ -40,6 +40,13 @@ export const CONFIG = {
 
     // Provider
     PROVIDER: 'vobiz.ai',
+
+    // Campaign Service API
+    CAMPAIGNS: {
+        BASE_URL: typeof window !== 'undefined' ? '/api/campaign-service' : 'http://35.200.254.189/campaigns',
+        DIRECT_URL: 'http://35.200.254.189/campaigns',
+        API_VERSION: 'v1',
+    },
 } as const;
 
 // Export individual configs for convenience

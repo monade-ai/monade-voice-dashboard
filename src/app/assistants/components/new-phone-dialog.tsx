@@ -203,8 +203,8 @@ export function NewPhoneDialog({
                     ))
                   ) : (
                     <>
-                      <SelectItem value="vobiz">Vobiz (Indian calls)</SelectItem>
-                      <SelectItem value="twilio">Twilio (International)</SelectItem>
+                      <SelectItem key="vobiz" value="vobiz">Vobiz (Indian calls)</SelectItem>
+                      <SelectItem key="twilio" value="twilio">Twilio (International)</SelectItem>
                     </>
                   )}
                 </SelectContent>
