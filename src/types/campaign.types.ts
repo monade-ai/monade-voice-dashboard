@@ -215,7 +215,9 @@ export interface CSVPreviewCache {
 // ============================================
 
 export const CAMPAIGN_API_CONFIG = {
-  BASE_URL: 'http://35.200.254.189/campaigns/api/v1',
+  BASE_URL: typeof window !== 'undefined'
+    ? '/api/campaigns'
+    : 'http://35.200.254.189/campaigns/api/v1',
   DB_SERVICES_URL: 'http://35.200.254.189/db_services/api',
   POLL_INTERVALS: {
     QUEUE_STATUS: 5000, // 5 seconds during active campaign

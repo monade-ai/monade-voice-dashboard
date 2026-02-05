@@ -1,19 +1,43 @@
 // app/layout.tsx (Server Component)
 
 import type { Metadata } from 'next';
-import { Geist, Geist_Mono } from 'next/font/google';
+import localFont from 'next/font/local';
 
 import './globals.css';
 import ClientLayout from './client-layout';
 
-const geistSans = Geist({
+const geistSans = localFont({
+  src: [
+    {
+      path: '../../public/fonts/geist/Geist[wght].woff2',
+      weight: '100 900',
+      style: 'normal',
+    },
+    {
+      path: '../../public/fonts/geist/Geist-Italic[wght].woff2',
+      weight: '100 900',
+      style: 'italic',
+    },
+  ],
   variable: '--font-geist-sans',
-  subsets: ['latin'],
+  display: 'swap',
 });
 
-const geistMono = Geist_Mono({
+const geistMono = localFont({
+  src: [
+    {
+      path: '../../public/fonts/geist-mono/GeistMono[wght].woff2',
+      weight: '100 900',
+      style: 'normal',
+    },
+    {
+      path: '../../public/fonts/geist-mono/GeistMono-Italic[wght].woff2',
+      weight: '100 900',
+      style: 'italic',
+    },
+  ],
   variable: '--font-geist-mono',
-  subsets: ['latin'],
+  display: 'swap',
 });
 
 export const metadata: Metadata = {
