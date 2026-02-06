@@ -182,9 +182,27 @@ async function handleProxy(request: NextRequest) {
     }
 
     const search = searchParams.toString();
+    const normalizedBase = CAMPAIGN_API_BASE.replace(/\/+$/, '');
+    let baseForPath = normalizedBase;
+    let normalizedPath = path;
+
+    // Guard against misconfigured base URLs that already include "/campaigns"
+    if (normalizedBase.endsWith('/campaigns')) {
+      if (normalizedPath.startsWith('/campaigns')) {
+        normalizedPath = normalizedPath.replace('/campaigns', '');
+      } else if (normalizedPath.startsWith('/monitoring')) {
+        baseForPath = normalizedBase.replace(/\/campaigns$/, '');
+      }
+    }
+
+    // Normalize list/create path to include trailing slash for upstream compatibility.
+    if (normalizedPath === '/campaigns') {
+      normalizedPath = '/campaigns/';
+    }
+
     const targetUrl = search
-      ? `${CAMPAIGN_API_BASE}${path}?${search}`
-      : `${CAMPAIGN_API_BASE}${path}`;
+      ? `${baseForPath}${normalizedPath}?${search}`
+      : `${baseForPath}${normalizedPath}`;
 
     const headers: HeadersInit = {};
     if (userApiKey) {
@@ -223,6 +241,14 @@ async function handleProxy(request: NextRequest) {
       data = JSON.parse(responseText);
     } catch {
       data = responseText;
+    }
+
+    if (!response.ok) {
+      console.warn('[CampaignProxy] upstream error', {
+        status: response.status,
+        statusText: response.statusText,
+        targetUrl,
+      });
     }
 
     return NextResponse.json(data, {
