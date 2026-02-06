@@ -118,6 +118,7 @@ export function CreateCampaignModal({
         description: formData.description.trim() || undefined,
         provider: formData.provider,
         trunk_name: formData.trunkName,
+        assistant_id: formData.assistantId,
         max_concurrent: formData.maxConcurrent,
         calls_per_second: formData.callsPerSecond,
         daily_start_time: formData.dailyStartTime,
@@ -139,7 +140,8 @@ export function CreateCampaignModal({
       onOpenChange(false);
       onCampaignCreated?.(campaign);
     } catch (error) {
-      // Hook handles error state
+      const message = error instanceof Error ? error.message : 'Failed to create campaign';
+      toast.error(message);
     }
   };
 

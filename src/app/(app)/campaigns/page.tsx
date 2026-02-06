@@ -352,13 +352,13 @@ export default function CampaignsPage() {
             ) : (
               <div className="flex flex-col">
                 {filteredCampaigns.map(c => (
-                  <CampaignRow 
-                    key={c.id} 
-                    campaign={c} 
-                    onStart={startCampaign}
-                    onPause={pauseCampaign}
-                    onStop={stopCampaign}
-                    onDelete={deleteCampaign}
+                  <CampaignRow
+                    key={c.id}
+                    campaign={c}
+                    onStart={(campaign) => startCampaign(campaign.id)}
+                    onPause={(campaign) => pauseCampaign(campaign.id)}
+                    onStop={(campaign) => stopCampaign(campaign.id)}
+                    onDelete={(campaign) => deleteCampaign(campaign.id)}
                   />
                 ))}
               </div>

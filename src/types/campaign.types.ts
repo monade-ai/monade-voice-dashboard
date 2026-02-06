@@ -57,6 +57,7 @@ export interface CreateCampaignRequest {
   description?: string;
   provider: CampaignProvider;
   trunk_name: string;
+  assistant_id: string;
   max_concurrent?: number; // default: 5
   calls_per_second?: number; // default: 1
   daily_start_time?: string; // default: "10:00"

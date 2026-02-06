@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import dynamic from 'next/dynamic';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { 
   Plus, 
   Search, 
@@ -37,6 +38,9 @@ function AssistantStudioWorkspace() {
 
 function AssistantsGallery() {
   const { assistants, currentAssistant, setCurrentAssistant, addDraftAssistant } = useAssistants();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [search, setSearch] = useState('');
   const [showBrief, setShowBrief] = useState(false);
 
@@ -50,9 +54,39 @@ function AssistantsGallery() {
     localStorage.setItem('monade_studio_brief_dismissed', 'true');
   };
 
+  const activeTab = useMemo(() => {
+    const tab = searchParams.get('tab');
+    if (tab === 'production' || tab === 'drafts' || tab === 'all') return tab;
+    return 'all';
+  }, [searchParams]);
+  const setActiveTab = (tab: 'all' | 'production' | 'drafts') => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (tab === 'all') {
+      params.delete('tab');
+    } else {
+      params.set('tab', tab);
+    }
+    const query = params.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  };
+  const isDraftAssistant = (assistant: { id: string; status?: string; isDraft?: boolean }) => {
+    if (assistant.isDraft) return true;
+    if (assistant.status === 'draft') return true;
+    return assistant.id.startsWith('local-');
+  };
   const filteredAssistants = useMemo(() => {
-    return assistants.filter(a => a.name.toLowerCase().includes(search.toLowerCase()));
-  }, [assistants, search]);
+    const matchesSearch = assistants.filter(a => a.name.toLowerCase().includes(search.toLowerCase()));
+    if (activeTab === 'drafts') {
+      return matchesSearch.filter(isDraftAssistant);
+    }
+    if (activeTab === 'production') {
+      return matchesSearch.filter(a => !isDraftAssistant(a));
+    }
+
+    return matchesSearch;
+  }, [assistants, search, activeTab]);
+  const draftCount = assistants.filter(isDraftAssistant).length;
+  const productionCount = assistants.length - draftCount;
 
   const handleCreateDraft = () => {
     const draft = addDraftAssistant({
@@ -138,13 +172,50 @@ function AssistantsGallery() {
         <section className="space-y-8 pb-40">
           <div className="flex items-center justify-between border-b border-border/20 pb-4">
             <div className="flex items-center gap-8">
-              <button className="text-[10px] font-bold uppercase tracking-widest pb-1 border-b-2 border-primary text-foreground transition-all">All Assistants</button>
-              <button className="text-[10px] font-bold uppercase tracking-widest pb-1 border-b-2 border-transparent text-muted-foreground hover:text-foreground transition-all">Production</button>
-              <button className="text-[10px] font-bold uppercase tracking-widest pb-1 border-b-2 border-transparent text-muted-foreground hover:text-foreground transition-all">Drafts</button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('all')}
+                aria-pressed={activeTab === 'all'}
+                className={`text-[10px] font-bold uppercase tracking-widest pb-1 border-b-2 transition-all ${
+                  activeTab === 'all'
+                    ? 'border-primary text-foreground'
+                    : 'border-transparent text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                All Assistants
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('production')}
+                aria-pressed={activeTab === 'production'}
+                className={`text-[10px] font-bold uppercase tracking-widest pb-1 border-b-2 transition-all ${
+                  activeTab === 'production'
+                    ? 'border-primary text-foreground'
+                    : 'border-transparent text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                Production
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('drafts')}
+                aria-pressed={activeTab === 'drafts'}
+                className={`text-[10px] font-bold uppercase tracking-widest pb-1 border-b-2 transition-all ${
+                  activeTab === 'drafts'
+                    ? 'border-primary text-foreground'
+                    : 'border-transparent text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                Drafts
+              </button>
             </div>
             <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-foreground/40">
               <Users size={12} className="text-primary/60" />
-              <span>{filteredAssistants.length} Assistants Ready</span>
+              <span>
+                {filteredAssistants.length} Assistants Ready
+                {activeTab === 'drafts' && ` (${draftCount} total drafts)`}
+                {activeTab === 'production' && ` (${productionCount} production)`}
+              </span>
             </div>
           </div>
 
