@@ -318,7 +318,7 @@ export function CampaignProvider({ children }: { children: React.ReactNode }) {
 
         const totalContacts = contacts.length;
         // Use 5 concurrent workers (50% of Vobiz's 10 limit for safety)
-        const MAX_CONCURRENT_CALLS = 5;
+        const MAX_CONCURRENT_CALLS = 10;
         // Fixed delay per call slot (90 seconds) - allows call to complete + transcript to generate
         const CALL_SLOT_DURATION_MS = 90_000;
         let nextContactIndex = 0;
