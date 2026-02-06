@@ -33,6 +33,13 @@ export interface Assistant {
   flowJson?: Record<string, unknown> | null;
 }
 
+const extractCallProvider = (assistant: { tags?: string[]; callProvider?: string | null }) => {
+  const tags = assistant.tags || [];
+  const trunkTag = tags.find((t) => t.startsWith('trunk:'));
+
+  return trunkTag ? trunkTag.replace('trunk:', '') : (assistant.callProvider || '');
+};
+
 // Define the structure for creating an assistant (maps to POST body)
 // Explicitly define fields matching API requirements
 type CreateAssistantData = {
@@ -167,14 +174,9 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
       console.log('[Assistants] GET /api/assistants Raw fetched:', data);
       apiAssistants = data.map((a: any) => {
         const tags = a.tags || [];
-        // Extract callProvider from "trunk:value" tag
-        const trunkTag = tags.find((t: string) => t.startsWith('trunk:'));
-        // Default to 'vobiz' if no tag found, or use existing property if backend supports it in future
-        const callProvider = trunkTag ? trunkTag.replace('trunk:', '') : (a.callProvider || 'vobiz');
-
         return {
           ...a,
-          callProvider,
+          callProvider: extractCallProvider({ tags, callProvider: a.callProvider }),
           createdAt: a.createdAt ? new Date(a.createdAt) : new Date(),
           knowledgeBase: a.knowledgeBase || null,
           tags: tags, // Ensure tags array exists
@@ -280,6 +282,7 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
       });
       const processedAssistant: Assistant = {
         ...createdAssistantResponse,
+        callProvider: extractCallProvider(createdAssistantResponse),
         createdAt: createdAssistantResponse.createdAt ? new Date(createdAssistantResponse.createdAt) : new Date(),
         knowledgeBase: createdAssistantResponse.knowledgeBase || null,
         tags: createdAssistantResponse.tags || [],
@@ -394,11 +397,21 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
         body: JSON.stringify(payload),
         retry: { retries: 0 },
       });
+      const existingAssistant = assistants.find(a => a.id === id);
+      const responseTags = updatedAssistantResponse.tags ?? existingAssistant?.tags ?? [];
+      const responseKnowledgeBase = updatedAssistantResponse.knowledgeBase ?? existingAssistant?.knowledgeBase ?? null;
       const processedAssistant: Assistant = {
+        ...existingAssistant,
         ...updatedAssistantResponse,
-        createdAt: updatedAssistantResponse.createdAt ? new Date(updatedAssistantResponse.createdAt) : new Date(),
-        knowledgeBase: updatedAssistantResponse.knowledgeBase || null,
-        tags: updatedAssistantResponse.tags || [],
+        callProvider: extractCallProvider({
+          tags: responseTags,
+          callProvider: updatedAssistantResponse.callProvider ?? existingAssistant?.callProvider,
+        }),
+        createdAt: updatedAssistantResponse.createdAt
+          ? new Date(updatedAssistantResponse.createdAt)
+          : (existingAssistant?.createdAt || new Date()),
+        knowledgeBase: responseKnowledgeBase,
+        tags: responseTags,
       };
 
       console.log('[Assistants] PATCH Success, updated:', processedAssistant);
