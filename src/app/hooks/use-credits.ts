@@ -48,7 +48,6 @@ export function useCredits(): UseCreditsReturn {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
-            'X-API-Key': MONADE_API_CONFIG.API_KEY,
           },
         },
       );

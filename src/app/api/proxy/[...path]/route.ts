@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-// Hardcoded Monade API config
-const MONADE_API_BASE = 'http://35.200.254.189/db_services';
-const MONADE_API_KEY = 'monade_d8325992-cf93-4cdd-9c54-34ca18d72441';
+const MONADE_API_BASE = process.env.MONADE_API_BASE_URL ?? 'http://35.200.254.189/db_services';
+const MONADE_API_KEY = process.env.MONADE_API_KEY;
 
 export async function GET(request: NextRequest) {
   return handleProxy(request, 'GET');
@@ -33,6 +32,13 @@ function isNetworkError(error: unknown) {
 
 async function handleProxy(request: NextRequest, method: string) {
   try {
+    if (!MONADE_API_KEY) {
+      return NextResponse.json(
+        { error: 'Server misconfigured: MONADE_API_KEY is not set.' },
+        { status: 500, headers: { 'Cache-Control': 'no-store' } },
+      );
+    }
+
     // Get the path after /api/proxy/
     const url = new URL(request.url);
     const path = url.pathname.replace('/api/proxy', '');

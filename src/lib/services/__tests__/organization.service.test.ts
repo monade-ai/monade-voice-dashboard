@@ -32,6 +32,7 @@ describe('OrganizationService', () => {
     it('should create organization successfully', async () => {
       const mockOrgData = {
         name: 'Test Organization',
+        slug: 'test-organization',
         industry: 'Technology',
         contact_email: 'test@example.com',
       };
@@ -73,7 +74,7 @@ describe('OrganizationService', () => {
       expect(result.data).toEqual(mockOrganization);
       expect(mockSupabase.rpc).toHaveBeenCalledWith('create_organization_with_owner', {
         org_name: 'Test Organization',
-        org_slug: undefined,
+        org_slug: 'test-organization',
         creator_email: 'test@example.com',
       });
     });
@@ -94,6 +95,7 @@ describe('OrganizationService', () => {
     it('should handle Supabase errors', async () => {
       const mockOrgData = {
         name: 'Test Organization',
+        slug: 'test-organization',
         industry: 'Technology',
       };
 

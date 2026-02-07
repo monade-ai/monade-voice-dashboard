@@ -105,7 +105,6 @@ export function TranscriptsProvider({ children }: { children: React.ReactNode })
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
-            'X-API-Key': MONADE_API_CONFIG.API_KEY,
           },
         },
       );

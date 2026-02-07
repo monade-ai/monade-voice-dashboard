@@ -31,7 +31,15 @@ export interface ParseCSVResult {
  * Parse a CSV file and extract contacts
  */
 export async function parseCSV(file: File): Promise<ParseCSVResult> {
-  const text = await file.text();
+  // Some test environments provide a File polyfill without `text()`.
+  const text = typeof (file as any)?.text === 'function'
+    ? await (file as any).text()
+    : await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result ?? ''));
+      reader.onerror = () => reject(reader.error ?? new Error('Failed to read CSV file'));
+      reader.readAsText(file);
+    });
   const lines = text.split(/\r?\n/).filter((line) => line.trim());
 
   if (lines.length < 2) {
@@ -39,8 +47,8 @@ export async function parseCSV(file: File): Promise<ParseCSVResult> {
   }
 
   // Parse header
-  const headers = parseCSVLine(lines[0]);
-  const phoneColumnName = detectPhoneColumn(headers);
+  const rawHeaders = parseCSVLine(lines[0]);
+  const { headers, phoneColumnName } = normalizePhoneHeaders(rawHeaders);
 
   if (!phoneColumnName) {
     throw new Error(
@@ -92,6 +100,57 @@ export async function parseCSV(file: File): Promise<ParseCSVResult> {
   };
 }
 
+const PHONE_HEADER_ALIASES = new Set([
+  'phone number',
+  'phone',
+  'number',
+  'no',
+  'phone no',
+  'mobile',
+  'mobile number',
+  'contact number',
+  'contact no',
+  'contact',
+  'tel',
+  'telephone',
+  'cell',
+  'cell phone',
+]);
+
+function normalizeHeaderKey(header: string): string {
+  return header.trim().toLowerCase().replace(/[\s_-]+/g, ' ');
+}
+
+function isPhoneHeader(header: string): boolean {
+  const normalized = normalizeHeaderKey(header);
+
+  return PHONE_HEADER_ALIASES.has(normalized);
+}
+
+function normalizePhoneHeaders(headers: string[]): { headers: string[]; phoneColumnName: string | null } {
+  let phoneIndex = -1;
+  const normalizedHeaders = headers.map((header, idx) => {
+    if (phoneIndex === -1 && isPhoneHeader(header)) {
+      phoneIndex = idx;
+      return 'phone_number';
+    }
+    return header;
+  });
+
+  if (phoneIndex === -1) {
+    const detected = detectPhoneColumn(headers);
+    if (detected) {
+      const detectedIndex = headers.indexOf(detected);
+      const updated = [...headers];
+      updated[detectedIndex] = 'phone_number';
+      return { headers: updated, phoneColumnName: 'phone_number' };
+    }
+    return { headers, phoneColumnName: null };
+  }
+
+  return { headers: normalizedHeaders, phoneColumnName: 'phone_number' };
+}
+
 /**
  * Parse a single CSV line, handling quoted fields
  */
@@ -130,11 +189,16 @@ function detectPhoneColumn(headers: string[]): string | null {
   const phonePatterns = [
     /^phone$/i,
     /^phone[_\s-]?number$/i,
+    /^phone[_\s-]?no$/i,
+    /^number$/i,
+    /^no$/i,
     /^mobile$/i,
     /^mobile[_\s-]?number$/i,
     /^cell$/i,
     /^cell[_\s-]?phone$/i,
     /^contact[_\s-]?number$/i,
+    /^contact[_\s-]?no$/i,
+    /^contact$/i,
     /^tel$/i,
     /^telephone$/i,
     /phone/i, // Fallback: any column containing "phone"

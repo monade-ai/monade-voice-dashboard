@@ -1,26 +1,24 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   X, 
   Loader2, 
   Sparkles, 
   ArrowRight, 
-  CalendarClock, 
   Settings2, 
   Bot, 
   ShieldCheck,
   Zap,
   Activity,
-  Clock,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { PaperCard, PaperCardContent } from '@/components/ui/paper-card';
 import { useAssistants } from '@/app/hooks/use-assistants-context';
 import { useTrunks } from '@/app/hooks/use-trunks';
 import { useCampaignApi } from '@/app/hooks/use-campaign-api';
@@ -91,12 +89,18 @@ export function CreateCampaignModal({
   onOpenChange,
   onCampaignCreated,
 }: CreateCampaignModalProps) {
+  const router = useRouter();
   const { assistants } = useAssistants();
   const { trunks } = useTrunks({ checkAssignments: false });
   const { createCampaign, loading } = useCampaignApi();
 
   const [formData, setFormData] = useState<FormData>(initialFormData);
   const [step, setStep] = useState<1 | 2 | 3>(1);
+
+  const concurrencyOptions = [1, 2, 3, 4, 5, LIMITS.MAX_CONCURRENT]
+    .filter((v, idx, arr) => v <= LIMITS.MAX_CONCURRENT && arr.indexOf(v) === idx);
+  const cpsOptions = [1, 2, LIMITS.CALLS_PER_SECOND]
+    .filter((v, idx, arr) => v <= LIMITS.CALLS_PER_SECOND && arr.indexOf(v) === idx);
 
   const handleChange = <K extends keyof FormData>(field: K, value: FormData[K]) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -135,10 +139,11 @@ export function CreateCampaignModal({
         provider: formData.provider,
         updatedAt: new Date().toISOString(),
       });
+      onCampaignCreated?.(campaign);
+      router.push(`/campaigns/${campaign.id}`);
       setFormData(initialFormData);
       setStep(1);
       onOpenChange(false);
-      onCampaignCreated?.(campaign);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to create campaign';
       toast.error(message);
@@ -270,7 +275,7 @@ export function CreateCampaignModal({
                           onChange={(e) => handleChange('maxConcurrent', Number(e.target.value))}
                           className="w-full h-10 bg-background border border-border/40 rounded-md px-3 text-xs font-mono"
                         >
-                          {[1, 5, 10, 20, 50].map(n => <option key={n} value={n}>{n} Lines</option>)}
+                          {concurrencyOptions.map(n => <option key={n} value={n}>{n} Lines</option>)}
                         </select>
                       </div>
                       <div className="space-y-2">
@@ -280,7 +285,7 @@ export function CreateCampaignModal({
                           onChange={(e) => handleChange('callsPerSecond', Number(e.target.value))}
                           className="w-full h-10 bg-background border border-border/40 rounded-md px-3 text-xs font-mono"
                         >
-                          {[1, 2, 5, 10].map(n => <option key={n} value={n}>{n} CPS</option>)}
+                          {cpsOptions.map(n => <option key={n} value={n}>{n} CPS</option>)}
                         </select>
                       </div>
                     </div>

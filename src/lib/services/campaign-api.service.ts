@@ -11,6 +11,7 @@ import {
   CampaignControlResponse,
   CSVUploadResponse,
   QueueStatus,
+  CampaignMonitoringStats,
   CreditStatus,
   SystemConfig,
   CampaignAnalytics,
@@ -116,7 +117,7 @@ export async function updateCampaign(
   return fetchCampaignApi<Campaign>(
     `/campaigns/${campaignId}?user_uid=${encodeURIComponent(userUid)}`,
     {
-      method: 'PUT',
+      method: 'PATCH',
       body: JSON.stringify(data),
     },
   );
@@ -214,7 +215,6 @@ export async function pauseCampaign(
 
 /**
  * Resume a paused campaign
- * NOTE: This endpoint currently returns 404 - flagged with backend team
  */
 export async function resumeCampaign(
   campaignId: string,
@@ -253,6 +253,18 @@ export async function stopCampaign(
 export async function getQueueStatus(userUid: string): Promise<QueueStatus> {
   return fetchCampaignApi<QueueStatus>(
     `/monitoring/queue-status/${encodeURIComponent(userUid)}`,
+  );
+}
+
+/**
+ * Get monitoring stats for a specific campaign
+ */
+export async function getCampaignMonitoringStats(
+  campaignId: string,
+  userUid: string,
+): Promise<CampaignMonitoringStats> {
+  return fetchCampaignApi<CampaignMonitoringStats>(
+    `/monitoring/campaigns/${encodeURIComponent(campaignId)}/stats?user_uid=${encodeURIComponent(userUid)}`,
   );
 }
 
@@ -334,6 +346,7 @@ export const campaignApi = {
 
   // Monitoring
   getQueueStatus,
+  getCampaignMonitoringStats,
   getCreditStatus,
   getSystemConfig,
 

@@ -19,6 +19,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   parseCSV,
   saveCSVPreview,
+  deleteCSVPreview,
   ParseCSVResult,
   createDedupedCSV,
 } from '@/lib/utils/csv-preview';
@@ -26,8 +27,8 @@ import { CSVPreviewCache } from '@/types/campaign.types';
 
 interface CSVUploadProps {
   campaignId?: string;
-  onUploadComplete?: (file: File, result: ParseCSVResult) => void;
-  onPreviewSaved?: (preview: CSVPreviewCache) => void;
+  onUploadComplete?: (file: File, result: ParseCSVResult) => void | Promise<void>;
+  onPreviewSaved?: (preview: CSVPreviewCache | null) => void;
   disabled?: boolean;
   existingPreview?: CSVPreviewCache | null;
 }
@@ -73,7 +74,6 @@ export function CSVUpload({
           toast.warning(`Found ${result.duplicates.count} duplicate phone numbers`);
         }
 
-        onUploadComplete?.(file, result);
       } catch (error) {
         console.error('CSV parsing error:', error);
         toast.error(error instanceof Error ? error.message : 'Failed to parse CSV');
@@ -81,7 +81,7 @@ export function CSVUpload({
         setIsProcessing(false);
       }
     },
-    [campaignId, onUploadComplete, onPreviewSaved],
+    [campaignId, onPreviewSaved],
   );
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -136,7 +136,6 @@ export function CSVUpload({
       }
 
       toast.success(`Removed ${parseResult.duplicates.count} duplicates`);
-      onUploadComplete?.(dedupedFile, result);
     } catch (error) {
       console.error('Deduplication error:', error);
       toast.error('Failed to remove duplicates');
@@ -149,6 +148,29 @@ export function CSVUpload({
     setParseResult(null);
     setCurrentFile(null);
     setPreview(null);
+    if (campaignId) {
+      deleteCSVPreview(campaignId);
+    }
+    onPreviewSaved?.(null);
+  };
+
+  const handleUploadToCampaign = async () => {
+    if (!currentFile || !parseResult || !onUploadComplete) return;
+    setIsProcessing(true);
+    try {
+      // Keep backend ingestion aligned with the preview: upload a normalized, deduped CSV when duplicates exist.
+      // Backend currently accepts duplicates; this prevents duplicate calls and "preview != uploaded" mismatches.
+      const fileToUpload = parseResult.duplicates.count > 0
+        ? await createDedupedCSV(currentFile)
+        : currentFile;
+
+      await onUploadComplete(fileToUpload, parseResult);
+    } catch (error) {
+      console.error('Campaign upload error:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to upload contacts');
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const displayPreview = preview || (parseResult ? {
@@ -395,6 +417,21 @@ export function CSVUpload({
               )}
 
               {/* Actions */}
+              {onUploadComplete && (
+                <Button
+                  className="w-full"
+                  onClick={handleUploadToCampaign}
+                  disabled={disabled || isProcessing || !currentFile || !parseResult}
+                >
+                  {isProcessing ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <CheckCircle2 className="h-4 w-4 mr-2" />
+                  )}
+                  Upload Contacts to Campaign
+                </Button>
+              )}
+
               <Button
                 variant="outline"
                 className="w-full"

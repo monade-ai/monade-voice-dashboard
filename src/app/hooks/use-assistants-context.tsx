@@ -161,7 +161,6 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
     try {
       const headers = {
         'Content-Type': 'application/json',
-        'X-API-Key': MONADE_API_CONFIG.API_KEY,
       };
       console.log('[Assistants] Making API request with headers:', headers);
       // Use user-specific endpoint for the new API
@@ -272,7 +271,6 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
       payload.user_uid = userUid;
       const headers = {
         'Content-Type': 'application/json',
-        'X-API-Key': MONADE_API_CONFIG.API_KEY,
       };
       const createdAssistantResponse = await fetchJson<any>(`${API_BASE_URL}/api/assistants`, {
         method: 'POST',
@@ -389,7 +387,6 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
     try {
       const headers = {
         'Content-Type': 'application/json',
-        'X-API-Key': MONADE_API_CONFIG.API_KEY,
       };
       const updatedAssistantResponse = await fetchJson<any>(`${API_BASE_URL}/api/assistants/${id}`, {
         method: 'PATCH',
@@ -464,12 +461,8 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
     console.log('[Assistants] DELETE /api/assistants/:id', `${API_BASE_URL}/api/assistants/${id}`);
     try {
       // Note: Don't set Content-Type for DELETE without body, it causes backend errors
-      const headers: Record<string, string> = {
-        'X-API-Key': MONADE_API_CONFIG.API_KEY,
-      };
       await fetchJson(`${API_BASE_URL}/api/assistants/${id}`, {
         method: 'DELETE',
-        headers,
         parseJson: false,
         retry: { retries: 0 },
       });

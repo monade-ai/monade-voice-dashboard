@@ -9,6 +9,7 @@ import {
   CreateCampaignRequest,
   UpdateCampaignRequest,
   QueueStatus,
+  CampaignMonitoringStats,
   CreditStatus,
   CampaignAnalytics,
 } from '@/types/campaign.types';
@@ -18,6 +19,7 @@ interface UseCampaignApiState {
   campaigns: Campaign[];
   currentCampaign: Campaign | null;
   queueStatus: QueueStatus | null;
+  campaignStats: Record<string, CampaignMonitoringStats>;
   creditStatus: CreditStatus | null;
   loading: boolean;
   error: string | null;
@@ -42,6 +44,7 @@ interface UseCampaignApiReturn extends UseCampaignApiState {
 
   // Monitoring
   refreshQueueStatus: () => Promise<QueueStatus>;
+  refreshCampaignStats: (campaignId: string) => Promise<CampaignMonitoringStats>;
   refreshCreditStatus: () => Promise<CreditStatus>;
 
   // Analytics
@@ -59,6 +62,7 @@ export function useCampaignApi(): UseCampaignApiReturn {
     campaigns: [],
     currentCampaign: null,
     queueStatus: null,
+    campaignStats: {},
     creditStatus: null,
     loading: false,
     error: null,
@@ -128,7 +132,7 @@ export function useCampaignApi(): UseCampaignApiReturn {
       setError(message);
       throw error;
     }
-  }, [userUid]);
+  }, [userUid, userLoading]);
 
   const getCampaign = useCallback(
     async (campaignId: string): Promise<Campaign> => {
@@ -151,7 +155,7 @@ export function useCampaignApi(): UseCampaignApiReturn {
         throw error;
       }
     },
-    [userUid],
+    [userUid, userLoading],
   );
 
   const updateCampaign = useCallback(
@@ -285,7 +289,6 @@ export function useCampaignApi(): UseCampaignApiReturn {
       if (!userUid) throw new Error('User not authenticated');
       setLoading(true);
       try {
-        // NOTE: Resume endpoint returns 404 - flagged with backend
         await campaignApi.resume(campaignId, userUid);
         const updated = await campaignApi.get(campaignId, userUid);
         setState((prev) => ({
@@ -346,7 +349,33 @@ export function useCampaignApi(): UseCampaignApiReturn {
       setError(message);
       throw error;
     }
-  }, [userUid]);
+  }, [userUid, userLoading]);
+
+  const refreshCampaignStats = useCallback(
+    async (campaignId: string): Promise<CampaignMonitoringStats> => {
+      if (!userUid) {
+        if (userLoading) throw new Error('User not ready');
+        throw new Error('User not authenticated');
+      }
+      try {
+        const stats = await campaignApi.getCampaignMonitoringStats(campaignId, userUid);
+        setState((prev) => ({
+          ...prev,
+          campaignStats: {
+            ...prev.campaignStats,
+            [campaignId]: stats,
+          },
+        }));
+
+        return stats;
+      } catch (error) {
+        const message = handleError(error);
+        setError(message);
+        throw error;
+      }
+    },
+    [userUid, userLoading],
+  );
 
   const refreshCreditStatus = useCallback(async (): Promise<CreditStatus> => {
     if (!userUid) {
@@ -363,7 +392,7 @@ export function useCampaignApi(): UseCampaignApiReturn {
       setError(message);
       throw error;
     }
-  }, [userUid]);
+  }, [userUid, userLoading]);
 
   // ============================================
   // Analytics
@@ -408,6 +437,7 @@ export function useCampaignApi(): UseCampaignApiReturn {
     resumeCampaign,
     stopCampaign,
     refreshQueueStatus,
+    refreshCampaignStats,
     refreshCreditStatus,
     getCampaignAnalytics,
     clearError,

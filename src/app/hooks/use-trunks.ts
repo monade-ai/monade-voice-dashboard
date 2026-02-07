@@ -39,7 +39,6 @@ async function getPhoneAssignment(phoneNumber: string): Promise<{ assistantId: s
       {
         headers: {
           'Content-Type': 'application/json',
-          'X-API-Key': MONADE_API_CONFIG.API_KEY,
         },
       },
     );
@@ -66,7 +65,6 @@ export async function deallocatePhoneNumber(assistantId: string): Promise<{ succ
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
-        'X-API-Key': MONADE_API_CONFIG.API_KEY,
       },
       body: JSON.stringify({ phoneNumber: '' }),
       retry: { retries: 0 },

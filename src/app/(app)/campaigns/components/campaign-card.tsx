@@ -28,11 +28,10 @@ import {
 import {
   Campaign,
   CampaignStatus,
-  CAMPAIGN_STATUS_COLORS,
   canStartCampaign,
   canPauseCampaign,
   canStopCampaign,
-  isCampaignActive,
+  getCampaignProgress,
 } from '@/types/campaign.types';
 
 interface CampaignCardProps {
@@ -63,9 +62,7 @@ export function CampaignCard({
   const router = useRouter();
 
   const statusStyle = STATUS_STYLES[campaign.status];
-  const progressPercent = campaign.total_contacts > 0
-    ? Math.round(((campaign.successful_calls + campaign.failed_calls) / campaign.total_contacts) * 100)
-    : 0;
+  const progress = getCampaignProgress(campaign);
 
   const handleViewDetails = () => {
     router.push(`/campaigns/${campaign.id}`);
@@ -142,16 +139,14 @@ export function CampaignCard({
           <div className="space-y-2">
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">Progress</span>
-              <span className="font-medium">{progressPercent}%</span>
+              <span className="font-medium">{progress.percent}%</span>
             </div>
-            <Progress value={progressPercent} className="h-2" />
+            <Progress value={progress.percent} className="h-2" />
             <div className="flex items-center justify-between text-xs text-muted-foreground">
               <span className="text-green-600">
                 {campaign.successful_calls} successful
               </span>
-              <span className="text-red-600">
-                {campaign.failed_calls} failed
-              </span>
+              <span>{progress.statusLabel}</span>
             </div>
           </div>
         )}

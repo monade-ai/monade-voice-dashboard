@@ -7,7 +7,7 @@ const CAMPAIGN_API_BASE = process.env.CAMPAIGN_SERVICE_BASE_URL
   ?? 'http://35.200.254.189/campaigns/api/v1';
 
 const MONADE_API_BASE = MONADE_API_CONFIG.BASE_URL;
-const MONADE_API_KEY = process.env.MONADE_API_KEY ?? MONADE_API_CONFIG.API_KEY;
+const MONADE_API_KEY = process.env.MONADE_API_KEY;
 
 export async function GET(request: NextRequest) {
   return handleProxy(request);
@@ -121,6 +121,14 @@ async function handleProxy(request: NextRequest) {
 
     const monitoringUserUid = getMonitoringUserUid(path);
     const requiresAuth = path.startsWith('/campaigns') || path.startsWith('/monitoring');
+
+    if (requiresAuth && !MONADE_API_KEY) {
+      return NextResponse.json(
+        { error: 'Server misconfigured: MONADE_API_KEY is not set.' },
+        { status: 500, headers: { 'Cache-Control': 'no-store' } },
+      );
+    }
+
     const sessionUserUid = requiresAuth ? await resolveSessionUserUid() : null;
     const userApiKey = requiresAuth && sessionUserUid
       ? await resolveUserApiKey(sessionUserUid)
@@ -133,7 +141,6 @@ async function handleProxy(request: NextRequest) {
       requestedUserUid,
       sessionUserUid,
       hasUserApiKey: Boolean(userApiKey),
-      apiKey: userApiKey ?? null,
       monitoringUserUid,
     });
 

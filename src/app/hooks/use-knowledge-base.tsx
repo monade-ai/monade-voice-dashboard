@@ -82,7 +82,8 @@ export const LibraryProvider = ({ children }: { children: ReactNode }) => {
     setIsLoading(true);
     try {
       const res = await fetch(`${API_BASE_URL}/api/users/${userUid}/knowledge-bases`, {
-        headers: { 'X-API-Key': MONADE_API_CONFIG.API_KEY },
+        // Client requests go through `/api/proxy`, which injects auth server-side.
+        headers: {},
       });
       if (!res.ok) throw new Error('Sync failed');
       const data = await res.json();
@@ -139,7 +140,7 @@ export const LibraryProvider = ({ children }: { children: ReactNode }) => {
     try {
       const res = await fetch(`${API_BASE_URL}/api/knowledge-bases`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-API-Key': MONADE_API_CONFIG.API_KEY },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...payload, user_uid: userUid }),
       });
       if (!res.ok) throw new Error('Save failed');
@@ -161,7 +162,7 @@ export const LibraryProvider = ({ children }: { children: ReactNode }) => {
     try {
       const res = await fetch(`${API_BASE_URL}/api/knowledge-bases/${id}`, {
         method: 'DELETE',
-        headers: { 'X-API-Key': MONADE_API_CONFIG.API_KEY },
+        headers: {},
       });
       if (!res.ok) throw new Error('Deletion failed');
       toast.success('Purged from memory');

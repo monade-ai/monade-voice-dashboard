@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useMemo } from 'react';
 import dynamic from 'next/dynamic';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   Plus,
@@ -35,7 +36,12 @@ import {
 import { useCampaignApi } from '@/app/hooks/use-campaign-api';
 import {
   Campaign,
+  CampaignMonitoringStats,
   CampaignStatus,
+  canStartCampaign,
+  canPauseCampaign,
+  canStopCampaign,
+  getCampaignProgress,
 } from '@/types/campaign.types';
 import { cn } from '@/lib/utils';
 
@@ -58,32 +64,51 @@ const getStatusColor = (status: CampaignStatus) => {
   }
 };
 
-const calculateProgress = (c: Campaign) => {
-  if (c.total_contacts === 0) return 0;
-  const processed = c.successful_calls + c.failed_calls;
-
-  return Math.min(100, Math.round((processed / c.total_contacts) * 100));
+const getProgressColor = (status: CampaignStatus) => {
+  switch (status) {
+  case 'active': return 'bg-green-500';
+  case 'paused': return 'bg-yellow-500';
+  case 'stopped': return 'bg-red-500';
+  case 'completed': return 'bg-blue-500';
+  default: return 'bg-foreground/40';
+  }
 };
 
 // --- Component: CampaignRow ---
 
 const CampaignRow = ({ 
   campaign, 
+  stats,
   onStart, 
+  onResume,
   onPause, 
   onStop, 
   onDelete, 
 }: { 
   campaign: Campaign, 
+  stats?: CampaignMonitoringStats,
   onStart: (c: Campaign) => void, 
+  onResume: (c: Campaign) => void,
   onPause: (c: Campaign) => void,
   onStop: (c: Campaign) => void,
   onDelete: (c: Campaign) => void
 }) => {
-  const progress = calculateProgress(campaign);
-  const successRate = campaign.successful_calls + campaign.failed_calls > 0 
-    ? Math.round((campaign.successful_calls / (campaign.successful_calls + campaign.failed_calls)) * 100) 
+  const progress = getCampaignProgress(campaign, stats);
+  const successfulCalls = Math.max(0, stats?.completed_contacts ?? campaign.successful_calls);
+  const failedCalls = Math.max(0, stats?.failed_contacts ?? campaign.failed_calls);
+  const attempts = successfulCalls + failedCalls;
+  const successRate = attempts > 0
+    ? Math.round((successfulCalls / attempts) * 100)
     : 0;
+  const canStart = canStartCampaign(campaign.status);
+  const canPause = canPauseCampaign(campaign.status);
+  const canStop = canStopCampaign(campaign.status);
+  const canResume = campaign.status === 'paused';
+  const startDisabled = canStart && (
+    campaign.total_contacts <= 0
+    || !campaign.assistant_id
+    || !campaign.trunk_name
+  );
 
   return (
     <div className="group flex items-center justify-between p-4 border-b border-border/10 hover:bg-muted/30 transition-all">
@@ -108,14 +133,17 @@ const CampaignRow = ({
       <div className="flex flex-col w-[20%] gap-1.5">
         <div className="flex justify-between items-end">
           <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">Completion</span>
-          <span className="text-[10px] font-mono font-bold text-foreground">{progress}%</span>
+          <span className="text-[10px] font-mono font-bold text-foreground">{progress.percent}%</span>
         </div>
         <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
           <div 
-            className={cn('h-full transition-all duration-500', campaign.status === 'active' ? 'bg-green-500' : 'bg-foreground/40')} 
-            style={{ width: `${progress}%` }}
+            className={cn('h-full transition-all duration-500', getProgressColor(campaign.status))}
+            style={{ width: `${progress.percent}%` }}
           />
         </div>
+        <span className="text-[9px] uppercase tracking-widest text-muted-foreground/70">
+          {progress.statusLabel}
+        </span>
       </div>
 
       {/* 3. Metrics */}
@@ -123,7 +151,7 @@ const CampaignRow = ({
         <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 mb-1">Success Rate</span>
         <div className="flex items-baseline gap-1">
           <span className="text-sm font-mono font-bold text-foreground">{successRate}%</span>
-          <span className="text-[10px] text-muted-foreground">({campaign.successful_calls}/{campaign.total_contacts})</span>
+          <span className="text-[10px] text-muted-foreground">({successfulCalls}/{campaign.total_contacts})</span>
         </div>
       </div>
 
@@ -135,19 +163,36 @@ const CampaignRow = ({
 
       {/* 5. Actions */}
       <div className="flex items-center justify-end gap-2 w-[15%]">
-        {campaign.status === 'active' ? (
-          <button onClick={() => onPause(campaign)} className="p-2 rounded-md bg-yellow-500/10 text-yellow-600 hover:bg-yellow-500/20 transition-colors" title="Pause">
+        {canPause && (
+          <button
+            onClick={() => onPause(campaign)}
+            className="p-2 rounded-md bg-yellow-500/10 text-yellow-600 hover:bg-yellow-500/20 transition-colors"
+            title="Pause"
+            aria-label="Pause campaign"
+          >
             <Pause size={14} fill="currentColor" />
           </button>
-        ) : (
-          <button onClick={() => onStart(campaign)} className="p-2 rounded-md bg-green-500/10 text-green-600 hover:bg-green-500/20 transition-colors" title="Start">
+        )}
+        {(canStart || canResume) && (
+          <button
+            disabled={startDisabled}
+            onClick={() => (canResume ? onResume(campaign) : onStart(campaign))}
+            className={cn(
+              'p-2 rounded-md transition-colors',
+              startDisabled
+                ? 'bg-muted text-muted-foreground cursor-not-allowed'
+                : 'bg-green-500/10 text-green-600 hover:bg-green-500/20',
+            )}
+            title={canResume ? 'Resume' : (startDisabled ? 'Add contacts before starting' : 'Start')}
+            aria-label={canResume ? 'Resume campaign' : 'Start campaign'}
+          >
             <Play size={14} fill="currentColor" />
           </button>
         )}
         
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button className="p-2 text-muted-foreground hover:text-foreground transition-colors">
+            <button className="p-2 text-muted-foreground hover:text-foreground transition-colors" aria-label="Open campaign actions">
               <MoreVertical size={14} />
             </button>
           </DropdownMenuTrigger>
@@ -159,9 +204,11 @@ const CampaignRow = ({
                 <FolderOpen className="mr-2 h-4 w-4" /> View Details
               </Link>
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => onStop(campaign)} className="text-red-600">
-              <Square className="mr-2 h-4 w-4" /> Stop Campaign
-            </DropdownMenuItem>
+            {canStop && (
+              <DropdownMenuItem onClick={() => onStop(campaign)} className="text-red-600">
+                <Square className="mr-2 h-4 w-4" /> Stop Campaign
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem onClick={() => onDelete(campaign)} className="text-red-600">
               <Trash2 className="mr-2 h-4 w-4" /> Delete
             </DropdownMenuItem>
@@ -175,8 +222,10 @@ const CampaignRow = ({
 // --- Main Page ---
 
 export default function CampaignsPage() {
+  const router = useRouter();
   const {
     campaigns,
+    campaignStats,
     queueStatus,
     creditStatus,
     loading,
@@ -184,9 +233,11 @@ export default function CampaignsPage() {
     listCampaigns,
     startCampaign,
     pauseCampaign,
+    resumeCampaign,
     stopCampaign,
     deleteCampaign,
     refreshQueueStatus,
+    refreshCampaignStats,
     refreshCreditStatus,
     clearError,
   } = useCampaignApi();
@@ -203,25 +254,40 @@ export default function CampaignsPage() {
 
   // Initial & Polling
   useEffect(() => {
-    void Promise.all([
-      listCampaigns(),
-      refreshQueueStatus(),
-      refreshCreditStatus(),
-    ]).catch(() => {});
-  }, [listCampaigns, refreshQueueStatus, refreshCreditStatus]);
-
-  useEffect(() => {
-    const hasActive = campaigns.some(c => c.status === 'active');
-    if (!hasActive) return;
-    const interval = setInterval(() => {
-      void Promise.all([
-        listCampaigns(),
+    const bootstrap = async () => {
+      const listed = await listCampaigns();
+      await Promise.all([
         refreshQueueStatus(),
-      ]).catch(() => {});
-    }, 5000);
+        refreshCreditStatus(),
+      ]);
+      await Promise.allSettled(
+        listed
+          .filter((campaign) => campaign.status === 'active' || campaign.status === 'paused')
+          .map((campaign) => refreshCampaignStats(campaign.id)),
+      );
+    };
+    void bootstrap().catch(() => {});
+  }, [listCampaigns, refreshQueueStatus, refreshCreditStatus, refreshCampaignStats]);
+
+  // Keep list/status reasonably fresh while viewing the list.
+  useEffect(() => {
+    const interval = setInterval(() => {
+      void (async () => {
+        const listed = await listCampaigns();
+        await Promise.allSettled([
+          refreshQueueStatus(),
+          refreshCreditStatus(),
+        ]);
+        await Promise.allSettled(
+          listed
+            .filter((campaign) => campaign.status === 'active' || campaign.status === 'paused')
+            .map((campaign) => refreshCampaignStats(campaign.id)),
+        );
+      })();
+    }, CAMPAIGN_API_CONFIG.POLL_INTERVALS.CAMPAIGN_LIST);
 
     return () => clearInterval(interval);
-  }, [campaigns, listCampaigns, refreshQueueStatus]);
+  }, [listCampaigns, refreshQueueStatus, refreshCreditStatus, refreshCampaignStats]);
 
   const handleRefresh = async () => {
     try {
@@ -355,7 +421,9 @@ export default function CampaignsPage() {
                   <CampaignRow
                     key={c.id}
                     campaign={c}
+                    stats={campaignStats[c.id]}
                     onStart={(campaign) => startCampaign(campaign.id)}
+                    onResume={(campaign) => resumeCampaign(campaign.id)}
                     onPause={(campaign) => pauseCampaign(campaign.id)}
                     onStop={(campaign) => stopCampaign(campaign.id)}
                     onDelete={(campaign) => deleteCampaign(campaign.id)}
@@ -372,8 +440,8 @@ export default function CampaignsPage() {
         <CreateCampaignModal 
           open={createModalOpen} 
           onOpenChange={setCreateModalOpen} 
-          onCampaignCreated={() => {
-            void listCampaigns();
+          onCampaignCreated={(campaign) => {
+            router.push(`/campaigns/${campaign.id}`);
           }} 
         />
       )}

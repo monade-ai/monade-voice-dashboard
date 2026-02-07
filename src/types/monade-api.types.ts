@@ -209,5 +209,4 @@ export const MONADE_API_CONFIG = {
   BASE_URL: typeof window !== 'undefined' ? '/api/proxy' : 'http://35.200.254.189/db_services',
   PROVIDER: 'vobiz.ai',
   DEFAULT_USER_UID: 'b08d1d4d-a47d-414b-9360-80264388793f',
-  API_KEY: 'monade_d8325992-cf93-4cdd-9c54-34ca18d72441',
 } as const;

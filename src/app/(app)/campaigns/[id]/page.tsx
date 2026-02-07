@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import {
   ArrowLeft,
@@ -14,33 +14,24 @@ import {
   CheckCircle2,
   XCircle,
   AlertCircle,
-  UploadCloud,
-  FileSpreadsheet,
   Settings2,
-  Calendar,
-  Zap,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatDistanceToNow, format } from 'date-fns';
 
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
-import { Separator } from '@/components/ui/separator';
 import { PaperCard, PaperCardContent, PaperCardHeader, PaperCardTitle } from '@/components/ui/paper-card';
 import { DashboardHeader } from '@/components/dashboard-header';
 import { useCampaignApi } from '@/app/hooks/use-campaign-api';
-import { useCampaign } from '@/app/contexts/campaign-context';
-import { loadCSVPreview, CSVPreviewCache } from '@/lib/utils/csv-preview';
-import { loadCampaignConfig, saveCampaignContacts, loadCampaignContacts } from '@/lib/utils/campaign-storage';
+import { loadCSVPreview } from '@/lib/utils/csv-preview';
 import {
-  Campaign,
   CampaignStatus,
-  CSVContact,
+  CSVPreviewCache,
   CAMPAIGN_API_CONFIG,
   canStartCampaign,
   canPauseCampaign,
   canStopCampaign,
+  getCampaignProgress,
 } from '@/types/campaign.types';
 import { cn } from '@/lib/utils';
 
@@ -85,115 +76,98 @@ export default function CampaignDetailPage() {
   const {
     currentCampaign: campaign,
     queueStatus,
-    creditStatus,
+    campaignStats,
     loading,
     error,
     getCampaign,
     uploadCSV,
     startCampaign: startCampaignApi,
     pauseCampaign: pauseCampaignApi,
+    resumeCampaign: resumeCampaignApi,
     stopCampaign: stopCampaignApi,
     refreshQueueStatus,
-    refreshCreditStatus,
-    clearError,
+    refreshCampaignStats,
   } = useCampaignApi();
-
-  const {
-    campaignStatus,
-    setContacts,
-    setResults,
-    setOutputFileName,
-    setSelectedAssistantId,
-    setSelectedTrunk,
-    setSessionKey,
-    startCampaign: startCallingLoop,
-    stopCampaign: stopCallingLoop,
-  } = useCampaign();
 
   const [csvPreview, setCsvPreview] = useState<CSVPreviewCache | null>(null);
   const [isUploading, setIsUploading] = useState(false);
-  const [localConfigMissing, setLocalConfigMissing] = useState(false);
-  const stopSentRef = useRef(false);
 
   // Initialization
   useEffect(() => {
-    getCampaign(campaignId);
+    void getCampaign(campaignId);
+    void refreshCampaignStats(campaignId).catch(() => {});
     const preview = loadCSVPreview(campaignId);
     setCsvPreview(preview);
-    setSessionKey(`campaign-${campaignId}`);
-    stopSentRef.current = false;
-    const cfg = loadCampaignConfig(campaignId);
-    setLocalConfigMissing(!cfg);
-  }, [campaignId, getCampaign, setSessionKey]);
+  }, [campaignId, getCampaign, refreshCampaignStats]);
 
   // Polling
   useEffect(() => {
     if (!campaign || campaign.status !== 'active') return;
     const interval = setInterval(() => {
-      getCampaign(campaignId);
-      refreshQueueStatus();
+      void getCampaign(campaignId);
+      void refreshQueueStatus();
+      void refreshCampaignStats(campaignId).catch(() => {});
     }, CAMPAIGN_API_CONFIG.POLL_INTERVALS.QUEUE_STATUS);
 
     return () => clearInterval(interval);
-  }, [campaign, campaignId, getCampaign, refreshQueueStatus]);
+  }, [campaign, campaignId, getCampaign, refreshCampaignStats, refreshQueueStatus]);
 
   // Handlers
-  const handleCSVUpload = async (file: File, result: any) => {
+  const handleCSVUpload = async (file: File) => {
     setIsUploading(true);
     try {
       const response = await uploadCSV(campaignId, file);
       toast.success(`Ingested ${response.totalRows} contacts`);
       await getCampaign(campaignId);
-      saveCampaignContacts(campaignId, result.contacts);
-      
-      if (campaignStatus !== 'running') {
-        const mapped = result.contacts.map((c: any) => ({ phoneNumber: c.phone_number, calleeInfo: { ...c } }));
-        setContacts(mapped);
-        setResults([]);
-      }
-    } catch (error) {
+      await refreshCampaignStats(campaignId).catch(() => {});
+    } catch {
       toast.error('Upload failed');
     } finally {
       setIsUploading(false);
     }
   };
 
-  const handlePreviewSaved = (preview: CSVPreviewCache) => {
+  const handlePreviewSaved = (preview: CSVPreviewCache | null) => {
     setCsvPreview(preview);
-    if (campaignStatus !== 'running') {
-      const mapped = preview.preview.map((c: any) => ({ phoneNumber: c.phone_number, calleeInfo: { ...c } }));
-      setContacts(mapped);
-      setResults([]);
+  };
+
+  const prepareCampaignRun = async () => {
+    if (!campaign) return false;
+    if (!campaign.assistant_id || !campaign.trunk_name) {
+      toast.error('Campaign configuration missing.');
+
+      return false;
     }
+    if (campaign.total_contacts <= 0) {
+      toast.error('Contact list required.');
+
+      return false;
+    }
+
+    return true;
   };
 
   const handleStart = async () => {
     if (!campaign) return;
     try {
-      const cfg = loadCampaignConfig(campaign.id);
-      if (!cfg?.assistantId || !cfg?.trunkName) {
-        setLocalConfigMissing(true);
-        toast.error('Configuration lost. Please recreate campaign.');
-
-        return;
-      }
-      const storedContacts = loadCampaignContacts<CSVContact>(campaign.id);
-      if (!storedContacts || storedContacts.length === 0) {
-        toast.error('Contact list required.');
-
-        return;
-      }
-
-      setSelectedAssistantId(cfg.assistantId);
-      setSelectedTrunk(cfg.trunkName);
-      setOutputFileName(campaign.name || 'results');
-      const mapped = storedContacts.map((c) => ({ phoneNumber: c.phone_number, calleeInfo: { ...c } }));
-      setContacts(mapped);
-      setResults([]);
-
+      const ready = await prepareCampaignRun();
+      if (!ready) return;
       await startCampaignApi(campaign.id);
-      await startCallingLoop();
+      await refreshCampaignStats(campaign.id).catch(() => {});
       toast.success('Campaign Initiated');
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const handleResume = async () => {
+    if (!campaign) return;
+    try {
+      const ready = await prepareCampaignRun();
+      if (!ready) return;
+      await resumeCampaignApi(campaign.id);
+      await refreshCampaignStats(campaign.id).catch(() => {});
+      toast.success('Campaign Resumed');
     } catch (error) {
       console.error(error);
     }
@@ -202,14 +176,14 @@ export default function CampaignDetailPage() {
   const handlePause = async () => {
     if (!campaign) return;
     await pauseCampaignApi(campaign.id);
-    stopCallingLoop();
+    await refreshCampaignStats(campaign.id).catch(() => {});
     toast.success('Operations Paused');
   };
 
   const handleStop = async () => {
     if (!campaign) return;
     await stopCampaignApi(campaign.id);
-    stopCallingLoop();
+    await refreshCampaignStats(campaign.id).catch(() => {});
     toast.success('Operations Terminated');
   };
 
@@ -220,8 +194,19 @@ export default function CampaignDetailPage() {
   if (!campaign) return null;
 
   const statusConfig = getStatusConfig(campaign.status);
-  const progressPercent = campaign.total_contacts > 0 ? Math.round(((campaign.successful_calls + campaign.failed_calls) / campaign.total_contacts) * 100) : 0;
-  const successRate = campaign.successful_calls + campaign.failed_calls > 0 ? Math.round((campaign.successful_calls / (campaign.successful_calls + campaign.failed_calls)) * 100) : 0;
+  const currentCampaignStats = campaignStats[campaignId];
+  const progress = getCampaignProgress(campaign, currentCampaignStats);
+  const completedCalls = Math.max(0, currentCampaignStats?.completed_contacts ?? campaign.successful_calls ?? 0);
+  const failedCalls = Math.max(0, currentCampaignStats?.failed_contacts ?? campaign.failed_calls ?? 0);
+  const attempts = completedCalls + failedCalls;
+  const successRate = attempts > 0 ? Math.round((completedCalls / attempts) * 100) : 0;
+  const runtimeStatusLabel = campaign.status === 'active'
+    ? (!queueStatus?.time_window_active
+      ? 'Waiting for call window'
+      : queueStatus.credits_available === false
+        ? 'Waiting for credits'
+        : progress.statusLabel)
+    : progress.statusLabel;
 
   return (
     <div className="min-h-screen bg-background flex flex-col font-sans">
@@ -245,12 +230,23 @@ export default function CampaignDetailPage() {
           </div>
 
           <div className="flex items-center gap-3">
-            <Button variant="outline" size="sm" onClick={() => { getCampaign(campaignId); refreshQueueStatus(); }} className="h-10 border-border text-[10px] font-bold uppercase tracking-widest">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => { void getCampaign(campaignId); void refreshQueueStatus(); void refreshCampaignStats(campaignId).catch(() => {}); }}
+              className="h-10 border-border text-[10px] font-bold uppercase tracking-widest"
+              aria-label="Refresh campaign"
+            >
               <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
             </Button>
             {canStartCampaign(campaign.status) && (
               <Button onClick={handleStart} disabled={loading || campaign.total_contacts === 0} className="h-10 gap-2 bg-green-600 hover:bg-green-700 text-white rounded-[4px] text-[10px] font-bold uppercase tracking-widest">
                 <Play size={14} /> Execute
+              </Button>
+            )}
+            {campaign.status === 'paused' && (
+              <Button onClick={handleResume} disabled={loading} className="h-10 gap-2 bg-green-600 hover:bg-green-700 text-white rounded-[4px] text-[10px] font-bold uppercase tracking-widest">
+                <Play size={14} /> Resume
               </Button>
             )}
             {canPauseCampaign(campaign.status) && (
@@ -276,18 +272,34 @@ export default function CampaignDetailPage() {
             {/* Telemetry Bar */}
             <PaperCard variant="default" className="bg-muted/5 border-border/40">
               <PaperCardContent className="p-8 flex items-center justify-between">
-                <StatItem label="Completion" value={`${progressPercent}%`} subtext={`${campaign.successful_calls + campaign.failed_calls} / ${campaign.total_contacts}`} />
+                <StatItem label="Completion" value={`${progress.percent}%`} subtext={`${progress.processed} / ${progress.total} • ${runtimeStatusLabel}`} />
                 <div className="h-10 w-px bg-border/20" />
-                <StatItem label="Success" value={`${successRate}%`} subtext={`${campaign.successful_calls} Connected`} />
+                <StatItem label="Success" value={`${successRate}%`} subtext={`${completedCalls} Connected`} />
                 <div className="h-10 w-px bg-border/20" />
-                <StatItem label="Pending" value={queueStatus?.queue_depth || 0} subtext="In Queue" />
+                <StatItem label="Pending" value={(currentCampaignStats?.pending_contacts ?? progress.pending) || 0} subtext="In Queue" />
                 <div className="h-10 w-px bg-border/20" />
                 <StatItem label="Rate" value={`${campaign.calls_per_second} CPS`} subtext="Throttle" />
               </PaperCardContent>
               <div className="px-8 pb-8">
                 <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
-                  <div className="h-full bg-primary transition-all duration-1000 ease-out" style={{ width: `${progressPercent}%` }} />
+                  <div className={cn(
+                    'h-full transition-all duration-1000 ease-out',
+                    campaign.status === 'active'
+                      ? 'bg-green-500'
+                      : campaign.status === 'paused'
+                        ? 'bg-yellow-500'
+                        : campaign.status === 'completed'
+                          ? 'bg-blue-500'
+                          : campaign.status === 'stopped'
+                            ? 'bg-red-500'
+                            : 'bg-primary',
+                  )} style={{ width: `${progress.percent}%` }} />
                 </div>
+                {campaign.status === 'active' && queueStatus && (!queueStatus.time_window_active || queueStatus.credits_available === false) && (
+                  <p className="mt-2 text-[10px] font-medium text-muted-foreground">
+                    {queueStatus.time_window_active ? 'Campaign is paused until credits are available.' : 'Campaign is outside configured daily calling window.'}
+                  </p>
+                )}
               </div>
             </PaperCard>
 
