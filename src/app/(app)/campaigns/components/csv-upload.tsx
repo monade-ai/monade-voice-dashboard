@@ -33,6 +33,21 @@ interface CSVUploadProps {
   existingPreview?: CSVPreviewCache | null;
 }
 
+const getUploadFingerprint = (result: ParseCSVResult): string => {
+  const phones = result.contacts
+    .map((contact) => contact.phone_number)
+    .filter(Boolean)
+    .sort();
+
+  return `${phones.length}:${phones.join('|')}`;
+};
+
+const getUploadFingerprintKey = (campaignId?: string): string | null => {
+  if (!campaignId) return null;
+
+  return `campaign_csv_last_upload_${campaignId}`;
+};
+
 export function CSVUpload({
   campaignId,
   onUploadComplete,
@@ -41,6 +56,7 @@ export function CSVUpload({
   existingPreview = null,
 }: CSVUploadProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const uploadInFlightRef = useRef(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [parseResult, setParseResult] = useState<ParseCSVResult | null>(null);
@@ -156,6 +172,20 @@ export function CSVUpload({
 
   const handleUploadToCampaign = async () => {
     if (!currentFile || !parseResult || !onUploadComplete) return;
+    if (uploadInFlightRef.current) return;
+
+    const fingerprintKey = getUploadFingerprintKey(campaignId);
+    const fingerprint = getUploadFingerprint(parseResult);
+    if (fingerprintKey) {
+      const lastUploadedFingerprint = localStorage.getItem(fingerprintKey);
+      if (lastUploadedFingerprint === fingerprint) {
+        toast.error('This contact list is already uploaded for this campaign.');
+
+        return;
+      }
+    }
+
+    uploadInFlightRef.current = true;
     setIsProcessing(true);
     try {
       // Keep backend ingestion aligned with the preview: upload a normalized, deduped CSV when duplicates exist.
@@ -165,11 +195,18 @@ export function CSVUpload({
         : currentFile;
 
       await onUploadComplete(fileToUpload, parseResult);
+      if (fingerprintKey) {
+        localStorage.setItem(fingerprintKey, fingerprint);
+      }
+      // Mark this file as uploaded so repeated clicks cannot re-ingest the same contacts.
+      setParseResult(null);
+      setCurrentFile(null);
     } catch (error) {
       console.error('Campaign upload error:', error);
       toast.error(error instanceof Error ? error.message : 'Failed to upload contacts');
     } finally {
       setIsProcessing(false);
+      uploadInFlightRef.current = false;
     }
   };
 
@@ -417,11 +454,11 @@ export function CSVUpload({
               )}
 
               {/* Actions */}
-              {onUploadComplete && (
+              {onUploadComplete && parseResult && currentFile && (
                 <Button
                   className="w-full"
                   onClick={handleUploadToCampaign}
-                  disabled={disabled || isProcessing || !currentFile || !parseResult}
+                  disabled={disabled || isProcessing}
                 >
                   {isProcessing ? (
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />

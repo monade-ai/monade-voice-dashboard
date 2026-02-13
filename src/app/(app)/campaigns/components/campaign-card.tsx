@@ -33,6 +33,7 @@ import {
   canStopCampaign,
   getCampaignProgress,
 } from '@/types/campaign.types';
+import { parseApiDate } from '@/lib/utils/date';
 
 interface CampaignCardProps {
   campaign: Campaign;
@@ -63,6 +64,8 @@ export function CampaignCard({
 
   const statusStyle = STATUS_STYLES[campaign.status];
   const progress = getCampaignProgress(campaign);
+  const createdAt = parseApiDate(campaign.created_at);
+  const startedAt = parseApiDate(campaign.started_at);
 
   const handleViewDetails = () => {
     router.push(`/campaigns/${campaign.id}`);
@@ -170,12 +173,12 @@ export function CampaignCard({
           <div className="flex items-center gap-1">
             <Calendar className="h-3 w-3" />
             <span>
-              Created {formatDistanceToNow(new Date(campaign.created_at), { addSuffix: true })}
+              Created {createdAt ? formatDistanceToNow(createdAt, { addSuffix: true }) : '—'}
             </span>
           </div>
-          {campaign.started_at && (
+          {startedAt && (
             <span>
-              Started {formatDistanceToNow(new Date(campaign.started_at), { addSuffix: true })}
+              Started {formatDistanceToNow(startedAt, { addSuffix: true })}
             </span>
           )}
         </div>

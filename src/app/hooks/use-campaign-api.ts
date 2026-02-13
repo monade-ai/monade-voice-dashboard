@@ -10,6 +10,7 @@ import {
   UpdateCampaignRequest,
   QueueStatus,
   CampaignMonitoringStats,
+  CampaignContact,
   CreditStatus,
   CampaignAnalytics,
 } from '@/types/campaign.types';
@@ -20,6 +21,7 @@ interface UseCampaignApiState {
   currentCampaign: Campaign | null;
   queueStatus: QueueStatus | null;
   campaignStats: Record<string, CampaignMonitoringStats>;
+  campaignContacts: Record<string, CampaignContact[]>;
   creditStatus: CreditStatus | null;
   loading: boolean;
   error: string | null;
@@ -45,6 +47,7 @@ interface UseCampaignApiReturn extends UseCampaignApiState {
   // Monitoring
   refreshQueueStatus: () => Promise<QueueStatus>;
   refreshCampaignStats: (campaignId: string) => Promise<CampaignMonitoringStats>;
+  refreshCampaignContacts: (campaignId: string, options?: { skip?: number; limit?: number }) => Promise<CampaignContact[]>;
   refreshCreditStatus: () => Promise<CreditStatus>;
 
   // Analytics
@@ -63,6 +66,7 @@ export function useCampaignApi(): UseCampaignApiReturn {
     currentCampaign: null,
     queueStatus: null,
     campaignStats: {},
+    campaignContacts: {},
     creditStatus: null,
     loading: false,
     error: null,
@@ -377,6 +381,40 @@ export function useCampaignApi(): UseCampaignApiReturn {
     [userUid, userLoading],
   );
 
+  const refreshCampaignContacts = useCallback(
+    async (
+      campaignId: string,
+      options?: { skip?: number; limit?: number },
+    ): Promise<CampaignContact[]> => {
+      if (!userUid) {
+        if (userLoading) throw new Error('User not ready');
+        throw new Error('User not authenticated');
+      }
+      try {
+        const contacts = await campaignApi.getCampaignContacts(
+          campaignId,
+          userUid,
+          options?.skip ?? 0,
+          options?.limit ?? 200,
+        );
+        setState((prev) => ({
+          ...prev,
+          campaignContacts: {
+            ...prev.campaignContacts,
+            [campaignId]: contacts,
+          },
+        }));
+
+        return contacts;
+      } catch (error) {
+        const message = handleError(error);
+        setError(message);
+        throw error;
+      }
+    },
+    [userUid, userLoading],
+  );
+
   const refreshCreditStatus = useCallback(async (): Promise<CreditStatus> => {
     if (!userUid) {
       if (userLoading) throw new Error('User not ready');
@@ -438,6 +476,7 @@ export function useCampaignApi(): UseCampaignApiReturn {
     stopCampaign,
     refreshQueueStatus,
     refreshCampaignStats,
+    refreshCampaignContacts,
     refreshCreditStatus,
     getCampaignAnalytics,
     clearError,

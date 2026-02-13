@@ -36,6 +36,7 @@ import {
 import { useCampaignApi } from '@/app/hooks/use-campaign-api';
 import {
   Campaign,
+  CAMPAIGN_API_CONFIG,
   CampaignMonitoringStats,
   CampaignStatus,
   canStartCampaign,
@@ -44,6 +45,7 @@ import {
   getCampaignProgress,
 } from '@/types/campaign.types';
 import { cn } from '@/lib/utils';
+import { parseApiDate, parseApiTimestamp } from '@/lib/utils/date';
 
 import { CampaignsGuide } from './components/campaigns-guide';
 
@@ -104,6 +106,7 @@ const CampaignRow = ({
   const canPause = canPauseCampaign(campaign.status);
   const canStop = canStopCampaign(campaign.status);
   const canResume = campaign.status === 'paused';
+  const createdAt = parseApiDate(campaign.created_at);
   const startDisabled = canStart && (
     campaign.total_contacts <= 0
     || !campaign.assistant_id
@@ -125,7 +128,7 @@ const CampaignRow = ({
         </div>
         <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
           <Clock size={10} />
-          <span>Created {new Date(campaign.created_at).toLocaleDateString()}</span>
+          <span>Created {createdAt ? createdAt.toLocaleDateString() : '—'}</span>
         </div>
       </div>
 
@@ -302,7 +305,7 @@ export default function CampaignsPage() {
   const filteredCampaigns = useMemo(() => {
     return campaigns.filter(c => 
       c.name.toLowerCase().includes(searchQuery.toLowerCase()),
-    ).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    ).sort((a, b) => (parseApiTimestamp(b.created_at) ?? 0) - (parseApiTimestamp(a.created_at) ?? 0));
   }, [campaigns, searchQuery]);
 
   return (

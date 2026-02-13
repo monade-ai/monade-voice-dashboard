@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   ChevronLeft,
   ChevronRight,
@@ -17,7 +17,6 @@ import { Button } from '@/components/ui/button';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
 import { useTranscripts, Transcript } from '@/app/hooks/use-transcripts';
 import { useUserAnalytics, CallAnalytics } from '@/app/hooks/use-analytics';
-import { cn } from '@/lib/utils';
 
 import { CallHistoryFilterBar, CallHistoryFilterState } from './components/call-history-filter-bar';
 import { CallHistoryRow } from './components/call-history-row';
@@ -56,11 +55,18 @@ export default function CallHistoryPage() {
     }));
   }, [transcripts, allAnalytics]);
 
-  // Get unique campaigns for filter (disabled - campaign_id not in transcript type)
+  // Get unique campaigns for filter from analytics-linked records.
   const availableCampaigns: string[] = useMemo(() => {
-    // TODO: Add campaign_id to Transcript type when API supports it
-    return [];
-  }, []);
+    const uniqueCampaigns = new Set<string>();
+    mergedTranscripts.forEach((item) => {
+      const campaignId = item.analytics?.campaign_id;
+      if (typeof campaignId === 'string' && campaignId.trim()) {
+        uniqueCampaigns.add(campaignId);
+      }
+    });
+
+    return Array.from(uniqueCampaigns).sort();
+  }, [mergedTranscripts]);
 
   // Calculate insights
   const insights = useMemo(() => {
@@ -124,6 +130,12 @@ export default function CallHistoryPage() {
         const matchesId = t.call_id.toLowerCase().includes(searchLower);
         const matchesSummary = t.analytics?.summary?.toLowerCase().includes(searchLower);
         if (!matchesPhone && !matchesId && !matchesSummary) return false;
+      }
+
+      // 6. Campaigns
+      if (filters.campaigns.length > 0) {
+        const campaignId = t.analytics?.campaign_id;
+        if (!campaignId || !filters.campaigns.includes(campaignId)) return false;
       }
 
       // 7. Time Range
