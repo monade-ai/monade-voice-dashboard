@@ -48,7 +48,7 @@ function NavItem({ href, icon, label, isActive = false, count, isLive = false }:
       {isActive && (
         <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[2px] h-4 bg-primary rounded-full" />
       )}
-      
+
       <div className="flex items-center gap-3">
         <div className={cn(
           'transition-colors',
@@ -106,27 +106,34 @@ export function Sidebar() {
 
   return (
     <div className="w-64 h-full bg-background flex flex-col relative group/sidebar">
-      
+
       {/* Ghost Border */}
       <div className="absolute right-0 top-10 bottom-10 w-[1px] bg-border/40" />
 
       {/* Header: Brand Logo */}
-      <div className="p-6 pb-2">
-        <div className="flex items-center gap-3 mb-4">
-          <Image
-            src="/monade-logo.png"
-            alt="monade logo"
-            width={120}
-            height={40}
-            priority
-            className="dark:invert-0"
-          />
-          <span className="text-lg font-semibold tracking-tight text-foreground">Monade</span>
-        </div>
+      <div className="px-6 py-6">
+        <Link
+          href="/dashboard"
+          className="flex items-center gap-2 group/logo w-fit"
+        >
+          <div className="relative w-10 h-10 flex items-center justify-center">
+            <Image
+              src="/monade-logo.png"
+              alt="Monade"
+              width={40}
+              height={40}
+              priority
+              className="object-contain transition-transform duration-300 group-hover/logo:scale-110"
+            />
+          </div>
+          <span className="text-2xl font-bold tracking-tighter text-foreground transition-colors group-hover/logo:text-primary">
+            Monade
+          </span>
+        </Link>
       </div>
 
       <nav className="flex-1 px-3 overflow-y-auto custom-scrollbar">
-        
+
         <CategoryLabel>Main</CategoryLabel>
         <NavItem
           href="/dashboard"
@@ -195,9 +202,9 @@ export function Sidebar() {
 
       {/* Bottom: User & System Concierge */}
       <div className="p-3 mt-auto border-t border-border/20">
-        
+
         {/* User Card: Connects to Settings & Fetches Real Data */}
-        <button 
+        <button
           onClick={() => router.push('/settings')}
           className="w-full flex items-center justify-between p-2 rounded-[4px] hover:bg-muted/50 transition-all group border border-transparent hover:border-border/40"
         >
@@ -214,7 +221,7 @@ export function Sidebar() {
         </button>
 
         <div className="grid grid-cols-2 gap-2 mt-4">
-          <button 
+          <button
             onClick={() => setTheme(isDark ? 'light' : 'dark')}
             className="flex items-center justify-center gap-2 py-1.5 rounded-[4px] border border-border/50 text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-all"
           >
@@ -229,7 +236,7 @@ export function Sidebar() {
           </button>
         </div>
 
-        <button 
+        <button
           onClick={() => router.push('/settings')}
           className="w-full mt-2 flex items-center justify-center gap-2 py-1.5 rounded-[4px] text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-all"
         >

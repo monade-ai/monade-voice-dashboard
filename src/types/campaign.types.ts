@@ -35,6 +35,7 @@ export interface Campaign {
   status: CampaignStatus;
   provider: CampaignProvider;
   trunk_name: string;
+  assistant_id: string;
   max_concurrent: number;
   calls_per_second: number;
   daily_start_time: string; // "HH:MM"
@@ -69,6 +70,8 @@ export interface CreateCampaignRequest {
 export interface UpdateCampaignRequest {
   name?: string;
   description?: string;
+  trunk_name?: string;
+  assistant_id?: string;
   max_concurrent?: number;
   calls_per_second?: number;
   daily_start_time?: string;
@@ -105,6 +108,23 @@ export interface QueueStatus {
   queue_depth: number;
   time_window_active: boolean;
   credits_available: boolean;
+}
+
+export interface CampaignMonitoringStats {
+  campaign_id: string;
+  name: string;
+  status: CampaignStatus;
+  total_contacts: number;
+  successful_calls: number;
+  failed_calls: number;
+  pending_contacts: number;
+  in_progress_contacts: number;
+  completed_contacts: number;
+  failed_contacts: number;
+  success_rate: number;
+  created_at: string | null;
+  started_at: string | null;
+  completed_at: string | null;
 }
 
 export interface CreditStatus {
@@ -188,6 +208,41 @@ export interface CampaignCallRecord {
   key_discoveries: string[];
   transcript_url?: string;
   created_at: string;
+}
+
+// ============================================
+// Campaign Contact Telemetry
+// ============================================
+
+export type CampaignContactStatus = 'pending' | 'in-progress' | 'completed' | 'failed';
+
+export interface CampaignCallAttempt {
+  timestamp: string;
+  status: string;
+  duration: number | null;
+  provider_response: {
+    status?: string;
+    call_id?: string;
+    participant_id?: string;
+    room_name?: string;
+    dispatch_id?: string;
+    message?: string;
+    [key: string]: unknown;
+  } | null;
+}
+
+export interface CampaignContact {
+  id: string;
+  campaign_id: string;
+  user_uid: string;
+  phone_number: string;
+  status: CampaignContactStatus;
+  call_attempts: CampaignCallAttempt[];
+  metadata: Record<string, unknown>;
+  assigned_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 // ============================================
@@ -278,4 +333,60 @@ export function canPauseCampaign(status: CampaignStatus): boolean {
 
 export function canStopCampaign(status: CampaignStatus): boolean {
   return status === 'active' || status === 'paused';
+}
+
+export interface CampaignProgressState {
+  percent: number;
+  processed: number;
+  total: number;
+  pending: number;
+  inProgress: number;
+  statusLabel: string;
+}
+
+/**
+ * Progress snapshot for campaign UIs.
+ * Keeps lifecycle state and completion % aligned even when backend counters lag.
+ */
+export function getCampaignProgress(
+  campaign: Pick<Campaign, 'status' | 'total_contacts' | 'successful_calls' | 'failed_calls'>,
+  stats?: Partial<Pick<CampaignMonitoringStats, 'pending_contacts' | 'in_progress_contacts' | 'completed_contacts' | 'failed_contacts'>>,
+): CampaignProgressState {
+  const total = Math.max(0, campaign.total_contacts || 0);
+  const completed = Math.max(0, stats?.completed_contacts ?? campaign.successful_calls ?? 0);
+  const failed = Math.max(0, stats?.failed_contacts ?? campaign.failed_calls ?? 0);
+  const rawProcessed = completed + failed;
+  const processed = total > 0 ? Math.min(total, rawProcessed) : rawProcessed;
+  const pending = Math.max(0, stats?.pending_contacts ?? (total > 0 ? Math.max(total - processed, 0) : 0));
+  const inProgress = Math.max(0, stats?.in_progress_contacts ?? 0);
+
+  let percent = 0;
+  if (campaign.status === 'completed') {
+    percent = 100;
+  } else if (campaign.status === 'pending') {
+    percent = 0;
+  } else if (total > 0) {
+    percent = Math.round((processed / total) * 100);
+    // Avoid showing "fully done" while still marked active.
+    if (campaign.status === 'active' && percent >= 100) {
+      percent = 99;
+    }
+  }
+
+  const statusLabel: Record<CampaignStatus, string> = {
+    pending: 'Ready',
+    active: inProgress > 0 ? 'Dialing' : (pending > 0 ? 'Queued' : 'Running'),
+    paused: 'Paused',
+    stopped: 'Stopped',
+    completed: 'Completed',
+  };
+
+  return {
+    percent,
+    processed,
+    total,
+    pending,
+    inProgress,
+    statusLabel: statusLabel[campaign.status],
+  };
 }

@@ -17,6 +17,7 @@ import {
   CampaignAnalytics,
   UserAnalyticsStats,
   CampaignAnalyticsDetail,
+  CampaignContact,
   CAMPAIGN_API_CONFIG,
 } from '@/types/campaign.types';
 
@@ -269,6 +270,20 @@ export async function getCampaignMonitoringStats(
 }
 
 /**
+ * Get contact-level telemetry for a campaign
+ */
+export async function getCampaignContacts(
+  campaignId: string,
+  userUid: string,
+  skip = 0,
+  limit = 200,
+): Promise<CampaignContact[]> {
+  return fetchCampaignApi<CampaignContact[]>(
+    `/campaigns/${encodeURIComponent(campaignId)}/contacts?user_uid=${encodeURIComponent(userUid)}&skip=${skip}&limit=${limit}`,
+  );
+}
+
+/**
  * Get credit status for a user
  */
 export async function getCreditStatus(userUid: string): Promise<CreditStatus> {
@@ -347,6 +362,7 @@ export const campaignApi = {
   // Monitoring
   getQueueStatus,
   getCampaignMonitoringStats,
+  getCampaignContacts,
   getCreditStatus,
   getSystemConfig,
 
