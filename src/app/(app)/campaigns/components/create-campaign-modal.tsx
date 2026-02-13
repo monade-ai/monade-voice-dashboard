@@ -101,6 +101,7 @@ export function CreateCampaignModal({
     .filter((v, idx, arr) => v <= LIMITS.MAX_CONCURRENT && arr.indexOf(v) === idx);
   const cpsOptions = [1, 2, LIMITS.CALLS_PER_SECOND]
     .filter((v, idx, arr) => v <= LIMITS.CALLS_PER_SECOND && arr.indexOf(v) === idx);
+  const retryOptions = Array.from({ length: LIMITS.MAX_RETRIES + 1 }, (_, n) => n);
 
   const handleChange = <K extends keyof FormData>(field: K, value: FormData[K]) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -267,7 +268,7 @@ export function CreateCampaignModal({
                       <Settings2 size={16} className="text-primary" />
                       <span className="text-[10px] font-bold uppercase tracking-widest text-foreground">Throttling</span>
                     </div>
-                    <div className="grid grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
                       <div className="space-y-2">
                         <label className="text-[10px] text-muted-foreground uppercase tracking-widest">Concurrency</label>
                         <select 
@@ -286,6 +287,20 @@ export function CreateCampaignModal({
                           className="w-full h-10 bg-background border border-border/40 rounded-md px-3 text-xs font-mono"
                         >
                           {cpsOptions.map(n => <option key={n} value={n}>{n} CPS</option>)}
+                        </select>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] text-muted-foreground uppercase tracking-widest">Retries</label>
+                        <select
+                          value={formData.maxRetries}
+                          onChange={(e) => handleChange('maxRetries', Number(e.target.value))}
+                          className="w-full h-10 bg-background border border-border/40 rounded-md px-3 text-xs font-mono"
+                        >
+                          {retryOptions.map((n) => (
+                            <option key={n} value={n}>
+                              {n}
+                            </option>
+                          ))}
                         </select>
                       </div>
                     </div>
@@ -340,7 +355,8 @@ export function CreateCampaignModal({
                     <div className="space-y-1">
                       <p className="text-xs font-bold text-yellow-700 uppercase tracking-widest">Ready to Launch</p>
                       <p className="text-[10px] text-yellow-600/80 leading-relaxed">
-                                    Your campaign will utilize {formData.maxConcurrent} lines. Ensure you have sufficient credits in the Treasury.
+                                    Your campaign will utilize {formData.maxConcurrent} lines with up to {formData.maxRetries} retries per contact.
+                                    Ensure you have sufficient credits in the Treasury.
                       </p>
                     </div>
                   </div>

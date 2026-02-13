@@ -31,6 +31,7 @@ import { DashboardHeader } from '@/components/dashboard-header';
 import { useCampaignApi } from '@/app/hooks/use-campaign-api';
 import { campaignApi } from '@/lib/services/campaign-api.service';
 import { downloadCSV, generateCSV, loadCSVPreview } from '@/lib/utils/csv-preview';
+import { fetchJson } from '@/lib/http';
 import {
   CampaignStatus,
   CampaignContact,
@@ -83,7 +84,34 @@ interface CampaignCallLogRow {
   completed_at_utc: string;
   contact_created_at_utc: string;
   contact_updated_at_utc: string;
+  transcript_call_id: string;
+  transcript_url: string;
+  transcript_created_at_utc: string;
+  analysis_verdict: string;
+  analysis_summary: string;
+  analysis_confidence_score: string;
+  transcript_message_count: string;
+  transcript_text: string;
   metadata_json: string;
+}
+
+interface CampaignAnalyticsExportRecord {
+  call_id?: string;
+  transcript_url?: string;
+  phone_number?: string;
+  created_at?: string;
+  analytics?: {
+    verdict?: string;
+    summary?: string;
+    confidence_score?: number;
+  } | null;
+}
+
+interface CsvDownloadProgress {
+  phase: 'contacts' | 'analytics' | 'transcripts' | 'csv';
+  done: number;
+  total: number;
+  message: string;
 }
 
 const toUtcIso = (value: string | null | undefined): string => {
@@ -175,6 +203,30 @@ const getContactDisplayName = (metadata: Record<string, unknown>): string | null
   return normalized.length ? normalized : null;
 };
 
+const normalizePhoneKey = (phone: string | null | undefined): string => {
+  if (!phone) return '';
+
+  return phone.replace(/[^\d+]/g, '');
+};
+
+const extractCampaignAnalyticsRecords = (payload: unknown): CampaignAnalyticsExportRecord[] => {
+  if (!payload || typeof payload !== 'object') return [];
+
+  const data = payload as {
+    analytics?: unknown;
+    calls?: unknown;
+  };
+  const rawRecords = Array.isArray(data.analytics)
+    ? data.analytics
+    : Array.isArray(data.calls)
+      ? data.calls
+      : [];
+
+  return rawRecords.filter((record): record is CampaignAnalyticsExportRecord => {
+    return !!record && typeof record === 'object';
+  });
+};
+
 const buildCampaignCallLogRows = (
   campaignId: string,
   contacts: CampaignContact[],
@@ -211,6 +263,14 @@ const buildCampaignCallLogRows = (
         completed_at_utc: toUtcIso(contact.completed_at),
         contact_created_at_utc: toUtcIso(contact.created_at),
         contact_updated_at_utc: toUtcIso(contact.updated_at),
+        transcript_call_id: '',
+        transcript_url: '',
+        transcript_created_at_utc: '',
+        analysis_verdict: '',
+        analysis_summary: '',
+        analysis_confidence_score: '',
+        transcript_message_count: '',
+        transcript_text: '',
         metadata_json: metadataJson,
       });
     });
@@ -389,6 +449,7 @@ export default function CampaignDetailPage() {
     loading,
     error,
     getCampaign,
+    updateCampaign,
     uploadCSV,
     startCampaign: startCampaignApi,
     pauseCampaign: pauseCampaignApi,
@@ -402,6 +463,9 @@ export default function CampaignDetailPage() {
   const [csvPreview, setCsvPreview] = useState<CSVPreviewCache | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isDownloadingLogs, setIsDownloadingLogs] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState<CsvDownloadProgress | null>(null);
+  const [retryDraftValue, setRetryDraftValue] = useState<number>(CAMPAIGN_API_CONFIG.DEFAULTS.MAX_RETRIES);
+  const [isSavingRetries, setIsSavingRetries] = useState(false);
   const [contactQuery, setContactQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | CampaignContactStatus>('all');
   const [isImportMode, setIsImportMode] = useState(false);
@@ -420,6 +484,10 @@ export default function CampaignDetailPage() {
     const preview = loadCSVPreview(campaignId);
     setCsvPreview(preview);
   }, [campaignId, getCampaign, refreshCampaignStats, refreshCampaignContacts, refreshQueueStatus]);
+
+  useEffect(() => {
+    setRetryDraftValue(campaign?.max_retries ?? CAMPAIGN_API_CONFIG.DEFAULTS.MAX_RETRIES);
+  }, [campaign?.max_retries]);
 
   useEffect(() => {
     if (!campaign || campaign.status !== 'active') return;
@@ -544,9 +612,35 @@ export default function CampaignDetailPage() {
     toast.success('Telemetry refreshed');
   };
 
+  const handleSaveRetries = async () => {
+    if (!campaign) return;
+    if (retryDraftValue === campaign.max_retries) return;
+
+    setIsSavingRetries(true);
+    try {
+      await updateCampaign(campaign.id, { max_retries: retryDraftValue });
+      await Promise.allSettled([
+        getCampaign(campaign.id),
+        refreshCampaignStats(campaign.id),
+      ]);
+      toast.success(`Retries updated to ${retryDraftValue}`);
+    } catch (error) {
+      console.error('Failed to update campaign retries:', error);
+      toast.error('Failed to update retries.');
+    } finally {
+      setIsSavingRetries(false);
+    }
+  };
+
   const handleDownloadCallLogs = async () => {
     if (!campaign) return;
     setIsDownloadingLogs(true);
+    setDownloadProgress({
+      phase: 'contacts',
+      done: 0,
+      total: 1,
+      message: 'Collecting campaign contacts...',
+    });
 
     try {
       const pageSize = 300;
@@ -560,6 +654,12 @@ export default function CampaignDetailPage() {
         if (batch.length < pageSize) break;
         skip += batch.length;
       }
+      setDownloadProgress({
+        phase: 'contacts',
+        done: 1,
+        total: 1,
+        message: `Loaded ${allContacts.length} contacts.`,
+      });
 
       if (allContacts.length === 0) {
         toast.info('No contact telemetry available yet for this campaign.');
@@ -574,6 +674,172 @@ export default function CampaignDetailPage() {
 
         return;
       }
+
+      setDownloadProgress({
+        phase: 'analytics',
+        done: 0,
+        total: 1,
+        message: 'Linking campaign analytics and transcript records...',
+      });
+
+      const analyticsPayload = await campaignApi.getDetailedAnalytics(campaign.user_uid, campaign.id) as unknown;
+      const analyticsRecords = extractCampaignAnalyticsRecords(analyticsPayload);
+      const analyticsByPhone = new Map<string, CampaignAnalyticsExportRecord[]>();
+
+      analyticsRecords.forEach((record) => {
+        const phoneKey = normalizePhoneKey(record.phone_number);
+        if (!phoneKey) return;
+
+        const bucket = analyticsByPhone.get(phoneKey) ?? [];
+        bucket.push(record);
+        analyticsByPhone.set(phoneKey, bucket);
+      });
+
+      analyticsByPhone.forEach((bucket) => {
+        bucket.sort((a, b) => (parseDate(a.created_at) ?? 0) - (parseDate(b.created_at) ?? 0));
+      });
+
+      const usedAnalyticsIndices = new Map<string, Set<number>>();
+      const rowsByAttemptTime = [...rows].sort((a, b) => {
+        const aTime = parseDate(a.attempt_timestamp_utc) ?? parseDate(a.contact_updated_at_utc) ?? 0;
+        const bTime = parseDate(b.attempt_timestamp_utc) ?? parseDate(b.contact_updated_at_utc) ?? 0;
+
+        return aTime - bTime;
+      });
+
+      rowsByAttemptTime.forEach((row) => {
+        const phoneKey = normalizePhoneKey(row.phone_number);
+        if (!phoneKey) return;
+
+        const candidates = analyticsByPhone.get(phoneKey);
+        if (!candidates || candidates.length === 0) return;
+
+        const used = usedAnalyticsIndices.get(phoneKey) ?? new Set<number>();
+        let selectedIndex = -1;
+
+        if (row.provider_call_id) {
+          const exactIndex = candidates.findIndex((candidate, index) => {
+            return !used.has(index) && candidate.call_id === row.provider_call_id;
+          });
+          if (exactIndex >= 0) selectedIndex = exactIndex;
+        }
+
+        if (selectedIndex < 0) {
+          const rowTimestamp = parseDate(row.attempt_timestamp_utc) ?? parseDate(row.contact_updated_at_utc) ?? Date.now();
+          let bestScore = Number.POSITIVE_INFINITY;
+
+          candidates.forEach((candidate, index) => {
+            if (used.has(index)) return;
+            const candidateTimestamp = parseDate(candidate.created_at) ?? rowTimestamp;
+            const score = Math.abs(candidateTimestamp - rowTimestamp);
+            if (score < bestScore) {
+              bestScore = score;
+              selectedIndex = index;
+            }
+          });
+        }
+
+        if (selectedIndex < 0) return;
+
+        used.add(selectedIndex);
+        usedAnalyticsIndices.set(phoneKey, used);
+
+        const selected = candidates[selectedIndex];
+        row.transcript_call_id = selected.call_id ?? '';
+        row.transcript_url = selected.transcript_url ?? '';
+        row.transcript_created_at_utc = toUtcIso(selected.created_at);
+        row.analysis_verdict = selected.analytics?.verdict ?? '';
+        row.analysis_summary = selected.analytics?.summary ?? '';
+        row.analysis_confidence_score = typeof selected.analytics?.confidence_score === 'number'
+          ? String(selected.analytics.confidence_score)
+          : '';
+      });
+
+      setDownloadProgress({
+        phase: 'analytics',
+        done: 1,
+        total: 1,
+        message: `Matched analytics records for ${analyticsRecords.length} campaign calls.`,
+      });
+
+      const transcriptUrls = Array.from(
+        new Set(
+          rows
+            .map((row) => row.transcript_url)
+            .filter((url): url is string => typeof url === 'string' && url.length > 0),
+        ),
+      );
+
+      if (transcriptUrls.length > 0) {
+        setDownloadProgress({
+          phase: 'transcripts',
+          done: 0,
+          total: transcriptUrls.length,
+          message: `Fetching transcripts (0/${transcriptUrls.length})...`,
+        });
+
+        const transcriptCache = new Map<string, { transcript: string; messageCount: number }>();
+        const queue = [...transcriptUrls];
+        let completed = 0;
+
+        const workerCount = Math.min(4, queue.length);
+        const workers = Array.from({ length: workerCount }, async () => {
+          while (queue.length > 0) {
+            const url = queue.shift();
+            if (!url) break;
+
+            try {
+              const content = await fetchJson<{ transcript?: string; messageCount?: number }>(
+                '/api/transcript-content',
+                {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({ url }),
+                  retry: { retries: 2 },
+                },
+              );
+              transcriptCache.set(url, {
+                transcript: content.transcript ?? '',
+                messageCount: content.messageCount ?? 0,
+              });
+            } catch (error) {
+              console.error('Failed to fetch transcript for export:', url, error);
+              transcriptCache.set(url, {
+                transcript: '',
+                messageCount: 0,
+              });
+            } finally {
+              completed += 1;
+              setDownloadProgress({
+                phase: 'transcripts',
+                done: completed,
+                total: transcriptUrls.length,
+                message: `Fetching transcripts (${completed}/${transcriptUrls.length})...`,
+              });
+            }
+          }
+        });
+
+        await Promise.all(workers);
+
+        rows.forEach((row) => {
+          if (!row.transcript_url) return;
+          const transcriptEntry = transcriptCache.get(row.transcript_url);
+          if (!transcriptEntry) return;
+
+          row.transcript_text = transcriptEntry.transcript;
+          row.transcript_message_count = String(transcriptEntry.messageCount);
+        });
+      }
+
+      setDownloadProgress({
+        phase: 'csv',
+        done: 1,
+        total: 1,
+        message: 'Generating CSV file...',
+      });
 
       const fields = [
         'export_generated_at_utc',
@@ -596,6 +862,14 @@ export default function CampaignDetailPage() {
         'completed_at_utc',
         'contact_created_at_utc',
         'contact_updated_at_utc',
+        'transcript_call_id',
+        'transcript_url',
+        'transcript_created_at_utc',
+        'analysis_verdict',
+        'analysis_summary',
+        'analysis_confidence_score',
+        'transcript_message_count',
+        'transcript_text',
         'metadata_json',
       ];
       const csvContent = generateCSV(rows, fields);
@@ -608,6 +882,7 @@ export default function CampaignDetailPage() {
       toast.error('Failed to download campaign call logs.');
     } finally {
       setIsDownloadingLogs(false);
+      setDownloadProgress(null);
     }
   };
 
@@ -727,11 +1002,12 @@ export default function CampaignDetailPage() {
               size="sm"
               onClick={() => { void handleDownloadCallLogs(); }}
               disabled={isDownloadingLogs}
-              className="h-10 border-border text-[10px] font-bold uppercase tracking-widest gap-2"
+              className="h-10 max-w-[320px] border-border text-[10px] font-bold uppercase tracking-widest gap-2 truncate"
               aria-label="Download campaign call logs"
+              title={downloadProgress?.message ?? 'Download campaign call logs'}
             >
               {isDownloadingLogs ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
-              Download CSV
+              {isDownloadingLogs ? (downloadProgress?.message ?? 'Preparing CSV...') : 'Download CSV'}
             </Button>
             {canStartCampaign(campaign.status) && (
               <Button
@@ -772,6 +1048,12 @@ export default function CampaignDetailPage() {
             )}
           </div>
         </div>
+
+        {isDownloadingLogs && downloadProgress && (
+          <p className="text-[10px] text-muted-foreground">
+            {downloadProgress.message}
+          </p>
+        )}
 
         {error && (
           <div className="p-4 bg-destructive/10 text-destructive text-xs font-bold uppercase tracking-widest rounded-md flex items-center gap-2">
@@ -960,7 +1242,30 @@ export default function CampaignDetailPage() {
                 <ConfigItem label="Call Window" value={`${campaign.daily_start_time} - ${campaign.daily_end_time}`} />
                 <ConfigItem label="Rate" value={`${campaign.calls_per_second} CPS`} />
                 <ConfigItem label="Concurrency" value={campaign.max_concurrent} />
-                <ConfigItem label="Retries" value={campaign.max_retries} />
+                <div className="flex items-center justify-between py-2 border-b border-border/10 last:border-0">
+                  <span className="text-xs text-muted-foreground">Retries</span>
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={retryDraftValue}
+                      onChange={(event) => setRetryDraftValue(Number(event.target.value))}
+                      className="h-7 min-w-[64px] bg-background border border-border/40 rounded px-2 text-[11px] font-mono"
+                      disabled={isSavingRetries}
+                    >
+                      {Array.from({ length: CAMPAIGN_API_CONFIG.LIMITS.MAX_RETRIES + 1 }, (_, n) => (
+                        <option key={n} value={n}>{n}</option>
+                      ))}
+                    </select>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => { void handleSaveRetries(); }}
+                      disabled={isSavingRetries || retryDraftValue === campaign.max_retries}
+                      className="h-7 px-2 text-[9px] uppercase tracking-widest"
+                    >
+                      {isSavingRetries ? <Loader2 size={12} className="animate-spin" /> : 'Save'}
+                    </Button>
+                  </div>
+                </div>
               </PaperCardContent>
             </PaperCard>
 
