@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 // Hardcoded Trunks API config
 const TRUNKS_API_BASE = 'http://35.200.254.189/trunks';
+const DEBUG_TRUNKS_PROXY = process.env.NODE_ENV !== 'production';
 
 export async function GET(request: NextRequest) {
   return handleProxy(request, 'GET');
@@ -34,7 +35,9 @@ async function handleProxy(request: NextRequest, method: string) {
     const searchParams = url.search;
 
     const targetUrl = `${TRUNKS_API_BASE}${path}${searchParams}`;
-    console.log(`[TrunksProxy] ${method} ${targetUrl}`);
+    if (DEBUG_TRUNKS_PROXY) {
+      console.log(`[TrunksProxy] ${method} ${targetUrl}`);
+    }
 
     const headers: HeadersInit = {};
 
