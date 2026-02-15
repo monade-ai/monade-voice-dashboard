@@ -1,3 +1,5 @@
+import { Suspense } from 'react';
+
 import { AppShell } from './app-shell';
 
 export default function ProtectedAppLayout({
@@ -5,5 +7,9 @@ export default function ProtectedAppLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return <AppShell>{children}</AppShell>;
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-background" />}>
+      <AppShell>{children}</AppShell>
+    </Suspense>
+  );
 }
