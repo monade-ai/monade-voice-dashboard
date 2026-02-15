@@ -57,6 +57,7 @@ function AssistantsGallery() {
   const activeTab = useMemo(() => {
     const tab = searchParams.get('tab');
     if (tab === 'production' || tab === 'drafts' || tab === 'all') return tab;
+
     return 'all';
   }, [searchParams]);
   const setActiveTab = (tab: 'all' | 'production' | 'drafts') => {
@@ -72,6 +73,7 @@ function AssistantsGallery() {
   const isDraftAssistant = (assistant: { id: string; status?: string; isDraft?: boolean }) => {
     if (assistant.isDraft) return true;
     if (assistant.status === 'draft') return true;
+
     return assistant.id.startsWith('local-');
   };
   const filteredAssistants = useMemo(() => {

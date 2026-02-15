@@ -173,6 +173,7 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
       console.log('[Assistants] GET /api/assistants Raw fetched:', data);
       apiAssistants = data.map((a: any) => {
         const tags = a.tags || [];
+
         return {
           ...a,
           callProvider: extractCallProvider({ tags, callProvider: a.callProvider }),

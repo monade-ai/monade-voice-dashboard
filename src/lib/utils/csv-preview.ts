@@ -132,8 +132,10 @@ function normalizePhoneHeaders(headers: string[]): { headers: string[]; phoneCol
   const normalizedHeaders = headers.map((header, idx) => {
     if (phoneIndex === -1 && isPhoneHeader(header)) {
       phoneIndex = idx;
+
       return 'phone_number';
     }
+
     return header;
   });
 
@@ -143,8 +145,10 @@ function normalizePhoneHeaders(headers: string[]): { headers: string[]; phoneCol
       const detectedIndex = headers.indexOf(detected);
       const updated = [...headers];
       updated[detectedIndex] = 'phone_number';
+
       return { headers: updated, phoneColumnName: 'phone_number' };
     }
+
     return { headers, phoneColumnName: null };
   }
 
