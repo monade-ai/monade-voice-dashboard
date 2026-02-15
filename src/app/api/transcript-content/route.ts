@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+const DEBUG_TRANSCRIPT_PROXY = process.env.NODE_ENV !== 'production';
+
 /**
  * Proxy route to fetch transcript content from GCS
  * This avoids CORS issues when fetching from browser
@@ -12,10 +14,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid URL' }, { status: 400 });
     }
 
-    console.log('[Transcript Proxy] Fetching:', url);
+    if (DEBUG_TRANSCRIPT_PROXY) {
+      console.log('[Transcript Proxy] Fetching:', url);
+    }
 
     const response = await fetch(url, {
       method: 'GET',
+      cache: 'force-cache',
+      next: { revalidate: 3600 },
       headers: {
         'Accept': 'text/plain',
       },
@@ -31,7 +37,9 @@ export async function POST(request: NextRequest) {
     }
 
     const content = await response.text();
-    console.log('[Transcript Proxy] Content length:', content.length);
+    if (DEBUG_TRANSCRIPT_PROXY) {
+      console.log('[Transcript Proxy] Content length:', content.length);
+    }
 
     // Parse JSONL and extract conversation
     const lines = content.trim().split('\n');
@@ -76,7 +84,9 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    console.log('[Transcript Proxy] Parsed messages:', messages.length);
+    if (DEBUG_TRANSCRIPT_PROXY) {
+      console.log('[Transcript Proxy] Parsed messages:', messages.length);
+    }
 
     return NextResponse.json({
       success: true,

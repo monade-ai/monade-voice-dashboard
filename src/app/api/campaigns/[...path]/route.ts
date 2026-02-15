@@ -8,6 +8,7 @@ const CAMPAIGN_API_BASE = process.env.CAMPAIGN_SERVICE_BASE_URL
 
 const MONADE_API_BASE = MONADE_API_CONFIG.BASE_URL;
 const MONADE_API_KEY = process.env.MONADE_API_KEY;
+const DEBUG_CAMPAIGN_PROXY = process.env.NODE_ENV !== 'production';
 
 export async function GET(request: NextRequest) {
   return handleProxy(request);
@@ -135,14 +136,16 @@ async function handleProxy(request: NextRequest) {
       : null;
     const requestedUserUid = searchParams.get('user_uid');
 
-    console.log('[CampaignProxy] request', {
-      method: request.method,
-      path,
-      requestedUserUid,
-      sessionUserUid,
-      hasUserApiKey: Boolean(userApiKey),
-      monitoringUserUid,
-    });
+    if (DEBUG_CAMPAIGN_PROXY) {
+      console.log('[CampaignProxy] request', {
+        method: request.method,
+        path,
+        requestedUserUid,
+        sessionUserUid,
+        hasUserApiKey: Boolean(userApiKey),
+        monitoringUserUid,
+      });
+    }
 
     if (requiresAuth && !sessionUserUid) {
       return NextResponse.json(
