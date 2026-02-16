@@ -99,6 +99,7 @@ interface CampaignAnalyticsExportRecord {
   call_id?: string;
   transcript_url?: string;
   phone_number?: string;
+  campaign_id?: string | null;
   created_at?: string;
   analytics?: {
     verdict?: string;
@@ -683,7 +684,55 @@ export default function CampaignDetailPage() {
       });
 
       const analyticsPayload = await campaignApi.getDetailedAnalytics(campaign.user_uid, campaign.id) as unknown;
-      const analyticsRecords = extractCampaignAnalyticsRecords(analyticsPayload);
+      let analyticsRecords = extractCampaignAnalyticsRecords(analyticsPayload);
+
+      if (analyticsRecords.length === 0) {
+        setDownloadProgress({
+          phase: 'analytics',
+          done: 0,
+          total: 1,
+          message: 'No campaign-tagged analytics found, scanning user analytics as fallback...',
+        });
+
+        try {
+          const userAnalyticsPayload = await campaignApi.getUserDetailedAnalytics(campaign.user_uid) as unknown;
+          const userAnalyticsRecords = extractCampaignAnalyticsRecords(userAnalyticsPayload);
+
+          const campaignCallIds = new Set(
+            rows
+              .map((row) => row.provider_call_id)
+              .filter((callId): callId is string => typeof callId === 'string' && callId.length > 0),
+          );
+          const campaignPhoneKeys = new Set(
+            rows
+              .map((row) => normalizePhoneKey(row.phone_number))
+              .filter((phoneKey): phoneKey is string => phoneKey.length > 0),
+          );
+          const campaignWindowStart = parseDate(campaign.started_at) ?? parseDate(campaign.created_at) ?? 0;
+          const campaignWindowEnd = parseDate(campaign.completed_at) ?? parseDate(campaign.updated_at) ?? Date.now();
+          const windowStartPaddingMs = 15 * 60 * 1000;
+          const windowEndPaddingMs = 6 * 60 * 60 * 1000;
+
+          analyticsRecords = userAnalyticsRecords.filter((record) => {
+            if (record.campaign_id && record.campaign_id === campaign.id) return true;
+            if (record.call_id && campaignCallIds.has(record.call_id)) return true;
+
+            const phoneKey = normalizePhoneKey(record.phone_number);
+            if (!phoneKey || !campaignPhoneKeys.has(phoneKey)) return false;
+
+            const createdAt = parseDate(record.created_at);
+            if (createdAt === null) return true;
+
+            return (
+              createdAt >= campaignWindowStart - windowStartPaddingMs
+              && createdAt <= campaignWindowEnd + windowEndPaddingMs
+            );
+          });
+        } catch (fallbackError) {
+          console.warn('Failed to fetch user analytics fallback for campaign export:', fallbackError);
+        }
+      }
+
       const analyticsByPhone = new Map<string, CampaignAnalyticsExportRecord[]>();
 
       analyticsRecords.forEach((record) => {

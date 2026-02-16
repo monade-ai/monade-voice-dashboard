@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 const MONADE_API_BASE = process.env.MONADE_API_BASE_URL ?? 'http://35.200.254.189/db_services';
 const MONADE_API_KEY = process.env.MONADE_API_KEY;
+const DEBUG_PROXY = process.env.NODE_ENV !== 'production';
 
 export async function GET(request: NextRequest) {
   return handleProxy(request, 'GET');
@@ -45,7 +46,9 @@ async function handleProxy(request: NextRequest, method: string) {
     const searchParams = url.search;
 
     const targetUrl = `${MONADE_API_BASE}${path}${searchParams}`;
-    console.log(`[Proxy] ${method} ${targetUrl}`);
+    if (DEBUG_PROXY) {
+      console.log(`[Proxy] ${method} ${targetUrl}`);
+    }
 
     // Build headers - only set Content-Type for methods with body
     const headers: HeadersInit = {
@@ -61,7 +64,9 @@ async function handleProxy(request: NextRequest, method: string) {
     if (['POST', 'PUT', 'PATCH'].includes(method)) {
       try {
         const body = await request.json();
-        console.log(`[Proxy] ${method} body:`, JSON.stringify(body));
+        if (DEBUG_PROXY) {
+          console.log(`[Proxy] ${method} body:`, JSON.stringify(body));
+        }
         fetchOptions.body = JSON.stringify(body);
         // Only set Content-Type when we actually have a body
         (headers as Record<string, string>)['Content-Type'] = 'application/json';

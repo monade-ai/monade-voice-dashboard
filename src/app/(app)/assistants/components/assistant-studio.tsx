@@ -74,7 +74,7 @@ export default function AssistantStudio() {
     updateAssistantLocally, 
   } = useAssistants();
   const { items: libraryItems } = useLibrary();
-  const { trunks } = useTrunks({ checkAssignments: false });
+  const { trunks, phoneNumbers } = useTrunks({ checkAssignments: false });
   
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'saved' | 'error'>('idle');
@@ -147,6 +147,19 @@ export default function AssistantStudio() {
     { value: 'twilio', label: 'Twilio', description: 'Global coverage' },
   ];
 
+  const selectedTrunkName = currentAssistant.callProvider || '';
+  const filteredPhoneNumbers = phoneNumbers.filter((phone) => {
+    if (!selectedTrunkName) return false;
+
+    return phone.trunkName.toLowerCase() === selectedTrunkName.toLowerCase();
+  });
+  const uniqueFilteredPhoneNumbers = Array.from(
+    new Map(filteredPhoneNumbers.map((phone) => [phone.number, phone])).values(),
+  );
+  const hasSelectedPhoneInOptions = uniqueFilteredPhoneNumbers.some(
+    (phone) => phone.number === currentAssistant.phoneNumber,
+  );
+
   return (
     <motion.div 
       initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 30 }}
@@ -206,12 +219,46 @@ export default function AssistantStudio() {
                   </div>
                   <div className="space-y-2">
                     <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 px-1">Phone Line</label>
-                    <Input 
-                      value={currentAssistant.phoneNumber} 
-                      onChange={(e) => handleUpdate('phoneNumber', e.target.value)} 
-                      placeholder="+91 00000 00000" 
-                      className="bg-background border-border/40 h-12 font-mono text-base focus:border-primary transition-all rounded-md px-4" 
-                    />
+                    <div className="space-y-2">
+                      <Select
+                        value={currentAssistant.phoneNumber || '__none__'}
+                        onValueChange={(value) => handleUpdate('phoneNumber', value === '__none__' ? '' : value)}
+                      >
+                        <SelectTrigger className="bg-background border-border/40 h-12 font-mono text-base focus:border-primary transition-all rounded-md px-4">
+                          <SelectValue
+                            placeholder={selectedTrunkName
+                              ? `Select number from ${selectedTrunkName}`
+                              : 'Select a trunk to filter numbers'}
+                          />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">
+                            <span className="text-muted-foreground">None</span>
+                          </SelectItem>
+                          {currentAssistant.phoneNumber && !hasSelectedPhoneInOptions && (
+                            <SelectItem value={currentAssistant.phoneNumber}>
+                              {currentAssistant.phoneNumber} (Current custom)
+                            </SelectItem>
+                          )}
+                          {uniqueFilteredPhoneNumbers.map((phone) => (
+                            <SelectItem key={`${phone.trunkId || phone.trunkName}-${phone.number}`} value={phone.number}>
+                              {phone.number}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Input
+                        value={currentAssistant.phoneNumber}
+                        onChange={(e) => handleUpdate('phoneNumber', e.target.value)}
+                        placeholder={selectedTrunkName ? 'Or enter custom number' : '+91 00000 00000'}
+                        className="bg-background border-border/40 h-10 font-mono text-sm focus:border-primary transition-all rounded-md px-4"
+                      />
+                      <p className="text-[10px] text-muted-foreground/60 px-1 italic">
+                        {selectedTrunkName
+                          ? `Showing ${uniqueFilteredPhoneNumbers.length} numbers from ${selectedTrunkName}.`
+                          : 'Choose a trunk in Config to see matching numbers.'}
+                      </p>
+                    </div>
                   </div>
                 </div>
 

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 
 import { ApiError, fetchJson } from '@/lib/http';
+import { useMonadeUser } from '@/app/hooks/use-monade-user';
 import { MONADE_API_CONFIG } from '@/types/monade-api.types';
 
 // Trunk API base URL
@@ -80,6 +81,7 @@ export async function deallocatePhoneNumber(assistantId: string): Promise<{ succ
 
 export function useTrunks(options?: { checkAssignments?: boolean }) {
   const shouldCheckAssignments = options?.checkAssignments !== false;
+  const { userUid } = useMonadeUser();
   const [trunks, setTrunks] = useState<SipTrunk[]>([]);
   const [phoneNumbers, setPhoneNumbers] = useState<PhoneNumberOption[]>(FALLBACK_NUMBERS);
   const [loading, setLoading] = useState(true);
@@ -118,7 +120,25 @@ export function useTrunks(options?: { checkAssignments?: boolean }) {
     setError(null);
 
     try {
-      const data = await fetchJson<any>(`${TRUNK_API_BASE}/trunks`);
+      let data: any;
+
+      try {
+        if (userUid) {
+          data = await fetchJson<any>(`${API_BASE_URL}/api/users/${encodeURIComponent(userUid)}/trunks`, {
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          });
+        } else {
+          data = await fetchJson<any>(`${TRUNK_API_BASE}/trunks`);
+        }
+      } catch (scopedError) {
+        if (!userUid) {
+          throw scopedError;
+        }
+        console.warn('[useTrunks] Failed to fetch user-scoped trunks, falling back to global trunks:', scopedError);
+        data = await fetchJson<any>(`${TRUNK_API_BASE}/trunks`);
+      }
 
       // Handle both array and object response formats
       const trunksList = Array.isArray(data) ? data : (data.trunks && Array.isArray(data.trunks) ? data.trunks : []);
@@ -150,17 +170,19 @@ export function useTrunks(options?: { checkAssignments?: boolean }) {
         }
       } else {
         console.log('[useTrunks] No trunks found in response:', data);
+        setTrunks([]);
         setPhoneNumbers(FALLBACK_NUMBERS);
       }
     } catch (err) {
       console.error('[useTrunks] Error fetching trunks:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch trunks');
+      setTrunks([]);
       // Use fallback on error
       setPhoneNumbers(FALLBACK_NUMBERS);
     } finally {
       setLoading(false);
     }
-  }, [checkAssignmentsForNumbers]);
+  }, [checkAssignmentsForNumbers, shouldCheckAssignments, userUid]);
 
   // Refresh assignments only (without re-fetching trunks)
   const refreshAssignments = useCallback(() => {

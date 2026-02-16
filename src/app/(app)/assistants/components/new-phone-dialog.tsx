@@ -192,15 +192,15 @@ export function NewPhoneDialog({
               </SelectTrigger>
               <SelectContent>
                 {trunks.length > 0 ? (
-                  trunks.map((trunk) => (
-                    <SelectItem key={trunk.id} value={trunk.name}>
+                  trunks.map((trunk, index) => (
+                    <SelectItem key={`${trunk.id || trunk.name || 'trunk'}-${index}`} value={trunk.name}>
                       <span className="font-medium">{trunk.name}</span>
                     </SelectItem>
                   ))
                 ) : (
                   <>
-                    <SelectItem value="vobiz">Vobiz (Indian calls)</SelectItem>
-                    <SelectItem value="twilio">Twilio (International)</SelectItem>
+                    <SelectItem key="vobiz" value="vobiz">Vobiz (Indian calls)</SelectItem>
+                    <SelectItem key="twilio" value="twilio">Twilio (International)</SelectItem>
                   </>
                 )}
               </SelectContent>

@@ -22,12 +22,13 @@ interface Assistant {
   id: string;
   phoneNumber?: string;
   name: string;
+  callProvider?: string;
 }
 
 export default function LiveKitAssistantDualButton({ assistant }: AssistantDualButtonProps) {
   const [mode, setMode] = useState<'chat' | 'talk'>('chat');
   const { assistants } = useAssistants();
-  const { apiKey } = useMonadeUser();
+  const { apiKey, userUid } = useMonadeUser();
 
   // Get assistant data if string ID was passed
   const assistantData = typeof assistant === 'string'
@@ -51,6 +52,7 @@ export default function LiveKitAssistantDualButton({ assistant }: AssistantDualB
     assistantId: assistantData.id,
     assistantName: assistantData.name,
     apiKey: apiKey, // Pass user's API key for billing
+    userUid: userUid, // User UID for trunk ownership validation
   });
 
   // Use LiveKit web assistant hook
@@ -136,6 +138,7 @@ export default function LiveKitAssistantDualButton({ assistant }: AssistantDualB
         callStatus={callStatus}
         remainingTime={remainingTime}
         errorMessage={errorMessage}
+        callProvider={assistantData.callProvider}
       />
 
       {/* LiveKit Web Assistant Dialog */}

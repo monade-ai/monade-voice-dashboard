@@ -31,6 +31,7 @@ import { fetchJson } from '@/lib/http';
 import { MONADE_API_CONFIG } from '@/types/monade-api.types';
 
 import { ApiKeyManager } from './components/api-key-dialog';
+import { WebhookManager } from './components/webhook-manager';
 
 // --- Sub-Components ---
 
@@ -310,6 +311,16 @@ export default function SettingsPage() {
           <PaperCard className="border-border/40 bg-background shadow-sm">
             <PaperCardContent className="p-8 space-y-6">
               <ApiKeyManager />
+            </PaperCardContent>
+          </PaperCard>
+        </section>
+
+        {/* --- Webhooks --- */}
+        <section className="space-y-6">
+          <h2 className="text-[10px] font-bold uppercase tracking-[0.3em] text-foreground/60">Webhooks</h2>
+          <PaperCard className="border-border/40 bg-background shadow-sm">
+            <PaperCardContent className="p-8 space-y-6">
+              <WebhookManager />
             </PaperCardContent>
           </PaperCard>
         </section>

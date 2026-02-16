@@ -13,6 +13,7 @@ interface UseNewPhoneAssistantProps {
   assistantId: string;
   assistantName: string;
   apiKey: string | null; // User's API key for billing
+  userUid: string | null; // User UID for trunk ownership validation
 }
 
 interface UseNewPhoneAssistantReturn {
@@ -30,6 +31,7 @@ export function useNewPhoneAssistant({
   assistantId,
   assistantName,
   apiKey,
+  userUid,
 }: UseNewPhoneAssistantProps): UseNewPhoneAssistantReturn {
   const [callStatus, setCallStatus] = useState<'idle' | 'initiating' | 'connecting' | 'connected' | 'failed' | 'completed'>('idle');
   const [remainingTime, setRemainingTime] = useState(15);
@@ -62,6 +64,14 @@ export function useNewPhoneAssistant({
       return;
     }
 
+    if (!userUid) {
+      setError(new Error('User context is not loaded yet. Please try again in a moment.'));
+      console.error('[useNewPhoneAssistant] No user UID provided');
+      setCallStatus('failed');
+
+      return;
+    }
+
     try {
       setCallStatus('initiating');
       setRemainingTime(15);
@@ -81,6 +91,7 @@ export function useNewPhoneAssistant({
         assistant_id: assistantId,
         trunk_name: trunkName, // 'twilio' or 'vobiz'
         api_key: apiKey, // User's API key for billing
+        user_uid: userUid, // User UID for trunk ownership validation
       });
 
       console.log('[useNewPhoneAssistant] initiateNewCall response:', responseData);
@@ -92,7 +103,7 @@ export function useNewPhoneAssistant({
       setError(err instanceof Error ? err : new Error('Unknown error initiating call'));
       console.error('[useNewPhoneAssistant] Error initiating phone call:', err);
     }
-  }, [assistantId, assistantName, apiKey]);
+  }, [assistantId, assistantName, apiKey, userUid]);
 
   // End the call
   const endCall = useCallback(() => {

@@ -338,6 +338,17 @@ export async function getCampaignAnalyticsDetail(
   );
 }
 
+/**
+ * Get all analytics records for a user (fallback when campaign_id is missing).
+ */
+export async function getUserAnalyticsDetail(
+  userUid: string,
+): Promise<CampaignAnalyticsDetail> {
+  return fetchDbServicesApi<CampaignAnalyticsDetail>(
+    `/analytics/user/${encodeURIComponent(userUid)}`,
+  );
+}
+
 // ============================================
 // Convenience Object Export
 // ============================================
@@ -370,6 +381,7 @@ export const campaignApi = {
   getAnalytics: getCampaignAnalytics,
   getUserStats: getUserAnalyticsStats,
   getDetailedAnalytics: getCampaignAnalyticsDetail,
+  getUserDetailedAnalytics: getUserAnalyticsDetail,
 };
 
 export default campaignApi;
