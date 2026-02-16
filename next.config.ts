@@ -2,30 +2,10 @@ import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   output: 'standalone',
-  env: {
-    // NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://vysucyefzsscafczsoue.supabase.co',
-    // NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ5c3VjeWVmenNzY2FmY3pzb3VlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM2MzI2MTQsImV4cCI6MjA2OTIwODYxNH0.kJgU6YWP9IUyIqDZIAWq0UbbOUxg_K6Z6xYcK6n6Nrs',
-    NEXT_PUBLIC_SUPABASE_URL: 'https://jmuzbxveurbpmlgawcvq.supabase.co',
-    NEXT_PUBLIC_SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImptdXpieHZldXJicG1sZ2F3Y3ZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDcyNDIxMTgsImV4cCI6MjA2MjgxODExOH0.9GtSBBCwK3dqPPRIcqAOdHOlVVwU7rYFWOz1ejO_KaI',
-    NEXT_PUBLIC_GMAIL_SUPABASE_URL: process.env.NEXT_PUBLIC_GMAIL_SUPABASE_URL || 'https://jmuzbxveurbpmlgawcvq.supabase.co',
-    NEXT_PUBLIC_GMAIL_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_GMAIL_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImptdXpieHZldXJicG1sZ2F3Y3ZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDcyNDIxMTgsImV4cCI6MjA2MjgxODExOH0.9GtSBBCwK3dqPPRIcqAOdHOlVVwU7rYFWOz1ejO_KaI',
-    NEXT_PUBLIC_GMAIL_AUTH_URL: process.env.NEXT_PUBLIC_GMAIL_AUTH_URL,
-    NEXT_PUBLIC_DAILY_ROOM_URL: process.env.NEXT_PUBLIC_DAILY_ROOM_URL,
-    NEXT_PUBLIC_API_BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL,
-    NEXT_PUBLIC_DATABASE_URL: process.env.NEXT_PUBLIC_DATABASE_URL,
-    NEXT_PUBLIC_ASSISTANTS_BASEURL: process.env.NEXT_PUBLIC_ASSISTANTS_BASEURL,
-    NEXT_PUBLIC_KB_SERVICE_BASEURL: process.env.NEXT_PUBLIC_KB_SERVICE_BASEURL,
-    EXOTEL_API_URL: process.env.EXOTEL_API_URL,
-    EXOTEL_API_KEY: process.env.EXOTEL_API_KEY,
-    EXOTEL_FUNCTIONS_KEY: process.env.EXOTEL_FUNCTIONS_KEY,
-    EXOTEL_ACCOUNT_SID: process.env.EXOTEL_ACCOUNT_SID,
-    EXOTEL_BASE_URL: process.env.EXOTEL_BASE_URL,
-    NEXT_PUBLIC_EXOTEL_CALLBACK_URL: process.env.NEXT_PUBLIC_EXOTEL_CALLBACK_URL,
-    NEXT_PUBLIC_CALLING_SERVICE_URL: process.env.NEXT_PUBLIC_CALLING_SERVICE_URL || 'http://34.47.175.17:8000',
-    LIVEKIT_URL: process.env.LIVEKIT_URL ||'wss://monade-testing-r3st0js0.livekit.cloud',
-    LIVEKIT_API_KEY: process.env.LIVEKIT_API_KEY || 'APIS8xdGVuoQTcc',
-    LIVEKIT_API_SECRET: process.env.LIVEKIT_API_SECRET || 'YaZkJCJ4rDz8UV642a07h3sYyv9W6R0q8D0UiggTqxK'
-  },
+  cacheComponents: true,
+  // Do not inject secrets via `env` in next.config.ts.
+  // Next.js exposes only `NEXT_PUBLIC_*` vars to the browser automatically; server-only env vars
+  // should be provided at runtime (for standalone: container/service environment).
   typescript: {
     ignoreBuildErrors: true,
   },

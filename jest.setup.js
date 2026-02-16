@@ -1,5 +1,10 @@
 import '@testing-library/jest-dom'
 
+// Mock ESM-only shader library used by PaperCard (Jest doesn't transpile node_modules ESM by default).
+jest.mock('@paper-design/shaders-react', () => ({
+  StaticMeshGradient: () => null,
+}))
+
 // Mock Next.js router
 jest.mock('next/router', () => ({
   useRouter() {

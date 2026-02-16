@@ -35,6 +35,25 @@ const EVENT_TYPE_LABELS: Record<string, string> = {
   'call_analytics.completed': 'Call Analytics Completed',
 };
 
+/**
+ * Sanitize webhook URLs before saving.
+ * - Strips #!/view/ from webhook.site browser URLs (common copy-paste mistake)
+ * - Removes hash fragments (never sent in HTTP requests, so they'd cause 404s)
+ */
+const sanitizeWebhookUrl = (url: string): string => {
+  let sanitized = url.trim();
+  // webhook.site: user copies browser URL with #!/view/ instead of the API receiver URL
+  sanitized = sanitized.replace(/\/#!\/view\//, '/');
+  // Strip any remaining hash fragments — they're client-side only
+  const hashIndex = sanitized.indexOf('#');
+  if (hashIndex !== -1) {
+    sanitized = sanitized.substring(0, hashIndex);
+  }
+  // Remove trailing slashes for consistency
+  sanitized = sanitized.replace(/\/+$/, '');
+  return sanitized;
+};
+
 export function WebhookManager() {
   const { userUid } = useMonadeUser();
   const [endpoints, setEndpoints] = useState<WebhookEndpoint[]>([]);
@@ -130,13 +149,15 @@ export function WebhookManager() {
       return;
     }
 
+    const targetUrl = sanitizeWebhookUrl(formUrl);
+
     setIsCreating(true);
     try {
       const res = await fetch(`${baseUrl}/api/users/${userUid}/webhooks`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          url: formUrl,
+          url: targetUrl,
           event_types: formEventTypes,
           description: formDescription || undefined,
         }),
@@ -173,13 +194,15 @@ export function WebhookManager() {
       return;
     }
 
+    const targetUrl = sanitizeWebhookUrl(formUrl);
+
     setIsCreating(true);
     try {
       const res = await fetch(`${baseUrl}/api/users/${userUid}/webhooks/${editingEndpoint.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          url: formUrl,
+          url: targetUrl,
           event_types: formEventTypes,
           description: formDescription || undefined,
         }),
