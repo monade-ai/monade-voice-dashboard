@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Loader2, Sparkles, FileUp, AlertTriangle } from 'lucide-react';
+import { X, Loader2, Sparkles, FileUp, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -23,6 +23,8 @@ export function LibraryWorkshop({ isOpen, onClose, editItem }: LibraryWorkshopPr
   const [mode, setMode] = useState<'write' | 'upload'>('write');
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
+  const [fileBase64, setFileBase64] = useState('');
+  const [selectedFileName, setSelectedFileName] = useState('');
   const [isConfirming, setIsConfirming] = useState(false);
   const [isFetchingContent, setIsFetchingContent] = useState(false);
 
@@ -35,9 +37,42 @@ export function LibraryWorkshop({ isOpen, onClose, editItem }: LibraryWorkshopPr
     } else {
       setTitle('');
       setContent('');
+      setFileBase64('');
+      setSelectedFileName('');
       setIsConfirming(false);
     }
   }, [editItem, isOpen]);
+
+  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const nameWithoutExt = file.name.replace(/\.(txt|pdf|md)$/i, '');
+    setTitle(nameWithoutExt);
+    setSelectedFileName(file.name);
+
+    const isPdf = file.name.toLowerCase().endsWith('.pdf');
+
+    if (isPdf) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result as string;
+        const base64 = result.split(',')[1];
+        setFileBase64(base64);
+        setContent('');
+      };
+      reader.readAsDataURL(file);
+    } else {
+      const reader = new FileReader();
+      reader.onload = () => {
+        setContent(reader.result as string);
+        setFileBase64('');
+      };
+      reader.readAsText(file);
+    }
+
+    e.target.value = '';
+  }, []);
 
   const fetchOriginalContent = async (url: string) => {
     setIsFetchingContent(true);
@@ -75,10 +110,14 @@ export function LibraryWorkshop({ isOpen, onClose, editItem }: LibraryWorkshopPr
       ? `${title}_v${Date.now().toString().slice(-4)}.txt` 
       : `${title}.txt`;
 
-    const success = await addIntelligence({
-      filename: finalFilename,
-      kb_text: content,
-    });
+    const payload: Parameters<typeof addIntelligence>[0] = { filename: finalFilename };
+    if (fileBase64) {
+      payload.kb_file_base64 = fileBase64;
+    } else {
+      payload.kb_text = content;
+    }
+
+    const success = await addIntelligence(payload);
 
     if (success) {
       setIsConfirming(false);
@@ -154,16 +193,41 @@ export function LibraryWorkshop({ isOpen, onClose, editItem }: LibraryWorkshopPr
                   </div>
                 </div>
               ) : (
-                <div 
-                  onClick={() => document.getElementById('lib-upload')?.click()}
-                  className="border-2 border-dashed border-border/60 rounded-lg p-16 flex flex-col items-center justify-center gap-4 hover:border-primary/40 hover:bg-primary/[0.02] cursor-pointer transition-all group"
-                >
-                  <FileUp size={32} className="text-muted-foreground group-hover:text-primary transition-colors" />
-                  <div className="text-center">
-                    <p className="text-sm font-medium">Drop document here</p>
-                    <p className="text-[10px] text-muted-foreground mt-1 uppercase tracking-widest font-bold">TXT, PDF or MD</p>
+                <div className="space-y-6">
+                  <div
+                    onClick={() => document.getElementById('lib-upload')?.click()}
+                    className="border-2 border-dashed border-border/60 rounded-lg p-16 flex flex-col items-center justify-center gap-4 hover:border-primary/40 hover:bg-primary/[0.02] cursor-pointer transition-all group"
+                  >
+                    {selectedFileName ? (
+                      <>
+                        <CheckCircle2 size={32} className="text-primary" />
+                        <div className="text-center">
+                          <p className="text-sm font-medium">{selectedFileName}</p>
+                          <p className="text-[10px] text-muted-foreground mt-1 uppercase tracking-widest font-bold">Click to change file</p>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <FileUp size={32} className="text-muted-foreground group-hover:text-primary transition-colors" />
+                        <div className="text-center">
+                          <p className="text-sm font-medium">Drop document here</p>
+                          <p className="text-[10px] text-muted-foreground mt-1 uppercase tracking-widest font-bold">TXT, PDF or MD</p>
+                        </div>
+                      </>
+                    )}
+                    <input id="lib-upload" type="file" className="hidden" accept=".txt,.pdf,.md" onChange={handleFileSelect} />
                   </div>
-                  <input id="lib-upload" type="file" className="hidden" accept=".txt,.pdf,.md" />
+                  {selectedFileName && (
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60">Title</label>
+                      <Input
+                        placeholder="Fragment name..."
+                        value={title}
+                        onChange={(e) => setTitle(e.target.value)}
+                        className="border-border/40 focus:border-primary transition-all rounded-md"
+                      />
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -191,7 +255,7 @@ export function LibraryWorkshop({ isOpen, onClose, editItem }: LibraryWorkshopPr
               {!isConfirming && (
                 <Button 
                   onClick={handleSaveAttempt}
-                  disabled={isLoading || (mode === 'write' && !title) || isFetchingContent}
+                  disabled={isLoading || !title || isFetchingContent}
                   className="w-full h-12 gap-2 bg-foreground text-background hover:bg-foreground/90 transition-all rounded-[4px] text-[11px] font-bold uppercase tracking-[0.2em]"
                 >
                   {isLoading ? <Loader2 className="animate-spin" /> : <Sparkles size={16} />}

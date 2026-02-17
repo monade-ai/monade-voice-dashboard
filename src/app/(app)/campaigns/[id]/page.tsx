@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { motion } from 'framer-motion';
 import {
   ArrowLeft,
   Play,
@@ -19,6 +20,9 @@ import {
   PhoneForwarded,
   PhoneOff,
   Download,
+  Bot,
+  Brain,
+  Pencil,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatDistanceToNow, format } from 'date-fns';
@@ -33,6 +37,7 @@ import { campaignApi } from '@/lib/services/campaign-api.service';
 import { downloadCSV, generateCSV, loadCSVPreview } from '@/lib/utils/csv-preview';
 import { fetchJson } from '@/lib/http';
 import {
+  Campaign,
   CampaignStatus,
   CampaignContact,
   CampaignContactStatus,
@@ -45,10 +50,27 @@ import {
 } from '@/types/campaign.types';
 import { cn } from '@/lib/utils';
 import { parseApiTimestamp } from '@/lib/utils/date';
+import { useAssistants } from '@/app/hooks/use-assistants-context';
+import { useLibrary } from '@/app/hooks/use-knowledge-base';
 
 import { CSVUpload } from '../components/csv-upload';
 
 const CONTACT_STATUS_ORDER: CampaignContactStatus[] = ['pending', 'in-progress', 'completed', 'failed'];
+const TIMEZONES = [
+  { value: 'Asia/Kolkata', label: 'India (IST)' },
+  { value: 'Asia/Dubai', label: 'UAE (GST)' },
+  { value: 'America/New_York', label: 'US Eastern (ET)' },
+  { value: 'Europe/London', label: 'UK (GMT/BST)' },
+  { value: 'Asia/Singapore', label: 'Singapore (SGT)' },
+];
+
+interface CampaignParamsEditDraft {
+  assistantId: string;
+  dailyStartTime: string;
+  dailyEndTime: string;
+  timezone: string;
+  description: string;
+}
 
 type ActivityEventType = 'campaign' | 'call' | 'contact';
 
@@ -437,6 +459,14 @@ const ConfigItem = ({ label, value }: { label: string; value: string | number })
   </div>
 );
 
+const toCampaignEditDraft = (campaign: Campaign): CampaignParamsEditDraft => ({
+  assistantId: campaign.assistant_id ?? '',
+  dailyStartTime: campaign.daily_start_time ?? CAMPAIGN_API_CONFIG.DEFAULTS.DAILY_START_TIME,
+  dailyEndTime: campaign.daily_end_time ?? CAMPAIGN_API_CONFIG.DEFAULTS.DAILY_END_TIME,
+  timezone: campaign.timezone ?? CAMPAIGN_API_CONFIG.DEFAULTS.TIMEZONE,
+  description: campaign.description ?? '',
+});
+
 export default function CampaignDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -460,6 +490,8 @@ export default function CampaignDetailPage() {
     refreshCampaignStats,
     refreshCampaignContacts,
   } = useCampaignApi();
+  const { assistants } = useAssistants();
+  const { items: libraryItems } = useLibrary();
 
   const [csvPreview, setCsvPreview] = useState<CSVPreviewCache | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -470,6 +502,13 @@ export default function CampaignDetailPage() {
   const [contactQuery, setContactQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | CampaignContactStatus>('all');
   const [isImportMode, setIsImportMode] = useState(false);
+  const [isImportGateOpen, setIsImportGateOpen] = useState(false);
+  const [isPreparingImport, setIsPreparingImport] = useState(false);
+  const [isImportPausedForUpload, setIsImportPausedForUpload] = useState(false);
+  const [isEditingParams, setIsEditingParams] = useState(false);
+  const [editDraft, setEditDraft] = useState<CampaignParamsEditDraft | null>(null);
+  const [pendingEdit, setPendingEdit] = useState<CampaignParamsEditDraft | null>(null);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
 
   useEffect(() => {
     const bootstrap = async () => {
@@ -489,6 +528,11 @@ export default function CampaignDetailPage() {
   useEffect(() => {
     setRetryDraftValue(campaign?.max_retries ?? CAMPAIGN_API_CONFIG.DEFAULTS.MAX_RETRIES);
   }, [campaign?.max_retries]);
+
+  useEffect(() => {
+    if (!campaign || isEditingParams) return;
+    setEditDraft(toCampaignEditDraft(campaign));
+  }, [campaign, isEditingParams]);
 
   useEffect(() => {
     if (!campaign || campaign.status !== 'active') return;
@@ -518,12 +562,23 @@ export default function CampaignDetailPage() {
     try {
       const response = await uploadCSV(campaignId, file);
       toast.success(`Ingested ${response.totalRows} contacts`);
+      if (campaign && isImportPausedForUpload) {
+        try {
+          await resumeCampaignApi(campaign.id);
+          toast.success('Campaign resumed after import');
+        } catch (resumeError) {
+          console.error('Failed to resume campaign after import:', resumeError);
+          toast.error('CSV uploaded, but auto-resume failed. Resume the campaign manually.');
+        }
+      }
       await Promise.allSettled([
         getCampaign(campaignId),
+        refreshQueueStatus(),
         refreshCampaignStats(campaignId),
         refreshCampaignContacts(campaignId, { limit: 300 }),
       ]);
       setIsImportMode(false);
+      setIsImportPausedForUpload(false);
     } catch {
       toast.error('Upload failed');
     } finally {
@@ -630,6 +685,123 @@ export default function CampaignDetailPage() {
       toast.error('Failed to update retries.');
     } finally {
       setIsSavingRetries(false);
+    }
+  };
+
+  const handleStartEditParams = () => {
+    if (!campaign) return;
+    setEditDraft(toCampaignEditDraft(campaign));
+    setPendingEdit(null);
+    setIsEditingParams(true);
+  };
+
+  const handleCancelEditParams = () => {
+    if (!campaign) return;
+    setEditDraft(toCampaignEditDraft(campaign));
+    setPendingEdit(null);
+    setIsEditingParams(false);
+  };
+
+  const handleSaveParams = async (draft: CampaignParamsEditDraft) => {
+    if (!campaign) return;
+    const wasActive = campaign.status === 'active';
+    let pausedForUpdate = false;
+    let resumed = false;
+
+    setIsSavingEdit(true);
+    try {
+      if (wasActive) {
+        await pauseCampaignApi(campaign.id);
+        pausedForUpdate = true;
+      }
+
+      await updateCampaign(campaign.id, {
+        assistant_id: draft.assistantId,
+        daily_start_time: draft.dailyStartTime,
+        daily_end_time: draft.dailyEndTime,
+        timezone: draft.timezone,
+        description: draft.description.trim(),
+      });
+
+      if (pausedForUpdate) {
+        await resumeCampaignApi(campaign.id);
+        resumed = true;
+      }
+
+      await Promise.allSettled([
+        getCampaign(campaign.id),
+        refreshQueueStatus(),
+        refreshCampaignStats(campaign.id),
+        refreshCampaignContacts(campaign.id, { limit: 300 }),
+      ]);
+      setPendingEdit(null);
+      setIsEditingParams(false);
+      toast.success('Campaign parameters updated');
+    } catch (error) {
+      console.error('Failed to update campaign parameters:', error);
+      if (pausedForUpdate && !resumed) {
+        try {
+          await resumeCampaignApi(campaign.id);
+        } catch (resumeError) {
+          console.error('Failed to auto-resume campaign after update error:', resumeError);
+        }
+      }
+      toast.error('Failed to update campaign parameters.');
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
+  const handleSaveParamsClick = () => {
+    if (!campaign || !editDraft) return;
+    if (campaign.status === 'active') {
+      setPendingEdit({ ...editDraft });
+
+      return;
+    }
+    void handleSaveParams(editDraft);
+  };
+
+  const handleConfirmPendingEdit = () => {
+    if (!pendingEdit) return;
+    void handleSaveParams(pendingEdit);
+  };
+
+  const handleImportToggle = () => {
+    if (!campaign) return;
+    if (isImportMode) {
+      setIsImportMode(false);
+
+      return;
+    }
+    if (campaign.status === 'active') {
+      setIsImportGateOpen(true);
+
+      return;
+    }
+    setIsImportMode(true);
+  };
+
+  const handleConfirmImportGate = async () => {
+    if (!campaign) return;
+    setIsPreparingImport(true);
+    try {
+      await pauseCampaignApi(campaign.id);
+      await Promise.allSettled([
+        getCampaign(campaign.id),
+        refreshQueueStatus(),
+        refreshCampaignStats(campaign.id),
+        refreshCampaignContacts(campaign.id, { limit: 300 }),
+      ]);
+      setIsImportPausedForUpload(true);
+      setIsImportMode(true);
+      setIsImportGateOpen(false);
+      toast.success('Campaign paused. Upload CSV to append leads.');
+    } catch (error) {
+      console.error('Failed to pause campaign for import:', error);
+      toast.error('Failed to pause campaign for import.');
+    } finally {
+      setIsPreparingImport(false);
     }
   };
 
@@ -974,6 +1146,11 @@ export default function CampaignDetailPage() {
       .sort((a, b) => (parseDate(b.updated_at) ?? 0) - (parseDate(a.updated_at) ?? 0));
   }, [contacts, contactQuery, statusFilter]);
 
+  const sortedAssistants = useMemo(
+    () => [...assistants].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()),
+    [assistants],
+  );
+
   if (loading && !campaign) {
     return (
       <div className="h-screen flex items-center justify-center">
@@ -1013,6 +1190,14 @@ export default function CampaignDetailPage() {
         ? 'Waiting for credits'
         : progress.statusLabel)
     : progress.statusLabel;
+  const selectedAssistant = sortedAssistants.find((assistant) => assistant.id === campaign.assistant_id);
+  const selectedAssistantKbName = (() => {
+    const kb = selectedAssistant?.knowledgeBase;
+    if (!kb) return null;
+    const match = libraryItems.find((item) => item.id === kb || item.url === kb);
+
+    return match ? match.filename.replace(/\.txt$/, '') : null;
+  })();
 
   return (
     <div className="min-h-screen bg-background flex flex-col font-sans">
@@ -1109,6 +1294,48 @@ export default function CampaignDetailPage() {
             <AlertCircle size={16} /> {error}
           </div>
         )}
+        {(pendingEdit || isImportGateOpen) && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="p-4 rounded-md bg-primary/10 border border-primary/20 flex gap-3 items-start"
+          >
+            <AlertCircle className="text-primary shrink-0" size={18} />
+            <div className="space-y-2">
+              <p className="text-xs font-bold text-foreground uppercase tracking-wider">Confirmation required</p>
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                {pendingEdit
+                  ? 'This campaign is currently running. It will be paused, updated, and then resumed automatically.'
+                  : 'This campaign is currently running. It will be paused during CSV import and resumed after upload.'}
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    if (pendingEdit) {
+                      handleConfirmPendingEdit();
+                    } else {
+                      void handleConfirmImportGate();
+                    }
+                  }}
+                  disabled={isSavingEdit || isPreparingImport}
+                  className="text-[10px] font-bold text-primary uppercase tracking-widest hover:underline disabled:opacity-60 disabled:no-underline"
+                >
+                  Confirm
+                </button>
+                <button
+                  onClick={() => {
+                    setPendingEdit(null);
+                    setIsImportGateOpen(false);
+                  }}
+                  disabled={isSavingEdit || isPreparingImport}
+                  className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest hover:underline disabled:opacity-60 disabled:no-underline"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-10">
           <div className="space-y-8">
@@ -1186,9 +1413,9 @@ export default function CampaignDetailPage() {
                     <Button
                       variant={isImportMode ? 'default' : 'outline'}
                       size="sm"
-                      onClick={() => setIsImportMode(!isImportMode)}
+                      onClick={handleImportToggle}
                       className="h-8 text-[10px] uppercase tracking-widest gap-2"
-                      disabled={campaign.status === 'active'}
+                      disabled={loading || isUploading || isPreparingImport}
                     >
                       {isImportMode ? 'View Contacts' : 'Import CSV'}
                     </Button>
@@ -1203,7 +1430,7 @@ export default function CampaignDetailPage() {
                       onUploadComplete={handleCSVUpload}
                       onPreviewSaved={handlePreviewSaved}
                       existingPreview={csvPreview}
-                      disabled={loading || isUploading || campaign.status === 'active'}
+                      disabled={loading || isUploading || isPreparingImport || (campaign.status === 'active' && !isImportPausedForUpload)}
                     />
                   </div>
                 ) : filteredContacts.length === 0 ? (
@@ -1279,16 +1506,106 @@ export default function CampaignDetailPage() {
           <div className="space-y-8">
             <PaperCard variant="default" className="bg-muted/5 border-border/40">
               <PaperCardHeader className="p-6 pb-2">
-                <div className="flex items-center gap-2">
-                  <Settings2 size={16} className="text-primary" />
-                  <PaperCardTitle className="text-[10px] uppercase tracking-[0.2em]">Parameters</PaperCardTitle>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Settings2 size={16} className="text-primary" />
+                    <PaperCardTitle className="text-[10px] uppercase tracking-[0.2em]">Parameters</PaperCardTitle>
+                  </div>
+                  {!isEditingParams && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleStartEditParams}
+                      className="h-7 px-2 text-[9px] uppercase tracking-widest gap-1"
+                    >
+                      <Pencil size={11} />
+                      Edit
+                    </Button>
+                  )}
                 </div>
               </PaperCardHeader>
               <PaperCardContent className="p-6 pt-4 space-y-1">
                 <ConfigItem label="Provider" value={campaign.provider} />
                 <ConfigItem label="Trunk" value={campaign.trunk_name} />
-                <ConfigItem label="Timezone" value={campaign.timezone} />
-                <ConfigItem label="Call Window" value={`${campaign.daily_start_time} - ${campaign.daily_end_time}`} />
+                {isEditingParams && editDraft ? (
+                  <div className="space-y-3 py-2 border-b border-border/10">
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-muted-foreground uppercase tracking-widest">Agent</label>
+                      <select
+                        value={editDraft.assistantId}
+                        onChange={(event) => setEditDraft((prev) => (prev ? { ...prev, assistantId: event.target.value } : prev))}
+                        className="h-8 w-full bg-background border border-border/40 rounded px-2 text-[11px]"
+                        disabled={isSavingEdit}
+                      >
+                        <option value="">Select assistant</option>
+                        {sortedAssistants.map((assistant) => (
+                          <option key={assistant.id} value={assistant.id}>{assistant.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-muted-foreground uppercase tracking-widest">Call Window</label>
+                      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+                        <Input
+                          type="time"
+                          value={editDraft.dailyStartTime}
+                          onChange={(event) => setEditDraft((prev) => (prev ? { ...prev, dailyStartTime: event.target.value } : prev))}
+                          disabled={isSavingEdit}
+                          className="h-8 text-[11px] font-mono"
+                        />
+                        <span className="text-[10px] text-muted-foreground uppercase tracking-widest">to</span>
+                        <Input
+                          type="time"
+                          value={editDraft.dailyEndTime}
+                          onChange={(event) => setEditDraft((prev) => (prev ? { ...prev, dailyEndTime: event.target.value } : prev))}
+                          disabled={isSavingEdit}
+                          className="h-8 text-[11px] font-mono"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-muted-foreground uppercase tracking-widest">Timezone</label>
+                      <select
+                        value={editDraft.timezone}
+                        onChange={(event) => setEditDraft((prev) => (prev ? { ...prev, timezone: event.target.value } : prev))}
+                        className="h-8 w-full bg-background border border-border/40 rounded px-2 text-[11px]"
+                        disabled={isSavingEdit}
+                      >
+                        {TIMEZONES.map((tz) => (
+                          <option key={tz.value} value={tz.value}>{tz.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-muted-foreground uppercase tracking-widest">Description</label>
+                      <textarea
+                        value={editDraft.description}
+                        onChange={(event) => setEditDraft((prev) => (prev ? { ...prev, description: event.target.value } : prev))}
+                        disabled={isSavingEdit}
+                        rows={3}
+                        className="w-full bg-background border border-border/40 rounded px-2 py-2 text-[11px] resize-none"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <ConfigItem label="Agent" value={selectedAssistant?.name ?? campaign.assistant_id} />
+                    {selectedAssistantKbName ? (
+                      <div className="flex justify-between py-2 border-b border-border/10">
+                        <span className="text-xs text-muted-foreground flex items-center gap-1"><Brain size={12} /> KB</span>
+                        <span className="text-xs font-bold text-foreground">{selectedAssistantKbName}</span>
+                      </div>
+                    ) : (
+                      <div className="flex justify-between py-2 border-b border-border/10">
+                        <span className="text-xs text-muted-foreground flex items-center gap-1"><Bot size={12} /> Agent ID</span>
+                        <span className="text-xs font-bold text-foreground font-mono">{campaign.assistant_id || '—'}</span>
+                      </div>
+                    )}
+                    <ConfigItem label="Timezone" value={campaign.timezone} />
+                    <ConfigItem label="Call Window" value={`${campaign.daily_start_time} - ${campaign.daily_end_time}`} />
+                    <ConfigItem label="Description" value={campaign.description || '—'} />
+                  </>
+                )}
                 <ConfigItem label="Rate" value={`${campaign.calls_per_second} CPS`} />
                 <ConfigItem label="Concurrency" value={campaign.max_concurrent} />
                 <div className="flex items-center justify-between py-2 border-b border-border/10 last:border-0">
@@ -1308,13 +1625,34 @@ export default function CampaignDetailPage() {
                       variant="outline"
                       size="sm"
                       onClick={() => { void handleSaveRetries(); }}
-                      disabled={isSavingRetries || retryDraftValue === campaign.max_retries}
+                      disabled={isSavingRetries || isSavingEdit || retryDraftValue === campaign.max_retries}
                       className="h-7 px-2 text-[9px] uppercase tracking-widest"
                     >
                       {isSavingRetries ? <Loader2 size={12} className="animate-spin" /> : 'Save'}
                     </Button>
                   </div>
                 </div>
+                {isEditingParams && (
+                  <div className="flex items-center justify-end gap-2 pt-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleCancelEditParams}
+                      disabled={isSavingEdit}
+                      className="h-7 px-2 text-[9px] uppercase tracking-widest"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={handleSaveParamsClick}
+                      disabled={isSavingEdit || !editDraft?.assistantId}
+                      className="h-7 px-2 text-[9px] uppercase tracking-widest"
+                    >
+                      {isSavingEdit ? <Loader2 size={12} className="animate-spin" /> : 'Save'}
+                    </Button>
+                  </div>
+                )}
               </PaperCardContent>
             </PaperCard>
 

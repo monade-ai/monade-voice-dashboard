@@ -1,18 +1,20 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  X, 
-  Loader2, 
-  Sparkles, 
-  ArrowRight, 
-  Settings2, 
-  Bot, 
+import {
+  X,
+  Loader2,
+  Sparkles,
+  ArrowRight,
+  Settings2,
+  Bot,
   ShieldCheck,
   Zap,
   Activity,
+  Phone,
+  Brain,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -20,6 +22,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useAssistants } from '@/app/hooks/use-assistants-context';
+import { useLibrary } from '@/app/hooks/use-knowledge-base';
 import { useTrunks } from '@/app/hooks/use-trunks';
 import { useCampaignApi } from '@/app/hooks/use-campaign-api';
 import {
@@ -91,8 +94,22 @@ export function CreateCampaignModal({
 }: CreateCampaignModalProps) {
   const router = useRouter();
   const { assistants } = useAssistants();
+  const { items: libraryItems } = useLibrary();
   const { trunks } = useTrunks({ checkAssignments: false });
   const { createCampaign, loading } = useCampaignApi();
+
+  // Sort assistants: most recently created first
+  const sortedAssistants = useMemo(() =>
+    [...assistants].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()),
+    [assistants],
+  );
+
+  // Resolve knowledgeBase (id or url) to a display name
+  const getKbName = (kb: string | null | undefined): string | null => {
+    if (!kb) return null;
+    const match = libraryItems.find((item) => item.id === kb || item.url === kb);
+    return match ? match.filename.replace(/\.txt$/, '') : null;
+  };
 
   const [formData, setFormData] = useState<FormData>(initialFormData);
   const [step, setStep] = useState<1 | 2 | 3>(1);
@@ -200,27 +217,47 @@ export function CreateCampaignModal({
                   <div className="space-y-4">
                     <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 px-1">Assigned Agent</label>
                     <div className="grid grid-cols-1 gap-3">
-                      {assistants.map((assistant) => (
-                        <div 
-                          key={assistant.id}
-                          onClick={() => handleChange('assistantId', assistant.id)}
-                          className={cn(
-                            'flex items-center gap-4 p-4 rounded-md border cursor-pointer transition-all hover:border-primary/40',
-                            formData.assistantId === assistant.id 
-                              ? 'bg-primary/5 border-primary/40 shadow-sm' 
-                              : 'bg-background border-border/40 hover:bg-muted/30',
-                          )}
-                        >
-                          <div className={cn('w-8 h-8 rounded-full flex items-center justify-center transition-colors', formData.assistantId === assistant.id ? 'bg-primary text-black' : 'bg-muted text-muted-foreground')}>
-                            <Bot size={16} />
+                      {sortedAssistants.map((assistant) => {
+                        const kbName = getKbName(assistant.knowledgeBase);
+                        const isSelected = formData.assistantId === assistant.id;
+                        return (
+                          <div
+                            key={assistant.id}
+                            onClick={() => handleChange('assistantId', assistant.id)}
+                            className={cn(
+                              'flex items-center gap-4 p-4 rounded-md border cursor-pointer transition-all hover:border-primary/40',
+                              isSelected
+                                ? 'bg-primary/5 border-primary/40 shadow-sm'
+                                : 'bg-background border-border/40 hover:bg-muted/30',
+                            )}
+                          >
+                            <div className={cn('w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-colors', isSelected ? 'bg-primary text-black' : 'bg-muted text-muted-foreground')}>
+                              <Bot size={16} />
+                            </div>
+                            <div className="flex flex-col min-w-0 flex-1 gap-1">
+                              <span className="text-sm font-bold text-foreground truncate">{assistant.name}</span>
+                              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                                {assistant.phoneNumber && (
+                                  <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                                    <Phone size={10} className="shrink-0" />
+                                    <span className="truncate">{assistant.phoneNumber}</span>
+                                  </span>
+                                )}
+                                {kbName && (
+                                  <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                                    <Brain size={10} className="shrink-0" />
+                                    <span className="truncate">{kbName}</span>
+                                  </span>
+                                )}
+                                {!assistant.phoneNumber && !kbName && (
+                                  <span className="text-[10px] text-muted-foreground uppercase tracking-widest">{assistant.model || 'Standard'}</span>
+                                )}
+                              </div>
+                            </div>
+                            {isSelected && <Sparkles size={16} className="ml-auto shrink-0 text-primary" />}
                           </div>
-                          <div className="flex flex-col">
-                            <span className="text-sm font-bold text-foreground">{assistant.name}</span>
-                            <span className="text-[10px] text-muted-foreground uppercase tracking-widest">{assistant.model || 'Standard'}</span>
-                          </div>
-                          {formData.assistantId === assistant.id && <Sparkles size={16} className="ml-auto text-primary" />}
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                   <div className="space-y-4">
