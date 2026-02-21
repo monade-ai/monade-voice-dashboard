@@ -88,7 +88,7 @@ export async function signup(formData: FormData) {
     redirect('/login?message=' + encodeURIComponent(error.message));
   }
 
-  redirect('/login?message=Check email to continue signup process');
+  redirect('/login?mode=signup&pending_onboarding=1&message=' + encodeURIComponent('Check email to continue signup process'));
 }
 
 export async function logout() {

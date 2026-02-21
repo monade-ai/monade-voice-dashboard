@@ -12,6 +12,8 @@ import { login, signup, type LoginActionState } from './actions';
 // --- Types ---
 type OnboardingStep = 'identity' | 'purpose' | 'handover';
 type AuthMode = 'signin' | 'signup';
+const PENDING_ONBOARDING_KEY = 'monade_pending_onboarding';
+const ONBOARDING_COMPLETED_KEY = 'monade_onboarding_completed';
 
 interface OnboardingFormData {
   email: string;
@@ -35,9 +37,12 @@ const FadeIn = ({ children, delay = 0 }: { children: React.ReactNode, delay?: nu
   </motion.div>
 );
 
-export default function LoginPage() {
+function LoginComponent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const initialAuthMode: AuthMode = searchParams.get('mode') === 'signup' ? 'signup' : 'signin';
   const [step, setStep] = useState<OnboardingStep>('identity');
-  const [authMode, setAuthMode] = useState<AuthMode>('signin');
+  const [authMode, setAuthMode] = useState<AuthMode>(initialAuthMode);
   const [formData, setFormData] = useState<OnboardingFormData>({
     email: '',
     password: '',
@@ -46,8 +51,6 @@ export default function LoginPage() {
     teamSize: '',
     origin: '',
   });
-  const router = useRouter();
-  const searchParams = useSearchParams();
   const initialLoginState: LoginActionState = { success: false, error: null };
   const [loginState, loginAction, isLoggingIn] = useActionState(login, initialLoginState);
   const [isResetting, setIsResetting] = useState(false);
@@ -56,12 +59,30 @@ export default function LoginPage() {
     success: null,
   });
   const authMessage = searchParams.get('message');
+  const pendingOnboardingParam = searchParams.get('pending_onboarding');
 
   useEffect(() => {
-    if (loginState.success && step === 'identity') {
+    if (!loginState.success || step !== 'identity') return;
+
+    const shouldShowOnboarding = authMode === 'signup'
+      && typeof window !== 'undefined'
+      && localStorage.getItem(PENDING_ONBOARDING_KEY) === '1'
+      && localStorage.getItem(ONBOARDING_COMPLETED_KEY) !== '1';
+
+    if (shouldShowOnboarding) {
       setStep('purpose');
+
+      return;
     }
-  }, [loginState.success, step]);
+
+    router.push('/assistants');
+  }, [authMode, loginState.success, router, step]);
+
+  useEffect(() => {
+    if (pendingOnboardingParam !== '1') return;
+    localStorage.setItem(PENDING_ONBOARDING_KEY, '1');
+    setAuthMode('signup');
+  }, [pendingOnboardingParam]);
 
   const handleForgotPassword = async () => {
     const email = formData.email.trim();
@@ -99,6 +120,8 @@ export default function LoginPage() {
 
     // Simulate AI configuration delay
     setTimeout(() => {
+      localStorage.setItem(ONBOARDING_COMPLETED_KEY, '1');
+      localStorage.removeItem(PENDING_ONBOARDING_KEY);
       router.push('/assistants');
     }, 2500);
   };
@@ -142,22 +165,20 @@ export default function LoginPage() {
                     <button
                       type="button"
                       onClick={() => setAuthMode('signin')}
-                      className={`h-8 rounded-[3px] text-xs font-medium transition-colors ${
-                        authMode === 'signin'
+                      className={`h-8 rounded-[3px] text-xs font-medium transition-colors ${authMode === 'signin'
                           ? 'bg-foreground text-background'
                           : 'text-muted-foreground hover:text-foreground'
-                      }`}
+                        }`}
                     >
                       Sign in
                     </button>
                     <button
                       type="button"
                       onClick={() => setAuthMode('signup')}
-                      className={`h-8 rounded-[3px] text-xs font-medium transition-colors ${
-                        authMode === 'signup'
+                      className={`h-8 rounded-[3px] text-xs font-medium transition-colors ${authMode === 'signup'
                           ? 'bg-foreground text-background'
                           : 'text-muted-foreground hover:text-foreground'
-                      }`}
+                        }`}
                     >
                       Create account
                     </button>
@@ -266,7 +287,7 @@ export default function LoginPage() {
                           className={`text-left px-3 py-2 rounded-[4px] text-sm border transition-all ${formData.useCase === opt
                             ? 'border-[#facc15] bg-[#facc15]/10 text-foreground'
                             : 'border-border text-muted-foreground hover:border-foreground/30'
-                          }`}
+                            }`}
                         >
                           {opt}
                         </button>
@@ -286,7 +307,7 @@ export default function LoginPage() {
                           className={`flex-1 px-3 py-2 rounded-[4px] text-sm border transition-all ${formData.callVolume === opt
                             ? 'border-[#facc15] bg-[#facc15]/10 text-foreground'
                             : 'border-border text-muted-foreground hover:border-foreground/30'
-                          }`}
+                            }`}
                         >
                           {opt}
                         </button>
@@ -306,7 +327,7 @@ export default function LoginPage() {
                           className={`flex-1 px-3 py-2 rounded-[4px] text-sm border transition-all ${formData.teamSize === opt
                             ? 'border-[#facc15] bg-[#facc15]/10 text-foreground'
                             : 'border-border text-muted-foreground hover:border-foreground/30'
-                          }`}
+                            }`}
                         >
                           {opt}
                         </button>
@@ -396,5 +417,13 @@ export default function LoginPage() {
         </motion.div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <React.Suspense fallback={null}>
+      <LoginComponent />
+    </React.Suspense>
   );
 }

@@ -173,13 +173,22 @@ export function ApiKeyManager() {
                   </span>
                 </div>
               </div>
-              <button 
-                onClick={() => handleDelete(key.id)}
-                className="opacity-0 group-hover:opacity-100 p-2 text-muted-foreground hover:text-destructive transition-all"
-                title="Revoke Key"
-              >
-                <Trash2 size={14} />
-              </button>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => handleCopy(key.api_key)}
+                  className="h-8 w-8 inline-flex items-center justify-center rounded-[4px] border border-border/30 text-muted-foreground hover:text-foreground hover:bg-background/80 transition-all"
+                  title="Copy Key"
+                >
+                  <Copy size={13} />
+                </button>
+                <button 
+                  onClick={() => handleDelete(key.id)}
+                  className="h-8 w-8 inline-flex items-center justify-center rounded-[4px] border border-border/30 text-muted-foreground hover:text-destructive hover:bg-background/80 transition-all"
+                  title="Revoke Key"
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
             </div>
           ))
         )}

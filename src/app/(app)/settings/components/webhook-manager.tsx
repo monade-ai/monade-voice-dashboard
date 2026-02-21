@@ -334,21 +334,21 @@ export function WebhookManager() {
               <div className="flex items-center gap-1 shrink-0 ml-2">
                 <button
                   onClick={() => handleToggle(ep)}
-                  className="p-2 text-muted-foreground hover:text-foreground transition-all"
+                  className="h-9 w-9 inline-flex items-center justify-center rounded-[4px] border border-border/30 text-muted-foreground hover:text-foreground hover:bg-background/80 transition-all"
                   title={ep.is_active ? 'Pause webhook' : 'Activate webhook'}
                 >
                   {ep.is_active ? <ToggleRight size={16} className="text-primary" /> : <ToggleLeft size={16} />}
                 </button>
                 <button
                   onClick={() => openEditDialog(ep)}
-                  className="p-2 text-muted-foreground hover:text-foreground transition-all opacity-0 group-hover:opacity-100"
+                  className="h-9 w-9 inline-flex items-center justify-center rounded-[4px] border border-border/30 text-muted-foreground hover:text-foreground hover:bg-background/80 transition-all"
                   title="Edit"
                 >
-                  <Pencil size={13} />
+                  <Pencil size={14} />
                 </button>
                 <button
                   onClick={() => handleDelete(ep.id)}
-                  className="p-2 text-muted-foreground hover:text-destructive transition-all opacity-0 group-hover:opacity-100"
+                  className="h-9 w-9 inline-flex items-center justify-center rounded-[4px] border border-border/30 text-muted-foreground hover:text-destructive hover:bg-background/80 transition-all"
                   title="Delete"
                 >
                   <Trash2 size={14} />

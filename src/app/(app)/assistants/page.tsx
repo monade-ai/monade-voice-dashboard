@@ -3,9 +3,9 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { 
-  Plus, 
-  Search, 
+import {
+  Plus,
+  Search,
   Users,
   X,
 } from 'lucide-react';
@@ -95,7 +95,7 @@ function AssistantsGallery() {
       name: 'New Assistant',
       phoneNumber: '',
       contact_bucket_id: null,
-      user_uid: '', 
+      user_uid: '',
       tags: [],
     });
     setCurrentAssistant(draft);
@@ -106,7 +106,7 @@ function AssistantsGallery() {
       <DashboardHeader />
 
       <main className="flex-1 p-6 md:p-8 max-w-7xl mx-auto w-full space-y-12">
-        
+
         {/* Header Section */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-8">
           <div className="space-y-2">
@@ -125,23 +125,23 @@ function AssistantsGallery() {
         {/* --- The Studio Brief (Warm & Grounded Redesign) --- */}
         <AnimatePresence>
           {showBrief && (
-            <motion.div 
-              initial={{ opacity: 0, y: -10 }} 
-              animate={{ opacity: 1, y: 0 }} 
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
               className="relative border border-primary/20 bg-primary/[0.01] rounded-md overflow-hidden mb-12"
             >
               <button onClick={dismissBrief} className="absolute top-6 right-6 p-2 text-muted-foreground hover:text-foreground transition-colors z-20">
                 <X size={18} />
               </button>
-                    
+
               <div className="p-12 md:p-16 space-y-10">
                 <div className="space-y-4">
                   <h2 className="text-4xl font-medium tracking-tight text-foreground max-w-2xl">
-                                Welcome to your Studio. This is where you bring your AI assistants to life.
+                    Welcome to your Studio. This is where you bring your AI assistants to life.
                   </h2>
                   <p className="text-lg text-muted-foreground max-w-xl font-normal leading-relaxed">
-                                It’s simple to get started. Just follow these three steps to help your team succeed.
+                    It’s simple to get started. Just follow these three steps to help your team succeed.
                   </p>
                 </div>
 
@@ -149,19 +149,19 @@ function AssistantsGallery() {
                   <div className="space-y-3">
                     <span className="text-[10px] font-bold text-primary uppercase tracking-[0.3em]">01. What they say</span>
                     <p className="text-sm text-muted-foreground leading-relaxed">
-                                    Write a script to guide your assistant. Tell them who they are and how you'd like them to talk to your customers.
+                      Write a script to guide your assistant. Tell them who they are and how you'd like them to talk to your customers.
                     </p>
                   </div>
                   <div className="space-y-3 border-l border-border/20 pl-8">
                     <span className="text-[10px] font-bold text-primary uppercase tracking-[0.3em]">02. What they know</span>
                     <p className="text-sm text-muted-foreground leading-relaxed">
-                                    Link files from your library so they have all the right facts about your business, pricing, and services.
+                      Link files from your library so they have all the right facts about your business, pricing, and services.
                     </p>
                   </div>
                   <div className="space-y-3 border-l border-border/20 pl-8">
                     <span className="text-[10px] font-bold text-primary uppercase tracking-[0.3em]">03. Going live</span>
                     <p className="text-sm text-muted-foreground leading-relaxed">
-                                    Pick a voice you like, connect a phone line, and your assistant is ready to start helping people.
+                      Pick a voice you like, connect a phone line, and your assistant is ready to start helping people.
                     </p>
                   </div>
                 </div>
@@ -178,11 +178,10 @@ function AssistantsGallery() {
                 type="button"
                 onClick={() => setActiveTab('all')}
                 aria-pressed={activeTab === 'all'}
-                className={`text-[10px] font-bold uppercase tracking-widest pb-1 border-b-2 transition-all ${
-                  activeTab === 'all'
+                className={`text-[10px] font-bold uppercase tracking-widest pb-1 border-b-2 transition-all ${activeTab === 'all'
                     ? 'border-primary text-foreground'
                     : 'border-transparent text-muted-foreground hover:text-foreground'
-                }`}
+                  }`}
               >
                 All Assistants
               </button>
@@ -190,11 +189,10 @@ function AssistantsGallery() {
                 type="button"
                 onClick={() => setActiveTab('production')}
                 aria-pressed={activeTab === 'production'}
-                className={`text-[10px] font-bold uppercase tracking-widest pb-1 border-b-2 transition-all ${
-                  activeTab === 'production'
+                className={`text-[10px] font-bold uppercase tracking-widest pb-1 border-b-2 transition-all ${activeTab === 'production'
                     ? 'border-primary text-foreground'
                     : 'border-transparent text-muted-foreground hover:text-foreground'
-                }`}
+                  }`}
               >
                 Production
               </button>
@@ -202,11 +200,10 @@ function AssistantsGallery() {
                 type="button"
                 onClick={() => setActiveTab('drafts')}
                 aria-pressed={activeTab === 'drafts'}
-                className={`text-[10px] font-bold uppercase tracking-widest pb-1 border-b-2 transition-all ${
-                  activeTab === 'drafts'
+                className={`text-[10px] font-bold uppercase tracking-widest pb-1 border-b-2 transition-all ${activeTab === 'drafts'
                     ? 'border-primary text-foreground'
                     : 'border-transparent text-muted-foreground hover:text-foreground'
-                }`}
+                  }`}
               >
                 Drafts
               </button>
@@ -241,5 +238,9 @@ function AssistantsGallery() {
 }
 
 export default function AssistantsPage() {
-  return <AssistantsGallery />;
+  return (
+    <React.Suspense fallback={null}>
+      <AssistantsGallery />
+    </React.Suspense>
+  );
 }
