@@ -1,22 +1,15 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { 
   ArrowLeft, 
-  CreditCard, 
   TrendingDown, 
-  History, 
   Zap, 
-  Plus, 
   ShieldCheck, 
   ChevronRight,
-  Download,
   AlertCircle,
-  Clock,
-  Sparkles,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { Activity } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { useCredits } from '@/app/hooks/use-credits';
@@ -28,33 +21,6 @@ import { cn } from '@/lib/utils';
 // --- Helpers ---
 
 const formatCurrency = (num: number) => `₹${Math.round(num).toLocaleString()}`;
-
-// --- Component: TransactionRow (Linear Copy) ---
-
-const TransactionRow = ({ type, amount, date, status }: { type: string, amount: string, date: string, status: string }) => (
-  <div className="group flex items-center justify-between p-4 border-b border-border/10 hover:bg-muted/30 transition-all cursor-pointer">
-    <div className="flex items-center gap-4">
-      <div className={cn(
-        'w-8 h-8 rounded-md flex items-center justify-center border',
-        type === 'usage' ? 'bg-muted border-border/40 text-muted-foreground' : 'bg-primary/10 border-primary/20 text-primary',
-      )}>
-        {type === 'usage' ? <Activity size={14} /> : <Plus size={14} />}
-      </div>
-      <div className="flex flex-col">
-        <span className="text-sm font-medium text-foreground capitalize">{type === 'usage' ? 'Session Usage' : 'Deposit'}</span>
-        <span className="text-[10px] text-muted-foreground uppercase tracking-widest">{date}</span>
-      </div>
-    </div>
-    <div className="flex items-center gap-6">
-      <span className={cn('text-sm font-mono font-bold', type === 'usage' ? 'text-foreground' : 'text-primary')}>
-        {type === 'usage' ? '-' : '+'}{amount}
-      </span>
-      <div className="opacity-0 group-hover:opacity-100 transition-all">
-        <button title="Download Invoice" className="p-2 text-muted-foreground hover:text-foreground"><Download size={14} /></button>
-      </div>
-    </div>
-  </div>
-);
 
 
 // --- Main Page ---
@@ -175,13 +141,17 @@ export default function WalletPage() {
             <section className="space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground/60">Activity Ledger</h3>
-                <button className="text-[10px] font-bold uppercase tracking-widest text-primary hover:underline">Export CSV</button>
+                <button className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50 cursor-not-allowed" disabled>
+                  Export CSV
+                </button>
               </div>
-              <div className="bg-card/30 rounded-md border border-border/20 overflow-hidden shadow-sm">
-                <TransactionRow type="purchase" amount="2,000m" date="Feb 02, 2026" status="confirmed" />
-                <TransactionRow type="usage" amount="12m" date="Feb 02, 2026" status="confirmed" />
-                <TransactionRow type="usage" amount="45m" date="Feb 01, 2026" status="confirmed" />
-                <TransactionRow type="purchase" amount="500m" date="Jan 28, 2026" status="confirmed" />
+              <div className="bg-card/30 rounded-md border border-border/20 shadow-sm p-8 text-center">
+                <p className="text-xs text-muted-foreground italic">
+                  No transaction history is available yet.
+                </p>
+                <p className="text-[10px] text-muted-foreground/70 mt-2 uppercase tracking-widest">
+                  Ledger data will appear here once backend audit entries are enabled.
+                </p>
               </div>
             </section>
           </div>

@@ -46,3 +46,35 @@ next-env.d.ts
 
 # API configuration (contains sensitive endpoints)
 api-config.json
+
+# AI Agents & IDEs
+.agent/
+.agents/
+.claude/
+.cursor/
+.factory/
+.goose/
+.kiro/
+.qoder/
+.serena/
+.trae/
+.windsurf/
+skills/
+
+# AI Generated Scratchpads & Plans
+API_BACKEND_SHORTCOMINGS.md
+API_TREE.md
+ASSISTANTS_PLAN.md
+AUDIT_*.md
+EPIC_*.md
+FLOW_*.md
+PHASE2_*.md
+REFACTOR_*.md
+SYSTEM_PRIMING_MASTER.md
+todo.md
+
+# Data & Temp Files
+.tmp_truncate_test
+unified-api-collection (1).json
+raw-data.csv
+*.csv

@@ -153,24 +153,24 @@ const toLocalTimestamp = (value: string | null | undefined): string => {
 
 const getStatusConfig = (status: CampaignStatus) => {
   switch (status) {
-  case 'active': return { color: 'text-green-500', bg: 'bg-green-500/10', border: 'border-green-500/20', icon: Activity, label: 'Running' };
-  case 'paused': return { color: 'text-yellow-500', bg: 'bg-yellow-500/10', border: 'border-yellow-500/20', icon: Pause, label: 'Paused' };
-  case 'completed': return { color: 'text-blue-500', bg: 'bg-blue-500/10', border: 'border-blue-500/20', icon: CheckCircle2, label: 'Complete' };
-  case 'stopped': return { color: 'text-red-500', bg: 'bg-red-500/10', border: 'border-red-500/20', icon: XCircle, label: 'Stopped' };
-  default: return { color: 'text-muted-foreground', bg: 'bg-muted', border: 'border-border/40', icon: Clock, label: 'Queued' };
+    case 'active': return { color: 'text-green-500', bg: 'bg-green-500/10', border: 'border-green-500/20', icon: Activity, label: 'Running' };
+    case 'paused': return { color: 'text-yellow-500', bg: 'bg-yellow-500/10', border: 'border-yellow-500/20', icon: Pause, label: 'Paused' };
+    case 'completed': return { color: 'text-blue-500', bg: 'bg-blue-500/10', border: 'border-blue-500/20', icon: CheckCircle2, label: 'Complete' };
+    case 'stopped': return { color: 'text-red-500', bg: 'bg-red-500/10', border: 'border-red-500/20', icon: XCircle, label: 'Stopped' };
+    default: return { color: 'text-muted-foreground', bg: 'bg-muted', border: 'border-border/40', icon: Clock, label: 'Queued' };
   }
 };
 
 const getContactStatusBadgeClass = (status: CampaignContactStatus) => {
   switch (status) {
-  case 'completed':
-    return 'text-green-500 bg-green-500/10 border-green-500/20';
-  case 'failed':
-    return 'text-red-500 bg-red-500/10 border-red-500/20';
-  case 'in-progress':
-    return 'text-yellow-500 bg-yellow-500/10 border-yellow-500/20';
-  default:
-    return 'text-muted-foreground bg-muted border-border/40';
+    case 'completed':
+      return 'text-green-500 bg-green-500/10 border-green-500/20';
+    case 'failed':
+      return 'text-red-500 bg-red-500/10 border-red-500/20';
+    case 'in-progress':
+      return 'text-yellow-500 bg-yellow-500/10 border-yellow-500/20';
+    default:
+      return 'text-muted-foreground bg-muted border-border/40';
   }
 };
 
@@ -218,12 +218,111 @@ const getAttemptMessage = (contact: CampaignContact): string => {
   return 'No call attempts yet';
 };
 
-const getContactDisplayName = (metadata: Record<string, unknown>): string | null => {
-  const value = metadata.name ?? metadata.Name ?? metadata.full_name ?? metadata.fullName;
-  if (typeof value !== 'string') return null;
-  const normalized = value.trim();
+/**
+ * Normalise a CSV column header key for comparison.
+ * Strips leading/trailing whitespace, collapses separators (space, _, -, .)
+ * into a single space, then lowercases.
+ */
+const normalizeKey = (k: string): string =>
+  k.trim().replace(/[\s_\-\.]+/g, ' ').toLowerCase();
 
-  return normalized.length ? normalized : null;
+/**
+ * Exhaustive set of normalised name-column aliases.
+ * Includes common typos, regional variants, CRM exports, and space/separator variants.
+ */
+const NAME_KEY_ALIASES = new Set([
+  // canonical
+  'name', 'full name', 'fullname',
+  // contact variants
+  'contact name', 'contactname', 'contact', 'contacts',
+  // first / last splits
+  'first name', 'firstname', 'fname', 'f name',
+  'last name', 'lastname', 'lname', 'l name',
+  'first last', 'first and last',
+  // person / person name
+  'person', 'person name', 'personname',
+  // customer
+  'customer name', 'customername', 'customer',
+  // client
+  'client name', 'clientname', 'client',
+  // lead
+  'lead name', 'leadname', 'lead',
+  // prospect / subscriber
+  'prospect name', 'prospectname', 'prospect',
+  'subscriber name', 'subscribername', 'subscriber',
+  'member name', 'membername', 'member',
+  // common CRM fields
+  'display name', 'displayname',
+  'user name', 'username', 'user',
+  'account name', 'accountname',
+  'company contact', 'employee name', 'employeename',
+  // common typos / fat-finger variants
+  'nme', 'naem', 'nmae', 'nam', 'nme', 'naame', 'namee',
+  'flname', 'fl name', 'f l name',
+  'fullnme', 'ful name', 'fullnm',
+  // Hindi / regional transliterations often used in India
+  'naam', 'nama', 'nombree', 'nombre',
+  // misformatted from Excel exports
+  'name ', ' name', ' name ', '  name',   // handled by normalizeKey anyway, included for clarity
+  'col name', 'column name',
+]);
+
+/**
+ * Given a metadata record and an optional manual column override,
+ * return the best contact display name string or null.
+ *
+ * Resolution order:
+ *  1. Manual override key (set by user in the UI)
+ *  2. Exact match against the alias set (after normalisation)
+ *  3. Key contains the word "name" anywhere (after normalisation)
+ *  4. Key contains "first" or "person" (weaker heuristic, last resort)
+ */
+const getContactDisplayName = (
+  metadata: Record<string, unknown>,
+  nameColumnOverride?: string | null,
+): string | null => {
+  const readValue = (key: string): string | null => {
+    const v = metadata[key];
+    if (typeof v === 'string') {
+      const t = v.trim();
+      return t.length ? t : null;
+    }
+    return null;
+  };
+
+  // 1. Manual override: trust it completely
+  if (nameColumnOverride) {
+    const v = readValue(nameColumnOverride);
+    if (v !== null) return v;
+  }
+
+  // 2. Alias-set match (normalise each key then check the set)
+  for (const key of Object.keys(metadata)) {
+    if (NAME_KEY_ALIASES.has(normalizeKey(key))) {
+      const v = readValue(key);
+      if (v !== null) return v;
+    }
+  }
+
+  // 3. Key contains "name" anywhere after normalisation
+  for (const key of Object.keys(metadata)) {
+    if (normalizeKey(key).includes('name')) {
+      const v = readValue(key);
+      if (v !== null) return v;
+    }
+  }
+
+  // 4. Weak heuristics: keys containing "first", "person", "contact", "client", "lead"
+  const weakWords = ['first', 'person', 'contact', 'client', 'lead', 'user', 'member'];
+  for (const key of Object.keys(metadata)) {
+    const nk = normalizeKey(key);
+    if (weakWords.some((w) => nk.includes(w))) {
+      const v = readValue(key);
+      if (v !== null) return v;
+    }
+  }
+
+  return null;
 };
 
 const normalizePhoneKey = (phone: string | null | undefined): string => {
@@ -510,6 +609,22 @@ export default function CampaignDetailPage() {
   const [pendingEdit, setPendingEdit] = useState<CampaignParamsEditDraft | null>(null);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
 
+  // ── Name-column field mapper ──────────────────────────────────────────
+  // Persisted per campaign so the user only has to pick once.
+  const nameColumnKey = `monade_campaign_name_col_${campaignId}`;
+  const [nameColumnOverride, setNameColumnOverride] = useState<string | null>(
+    () => (typeof window !== 'undefined' ? localStorage.getItem(nameColumnKey) : null),
+  );
+  const handleNameColumnChange = (col: string) => {
+    if (col === '') {
+      localStorage.removeItem(nameColumnKey);
+      setNameColumnOverride(null);
+    } else {
+      localStorage.setItem(nameColumnKey, col);
+      setNameColumnOverride(col);
+    }
+  };
+
   useEffect(() => {
     const bootstrap = async () => {
       await getCampaign(campaignId);
@@ -520,7 +635,7 @@ export default function CampaignDetailPage() {
       ]);
     };
 
-    void bootstrap().catch(() => {});
+    void bootstrap().catch(() => { });
     const preview = loadCSVPreview(campaignId);
     setCsvPreview(preview);
   }, [campaignId, getCampaign, refreshCampaignStats, refreshCampaignContacts, refreshQueueStatus]);
@@ -1135,7 +1250,7 @@ export default function CampaignDetailPage() {
       .filter((contact) => {
         if (statusFilter !== 'all' && contact.status !== statusFilter) return false;
         if (!normalizedQuery) return true;
-        const name = getContactDisplayName(contact.metadata)?.toLowerCase() ?? '';
+        const name = getContactDisplayName(contact.metadata, nameColumnOverride)?.toLowerCase() ?? '';
         const phone = contact.phone_number.toLowerCase();
         const callId = getAttemptCallId(contact)?.toLowerCase() ?? '';
 
@@ -1144,7 +1259,7 @@ export default function CampaignDetailPage() {
           || callId.includes(normalizedQuery);
       })
       .sort((a, b) => (parseDate(b.updated_at) ?? 0) - (parseDate(a.updated_at) ?? 0));
-  }, [contacts, contactQuery, statusFilter]);
+  }, [contacts, contactQuery, statusFilter, nameColumnOverride]);
 
   const sortedAssistants = useMemo(
     () => [...assistants].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()),
@@ -1444,7 +1559,37 @@ export default function CampaignDetailPage() {
                     <table className="w-full min-w-[840px] text-left">
                       <thead>
                         <tr className="border-b border-border/30">
-                          <th className="py-2 pr-3 text-[10px] uppercase tracking-widest text-muted-foreground">Contact</th>
+                          <th className="py-2 pr-3 text-[10px] uppercase tracking-widest text-muted-foreground">
+                            {/* ── Field Mapper ───────────────────────────────── */}
+                            {(() => {
+                              // Collect all metadata keys from the first contact that has metadata
+                              const sampleMeta = filteredContacts.find((c) => Object.keys(c.metadata).length > 0)?.metadata ?? {};
+                              const metaKeys = Object.keys(sampleMeta);
+                              // Show mapper if there are metadata keys but we still can't auto-resolve a name
+                              // (or user already picked manually — always show so they can change)
+                              const showMapper = metaKeys.length > 0;
+                              if (!showMapper) return 'Contact';
+                              return (
+                                <div className="flex flex-col gap-0.5">
+                                  <span>Contact</span>
+                                  <div className="flex items-center gap-1 mt-0.5">
+                                    <span className="text-[9px] normal-case tracking-normal text-muted-foreground/60">name col:</span>
+                                    <select
+                                      value={nameColumnOverride ?? ''}
+                                      onChange={(e) => handleNameColumnChange(e.target.value)}
+                                      className="h-5 max-w-[120px] bg-background border border-border/40 rounded px-1 text-[9px] text-muted-foreground font-mono normal-case tracking-normal cursor-pointer"
+                                      title="Choose which CSV column to use as the contact name"
+                                    >
+                                      <option value="">(auto-detect)</option>
+                                      {metaKeys.map((k) => (
+                                        <option key={k} value={k}>{k}</option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                </div>
+                              );
+                            })()}
+                          </th>
                           <th className="py-2 pr-3 text-[10px] uppercase tracking-widest text-muted-foreground">Status</th>
                           <th className="py-2 pr-3 text-[10px] uppercase tracking-widest text-muted-foreground">Attempts</th>
                           <th className="py-2 pr-3 text-[10px] uppercase tracking-widest text-muted-foreground">Last Attempt</th>
@@ -1457,14 +1602,16 @@ export default function CampaignDetailPage() {
                         {filteredContacts.map((contact) => {
                           const lastAttempt = getLastAttempt(contact);
                           const callId = getAttemptCallId(contact);
-                          const displayName = getContactDisplayName(contact.metadata);
+                          const displayName = getContactDisplayName(contact.metadata, nameColumnOverride);
 
                           return (
                             <tr key={contact.id} className="border-b border-border/10 align-top hover:bg-muted/5 transition-colors">
                               <td className="py-3 pr-3">
                                 <div className="flex flex-col">
                                   <span className="text-xs font-semibold text-foreground font-mono">{contact.phone_number}</span>
-                                  <span className="text-[11px] text-muted-foreground">{displayName ?? 'Unnamed contact'}</span>
+                                  {displayName
+                                    ? <span className="text-[11px] text-muted-foreground">{displayName}</span>
+                                    : <span className="text-[11px] text-muted-foreground/40 italic">—</span>}
                                 </div>
                               </td>
                               <td className="py-3 pr-3">

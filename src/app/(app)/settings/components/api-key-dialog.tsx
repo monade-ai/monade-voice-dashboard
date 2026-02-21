@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Key, 
   Copy, 
@@ -10,16 +10,13 @@ import {
   AlertTriangle,
   Loader2,
   ShieldCheck,
-  Eye,
-  EyeOff,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { motion, AnimatePresence } from 'framer-motion';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { useAuth } from '@/contexts/auth-context';
+import { useMonadeUser } from '@/app/hooks/use-monade-user';
 import { MONADE_API_CONFIG } from '@/types/monade-api.types';
 import { cn } from '@/lib/utils';
 
@@ -31,7 +28,7 @@ interface ApiKey {
 }
 
 export function ApiKeyManager() {
-  const { user } = useAuth();
+  const { userUid, loading: userLoading, error: userError, refetch } = useMonadeUser();
   const [keys, setKeys] = useState<ApiKey[]>([]);
   const [loading, setLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -39,32 +36,43 @@ export function ApiKeyManager() {
   const [copied, setCopied] = useState(false);
 
   // Fetch Keys
-  const fetchKeys = async () => {
-    if (!user?.id) return;
+  const fetchKeys = useCallback(async () => {
+    if (!userUid) {
+      setLoading(false);
+
+      return;
+    }
     try {
       setLoading(true);
-      const res = await fetch(`${MONADE_API_CONFIG.BASE_URL}/api/users/${user.id}/api-keys`);
+      const res = await fetch(`${MONADE_API_CONFIG.BASE_URL}/api/users/${userUid}/api-keys`);
       if (res.ok) {
         const data = await res.json();
         setKeys(Array.isArray(data) ? data : []);
+      } else {
+        toast.error('Failed to fetch API keys');
       }
-    } catch (err) {
+    } catch {
       console.error('Failed to fetch API keys');
+      toast.error('Failed to fetch API keys');
     } finally {
       setLoading(false);
     }
-  };
+  }, [userUid]);
 
   useEffect(() => {
-    fetchKeys();
-  }, [user?.id]);
+    if (userUid) {
+      fetchKeys();
+    } else if (!userLoading) {
+      setLoading(false);
+    }
+  }, [userUid, userLoading, fetchKeys]);
 
   // Generate Key
   const handleGenerate = async () => {
-    if (!user?.id) return;
+    if (!userUid) return;
     setIsGenerating(true);
     try {
-      const res = await fetch(`${MONADE_API_CONFIG.BASE_URL}/api/users/${user.id}/api-keys`, {
+      const res = await fetch(`${MONADE_API_CONFIG.BASE_URL}/api/users/${userUid}/api-keys`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       });
@@ -79,7 +87,7 @@ export function ApiKeyManager() {
       } else {
         toast.error('Failed to generate key');
       }
-    } catch (err) {
+    } catch {
       toast.error('Network error');
     } finally {
       setIsGenerating(false);
@@ -100,7 +108,7 @@ export function ApiKeyManager() {
       } else {
         toast.error('Failed to revoke key');
       }
-    } catch (err) {
+    } catch {
       toast.error('Network error');
     }
   };
@@ -118,7 +126,7 @@ export function ApiKeyManager() {
         <h3 className="text-[10px] font-bold uppercase tracking-[0.3em] text-foreground/60">Active Credentials</h3>
         <Button 
           onClick={handleGenerate} 
-          disabled={isGenerating}
+          disabled={isGenerating || !userUid}
           size="sm"
           className="h-8 gap-2 bg-foreground text-background hover:bg-foreground/90 transition-all rounded-[4px] text-[10px] font-bold uppercase tracking-widest"
         >
@@ -128,8 +136,23 @@ export function ApiKeyManager() {
       </div>
 
       <div className="space-y-2">
-        {loading ? (
+        {userLoading || loading ? (
           <div className="py-8 text-center text-xs text-muted-foreground animate-pulse">Loading secure vault...</div>
+        ) : !userUid ? (
+          <div className="py-8 px-4 text-center border border-dashed border-border/40 rounded-md bg-muted/5 space-y-3">
+            <p className="text-xs text-muted-foreground italic">
+              {userError || 'Your internal Monade account is not ready yet. API keys cannot be loaded.'}
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => refetch()}
+              className="h-8 text-[10px] font-bold uppercase tracking-widest"
+            >
+              Retry
+            </Button>
+          </div>
         ) : keys.length === 0 ? (
           <div className="py-8 text-center border border-dashed border-border/40 rounded-md bg-muted/5">
             <p className="text-xs text-muted-foreground italic">No active keys found.</p>

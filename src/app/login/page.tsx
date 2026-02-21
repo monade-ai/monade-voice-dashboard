@@ -3,12 +3,15 @@
 import React, { useActionState, useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GrainGradient } from '@paper-design/shaders-react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 
-import { login, type LoginActionState } from './actions';
+import { createClient } from '@/utils/supabase/client';
+
+import { login, signup, type LoginActionState } from './actions';
 
 // --- Types ---
 type OnboardingStep = 'identity' | 'purpose' | 'handover';
+type AuthMode = 'signin' | 'signup';
 
 interface OnboardingFormData {
   email: string;
@@ -34,6 +37,7 @@ const FadeIn = ({ children, delay = 0 }: { children: React.ReactNode, delay?: nu
 
 export default function LoginPage() {
   const [step, setStep] = useState<OnboardingStep>('identity');
+  const [authMode, setAuthMode] = useState<AuthMode>('signin');
   const [formData, setFormData] = useState<OnboardingFormData>({
     email: '',
     password: '',
@@ -43,14 +47,51 @@ export default function LoginPage() {
     origin: '',
   });
   const router = useRouter();
+  const searchParams = useSearchParams();
   const initialLoginState: LoginActionState = { success: false, error: null };
   const [loginState, loginAction, isLoggingIn] = useActionState(login, initialLoginState);
+  const [isResetting, setIsResetting] = useState(false);
+  const [resetState, setResetState] = useState<{ error: string | null, success: string | null }>({
+    error: null,
+    success: null,
+  });
+  const authMessage = searchParams.get('message');
 
   useEffect(() => {
     if (loginState.success && step === 'identity') {
       setStep('purpose');
     }
   }, [loginState.success, step]);
+
+  const handleForgotPassword = async () => {
+    const email = formData.email.trim();
+    if (!email) {
+      setResetState({
+        error: 'Enter your email first to receive a password reset link.',
+        success: null,
+      });
+
+      return;
+    }
+
+    setIsResetting(true);
+    setResetState({ error: null, success: null });
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.auth.resetPasswordForEmail(email);
+      if (error) {
+        setResetState({ error: error.message, success: null });
+
+        return;
+      }
+      setResetState({
+        error: null,
+        success: `Reset link sent to ${email}.`,
+      });
+    } finally {
+      setIsResetting(false);
+    }
+  };
 
   const handlePurposeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -92,8 +133,35 @@ export default function LoginPage() {
                     Welcome to Monade.
                   </h1>
                   <p className="text-muted-foreground mb-8 text-sm">
-                    Let&apos;s get to work.
+                    {authMode === 'signin' ? 'Let&apos;s get to work.' : 'Create your workspace in seconds.'}
                   </p>
+                </FadeIn>
+
+                <FadeIn delay={0.05}>
+                  <div className="mb-6 grid grid-cols-2 rounded-[4px] border border-border/70 p-1">
+                    <button
+                      type="button"
+                      onClick={() => setAuthMode('signin')}
+                      className={`h-8 rounded-[3px] text-xs font-medium transition-colors ${
+                        authMode === 'signin'
+                          ? 'bg-foreground text-background'
+                          : 'text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      Sign in
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAuthMode('signup')}
+                      className={`h-8 rounded-[3px] text-xs font-medium transition-colors ${
+                        authMode === 'signup'
+                          ? 'bg-foreground text-background'
+                          : 'text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      Create account
+                    </button>
+                  </div>
                 </FadeIn>
 
                 <form className="space-y-4" action={loginAction}>
@@ -128,19 +196,40 @@ export default function LoginPage() {
                   <FadeIn delay={0.3}>
                     <button
                       type="submit"
-                      disabled={isLoggingIn}
+                      disabled={authMode === 'signin' && isLoggingIn}
+                      formAction={authMode === 'signup' ? signup : undefined}
                       className="mt-8 w-full bg-foreground text-background hover:bg-foreground/90 h-10 rounded-[4px] font-medium text-sm transition-all"
                     >
-                      {isLoggingIn ? 'Signing in...' : 'Continue'}
+                      {authMode === 'signin'
+                        ? (isLoggingIn ? 'Signing in...' : 'Continue')
+                        : 'Create account'}
                     </button>
-                    {loginState.error && (
+                    {authMode === 'signin' && loginState.error && (
                       <p className="mt-3 text-xs text-red-600">{loginState.error}</p>
                     )}
-                    <div className="mt-4 flex gap-4 text-xs text-muted-foreground justify-center">
-                      <button type="button" className="hover:text-foreground transition-colors">Forgot password?</button>
-                      <span>|</span>
-                      <button type="button" className="hover:text-foreground transition-colors">SSO Login</button>
-                    </div>
+                    {authMessage && (
+                      <p className="mt-3 text-xs text-primary">{authMessage}</p>
+                    )}
+                    {resetState.error && (
+                      <p className="mt-3 text-xs text-red-600">{resetState.error}</p>
+                    )}
+                    {resetState.success && (
+                      <p className="mt-3 text-xs text-green-600">{resetState.success}</p>
+                    )}
+                    {authMode === 'signin' && (
+                      <div className="mt-4 flex gap-4 text-xs text-muted-foreground justify-center">
+                        <button
+                          type="button"
+                          onClick={handleForgotPassword}
+                          disabled={isResetting}
+                          className="hover:text-foreground transition-colors disabled:opacity-50"
+                        >
+                          {isResetting ? 'Sending reset...' : 'Forgot password?'}
+                        </button>
+                        <span>|</span>
+                        <button type="button" className="hover:text-foreground transition-colors">SSO Login</button>
+                      </div>
+                    )}
                   </FadeIn>
                 </form>
               </motion.div>
