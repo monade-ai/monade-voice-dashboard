@@ -163,17 +163,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Format target phone number
+    // Format target phone number — must already be in E.164 format (+<country><number>)
     let formattedPhone = phone_number.trim();
-    // Remove any non-digit characters except + at the start
+    // Strip formatting characters (spaces, dashes, parens) but keep leading +
     formattedPhone = formattedPhone.replace(/[^\d+]/g, '');
     if (!formattedPhone.startsWith('+')) {
-      // If 10 digits, assume Indian number
-      if (formattedPhone.length === 10) {
-        formattedPhone = '+91' + formattedPhone;
-      } else {
-        formattedPhone = '+' + formattedPhone;
-      }
+      return NextResponse.json(
+        {
+          error:
+            'Phone number must include a country code in E.164 format '
+            + '(e.g., +91 for India, +1 for US/Canada, +971 for UAE). '
+            + 'Please update your contacts to include the country code before calling.',
+        },
+        { status: 400 },
+      );
     }
 
     // Map trunk name from UI selection to actual trunk name

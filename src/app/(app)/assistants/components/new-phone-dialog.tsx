@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Phone, X } from 'lucide-react';
+import { Phone, X, AlertTriangle } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,6 +21,19 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useTrunks } from '@/app/hooks/use-trunks';
+
+const COUNTRY_CODES = [
+  { code: '+91', label: 'India (+91)' },
+  { code: '+1', label: 'US / Canada (+1)' },
+  { code: '+971', label: 'UAE (+971)' },
+  { code: '+44', label: 'UK (+44)' },
+  { code: '+65', label: 'Singapore (+65)' },
+  { code: '+61', label: 'Australia (+61)' },
+  { code: '+49', label: 'Germany (+49)' },
+  { code: '+33', label: 'France (+33)' },
+  { code: '+81', label: 'Japan (+81)' },
+  { code: '+86', label: 'China (+86)' },
+];
 
 interface CalleeInfo {
   [key: string]: string;
@@ -53,6 +66,7 @@ export function NewPhoneDialog({
 }: NewPhoneDialogProps) {
   const { trunks } = useTrunks();
   const [phoneNumber, setPhoneNumber] = useState('');
+  const [countryCode, setCountryCode] = useState('');
   const [error, setError] = useState('');
   const [calleeInfo, setCalleeInfo] = useState<CalleeInfo>({});
   const [newKey, setNewKey] = useState('');
@@ -62,26 +76,37 @@ export function NewPhoneDialog({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('[NewPhoneDialog] Form submitted with phoneNumber:', phoneNumber, 'trunk:', selectedTrunk, 'calleeInfo:', calleeInfo);
 
-    // Basic phone number validation
-    const cleaned = phoneNumber.replace(/\D/g, '');
-    if (cleaned.length < 10) {
-      setError('Please enter a valid phone number');
-      console.error('[NewPhoneDialog] Validation failed: invalid phone number:', phoneNumber);
+    // Compose the full E.164 number
+    let fullNumber: string;
+    const trimmed = phoneNumber.trim();
 
+    if (trimmed.startsWith('+')) {
+      // User typed the full E.164 number directly — use as-is
+      fullNumber = trimmed.replace(/[^\d+]/g, '');
+    } else if (countryCode) {
+      // Combine selected country code + local digits
+      const localDigits = trimmed.replace(/\D/g, '');
+      fullNumber = `${countryCode}${localDigits}`;
+    } else {
+      setError('Select a country code, or enter the full number with a + prefix (e.g. +91...)');
+      return;
+    }
+
+    const digits = fullNumber.replace(/\D/g, '');
+    if (digits.length < 10) {
+      setError('Please enter a valid phone number (at least 10 digits)');
       return;
     }
 
     if (!selectedTrunk) {
       setError('Please select a trunk provider (Twilio or Vobiz)');
-
       return;
     }
 
     setError('');
-    console.log('[NewPhoneDialog] Calling onCall with phoneNumber:', phoneNumber, 'trunk:', selectedTrunk, 'calleeInfo:', calleeInfo);
-    onCall(phoneNumber, calleeInfo, selectedTrunk);
+    console.log('[NewPhoneDialog] Calling onCall with phoneNumber:', fullNumber, 'trunk:', selectedTrunk, 'calleeInfo:', calleeInfo);
+    onCall(fullNumber, calleeInfo, selectedTrunk);
   };
 
   const addCalleeInfoField = () => {
@@ -166,19 +191,52 @@ export function NewPhoneDialog({
           {/* Phone Number Input */}
           <div className="space-y-2">
             <label htmlFor="phone" className="text-sm font-medium">
-                Phone Number
+              Phone Number
             </label>
-            <Input
-              id="phone"
-              type="tel"
-              placeholder="e.g., +911234567890 or 1234567890"
-              value={phoneNumber}
-              onChange={(e) => {
-                setPhoneNumber(e.target.value);
-                setError('');
-              }}
-              className={error ? 'border-red-300' : ''}
-            />
+            <div className="flex gap-2">
+              {/* Country code selector */}
+              <Select
+                value={countryCode}
+                onValueChange={(val) => {
+                  setCountryCode(val);
+                  setError('');
+                }}
+              >
+                <SelectTrigger className="w-40 shrink-0">
+                  <SelectValue placeholder="+code" />
+                </SelectTrigger>
+                <SelectContent>
+                  {COUNTRY_CODES.map(({ code, label }) => (
+                    <SelectItem key={code} value={code}>{label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {/* Local number */}
+              <Input
+                id="phone"
+                type="tel"
+                placeholder={phoneNumber.startsWith('+') ? '+91 9876543210' : '9876543210'}
+                value={phoneNumber}
+                onChange={(e) => {
+                  setPhoneNumber(e.target.value);
+                  // If user starts typing a full E.164 number, clear country code
+                  if (e.target.value.startsWith('+')) {
+                    setCountryCode('');
+                  }
+                  setError('');
+                }}
+                className={error ? 'border-red-300 flex-1' : 'flex-1'}
+              />
+            </div>
+            {!phoneNumber.startsWith('+') && !countryCode && (
+              <p className="text-xs text-amber-600 flex items-center gap-1">
+                <AlertTriangle className="h-3 w-3 shrink-0" />
+                Select a country code above, or type the full number starting with +
+              </p>
+            )}
+            <p className="text-xs text-muted-foreground">
+              E.164 format required (e.g., +91 9876543210 for India, +1 2025551234 for US)
+            </p>
           </div>
 
           {/* Call Provider Selector */}
@@ -297,6 +355,7 @@ export function NewPhoneDialog({
   useEffect(() => {
     if (isOpen) {
       setPhoneNumber('');
+      setCountryCode('');
       setError('');
       setCalleeInfo({});
       setNewKey('');

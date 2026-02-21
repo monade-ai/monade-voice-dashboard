@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useCallback, useState, useRef } from 'react';
-import { Upload, FileSpreadsheet, X, AlertTriangle, CheckCircle2, Loader2 } from 'lucide-react';
+import React, { useCallback, useState, useRef, useMemo } from 'react';
+import { Upload, FileSpreadsheet, X, AlertTriangle, CheckCircle2, Loader2, Globe } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -22,8 +22,23 @@ import {
   deleteCSVPreview,
   ParseCSVResult,
   createDedupedCSV,
+  generateCSV,
+  ExportContact,
 } from '@/lib/utils/csv-preview';
-import { CSVPreviewCache } from '@/types/campaign.types';
+import { CSVPreviewCache, CSVContact } from '@/types/campaign.types';
+
+const COUNTRY_CODES = [
+  { code: '+91', label: 'India (+91)' },
+  { code: '+1', label: 'US / Canada (+1)' },
+  { code: '+971', label: 'UAE (+971)' },
+  { code: '+44', label: 'UK (+44)' },
+  { code: '+65', label: 'Singapore (+65)' },
+  { code: '+61', label: 'Australia (+61)' },
+  { code: '+49', label: 'Germany (+49)' },
+  { code: '+33', label: 'France (+33)' },
+  { code: '+81', label: 'Japan (+81)' },
+  { code: '+86', label: 'China (+86)' },
+];
 
 interface CSVUploadProps {
   campaignId?: string;
@@ -62,6 +77,13 @@ export function CSVUpload({
   const [parseResult, setParseResult] = useState<ParseCSVResult | null>(null);
   const [currentFile, setCurrentFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<CSVPreviewCache | null>(existingPreview);
+  const [countryCodeDraft, setCountryCodeDraft] = useState('');
+
+  // Count contacts missing a country code (no leading +)
+  const missingCcCount = useMemo(
+    () => parseResult?.contacts.filter((c) => !c.phone_number.startsWith('+')).length ?? 0,
+    [parseResult],
+  );
 
   const processFile = useCallback(
     async (file: File) => {
@@ -155,6 +177,45 @@ export function CSVUpload({
     } catch (error) {
       console.error('Deduplication error:', error);
       toast.error('Failed to remove duplicates');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const applyCountryCodeToAll = async () => {
+    if (!parseResult || !currentFile || !countryCodeDraft) return;
+
+    setIsProcessing(true);
+    try {
+      const updatedContacts: CSVContact[] = parseResult.contacts.map((contact) => ({
+        ...contact,
+        phone_number: contact.phone_number.startsWith('+')
+          ? contact.phone_number
+          : `${countryCodeDraft}${contact.phone_number}`,
+      }));
+
+      const updatedResult: ParseCSVResult = {
+        ...parseResult,
+        contacts: updatedContacts,
+      };
+
+      const csvContent = generateCSV(updatedContacts as ExportContact[], parseResult.fieldNames);
+      const blob = new Blob([csvContent], { type: 'text/csv' });
+      const updatedFile = new File([blob], currentFile.name, { type: 'text/csv' });
+
+      setParseResult(updatedResult);
+      setCurrentFile(updatedFile);
+
+      if (campaignId) {
+        const savedPreview = saveCSVPreview(campaignId, updatedFile.name, updatedResult);
+        setPreview(savedPreview);
+        onPreviewSaved?.(savedPreview);
+      }
+
+      toast.success(`Applied ${countryCodeDraft} to ${missingCcCount} phone number${missingCcCount !== 1 ? 's' : ''}`);
+    } catch (err) {
+      console.error('Country code application error:', err);
+      toast.error('Failed to apply country code');
     } finally {
       setIsProcessing(false);
     }
@@ -257,6 +318,17 @@ export function CSVUpload({
                 </Badge>
               ))}
             </div>
+
+            {/* Country code nudge for cached preview */}
+            {existingPreview.preview.some((c) => !c.phone_number.startsWith('+')) && (
+              <div className="flex items-start gap-2 rounded-md bg-amber-500/10 border border-amber-500/20 p-3 text-sm">
+                <Globe className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
+                <p className="text-amber-700 text-xs leading-relaxed">
+                  Some contacts in this list appear to be missing a country code (e.g., +91, +1).
+                  Re-upload your CSV and use the <strong>Add country code</strong> tool to fix them — otherwise calls will fail.
+                </p>
+              </div>
+            )}
 
             <ScrollArea className="h-64 rounded border">
               <Table>
@@ -407,6 +479,47 @@ export function CSVUpload({
                       'Remove Duplicates'
                     )}
                   </Button>
+                </div>
+              )}
+
+              {/* Country Code Warning — only when we have a fresh parse to work with */}
+              {parseResult && missingCcCount > 0 && (
+                <div className="rounded-md bg-amber-500/10 border border-amber-500/20 p-3 space-y-3">
+                  <div className="flex items-start gap-2">
+                    <Globe className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
+                    <div>
+                      <p className="text-sm font-medium text-amber-700">
+                        {missingCcCount} contact{missingCcCount !== 1 ? 's' : ''} missing country code
+                      </p>
+                      <p className="text-xs text-amber-600 mt-0.5 leading-relaxed">
+                        Phone numbers without a country code (e.g., +91, +1) will be rejected by the carrier.
+                        Select a code below to add it to all bare numbers in one click.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 pl-6">
+                    <select
+                      value={countryCodeDraft}
+                      onChange={(e) => setCountryCodeDraft(e.target.value)}
+                      className="h-8 bg-background border border-amber-300 rounded px-2 text-xs"
+                    >
+                      <option value="">Select country code…</option>
+                      {COUNTRY_CODES.map(({ code, label }) => (
+                        <option key={code} value={code}>{label}</option>
+                      ))}
+                    </select>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => { void applyCountryCodeToAll(); }}
+                      disabled={!countryCodeDraft || isProcessing}
+                      className="border-amber-400 text-amber-700 hover:bg-amber-50 h-8 text-xs"
+                    >
+                      {isProcessing
+                        ? <Loader2 className="h-3 w-3 animate-spin" />
+                        : `Add ${countryCodeDraft || 'code'} to all missing`}
+                    </Button>
+                  </div>
                 </div>
               )}
 

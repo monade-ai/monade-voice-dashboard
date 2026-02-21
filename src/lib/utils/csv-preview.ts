@@ -218,28 +218,29 @@ function detectPhoneColumn(headers: string[]): string | null {
 }
 
 /**
- * Normalize a phone number for comparison
+ * Normalize a phone number for comparison.
+ * Strips formatting characters but does NOT add a country code — callers are
+ * responsible for ensuring numbers are in E.164 format (+<country><number>).
  */
 function normalizePhoneNumber(phone: string): string {
-  // Remove all non-digit characters except leading +
+  // Remove all non-digit characters except a leading +
   const normalized = phone.replace(/[^\d+]/g, '');
 
-  // If it starts with +, keep it
+  // If it starts with +, keep it as-is (already E.164)
   if (normalized.startsWith('+')) {
     return normalized;
   }
 
-  // If it's a 10-digit Indian number, add +91
-  if (normalized.length === 10 && /^[6-9]/.test(normalized)) {
-    return `+91${normalized}`;
-  }
-
-  // If it starts with 91 and is 12 digits, add +
-  if (normalized.startsWith('91') && normalized.length === 12) {
-    return `+${normalized}`;
-  }
-
+  // Return as-is — do NOT silently prepend any country code
   return normalized;
+}
+
+/**
+ * Returns true if the phone number appears to be missing a country code
+ * (i.e., does not start with '+').
+ */
+export function isMissingCountryCode(phone: string): boolean {
+  return !phone.startsWith('+');
 }
 
 // ============================================
