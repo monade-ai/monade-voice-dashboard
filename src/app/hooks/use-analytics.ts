@@ -25,30 +25,33 @@ const userAnalyticsInFlight = new Map<string, Promise<CallAnalytics[]>>();
 
 // Analytics data structure matching actual API response
 export interface CallAnalytics {
-    id?: string;
-    call_id: string;
-    user_uid?: string;
-    verdict: string; // e.g., "interested", "not_interested", "callback"
-    confidence_score: number; // 0-100
-    summary: string;
-    key_discoveries: {
-        service_type?: string;
-        price_quoted?: string;
-        customer_location?: string;
-        customer_name?: string | null;
-        customer_language?: string;
-        objections_raised?: string[];
-        next_steps?: string | null;
-        [key: string]: string | string[] | null | undefined;
-    };
-    call_quality: string; // e.g., "high", "medium", "low", "abrupt_end"
-    use_case: string;
-    analysis_timestamp?: string;
-    analysis_model?: string;
-    transcript_url?: string;
-    phone_number?: string;
-    campaign_id?: string;
-    created_at?: string;
+  id?: string;
+  call_id: string;
+  user_uid?: string;
+  verdict: string; // e.g., "interested", "not_interested", "callback"
+  confidence_score: number; // 0-100
+  summary: string;
+  key_discoveries: {
+    service_type?: string;
+    price_quoted?: string;
+    customer_location?: string;
+    customer_name?: string | null;
+    customer_language?: string;
+    objections_raised?: string[];
+    next_steps?: string | null;
+    [key: string]: string | string[] | null | undefined;
+  };
+  call_quality: string; // e.g., "high", "medium", "low", "abrupt_end"
+  use_case: string;
+  analysis_timestamp?: string;
+  analysis_model?: string;
+  transcript_url?: string;
+  phone_number?: string;
+  campaign_id?: string;
+  created_at?: string;
+  sip_call_id?: string;
+  recording_url?: string | null;
+  recording_duration_ms?: string | null;
 }
 
 // Hook to fetch analytics for a specific call
@@ -189,6 +192,9 @@ export function useUserAnalytics() {
                 campaign_id: item.campaign_id,
                 created_at: item.created_at,
                 updated_at: item.updated_at,
+                sip_call_id: item.sip_call_id,
+                recording_url: item.recording_url,
+                recording_duration_ms: item.recording_duration_ms,
               };
             }
 
@@ -208,6 +214,9 @@ export function useUserAnalytics() {
                   campaign_id: item.campaign_id,
                   created_at: item.created_at,
                   updated_at: item.updated_at,
+                  sip_call_id: item.sip_call_id,
+                  recording_url: item.recording_url,
+                  recording_duration_ms: item.recording_duration_ms,
                 };
               }
 

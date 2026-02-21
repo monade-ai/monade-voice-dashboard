@@ -11,6 +11,7 @@ import {
   Activity,
   Play,
   Pause,
+  Loader2,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
@@ -18,6 +19,7 @@ import { useDashboardData } from '@/app/hooks/use-dashboard-data';
 import { useCredits } from '@/app/hooks/use-credits';
 import { useTranscripts, Transcript } from '@/app/hooks/use-transcripts';
 import { useUserAnalytics, CallAnalytics } from '@/app/hooks/use-analytics';
+import { useCallRecording } from '@/app/hooks/use-call-recording';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
 import { Button } from '@/components/ui/button';
 import { PaperCard, PaperCardContent, PaperCardHeader, PaperCardTitle } from '@/components/ui/paper-card';
@@ -67,7 +69,20 @@ const TranscriptRow = ({
   analytics?: CallAnalytics;
   onView: () => void
 }) => {
-  const [isPlaying, setIsPlaying] = useState(false);
+  const hasSipCallId = !!(analytics?.sip_call_id || analytics?.recording_url);
+  const {
+    loading: recordingLoading,
+    isPlaying,
+    formattedDuration,
+    formattedCurrentTime,
+    progress,
+    togglePlay,
+  } = useCallRecording(
+    transcript.call_id,
+    analytics?.recording_url,
+    analytics?.recording_duration_ms,
+  );
+
   const isEngaged = transcript.has_conversation || (analytics && analytics.verdict !== 'no_answer');
   const verdictRaw = analytics?.verdict || (isEngaged ? 'conversation' : 'no_answer');
   const verdict = analytics?.verdict ? analytics.verdict.replace('_', ' ') : (isEngaged ? 'Conversation' : 'No Answer');
@@ -81,6 +96,8 @@ const TranscriptRow = ({
     conversation: 'bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.4)]',
     no_answer: 'bg-gray-500/40',
   }[verdictRaw] || 'bg-gray-500/40';
+
+  const displayDuration = formattedDuration || '--:--';
 
   return (
     <tr
@@ -145,7 +162,7 @@ const TranscriptRow = ({
       {/* 4. Action (Professional) */}
       <td className="py-3 px-6 text-right">
         <div className="flex items-center justify-end gap-3">
-          {isEngaged ? (
+          {isEngaged && hasSipCallId ? (
             <div className="flex items-center gap-2">
               <motion.div
                 layout
@@ -156,15 +173,23 @@ const TranscriptRow = ({
               >
                 <motion.button
                   layout
-                  onClick={(e) => { e.stopPropagation(); setIsPlaying(!isPlaying); }}
+                  onClick={(e) => { e.stopPropagation(); togglePlay(); }}
+                  disabled={recordingLoading}
                   className={cn(
-                    'h-7 flex items-center bg-foreground text-background font-bold tracking-widest overflow-hidden transition-all duration-500 rounded-full',
+                    'h-7 flex items-center bg-foreground text-background font-bold tracking-widest overflow-hidden transition-all duration-500 rounded-full disabled:opacity-60',
                     isPlaying ? 'px-3 gap-3 w-48' : 'px-3 gap-2 w-auto',
                   )}
                 >
                   <div className="flex items-center gap-2 flex-shrink-0">
-                    {isPlaying ? <Pause size={12} fill="currentColor" /> : <Play size={12} fill="currentColor" />}
-                    {!isPlaying && <span className="text-[9px] uppercase">3:42</span>}
+                    {recordingLoading ? (
+                      <Loader2 size={12} className="animate-spin" />
+                    ) : isPlaying ? (
+                      <Pause size={12} fill="currentColor" />
+                    ) : (
+                      <Play size={12} fill="currentColor" />
+                    )}
+                    {!isPlaying && !recordingLoading && <span className="text-[9px] uppercase">{displayDuration}</span>}
+                    {recordingLoading && <span className="text-[9px] uppercase">Loading</span>}
                   </div>
 
                   {isPlaying && (
@@ -176,11 +201,12 @@ const TranscriptRow = ({
                       <div className="flex-1 h-1 bg-background/20 rounded-full relative overflow-hidden">
                         <motion.div
                           initial={{ width: 0 }}
-                          animate={{ width: '35%' }}
+                          animate={{ width: `${progress}%` }}
+                          transition={{ duration: 0.3 }}
                           className="absolute inset-y-0 left-0 bg-background"
                         />
                       </div>
-                      <span className="text-[8px] font-mono tabular-nums opacity-60">1:12</span>
+                      <span className="text-[8px] font-mono tabular-nums opacity-60">{formattedCurrentTime}</span>
                     </motion.div>
                   )}
                 </motion.button>
@@ -192,6 +218,10 @@ const TranscriptRow = ({
                   className="text-muted-foreground/60"
                 />
               </div>
+            </div>
+          ) : isEngaged ? (
+            <div className="flex items-center min-w-[14px] group-hover:hidden transition-all">
+              <MessageSquare size={14} className="text-muted-foreground/60" />
             </div>
           ) : (
             <MessageSquare size={14} className="text-muted-foreground/60 group-hover:hidden" />

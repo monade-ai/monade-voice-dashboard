@@ -18,6 +18,8 @@ import {
   Settings,
   ChevronRight,
   Globe,
+  Radio,
+  Server,
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 
@@ -164,6 +166,13 @@ export function Sidebar() {
           isActive={pathname === '/hot-leads'}
           count={12}
         />
+        <NavItem
+          href="/sessions"
+          icon={<Radio />}
+          label="Sessions"
+          isActive={pathname === '/sessions'}
+          isLive={true}
+        />
 
         <CategoryLabel>Archive</CategoryLabel>
         <NavItem
@@ -186,6 +195,12 @@ export function Sidebar() {
         />
 
         <CategoryLabel>Connectivity</CategoryLabel>
+        <NavItem
+          href="/trunks"
+          icon={<Server />}
+          label="Trunks"
+          isActive={pathname === '/trunks'}
+        />
         <NavItem
           href="/phone-numbers"
           icon={<PhoneCall />}

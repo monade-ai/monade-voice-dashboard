@@ -20,15 +20,15 @@ import { cn } from '@/lib/utils';
 // --- Types ---
 
 interface TranscriptMessage {
-    role: 'user' | 'assistant' | 'system';
-    content: string;
-    timestamp?: string;
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  timestamp?: string;
 }
 
 interface TranscriptViewerProps {
-    transcriptUrl: string;
-    callId: string;
-    onClose: () => void;
+  transcriptUrl: string;
+  callId: string;
+  onClose: () => void;
 }
 
 // --- Helper Components ---
@@ -91,7 +91,7 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
             return;
           }
         }
-                
+
         if (data.raw) {
           const lines = data.raw.trim().split('\n');
           const parsedMessages = lines.map((l: string) => {
@@ -125,7 +125,7 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-8">
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
@@ -133,7 +133,7 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
         className="absolute inset-0 bg-background/40 backdrop-blur-md"
       />
 
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, y: 20, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, scale: 0.98 }}
@@ -143,7 +143,7 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
         <div className="w-full md:w-[38%] border-r border-border bg-muted/5 flex flex-col h-full relative overflow-hidden">
           <div className={cn(
             'absolute top-0 left-0 w-full h-1',
-            analytics?.verdict === 'interested' ? 'bg-green-500' : 
+            analytics?.verdict === 'interested' ? 'bg-green-500' :
               analytics?.verdict === 'callback' ? 'bg-primary' : 'bg-muted-foreground/20',
           )} />
 
@@ -152,7 +152,7 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
               <div className="flex items-center justify-between mb-2">
                 <h2 className="text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground">AI Intelligence</h2>
                 <Badge variant="outline" className="text-[9px] font-bold uppercase tracking-widest border-border/60 bg-background">
-                  {analytics?.call_quality || 'Unknown'} 
+                  {analytics?.call_quality || 'Unknown'}
                 </Badge>
               </div>
               <h1 className="text-3xl font-medium tracking-tight mt-4 capitalize">
@@ -199,7 +199,7 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
 
         {/* --- Right Pane: High-Contrast Conversation --- */}
         <div className="flex-1 bg-background flex flex-col h-full relative">
-                    
+
           <div className="h-14 border-b border-border/40 flex items-center justify-between px-8 shrink-0">
             <div className="flex items-center gap-4">
               <h2 className="text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground">Conversation Log</h2>
@@ -222,8 +222,8 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
                 <div className="text-center py-20 italic text-muted-foreground text-sm">Empty session.</div>
               ) : (
                 messages.map((m, i) => (
-                  <div 
-                    key={i} 
+                  <div
+                    key={i}
                     className={cn(
                       'flex flex-col max-w-[90%]',
                       m.role === 'assistant' ? 'mr-auto items-start' : 'ml-auto items-end',
@@ -235,11 +235,11 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
                     )}>
                       {m.role === 'assistant' ? 'Agent' : customerName}
                     </span>
-                    <div 
+                    <div
                       className={cn(
                         'px-4 py-2.5 rounded-[4px] shadow-sm text-sm leading-relaxed',
-                        m.role === 'assistant' 
-                          ? 'bg-primary text-black font-medium' 
+                        m.role === 'assistant'
+                          ? 'bg-primary text-black font-medium'
                           : 'bg-foreground text-background font-normal',
                       )}
                     >
@@ -252,7 +252,12 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
           </div>
 
           <div className="h-20 border-t border-border/40 bg-muted/5 flex items-center px-8 shrink-0 relative z-20">
-            <AudioPill />
+            <AudioPill
+              callId={callId}
+              sipCallId={analytics?.sip_call_id}
+              recordingUrl={analytics?.recording_url}
+              durationMs={analytics?.recording_duration_ms}
+            />
           </div>
         </div>
       </motion.div>
