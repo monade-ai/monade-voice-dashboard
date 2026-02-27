@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 // Voice Agents API for making outbound calls
-const VOICE_AGENTS_URL = process.env.NEXT_PUBLIC_VOICE_AGENTS_URL || 'http://35.200.254.189/voice_agents';
-const MONADE_API_BASE_URL = process.env.MONADE_API_BASE_URL || 'http://35.200.254.189/db_services';
+const VOICE_AGENTS_URL = process.env.NEXT_PUBLIC_VOICE_AGENTS_URL || 'https://service.monade.ai/voice_agents';
+const MONADE_API_BASE_URL = process.env.MONADE_API_BASE_URL || 'https://service.monade.ai/db_services';
 
 // Trunk name mapping - map UI selection to actual trunk names registered in backend
 const TRUNK_NAME_MAP: Record<string, string> = {

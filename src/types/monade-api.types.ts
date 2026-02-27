@@ -206,7 +206,7 @@ export interface MonadeApiResponse<T> {
 
 export const MONADE_API_CONFIG = {
   // Use proxy for client-side to avoid mixed content issues
-  BASE_URL: typeof window !== 'undefined' ? '/api/proxy' : 'http://35.200.254.189/db_services',
+  BASE_URL: typeof window !== 'undefined' ? '/api/proxy' : 'https://service.monade.ai/db_services',
   PROVIDER: 'vobiz.ai',
   DEFAULT_USER_UID: 'b08d1d4d-a47d-414b-9360-80264388793f',
 } as const;

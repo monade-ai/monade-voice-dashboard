@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const MONADE_API_BASE = process.env.MONADE_API_BASE_URL ?? 'http://35.200.254.189/db_services';
+const MONADE_API_BASE = process.env.MONADE_API_BASE_URL ?? 'https://service.monade.ai/db_services';
 const MONADE_API_KEY = process.env.MONADE_API_KEY;
 const DEBUG_PROXY = process.env.NODE_ENV !== 'production';
 

@@ -4,7 +4,7 @@ import { createClient } from '@/utils/supabase/server';
 import { MONADE_API_CONFIG } from '@/types/monade-api.types';
 
 const CAMPAIGN_API_BASE = process.env.CAMPAIGN_SERVICE_BASE_URL
-  ?? 'http://35.200.254.189/campaigns/api/v1';
+  ?? 'https://service.monade.ai/campaigns/api/v1';
 
 const MONADE_API_BASE = MONADE_API_CONFIG.BASE_URL;
 const MONADE_API_KEY = process.env.MONADE_API_KEY;
@@ -100,7 +100,7 @@ async function resolveUserApiKey(userUid: string): Promise<string | null> {
   ));
   const activeKey = scopedKeys.find((key: any) => (
     (key?.is_active ?? key?.isActive ?? true)
-      && (key?.api_key || key?.key || typeof key === 'string')
+    && (key?.api_key || key?.key || typeof key === 'string')
   )) ?? scopedKeys[0];
   const keyValue = activeKey?.api_key || activeKey?.key || activeKey;
 

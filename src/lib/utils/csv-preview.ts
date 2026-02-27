@@ -117,6 +117,31 @@ const PHONE_HEADER_ALIASES = new Set([
   'cell phone',
 ]);
 
+const NAME_HEADER_ALIASES = new Set([
+  'name',
+  'full name',
+  'fullname',
+  'customer name',
+  'contact name',
+  'first name',
+  'firstname',
+  'last name',
+  'lastname',
+  'person',
+  'person name',
+  'client name',
+  'lead name',
+  'caller name',
+  'customer',
+  'client',
+  'lead',
+  'candidate name',
+  'candidate',
+  'agent name',
+  'user name',
+  'username',
+]);
+
 function normalizeHeaderKey(header: string): string {
   return header.trim().toLowerCase().replace(/[\s_-]+/g, ' ');
 }
@@ -127,32 +152,55 @@ function isPhoneHeader(header: string): boolean {
   return PHONE_HEADER_ALIASES.has(normalized);
 }
 
+function isNameHeader(header: string): boolean {
+  const normalized = normalizeHeaderKey(header);
+
+  return NAME_HEADER_ALIASES.has(normalized);
+}
+
 function normalizePhoneHeaders(headers: string[]): { headers: string[]; phoneColumnName: string | null } {
   let phoneIndex = -1;
+  let nameIndex = -1;
   const normalizedHeaders = headers.map((header, idx) => {
     if (phoneIndex === -1 && isPhoneHeader(header)) {
       phoneIndex = idx;
 
       return 'phone_number';
     }
+    if (nameIndex === -1 && isNameHeader(header)) {
+      nameIndex = idx;
+
+      return 'name';
+    }
 
     return header;
   });
+
+  let result = normalizedHeaders;
 
   if (phoneIndex === -1) {
     const detected = detectPhoneColumn(headers);
     if (detected) {
       const detectedIndex = headers.indexOf(detected);
-      const updated = [...headers];
-      updated[detectedIndex] = 'phone_number';
-
-      return { headers: updated, phoneColumnName: 'phone_number' };
+      result = [...result];
+      result[detectedIndex] = 'phone_number';
+      phoneIndex = detectedIndex;
     }
-
-    return { headers, phoneColumnName: null };
   }
 
-  return { headers: normalizedHeaders, phoneColumnName: 'phone_number' };
+  // Fallback name detection: look for any header containing "name"
+  if (nameIndex === -1) {
+    const nameIdx = headers.findIndex((h) => /name/i.test(h));
+    if (nameIdx !== -1 && nameIdx !== phoneIndex) {
+      result = [...result];
+      result[nameIdx] = 'name';
+    }
+  }
+
+  return {
+    headers: result,
+    phoneColumnName: phoneIndex !== -1 || headers.some((h) => detectPhoneColumn([h])) ? 'phone_number' : null,
+  };
 }
 
 /**

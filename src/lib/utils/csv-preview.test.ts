@@ -40,4 +40,34 @@ describe('csv-preview', () => {
     expect(parsed.duplicates.count).toBe(0);
     expect(parsed.totalContacts).toBe(2);
   });
+
+  test('parseCSV normalizes name column variants to "name"', async () => {
+    const content = [
+      'FULL NAME,Phone Number',
+      'John Doe,+919000000001',
+      'Jane Smith,+919000000002',
+    ].join('\n');
+    const file = { name: 'leads.csv', text: async () => content } as unknown as File;
+
+    const result = await parseCSV(file);
+
+    expect(result.fieldNames).toContain('name');
+    expect(result.fieldNames).not.toContain('FULL NAME');
+    expect(result.contacts[0].name).toBe('John Doe');
+    expect(result.contacts[1].name).toBe('Jane Smith');
+  });
+
+  test('parseCSV handles Customer_Name header', async () => {
+    const content = [
+      'Customer_Name,mobile',
+      'Alice,9876543210',
+    ].join('\n');
+    const file = { name: 'customers.csv', text: async () => content } as unknown as File;
+
+    const result = await parseCSV(file);
+
+    expect(result.fieldNames).toContain('name');
+    expect(result.contacts[0].name).toBe('Alice');
+    expect(result.contacts[0].phone_number).toBe('+919876543210');
+  });
 });

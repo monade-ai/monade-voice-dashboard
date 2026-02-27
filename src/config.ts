@@ -11,16 +11,16 @@ export const CONFIG = {
   // On client-side, use proxy; on server-side, use direct URL
   MONADE_API: {
     // For client-side fetch calls, use the proxy to avoid mixed content
-    BASE_URL: typeof window !== 'undefined' ? '/api/proxy' : 'http://35.200.254.189/db_services',
+    BASE_URL: typeof window !== 'undefined' ? '/api/proxy' : 'https://service.monade.ai/db_services',
     // Direct URL for server-side calls
-    DIRECT_URL: 'http://35.200.254.189/db_services',
+    DIRECT_URL: 'https://service.monade.ai/db_services',
     API_KEY: 'monade_d8325992-cf93-4cdd-9c54-34ca18d72441',
     DEFAULT_USER_UID: 'b08d1d4d-a47d-414b-9360-80264388793f',
   },
 
   // Voice Agents API (for outbound calling)
   VOICE_AGENTS: {
-    BASE_URL: 'http://35.200.254.189/voice_agents',
+    BASE_URL: 'https://service.monade.ai/voice_agents',
     API_KEY: 'monade_d8325992-cf93-4cdd-9c54-34ca18d72441',
   },
 

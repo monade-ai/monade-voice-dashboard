@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 // Hardcoded Trunks API config
-const TRUNKS_API_BASE = 'http://35.200.254.189/trunks';
+const TRUNKS_API_BASE = 'https://service.monade.ai/trunks';
 const DEBUG_TRUNKS_PROXY = process.env.NODE_ENV !== 'production';
 
 export async function GET(request: NextRequest) {

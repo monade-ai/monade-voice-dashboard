@@ -114,7 +114,7 @@ export function CreateCampaignModal({
   const [formData, setFormData] = useState<FormData>(initialFormData);
   const [step, setStep] = useState<1 | 2 | 3>(1);
 
-  const concurrencyOptions = [1, 2, 3, 4, 5, LIMITS.MAX_CONCURRENT]
+  const concurrencyOptions = [1, 2, 3, 4, 5, 8, LIMITS.MAX_CONCURRENT]
     .filter((v, idx, arr) => v <= LIMITS.MAX_CONCURRENT && arr.indexOf(v) === idx);
   const cpsOptions = [1, 2, LIMITS.CALLS_PER_SECOND]
     .filter((v, idx, arr) => v <= LIMITS.CALLS_PER_SECOND && arr.indexOf(v) === idx);
@@ -175,10 +175,10 @@ export function CreateCampaignModal({
     <AnimatePresence>
       {open && (
         <>
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             onClick={() => onOpenChange(false)}
-            className="fixed inset-0 bg-background/40 backdrop-blur-sm z-[60]" 
+            className="fixed inset-0 bg-background/40 backdrop-blur-sm z-[60]"
           />
           <motion.div
             initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
@@ -202,15 +202,15 @@ export function CreateCampaignModal({
 
             {/* Body */}
             <div className="flex-1 overflow-y-auto p-8 space-y-8 custom-scrollbar">
-                
+
               {step === 1 && (
                 <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-8">
                   <div className="space-y-4">
                     <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 px-1">Operation Name</label>
-                    <Input 
+                    <Input
                       value={formData.name}
                       onChange={(e) => handleChange('name', e.target.value)}
-                      placeholder="e.g. Q1 Renewal Campaign" 
+                      placeholder="e.g. Q1 Renewal Campaign"
                       className="bg-background border-border/40 h-12 text-base font-medium focus:border-primary transition-all rounded-md"
                     />
                   </div>
@@ -262,7 +262,7 @@ export function CreateCampaignModal({
                   </div>
                   <div className="space-y-4">
                     <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 px-1">Brief (Optional)</label>
-                    <Textarea 
+                    <Textarea
                       value={formData.description}
                       onChange={(e) => handleChange('description', e.target.value)}
                       placeholder="Internal notes about this operation..."
@@ -278,13 +278,13 @@ export function CreateCampaignModal({
                     <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 px-1">Line Provider</label>
                     <div className="grid grid-cols-1 gap-3">
                       {trunks.map((trunk) => (
-                        <div 
+                        <div
                           key={trunk.name}
                           onClick={() => handleTrunkChange(trunk.name)}
                           className={cn(
                             'flex items-center gap-4 p-4 rounded-md border cursor-pointer transition-all hover:border-primary/40',
-                            formData.trunkName === trunk.name 
-                              ? 'bg-primary/5 border-primary/40 shadow-sm' 
+                            formData.trunkName === trunk.name
+                              ? 'bg-primary/5 border-primary/40 shadow-sm'
                               : 'bg-background border-border/40 hover:bg-muted/30',
                           )}
                         >
@@ -308,7 +308,7 @@ export function CreateCampaignModal({
                     <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
                       <div className="space-y-2">
                         <label className="text-[10px] text-muted-foreground uppercase tracking-widest">Concurrency</label>
-                        <select 
+                        <select
                           value={formData.maxConcurrent}
                           onChange={(e) => handleChange('maxConcurrent', Number(e.target.value))}
                           className="w-full h-10 bg-background border border-border/40 rounded-md px-3 text-xs font-mono"
@@ -318,7 +318,7 @@ export function CreateCampaignModal({
                       </div>
                       <div className="space-y-2">
                         <label className="text-[10px] text-muted-foreground uppercase tracking-widest">Rate Limit</label>
-                        <select 
+                        <select
                           value={formData.callsPerSecond}
                           onChange={(e) => handleChange('callsPerSecond', Number(e.target.value))}
                           className="w-full h-10 bg-background border border-border/40 rounded-md px-3 text-xs font-mono"
@@ -350,15 +350,15 @@ export function CreateCampaignModal({
                   <div className="space-y-4">
                     <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 px-1">Active Hours</label>
                     <div className="flex items-center gap-4">
-                      <Input 
-                        type="time" 
+                      <Input
+                        type="time"
                         value={formData.dailyStartTime}
                         onChange={(e) => handleChange('dailyStartTime', e.target.value)}
                         className="h-12 bg-background border-border/40 font-mono text-sm"
                       />
                       <span className="text-muted-foreground text-xs uppercase tracking-widest">To</span>
-                      <Input 
-                        type="time" 
+                      <Input
+                        type="time"
                         value={formData.dailyEndTime}
                         onChange={(e) => handleChange('dailyEndTime', e.target.value)}
                         className="h-12 bg-background border-border/40 font-mono text-sm"
@@ -370,13 +370,13 @@ export function CreateCampaignModal({
                     <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 px-1">Region</label>
                     <div className="grid grid-cols-1 gap-3">
                       {TIMEZONES.map((tz) => (
-                        <div 
+                        <div
                           key={tz.value}
                           onClick={() => handleChange('timezone', tz.value)}
                           className={cn(
                             'flex items-center justify-between p-3 rounded-md border cursor-pointer transition-all hover:border-primary/40',
-                            formData.timezone === tz.value 
-                              ? 'bg-primary/5 border-primary/40' 
+                            formData.timezone === tz.value
+                              ? 'bg-primary/5 border-primary/40'
                               : 'bg-background border-border/40',
                           )}
                         >
@@ -392,8 +392,8 @@ export function CreateCampaignModal({
                     <div className="space-y-1">
                       <p className="text-xs font-bold text-yellow-700 uppercase tracking-widest">Ready to Launch</p>
                       <p className="text-[10px] text-yellow-600/80 leading-relaxed">
-                                    Your campaign will utilize {formData.maxConcurrent} lines with up to {formData.maxRetries} retries per contact.
-                                    Ensure you have sufficient credits in the Treasury.
+                        Your campaign will utilize {formData.maxConcurrent} lines with up to {formData.maxRetries} retries per contact.
+                        Ensure you have sufficient credits in the Treasury.
                       </p>
                     </div>
                   </div>
@@ -406,23 +406,23 @@ export function CreateCampaignModal({
               {step > 1 ? (
                 <button onClick={() => setStep((s) => Math.max(1, s - 1) as any)} className="text-xs font-bold uppercase tracking-widest text-muted-foreground hover:text-foreground">Back</button>
               ) : <div />}
-                
+
               {step < 3 ? (
-                <Button 
+                <Button
                   onClick={() => setStep((s) => Math.min(3, s + 1) as any)}
                   disabled={step === 1 ? !isStep1Valid : !isStep2Valid}
                   className="h-10 px-6 gap-2 bg-foreground text-background hover:bg-foreground/90 transition-all rounded-[4px] text-[10px] font-bold uppercase tracking-[0.2em]"
                 >
-                        Next Step <ArrowRight size={14} />
+                  Next Step <ArrowRight size={14} />
                 </Button>
               ) : (
-                <Button 
+                <Button
                   onClick={handleSubmit}
                   disabled={loading}
                   className="h-10 px-6 gap-2 bg-green-600 hover:bg-green-700 text-white transition-all rounded-[4px] text-[10px] font-bold uppercase tracking-[0.2em]"
                 >
                   {loading ? <Loader2 className="animate-spin" /> : <Activity size={14} />}
-                        Execute Mission
+                  Execute Mission
                 </Button>
               )}
             </div>
