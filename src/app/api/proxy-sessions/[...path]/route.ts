@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const SESSION_API_BASE = 'http://35.200.254.189/session-manager';
+const SESSION_API_BASE = process.env.SESSION_API_BASE_URL ?? 'https://service.monade.ai/session-manager';
 const DEBUG_PROXY = process.env.NODE_ENV !== 'production';
 
 export async function GET(request: NextRequest) {
