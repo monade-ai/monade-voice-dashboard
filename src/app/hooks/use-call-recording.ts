@@ -3,6 +3,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 
 import { ApiError, fetchJson } from '@/lib/http';
+import { MONADE_API_BASE } from '@/config';
 
 // --- Types ---
 
@@ -175,7 +176,7 @@ export function useCallRecording(callId: string, existingRecordingUrl?: string |
 
         try {
             const data = await fetchJson<RecordingResponse>(
-                `/api/proxy/api/analytics/${callId}/recording`,
+                `${MONADE_API_BASE}/api/analytics/${callId}/recording`,
                 { retry: { retries: 0 } },
             );
 

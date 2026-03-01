@@ -5,7 +5,9 @@ import { useState, useCallback, useEffect } from 'react';
 import { fetchJson } from '@/lib/http';
 import { useMonadeUser } from '@/app/hooks/use-monade-user';
 
-const API_BASE = '/api/proxy';
+import { MONADE_API_BASE } from '@/config';
+
+const API_BASE = MONADE_API_BASE;
 
 export interface UserTrunk {
     id: string;

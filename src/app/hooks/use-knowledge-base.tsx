@@ -82,7 +82,7 @@ export const LibraryProvider = ({ children }: { children: ReactNode }) => {
     setIsLoading(true);
     try {
       const res = await fetch(`${API_BASE_URL}/api/users/${userUid}/knowledge-bases`, {
-        // Client requests go through `/api/proxy`, which injects auth server-side.
+        // Direct call to backend (HTTPS)
         headers: {},
       });
       if (!res.ok) throw new Error('Sync failed');

@@ -7,7 +7,9 @@ import { useMonadeUser } from '@/app/hooks/use-monade-user';
 import { MONADE_API_CONFIG } from '@/types/monade-api.types';
 
 // Trunk API base URL
-const TRUNK_API_BASE = '/api/proxy-trunks';
+import { TRUNKS_SERVICE_URL } from '@/config';
+
+const TRUNK_API_BASE = TRUNKS_SERVICE_URL;
 const API_BASE_URL = MONADE_API_CONFIG.BASE_URL;
 
 export interface SipTrunk {
@@ -122,23 +124,14 @@ export function useTrunks(options?: { checkAssignments?: boolean }) {
     try {
       let data: any;
 
-      try {
-        if (userUid) {
-          data = await fetchJson<any>(`${API_BASE_URL}/api/users/${encodeURIComponent(userUid)}/trunks`, {
-            headers: {
-              'Content-Type': 'application/json',
-            },
-          });
-        } else {
-          data = await fetchJson<any>(`${TRUNK_API_BASE}/trunks`);
-        }
-      } catch (scopedError) {
-        if (!userUid) {
-          throw scopedError;
-        }
-        console.warn('[useTrunks] Failed to fetch user-scoped trunks, falling back to global trunks:', scopedError);
-        data = await fetchJson<any>(`${TRUNK_API_BASE}/trunks`);
+      if (!userUid) {
+        throw new Error('No user UID available');
       }
+      data = await fetchJson<any>(`${API_BASE_URL}/api/users/${encodeURIComponent(userUid)}/trunks`, {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
 
       // Handle both array and object response formats
       const trunksList = Array.isArray(data) ? data : (data.trunks && Array.isArray(data.trunks) ? data.trunks : []);

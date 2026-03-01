@@ -4,8 +4,9 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 
 import { fetchJson } from '@/lib/http';
 import { useMonadeUser } from '@/app/hooks/use-monade-user';
+import { SESSION_MANAGER_URL } from '@/config';
 
-const SESSION_API_BASE = '/api/proxy-sessions';
+const SESSION_API_BASE = SESSION_MANAGER_URL;
 const REFRESH_INTERVAL_MS = 10_000;
 
 export interface ActiveSession {

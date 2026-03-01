@@ -3,6 +3,7 @@
 import { useState, useCallback } from 'react';
 
 import { ApiError, fetchJson } from '@/lib/http';
+import { MONADE_API_BASE } from '@/config';
 
 import { useMonadeUser } from './use-monade-user';
 
@@ -88,7 +89,7 @@ export function useCallAnalytics() {
 
     const request = (async () => {
       try {
-        const data = await fetchJson<any>(`/api/proxy/api/analytics/${callId}`);
+        const data = await fetchJson<any>(`${MONADE_API_BASE}/api/analytics/${callId}`);
         const analyticsData = (data.analytics || data) as CallAnalytics;
         callAnalyticsCache.set(callId, { data: analyticsData, cachedAt: Date.now() });
 
@@ -176,7 +177,7 @@ export function useUserAnalytics() {
 
     const request = (async () => {
       try {
-        const data = await fetchJson<any>(`/api/proxy/api/analytics?user_uid=${userUid}`);
+        const data = await fetchJson<any>(`${MONADE_API_BASE}/api/analytics?user_uid=${userUid}`);
 
         let analyticsArray: CallAnalytics[] = [];
         if (Array.isArray(data)) {

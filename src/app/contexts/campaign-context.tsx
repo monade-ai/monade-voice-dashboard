@@ -7,6 +7,7 @@ import { useAssistants } from '@/app/hooks/use-assistants-context';
 import { useMonadeUser } from '@/app/hooks/use-monade-user';
 import { useCampaignHistory } from '@/app/hooks/use-campaign-history';
 import { fetchJson } from '@/lib/http';
+import { MONADE_API_BASE } from '@/config';
 
 // Types
 export interface Contact {
@@ -246,7 +247,7 @@ export function CampaignProvider({ children }: { children: React.ReactNode }) {
     // Helper to check for transcript
     const checkForTranscript = async (): Promise<string | null> => {
       try {
-        const data = await fetchJson<any>(`/api/proxy/api/users/${userUid}/transcripts`);
+        const data = await fetchJson<any>(`${MONADE_API_BASE}/api/users/${userUid}/transcripts`);
         const transcripts = Array.isArray(data) ? data : data.transcripts || [];
 
         for (const t of transcripts) {
@@ -495,7 +496,7 @@ export function CampaignProvider({ children }: { children: React.ReactNode }) {
 
           // Find call_id from transcript
           try {
-            const transcriptsData = await fetchJson<any>(`/api/proxy/api/users/${userUid}/transcripts`);
+            const transcriptsData = await fetchJson<any>(`${MONADE_API_BASE}/api/users/${userUid}/transcripts`);
             const transcripts = Array.isArray(transcriptsData) ? transcriptsData : transcriptsData.transcripts || [];
             const match = transcripts.find((t: any) => {
               const tPhone = normalizePhone(t.phone_number || '');
@@ -512,7 +513,7 @@ export function CampaignProvider({ children }: { children: React.ReactNode }) {
           if (realCallId) {
             finalResults[idx].call_id = realCallId;
             try {
-              const d = await fetchJson<any>(`/api/proxy/api/analytics/${realCallId}`);
+              const d = await fetchJson<any>(`${MONADE_API_BASE}/api/analytics/${realCallId}`);
               finalResults[idx].analytics = d.analytics || d;
             } catch (e) {
               console.error('Analytics fetch failed:', e);
