@@ -183,16 +183,19 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
         };
       });
       console.log('[Assistants] Processed API list:', apiAssistants);
-    } catch (err) {
+    } catch (err: any) {
       const errorMsg = err instanceof Error ? err.message : 'Could not load assistants.';
       console.error('[Assistants] Fetch error caught:', err);
       console.error('[Assistants] Error details:', {
         message: errorMsg,
+        status: err?.status,
+        data: err?.data,
+        cause: err?.cause,
         stack: err instanceof Error ? err.stack : 'No stack trace',
         userUid,
         apiUrl: `${API_BASE_URL}/api/assistants/user/${userUid}`,
       });
-      toast({ title: 'Error Fetching Assistants', description: errorMsg });
+      toast({ title: 'Error Fetching Assistants', description: `${errorMsg} (HTTP ${err?.status || 'unknown'})` });
       // Proceed to load drafts even if API fetch fails
     }
 

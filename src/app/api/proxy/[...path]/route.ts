@@ -83,7 +83,10 @@ async function handleProxy(request: NextRequest, method: string) {
 
     // Log response for debugging
     if (!response.ok) {
-      console.error(`[Proxy] Backend returned ${response.status}:`, responseText);
+      console.error(`[Proxy] Backend error — ${method} ${targetUrl}`);
+      console.error(`[Proxy] Status: ${response.status} ${response.statusText}`);
+      console.error(`[Proxy] Response headers:`, Object.fromEntries(response.headers.entries()));
+      console.error(`[Proxy] Response body:`, responseText);
     }
 
     // Try to parse as JSON

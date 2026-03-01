@@ -132,6 +132,13 @@ export async function fetchJson<T = unknown>(url: string, options: FetchJsonOpti
           && !isHtmlLike(serverMessage)
           ? serverMessage
           : friendlyMessage;
+
+        // Full diagnostic logging for non-OK responses
+        console.error(`[fetchJson] HTTP ${response.status} ${response.statusText} — ${method} ${url}`);
+        console.error(`[fetchJson] Response body:`, errorData);
+        if (serverMessage) console.error(`[fetchJson] Server message:`, serverMessage);
+        console.error(`[fetchJson] Friendly message:`, message);
+
         const apiError = new ApiError(message, response.status, errorData);
 
         if (attempt < retries && retryOn(response.status, apiError)) {
