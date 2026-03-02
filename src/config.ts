@@ -19,9 +19,14 @@ export const CONFIG = {
   SESSION_MANAGER: {
     BASE_URL: process.env.NEXT_PUBLIC_SESSION_MANAGER_URL || 'https://service.monade.ai/session-manager',
   },
+
+  LIVEKIT: {
+    AGENT_NAME: process.env.NEXT_PUBLIC_LIVEKIT_AGENT_NAME || 'voice-agent',
+  },
 };
 
 // Convenience exports used by hooks and contexts
 export const MONADE_API_BASE = CONFIG.MONADE_API.BASE_URL;
 export const TRUNKS_SERVICE_URL = CONFIG.TRUNKS_SERVICE.BASE_URL;
 export const SESSION_MANAGER_URL = CONFIG.SESSION_MANAGER.BASE_URL;
+export const LIVEKIT_AGENT_NAME = CONFIG.LIVEKIT.AGENT_NAME;

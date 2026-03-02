@@ -10,6 +10,7 @@ import { useNewPhoneAssistant } from '@/app/hooks/use-new-phone-assistant';
 import { useLiveKitWebAssistant } from '@/app/hooks/use-livekit-web-assistant';
 import { useMonadeUser } from '@/app/hooks/use-monade-user';
 import { useAssistants } from '@/app/hooks/use-assistants-context';
+import { LIVEKIT_AGENT_NAME } from '@/config';
 
 import { NewPhoneDialog } from '../components/new-phone-dialog';
 import { LiveKitWebAssistantDialog } from '../components/livekit-web-assistant-dialog';
@@ -143,8 +144,7 @@ export default function LiveKitAssistantDualButton({ assistant }: AssistantDualB
 
       {/* LiveKit Web Assistant Dialog */}
       <LiveKitWebAssistantDialog
-        assistantName="voice-agent"
-        // assistantName="monade-test"
+        assistantName={LIVEKIT_AGENT_NAME}
         assistantId={assistantData.id}
         isOpen={isWebDialogOpen}
         onClose={handleWebDialogClose}
