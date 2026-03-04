@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Phone, X, AlertTriangle } from 'lucide-react';
+import { Phone, X, Plus } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -23,16 +23,16 @@ import {
 import { useTrunks } from '@/app/hooks/use-trunks';
 
 const COUNTRY_CODES = [
-  { code: '+91', label: 'India (+91)' },
-  { code: '+1', label: 'US / Canada (+1)' },
-  { code: '+971', label: 'UAE (+971)' },
-  { code: '+44', label: 'UK (+44)' },
-  { code: '+65', label: 'Singapore (+65)' },
-  { code: '+61', label: 'Australia (+61)' },
-  { code: '+49', label: 'Germany (+49)' },
-  { code: '+33', label: 'France (+33)' },
-  { code: '+81', label: 'Japan (+81)' },
-  { code: '+86', label: 'China (+86)' },
+  { code: '+91', label: 'India' },
+  { code: '+1', label: 'US / Canada' },
+  { code: '+971', label: 'UAE' },
+  { code: '+44', label: 'UK' },
+  { code: '+65', label: 'Singapore' },
+  { code: '+61', label: 'Australia' },
+  { code: '+49', label: 'Germany' },
+  { code: '+33', label: 'France' },
+  { code: '+81', label: 'Japan' },
+  { code: '+86', label: 'China' },
 ];
 
 interface CalleeInfo {
@@ -49,7 +49,7 @@ interface NewPhoneDialogProps {
   callStatus: 'idle' | 'initiating' | 'connecting' | 'connected' | 'failed' | 'completed';
   remainingTime: number;
   errorMessage?: string | null;
-  callProvider?: string; // New prop for saved provider
+  callProvider?: string;
 }
 
 export function NewPhoneDialog({
@@ -66,46 +66,38 @@ export function NewPhoneDialog({
 }: NewPhoneDialogProps) {
   const { trunks } = useTrunks();
   const [phoneNumber, setPhoneNumber] = useState('');
-  const [countryCode, setCountryCode] = useState('');
+  const [countryCode, setCountryCode] = useState('+91');
   const [error, setError] = useState('');
   const [calleeInfo, setCalleeInfo] = useState<CalleeInfo>({});
   const [newKey, setNewKey] = useState('');
   const [newValue, setNewValue] = useState('');
-  // Use saved provider if available, otherwise default to vobiz
   const [selectedTrunk, setSelectedTrunk] = useState(callProvider || 'vobiz');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Compose the full E.164 number
-    let fullNumber: string;
     const trimmed = phoneNumber.trim();
+    let fullNumber: string;
 
     if (trimmed.startsWith('+')) {
-      // User typed the full E.164 number directly — use as-is
       fullNumber = trimmed.replace(/[^\d+]/g, '');
-    } else if (countryCode) {
-      // Combine selected country code + local digits
+    } else {
       const localDigits = trimmed.replace(/\D/g, '');
       fullNumber = `${countryCode}${localDigits}`;
-    } else {
-      setError('Select a country code, or enter the full number with a + prefix (e.g. +91...)');
-      return;
     }
 
     const digits = fullNumber.replace(/\D/g, '');
     if (digits.length < 10) {
-      setError('Please enter a valid phone number (at least 10 digits)');
+      setError('Enter a valid phone number');
       return;
     }
 
     if (!selectedTrunk) {
-      setError('Please select a trunk provider (Twilio or Vobiz)');
+      setError('Select a call provider');
       return;
     }
 
     setError('');
-    console.log('[NewPhoneDialog] Calling onCall with phoneNumber:', fullNumber, 'trunk:', selectedTrunk, 'calleeInfo:', calleeInfo);
     onCall(fullNumber, calleeInfo, selectedTrunk);
   };
 
@@ -117,6 +109,13 @@ export function NewPhoneDialog({
       }));
       setNewKey('');
       setNewValue('');
+    }
+  };
+
+  const handleVariableKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      addCalleeInfoField();
     }
   };
 
@@ -187,14 +186,12 @@ export function NewPhoneDialog({
 
     default:
       return (
-        <form onSubmit={handleSubmit} className="space-y-4 py-2">
-          {/* Phone Number Input */}
-          <div className="space-y-2">
-            <label htmlFor="phone" className="text-sm font-medium">
-              Phone Number
-            </label>
+        <form onSubmit={handleSubmit} className="space-y-5 py-2">
+
+          {/* Phone Number */}
+          <div className="space-y-1.5">
+            <label htmlFor="phone" className="text-sm font-medium">Phone Number</label>
             <div className="flex gap-2">
-              {/* Country code selector */}
               <Select
                 value={countryCode}
                 onValueChange={(val) => {
@@ -202,142 +199,127 @@ export function NewPhoneDialog({
                   setError('');
                 }}
               >
-                <SelectTrigger className="w-40 shrink-0">
-                  <SelectValue placeholder="+code" />
+                <SelectTrigger className="w-24 shrink-0 font-mono text-sm">
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   {COUNTRY_CODES.map(({ code, label }) => (
-                    <SelectItem key={code} value={code}>{label}</SelectItem>
+                    <SelectItem key={code} value={code}>
+                      <span className="font-mono">{code}</span>
+                      <span className="text-muted-foreground ml-2 text-xs">{label}</span>
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              {/* Local number */}
               <Input
                 id="phone"
                 type="tel"
-                placeholder={phoneNumber.startsWith('+') ? '+91 9876543210' : '9876543210'}
+                placeholder="98765 43210"
                 value={phoneNumber}
                 onChange={(e) => {
                   setPhoneNumber(e.target.value);
-                  // If user starts typing a full E.164 number, clear country code
-                  if (e.target.value.startsWith('+')) {
-                    setCountryCode('');
-                  }
+                  if (e.target.value.startsWith('+')) setCountryCode('');
                   setError('');
                 }}
-                className={error ? 'border-red-300 flex-1' : 'flex-1'}
+                className={`flex-1 ${error ? 'border-red-300' : ''}`}
               />
             </div>
-            {!phoneNumber.startsWith('+') && !countryCode && (
-              <p className="text-xs text-amber-600 flex items-center gap-1">
-                <AlertTriangle className="h-3 w-3 shrink-0" />
-                Select a country code above, or type the full number starting with +
-              </p>
-            )}
-            <p className="text-xs text-muted-foreground">
-              E.164 format required (e.g., +91 9876543210 for India, +1 2025551234 for US)
-            </p>
           </div>
 
-          {/* Call Provider Selector */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium">
-                Call Provider
-            </label>
+          {/* Call Provider */}
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">Provider</label>
             <Select value={selectedTrunk} onValueChange={setSelectedTrunk}>
               <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select trunk provider" />
+                <SelectValue placeholder="Select provider" />
               </SelectTrigger>
               <SelectContent>
                 {trunks.length > 0 ? (
                   trunks.map((trunk, index) => (
                     <SelectItem key={`${trunk.id || trunk.name || 'trunk'}-${index}`} value={trunk.name}>
-                      <span className="font-medium">{trunk.name}</span>
+                      {trunk.name}
                     </SelectItem>
                   ))
                 ) : (
                   <>
-                    <SelectItem key="vobiz" value="vobiz">Vobiz (Indian calls)</SelectItem>
-                    <SelectItem key="twilio" value="twilio">Twilio (International)</SelectItem>
+                    <SelectItem value="vobiz">Vobiz</SelectItem>
+                    <SelectItem value="twilio">Twilio</SelectItem>
                   </>
                 )}
               </SelectContent>
             </Select>
-            {callProvider && selectedTrunk === callProvider && (
-              <p className="text-xs text-green-600">
-                  ✓ Using saved provider from assistant settings
-              </p>
+          </div>
+
+          {(error || errorMessage) && (
+            <p className="text-sm text-red-500">{error || errorMessage}</p>
+          )}
+
+          {/* Call Variables */}
+          <div className="space-y-3">
+            <div>
+              <p className="text-sm font-medium">Call Variables</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Optional context passed to the assistant</p>
+            </div>
+
+            {/* Chips */}
+            {Object.keys(calleeInfo).length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {Object.entries(calleeInfo).map(([key, value]) => (
+                  <span
+                    key={key}
+                    className="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-full bg-muted text-xs font-medium"
+                  >
+                    <span className="text-muted-foreground">{key}</span>
+                    <span className="text-muted-foreground">·</span>
+                    <span>{value}</span>
+                    <button
+                      type="button"
+                      onClick={() => removeCalleeInfoField(key)}
+                      className="ml-0.5 rounded-full p-0.5 text-muted-foreground hover:text-foreground hover:bg-background transition-colors"
+                    >
+                      <X className="h-2.5 w-2.5" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {/* Add row */}
+            <div className="flex gap-2">
+              <Input
+                type="text"
+                placeholder="Variable"
+                value={newKey}
+                onChange={(e) => setNewKey(e.target.value)}
+                onKeyDown={handleVariableKeyDown}
+                className="flex-1 h-9 text-sm"
+              />
+              <Input
+                type="text"
+                placeholder="Value"
+                value={newValue}
+                onChange={(e) => setNewValue(e.target.value)}
+                onKeyDown={handleVariableKeyDown}
+                className="flex-1 h-9 text-sm"
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={addCalleeInfoField}
+                disabled={!newKey.trim() || !newValue.trim()}
+                className="h-9 w-9 p-0 shrink-0"
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
+            {(newKey || newValue) && (
+              <p className="text-[11px] text-muted-foreground">Press Enter to add</p>
             )}
           </div>
 
-          {error && <p className="text-sm text-red-500">{error}</p>}
-          {errorMessage && <p className="text-sm text-red-500">{errorMessage}</p>}
-
-          {/* Callee Info Section */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium">
-                Callee Information (Optional)
-            </label>
-            <div className="space-y-2 max-h-32 overflow-y-auto p-2 border rounded-md">
-              {Object.entries(calleeInfo).map(([key, value]) => (
-                <div key={key} className="flex items-center justify-between bg-gray-50 p-2 rounded">
-                  <div>
-                    <span className="font-medium">{key}:</span> {value}
-                  </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => removeCalleeInfoField(key)}
-                    className="h-6 w-6 p-0"
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
-              {Object.keys(calleeInfo).length === 0 && (
-                <p className="text-sm text-gray-500 italic">No additional information added</p>
-              )}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-3 gap-2">
-            <div className="col-span-2">
-              <Input
-                type="text"
-                placeholder="Field name (e.g., name)"
-                value={newKey}
-                onChange={(e) => setNewKey(e.target.value)}
-              />
-            </div>
-            <div className="col-span-2">
-              <Input
-                type="text"
-                placeholder="Value (e.g., John Doe)"
-                value={newValue}
-                onChange={(e) => setNewValue(e.target.value)}
-              />
-            </div>
-            <div className="col-span-1">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={addCalleeInfoField}
-                disabled={!newKey.trim() || !newValue.trim()}
-                className="w-full"
-              >
-                  Add
-              </Button>
-            </div>
-          </div>
-
-          <p className="text-xs text-slate-500">
-            You&apos;ll receive a call from {assistantName}. Standard call rates may apply.
-          </p>
-
-          <DialogFooter>
+          <DialogFooter className="pt-1">
             <Button type="button" variant="outline" onClick={() => {
-              console.log('[NewPhoneDialog] Dialog closed (Cancel button)');
               onClose();
             }}>
               Cancel
@@ -351,18 +333,15 @@ export function NewPhoneDialog({
     }
   };
 
-  // Reset form when dialog opens
   useEffect(() => {
     if (isOpen) {
       setPhoneNumber('');
-      setCountryCode('');
+      setCountryCode('+91');
       setError('');
       setCalleeInfo({});
       setNewKey('');
       setNewValue('');
-      // Use saved provider if available, otherwise default to vobiz
       setSelectedTrunk(callProvider || 'vobiz');
-      console.log('[NewPhoneDialog] Dialog opened for assistant:', assistantName, 'provider:', callProvider);
     }
   }, [isOpen, assistantName, callProvider]);
 
@@ -373,7 +352,7 @@ export function NewPhoneDialog({
           <DialogTitle>
             {callStatus === 'idle' || callStatus === 'completed'
               ? `Call ${assistantName}`
-              : `${assistantName}`}
+              : assistantName}
           </DialogTitle>
         </DialogHeader>
 

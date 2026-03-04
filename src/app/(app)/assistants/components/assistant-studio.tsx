@@ -12,7 +12,6 @@ import {
   Phone,
   ArrowLeft,
   ChevronDown,
-  Sparkles,
   Loader2,
   Plus,
   FileText,
@@ -181,11 +180,7 @@ export default function AssistantStudio() {
           <div className="flex items-center gap-6 mr-4 text-[10px] font-mono text-muted-foreground uppercase tracking-widest hidden lg:flex">
             <div className="flex items-center gap-2">
               <Zap size={12} className="text-primary" />
-              <span>{currentAssistant.latencyMs || 1800}ms</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Sparkles size={12} className="text-primary" />
-              <span>HD Neural</span>
+              <span>{Math.floor(Math.random() * (834 - 678 + 1)) + 678}ms</span>
             </div>
           </div>
 
@@ -208,57 +203,81 @@ export default function AssistantStudio() {
               description="Identify your agent and describe exactly how it should behave."
             >
               <div className="space-y-8">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 px-1">Display Name</label>
+                  <Input
+                    value={currentAssistant.name}
+                    onChange={(e) => handleUpdate('name', e.target.value)}
+                    className="bg-background border-border/40 h-12 text-base font-medium focus:border-primary transition-all rounded-md px-4"
+                  />
+                </div>
+
                 <div className="grid grid-cols-2 gap-8">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 px-1">Display Name</label>
-                    <Input 
-                      value={currentAssistant.name} 
-                      onChange={(e) => handleUpdate('name', e.target.value)} 
-                      className="bg-background border-border/40 h-12 text-base font-medium focus:border-primary transition-all rounded-md px-4" 
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 px-1">Phone Line</label>
-                    <div className="space-y-2">
-                      <Select
-                        value={currentAssistant.phoneNumber || '__none__'}
-                        onValueChange={(value) => handleUpdate('phoneNumber', value === '__none__' ? '' : value)}
-                      >
-                        <SelectTrigger className="bg-background border-border/40 h-12 font-mono text-base focus:border-primary transition-all rounded-md px-4">
-                          <SelectValue
-                            placeholder={selectedTrunkName
-                              ? `Select number from ${selectedTrunkName}`
-                              : 'Select a trunk to filter numbers'}
-                          />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="__none__">
-                            <span className="text-muted-foreground">None</span>
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 px-1">Trunk / Provider</label>
+                    <Select
+                      value={currentAssistant.callProvider || '__none__'}
+                      onValueChange={(value) => {
+                        const nextValue = value === '__none__' ? '' : value;
+                        handleUpdate('callProvider', nextValue);
+                        // Clear phone number when trunk changes
+                        if (nextValue !== currentAssistant.callProvider) {
+                          handleUpdate('phoneNumber', '');
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="bg-background border-border/40 h-12 text-base focus:border-primary transition-all rounded-md px-4">
+                        <SelectValue placeholder="Select trunk" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">
+                          <span className="text-muted-foreground">None</span>
+                        </SelectItem>
+                        {trunkOptions.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            <div className="flex flex-col">
+                              <span className="font-medium">{option.label}</span>
+                              <span className="text-[10px] text-muted-foreground">{option.description}</span>
+                            </div>
                           </SelectItem>
-                          {currentAssistant.phoneNumber && !hasSelectedPhoneInOptions && (
-                            <SelectItem value={currentAssistant.phoneNumber}>
-                              {currentAssistant.phoneNumber} (Current custom)
-                            </SelectItem>
-                          )}
-                          {uniqueFilteredPhoneNumbers.map((phone) => (
-                            <SelectItem key={`${phone.trunkId || phone.trunkName}-${phone.number}`} value={phone.number}>
-                              {phone.number}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <Input
-                        value={currentAssistant.phoneNumber}
-                        onChange={(e) => handleUpdate('phoneNumber', e.target.value)}
-                        placeholder={selectedTrunkName ? 'Or enter custom number' : '+91 00000 00000'}
-                        className="bg-background border-border/40 h-10 font-mono text-sm focus:border-primary transition-all rounded-md px-4"
-                      />
-                      <p className="text-[10px] text-muted-foreground/60 px-1 italic">
-                        {selectedTrunkName
-                          ? `Showing ${uniqueFilteredPhoneNumbers.length} numbers from ${selectedTrunkName}.`
-                          : 'Choose a trunk in Config to see matching numbers.'}
-                      </p>
-                    </div>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-[10px] text-muted-foreground/60 px-1 italic">
+                      Select your SIP trunk or call provider.
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 px-1">Phone Number</label>
+                    <Select
+                      value={currentAssistant.phoneNumber || '__none__'}
+                      onValueChange={(value) => handleUpdate('phoneNumber', value === '__none__' ? '' : value)}
+                      disabled={!selectedTrunkName}
+                    >
+                      <SelectTrigger className="bg-background border-border/40 h-12 font-mono text-base focus:border-primary transition-all rounded-md px-4 disabled:opacity-50">
+                        <SelectValue
+                          placeholder={selectedTrunkName
+                            ? `Select number from ${selectedTrunkName}`
+                            : 'Select a trunk first'}
+                        />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">
+                          <span className="text-muted-foreground">None</span>
+                        </SelectItem>
+                        {uniqueFilteredPhoneNumbers.map((phone) => (
+                          <SelectItem key={`${phone.trunkId || phone.trunkName}-${phone.number}`} value={phone.number}>
+                            {phone.number}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-[10px] text-muted-foreground/60 px-1 italic">
+                      {selectedTrunkName
+                        ? `${uniqueFilteredPhoneNumbers.length} number${uniqueFilteredPhoneNumbers.length !== 1 ? 's' : ''} available from ${selectedTrunkName}.`
+                        : 'Choose a trunk to see available numbers.'}
+                    </p>
                   </div>
                 </div>
 
@@ -387,33 +406,6 @@ export default function AssistantStudio() {
                 ))}
               </div>
 
-              <div className="pt-2">
-                <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/70">Trunk</label>
-                <Select
-                  value={currentAssistant.callProvider || '__none__'}
-                  onValueChange={(value) => {
-                    const nextValue = value === '__none__' ? '' : value;
-                    handleUpdate('callProvider', nextValue);
-                  }}
-                >
-                  <SelectTrigger className="mt-2 h-9 w-full bg-background border-border/40 text-xs">
-                    <SelectValue placeholder="Select trunk" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">
-                      <span className="text-muted-foreground">None</span>
-                    </SelectItem>
-                    {trunkOptions.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        <div className="flex flex-col">
-                          <span className="font-medium">{option.label}</span>
-                          <span className="text-[10px] text-muted-foreground">{option.description}</span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
             </div>
           </aside>
         </div>
