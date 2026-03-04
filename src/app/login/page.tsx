@@ -1,13 +1,15 @@
 'use client';
 
-import React, { useActionState, useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GrainGradient } from '@paper-design/shaders-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
-import { createClient } from '@/utils/supabase/client';
-
-import { login, signup, type LoginActionState } from './actions';
+import {
+  requestPasswordReset,
+  signInEmail,
+  signUpEmail,
+} from '@/lib/auth/auth-client';
 
 // --- Types ---
 type OnboardingStep = 'identity' | 'purpose' | 'handover';
@@ -51,8 +53,9 @@ function LoginComponent() {
     teamSize: '',
     origin: '',
   });
-  const initialLoginState: LoginActionState = { success: false, error: null };
-  const [loginState, loginAction, isLoggingIn] = useActionState(login, initialLoginState);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitMessage, setSubmitMessage] = useState<string | null>(null);
   const [isResetting, setIsResetting] = useState(false);
   const [resetState, setResetState] = useState<{ error: string | null, success: string | null }>({
     error: null,
@@ -62,27 +65,66 @@ function LoginComponent() {
   const pendingOnboardingParam = searchParams.get('pending_onboarding');
 
   useEffect(() => {
-    if (!loginState.success || step !== 'identity') return;
-
-    const shouldShowOnboarding = authMode === 'signup'
-      && typeof window !== 'undefined'
-      && localStorage.getItem(PENDING_ONBOARDING_KEY) === '1'
-      && localStorage.getItem(ONBOARDING_COMPLETED_KEY) !== '1';
-
-    if (shouldShowOnboarding) {
-      setStep('purpose');
-
-      return;
-    }
-
-    router.push('/assistants');
-  }, [authMode, loginState.success, router, step]);
-
-  useEffect(() => {
     if (pendingOnboardingParam !== '1') return;
     localStorage.setItem(PENDING_ONBOARDING_KEY, '1');
     setAuthMode('signup');
   }, [pendingOnboardingParam]);
+
+  const handleIdentitySubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setSubmitError(null);
+    setSubmitMessage(null);
+
+    const email = formData.email.trim();
+    const password = formData.password;
+
+    if (!email || !password) {
+      setSubmitError('Email and password are required.');
+
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      if (authMode === 'signup') {
+        const { error } = await signUpEmail(email, password);
+        if (error) {
+          setSubmitError(error.message || 'Unable to create account.');
+
+          return;
+        }
+
+        localStorage.setItem(PENDING_ONBOARDING_KEY, '1');
+        setAuthMode('signin');
+        setSubmitMessage('Account created. Check your email to continue signup process.');
+
+        return;
+      }
+
+      const { error } = await signInEmail(email, password);
+      if (error) {
+        setSubmitError(error.message || 'Unable to sign in.');
+
+        return;
+      }
+
+      const shouldShowOnboarding = typeof window !== 'undefined'
+        && localStorage.getItem(PENDING_ONBOARDING_KEY) === '1'
+        && localStorage.getItem(ONBOARDING_COMPLETED_KEY) !== '1';
+
+      if (shouldShowOnboarding) {
+        setStep('purpose');
+
+        return;
+      }
+
+      router.push('/assistants');
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : 'Authentication failed.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const handleForgotPassword = async () => {
     const email = formData.email.trim();
@@ -98,16 +140,15 @@ function LoginComponent() {
     setIsResetting(true);
     setResetState({ error: null, success: null });
     try {
-      const supabase = createClient();
-      const { error } = await supabase.auth.resetPasswordForEmail(email);
-      if (error) {
-        setResetState({ error: error.message, success: null });
-
-        return;
-      }
+      await requestPasswordReset(email, `${window.location.origin}/login`);
       setResetState({
         error: null,
         success: `Reset link sent to ${email}.`,
+      });
+    } catch (error) {
+      setResetState({
+        error: error instanceof Error ? error.message : 'Unable to send reset link.',
+        success: null,
       });
     } finally {
       setIsResetting(false);
@@ -185,7 +226,7 @@ function LoginComponent() {
                   </div>
                 </FadeIn>
 
-                <form className="space-y-4" action={loginAction}>
+                <form className="space-y-4" onSubmit={handleIdentitySubmit}>
                   <FadeIn delay={0.1}>
                     <div className="space-y-1">
                       <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Email</label>
@@ -217,19 +258,21 @@ function LoginComponent() {
                   <FadeIn delay={0.3}>
                     <button
                       type="submit"
-                      disabled={authMode === 'signin' && isLoggingIn}
-                      formAction={authMode === 'signup' ? signup : undefined}
+                      disabled={isSubmitting}
                       className="mt-8 w-full bg-foreground text-background hover:bg-foreground/90 h-10 rounded-[4px] font-medium text-sm transition-all"
                     >
                       {authMode === 'signin'
-                        ? (isLoggingIn ? 'Signing in...' : 'Continue')
-                        : 'Create account'}
+                        ? (isSubmitting ? 'Signing in...' : 'Continue')
+                        : (isSubmitting ? 'Creating account...' : 'Create account')}
                     </button>
-                    {authMode === 'signin' && loginState.error && (
-                      <p className="mt-3 text-xs text-red-600">{loginState.error}</p>
+                    {submitError && (
+                      <p className="mt-3 text-xs text-red-600">{submitError}</p>
                     )}
                     {authMessage && (
                       <p className="mt-3 text-xs text-primary">{authMessage}</p>
+                    )}
+                    {submitMessage && (
+                      <p className="mt-3 text-xs text-primary">{submitMessage}</p>
                     )}
                     {resetState.error && (
                       <p className="mt-3 text-xs text-red-600">{resetState.error}</p>

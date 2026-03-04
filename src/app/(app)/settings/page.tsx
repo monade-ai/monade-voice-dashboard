@@ -15,9 +15,8 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { createClient } from '@/utils/supabase/client';
 import { useAuth } from '@/contexts/auth-context';
-import { signOut } from '@/app/actions/auth';
+import { requestPasswordReset, signOutSession } from '@/lib/auth/auth-client';
 import { DashboardHeader } from '@/components/dashboard-header';
 import { PaperCard, PaperCardContent } from '@/components/ui/paper-card';
 import { Button } from '@/components/ui/button';
@@ -58,12 +57,29 @@ const SettingRow = ({
 export default function SettingsPage() {
   const router = useRouter();
   const { user } = useAuth();
+  const [isSigningOut, setIsSigningOut] = React.useState(false);
 
   const handleResetPassword = async () => {
     if (!user?.email) return;
-    const supabase = createClient();
-    await supabase.auth.resetPasswordForEmail(user.email);
-    toast.success('Reset link sent to ' + user.email);
+    try {
+      await requestPasswordReset(user.email, `${window.location.origin}/login`);
+      toast.success('Reset link sent to ' + user.email);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to send reset link');
+    }
+  };
+
+  const handleSignOut = async () => {
+    try {
+      setIsSigningOut(true);
+      await signOutSession();
+      router.push('/login');
+      router.refresh();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to sign out');
+    } finally {
+      setIsSigningOut(false);
+    }
   };
 
   return (
@@ -84,16 +100,16 @@ export default function SettingsPage() {
             <h1 className="text-5xl font-medium tracking-tighter text-foreground">Settings</h1>
             <p className="text-muted-foreground text-sm font-medium">Manage your account and preferences.</p>
           </div>
-          <form action={signOut}>
-            <Button
-              type="submit"
-              variant="destructive"
-              className="h-10 px-4 gap-2 rounded-[4px] text-[10px] font-bold uppercase tracking-widest"
-            >
-              <LogOut size={14} />
-                  Sign Out
-            </Button>
-          </form>
+          <Button
+            type="button"
+            variant="destructive"
+            disabled={isSigningOut}
+            onClick={handleSignOut}
+            className="h-10 px-4 gap-2 rounded-[4px] text-[10px] font-bold uppercase tracking-widest"
+          >
+            <LogOut size={14} />
+            {isSigningOut ? 'Signing Out...' : 'Sign Out'}
+          </Button>
         </div>
 
         {/* --- Identity Section --- */}
@@ -109,7 +125,7 @@ export default function SettingsPage() {
                   <div className="space-y-2">
                     <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Name</label>
                     <Input 
-                      value={user?.user_metadata?.full_name || 'User'} 
+                      value={user?.name || user?.email?.split('@')[0] || 'User'} 
                       readOnly 
                       className="bg-muted/10 border-border/20 font-medium"
                     />
@@ -125,7 +141,7 @@ export default function SettingsPage() {
                 </div>
                 <div className="flex items-center gap-2 pt-2">
                   <Badge variant="outline" className="text-[9px] uppercase tracking-widest border-green-500/30 text-green-600 bg-green-500/5">Verified User</Badge>
-                  <Badge variant="outline" className="text-[9px] uppercase tracking-widest border-border/40 text-muted-foreground">ID: {user?.id.substring(0, 8)}...</Badge>
+                  <Badge variant="outline" className="text-[9px] uppercase tracking-widest border-border/40 text-muted-foreground">ID: {user?.id?.substring(0, 8)}...</Badge>
                 </div>
               </div>
             </PaperCardContent>

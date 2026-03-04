@@ -11,7 +11,6 @@ interface NewCallingParams {
   callee_info: CalleeInfo;
   assistant_id: string;
   trunk_name: string; // Selected trunk: 'twilio' or 'vobiz'
-  api_key: string; // User's API key for billing/transcripts
   user_uid: string; // User UID for trunk ownership validation
   use_case?: string; // Optional use case key, e.g. "sales" | "support"
   prompt_url?: string; // Optional direct prompt URL override
@@ -23,12 +22,7 @@ interface NewCallingParams {
 export async function initiateNewCall(params: NewCallingParams): Promise<unknown> {
   console.log('[NewCallingService] initiateNewCall called with params:', {
     ...params,
-    api_key: params.api_key ? `${params.api_key.substring(0, 20)}...` : 'NOT PROVIDED',
   });
-
-  if (!params.api_key) {
-    throw new Error('API key is required for billing. Please ensure you have an API key configured.');
-  }
 
   if (!params.trunk_name) {
     throw new Error('Please select a trunk (Twilio or Vobiz) to make the call.');
@@ -44,7 +38,6 @@ export async function initiateNewCall(params: NewCallingParams): Promise<unknown
     callee_info: params.callee_info || {},
     assistant_id: params.assistant_id,
     trunk_name: params.trunk_name, // 'twilio' or 'vobiz'
-    api_key: params.api_key, // User's API key for billing
     user_uid: params.user_uid, // User UID for trunk ownership validation
     use_case: params.use_case,
     prompt_url: params.prompt_url,
@@ -53,10 +46,7 @@ export async function initiateNewCall(params: NewCallingParams): Promise<unknown
     use_case_prompt_map: params.use_case_prompt_map,
   };
 
-  console.log('[NewCallingService] SENDING POST to /api/calling with body:', JSON.stringify({
-    ...payload,
-    api_key: `${payload.api_key.substring(0, 20)}...`,
-  }));
+  console.log('[NewCallingService] SENDING POST to /api/calling with body:', JSON.stringify(payload));
 
   return fetchJson('/api/calling', {
     method: 'POST',

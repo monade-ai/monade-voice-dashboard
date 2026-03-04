@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-// Hardcoded Trunks API config
-const TRUNKS_API_BASE = 'https://service.monade.ai/trunks';
+import {
+  fetchMonadeProfileFromRequestHeaders,
+  getServiceToken,
+} from '@/lib/auth/server-auth';
+
+const TRUNKS_API_BASE = process.env.MONADE_TRUNKS_API_BASE_URL || 'https://service.monade.ai/trunks';
 const DEBUG_TRUNKS_PROXY = process.env.NODE_ENV !== 'production';
 
 export async function GET(request: NextRequest) {
@@ -34,12 +38,27 @@ async function handleProxy(request: NextRequest, method: string) {
     const path = url.pathname.replace('/api/proxy-trunks', '');
     const searchParams = url.search;
 
-    const targetUrl = `${TRUNKS_API_BASE}${path}${searchParams}`;
+    // Incoming `/api/proxy-trunks/trunks` should map to `${TRUNKS_API_BASE}`, not `${TRUNKS_API_BASE}/trunks`.
+    const normalizedPath = path === '/trunks'
+      ? ''
+      : (path.startsWith('/trunks/') ? path.slice('/trunks'.length) : path);
+
+    const targetUrl = `${TRUNKS_API_BASE}${normalizedPath}${searchParams}`;
     if (DEBUG_TRUNKS_PROXY) {
       console.log(`[TrunksProxy] ${method} ${targetUrl}`);
     }
 
     const headers: HeadersInit = {};
+    const serviceToken = getServiceToken();
+    if (serviceToken) {
+      headers['Authorization'] = `Bearer ${serviceToken}`;
+      headers['X-API-Key'] = serviceToken;
+    }
+
+    const profile = await fetchMonadeProfileFromRequestHeaders(request.headers);
+    if (profile?.user_uid) {
+      headers['X-User-Uid'] = profile.user_uid;
+    }
 
     const fetchOptions: RequestInit = {
       method,

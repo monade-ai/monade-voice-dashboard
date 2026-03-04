@@ -1,12 +1,12 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { 
-  Key, 
-  Copy, 
-  Check, 
-  Trash2, 
-  Plus, 
+import {
+  Key,
+  Copy,
+  Check,
+  Trash2,
+  Plus,
   AlertTriangle,
   Loader2,
   ShieldCheck,
@@ -17,43 +17,78 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { useMonadeUser } from '@/app/hooks/use-monade-user';
-import { MONADE_API_CONFIG } from '@/types/monade-api.types';
+import { createApiKey, deleteApiKeyById, listApiKeys } from '@/lib/auth/auth-client';
 import { cn } from '@/lib/utils';
 
-interface ApiKey {
-  id: number;
-  api_key: string;
-  created_at: string;
-  is_active: boolean;
+interface BetterAuthApiKey {
+  id: string;
+  name?: string | null;
+  start?: string | null;
+  prefix?: string | null;
+  createdAt?: string;
+  expiresAt?: string | null;
+  enabled?: boolean;
+}
+
+function extractCreatedKey(payload: any): string | null {
+  const candidates = [
+    payload?.key,
+    payload?.apiKey?.key,
+    payload?.data?.key,
+    payload?.data?.apiKey?.key,
+    payload?.data?.data?.key,
+  ];
+
+  for (const candidate of candidates) {
+    if (typeof candidate === 'string' && candidate.trim()) {
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
+function normalizeApiKeys(input: any[]): BetterAuthApiKey[] {
+  return input.map((raw) => ({
+    id: String(raw?.id ?? ''),
+    name: raw?.name ?? null,
+    start: raw?.start ?? null,
+    prefix: raw?.prefix ?? null,
+    createdAt: raw?.createdAt ?? raw?.created_at ?? undefined,
+    expiresAt: raw?.expiresAt ?? raw?.expires_at ?? null,
+    enabled: raw?.enabled ?? true,
+  })).filter((key) => key.id.length > 0);
+}
+
+function getKeyPreview(key: BetterAuthApiKey) {
+  const first = key.start || key.prefix || key.id;
+  if (!first) return '********';
+
+  return `${first}...`;
 }
 
 export function ApiKeyManager() {
   const { userUid, loading: userLoading, error: userError, refetch } = useMonadeUser();
-  const [keys, setKeys] = useState<ApiKey[]>([]);
+  const [keys, setKeys] = useState<BetterAuthApiKey[]>([]);
   const [loading, setLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
   const [newKey, setNewKey] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
-  // Fetch Keys
   const fetchKeys = useCallback(async () => {
     if (!userUid) {
       setLoading(false);
 
       return;
     }
+
     try {
       setLoading(true);
-      const res = await fetch(`${MONADE_API_CONFIG.BASE_URL}/api/users/${userUid}/api-keys`);
-      if (res.ok) {
-        const data = await res.json();
-        setKeys(Array.isArray(data) ? data : []);
-      } else {
-        toast.error('Failed to fetch API keys');
-      }
-    } catch {
-      console.error('Failed to fetch API keys');
-      toast.error('Failed to fetch API keys');
+      const listed = await listApiKeys();
+      setKeys(normalizeApiKeys(Array.isArray(listed) ? listed : []));
+    } catch (error) {
+      console.error('Failed to fetch API keys', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to fetch API keys');
     } finally {
       setLoading(false);
     }
@@ -67,49 +102,35 @@ export function ApiKeyManager() {
     }
   }, [userUid, userLoading, fetchKeys]);
 
-  // Generate Key
   const handleGenerate = async () => {
     if (!userUid) return;
     setIsGenerating(true);
     try {
-      const res = await fetch(`${MONADE_API_CONFIG.BASE_URL}/api/users/${userUid}/api-keys`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      });
-      
-      if (res.ok) {
-        const data = await res.json();
-        // The API returns the new key object
-        const key = data.api_key || data.key; 
-        setNewKey(key);
-        await fetchKeys();
-        toast.success('New Access Key Generated');
-      } else {
-        toast.error('Failed to generate key');
+      const data = await createApiKey('Dashboard key');
+      const createdKey = extractCreatedKey(data);
+      if (!createdKey) {
+        throw new Error('API key created, but raw key was not returned.');
       }
-    } catch {
-      toast.error('Network error');
+
+      setNewKey(createdKey);
+      await fetchKeys();
+      toast.success('New API key generated');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to generate key');
     } finally {
       setIsGenerating(false);
     }
   };
 
-  // Delete Key
-  const handleDelete = async (id: number) => {
-    if (!confirm('Are you sure? This will immediately revoke access for any application using this key.')) return;
-    
+  const handleDelete = async (id: string) => {
+    if (!confirm('Are you sure? This will revoke access for integrations using this key.')) return;
+
     try {
-      const res = await fetch(`${MONADE_API_CONFIG.BASE_URL}/api/api-keys/${id}`, {
-        method: 'DELETE',
-      });
-      if (res.ok) {
-        setKeys(prev => prev.filter(k => k.id !== id));
-        toast.success('Key Revoked');
-      } else {
-        toast.error('Failed to revoke key');
-      }
-    } catch {
-      toast.error('Network error');
+      await deleteApiKeyById(id);
+      setKeys((prev) => prev.filter((k) => k.id !== id));
+      toast.success('Key revoked');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to revoke key');
     }
   };
 
@@ -124,14 +145,14 @@ export function ApiKeyManager() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h3 className="text-[10px] font-bold uppercase tracking-[0.3em] text-foreground/60">Active Credentials</h3>
-        <Button 
-          onClick={handleGenerate} 
+        <Button
+          onClick={handleGenerate}
           disabled={isGenerating || !userUid}
           size="sm"
           className="h-8 gap-2 bg-foreground text-background hover:bg-foreground/90 transition-all rounded-[4px] text-[10px] font-bold uppercase tracking-widest"
         >
           {isGenerating ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
-            Generate New
+          Generate New
         </Button>
       </div>
 
@@ -166,22 +187,15 @@ export function ApiKeyManager() {
                 </div>
                 <div className="flex flex-col">
                   <span className="text-xs font-mono font-medium text-foreground">
-                    {key.api_key.substring(0, 12)}...
+                    {getKeyPreview(key)}
                   </span>
                   <span className="text-[9px] text-muted-foreground uppercase tracking-widest">
-                                Created {new Date(key.created_at).toLocaleDateString()}
+                    Created {key.createdAt ? new Date(key.createdAt).toLocaleDateString() : 'Unknown'}
                   </span>
                 </div>
               </div>
               <div className="flex items-center gap-1.5">
                 <button
-                  onClick={() => handleCopy(key.api_key)}
-                  className="h-8 w-8 inline-flex items-center justify-center rounded-[4px] border border-border/30 text-muted-foreground hover:text-foreground hover:bg-background/80 transition-all"
-                  title="Copy Key"
-                >
-                  <Copy size={13} />
-                </button>
-                <button 
                   onClick={() => handleDelete(key.id)}
                   className="h-8 w-8 inline-flex items-center justify-center rounded-[4px] border border-border/30 text-muted-foreground hover:text-destructive hover:bg-background/80 transition-all"
                   title="Revoke Key"
@@ -194,29 +208,28 @@ export function ApiKeyManager() {
         )}
       </div>
 
-      {/* --- The Reveal Modal (One-Time View) --- */}
       <Dialog open={!!newKey} onOpenChange={(open) => !open && setNewKey(null)}>
         <DialogContent className="sm:max-w-md border-border/40 bg-background/95 backdrop-blur-xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-lg font-medium tracking-tight">
               <ShieldCheck className="text-green-500" size={20} />
-                    Credentials Generated
+              Credentials Generated
             </DialogTitle>
             <DialogDescription className="text-sm text-muted-foreground">
-                    This key grants full access to your Monade account. It will only be displayed once.
+              This key is shown only once. Store it securely now.
             </DialogDescription>
           </DialogHeader>
-            
+
           <div className="p-6 bg-muted/30 border border-border/40 rounded-md space-y-4 my-2">
             <div className="space-y-1">
               <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Secret Key</label>
               <div className="flex items-center gap-2">
-                <Input 
-                  value={newKey || ''} 
-                  readOnly 
+                <Input
+                  value={newKey || ''}
+                  readOnly
                   className="font-mono text-sm bg-background border-border/40 h-10"
                 />
-                <Button 
+                <Button
                   onClick={() => handleCopy(newKey || '')}
                   className={cn(
                     'h-10 w-10 shrink-0 transition-colors',
@@ -230,14 +243,14 @@ export function ApiKeyManager() {
             <div className="flex gap-2 items-start p-3 bg-yellow-500/10 border border-yellow-500/20 rounded text-yellow-600">
               <AlertTriangle size={14} className="mt-0.5 shrink-0" />
               <p className="text-[10px] leading-relaxed font-medium">
-                        Store this key securely. Monade cannot recover lost keys. If you lose it, you must generate a new one.
+                Store this key securely. Monade cannot recover lost keys. If you lose it, generate a new one.
               </p>
             </div>
           </div>
 
           <DialogFooter>
-            <Button 
-              onClick={() => setNewKey(null)} 
+            <Button
+              onClick={() => setNewKey(null)}
               disabled={!copied}
               className="w-full bg-foreground text-background hover:bg-foreground/90"
             >

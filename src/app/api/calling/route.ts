@@ -1,13 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-// Voice Agents API for making outbound calls
+import {
+  buildForwardHeaders,
+  fetchMonadeProfileFromRequestHeaders,
+  getConfigServerBaseUrl,
+  getServiceToken,
+} from '@/lib/auth/server-auth';
+
 const VOICE_AGENTS_URL = process.env.NEXT_PUBLIC_VOICE_AGENTS_URL || 'https://service.monade.ai/voice_agents';
-const MONADE_API_BASE_URL = process.env.MONADE_API_BASE_URL || 'https://service.monade.ai/db_services';
 
 // Trunk name mapping - map UI selection to actual trunk names registered in backend
 const TRUNK_NAME_MAP: Record<string, string> = {
-  'twilio': 'Twilio', // Actual registered name
-  'vobiz': 'Vobiz-SIP', // Actual registered name
+  twilio: 'Twilio',
+  vobiz: 'Vobiz-SIP',
 };
 
 type UseCasePromptMap = Record<string, string>;
@@ -46,13 +51,16 @@ function getEnvUseCasePromptMap(): UseCasePromptMap {
   }
 }
 
-async function resolvePromptUrl(params: {
-  promptUrl?: string;
-  knowledgeBaseUrl?: string;
-  knowledgeBaseId?: string;
-  useCase?: string;
-  requestUseCaseMap?: unknown;
-}): Promise<string | null> {
+async function resolvePromptUrl(
+  requestHeaders: Headers,
+  params: {
+    promptUrl?: string;
+    knowledgeBaseUrl?: string;
+    knowledgeBaseId?: string;
+    useCase?: string;
+    requestUseCaseMap?: unknown;
+  },
+): Promise<string | null> {
   const directPromptUrl = params.promptUrl?.trim();
   if (directPromptUrl) return directPromptUrl;
 
@@ -63,12 +71,11 @@ async function resolvePromptUrl(params: {
   if (knowledgeBaseId) {
     try {
       const kbResponse = await fetch(
-        `${MONADE_API_BASE_URL}/api/knowledge-bases/${encodeURIComponent(knowledgeBaseId)}`,
+        `${getConfigServerBaseUrl()}/api/knowledge-bases/${encodeURIComponent(knowledgeBaseId)}`,
         {
           method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers: buildForwardHeaders(requestHeaders),
+          cache: 'no-store',
         },
       );
 
@@ -100,22 +107,41 @@ async function resolvePromptUrl(params: {
 
 export async function POST(request: NextRequest) {
   try {
+    const profile = await fetchMonadeProfileFromRequestHeaders(request.headers);
+    if (!profile?.user_uid) {
+      return NextResponse.json({ error: 'User is not authenticated.' }, { status: 401 });
+    }
+
     const body = await request.json();
     const {
-      phone_number, // Target phone number to call
-      callee_info, // Metadata about the callee (name, etc.)
-      assistant_id, // Assistant ID (required)
-      trunk_name, // Selected trunk: 'twilio' or 'vobiz' from UI dropdown
-      api_key, // User's API key for billing/transcripts
-      user_uid, // User UID for trunk ownership validation
-      use_case, // Optional use case key to switch scripts per request
-      prompt_url, // Optional direct prompt URL override
-      knowledge_base_url, // Optional direct KB URL override
-      knowledge_base_id, // Optional KB ID (resolved to URL)
-      use_case_prompt_map, // Optional map: { [use_case]: prompt_url }
+      phone_number,
+      callee_info,
+      assistant_id,
+      trunk_name,
+      user_uid,
+      use_case,
+      prompt_url,
+      knowledge_base_url,
+      knowledge_base_id,
+      use_case_prompt_map,
     } = body;
 
-    const resolvedPromptUrl = await resolvePromptUrl({
+    if (!phone_number) {
+      return NextResponse.json({ error: 'Phone number is required' }, { status: 400 });
+    }
+
+    if (!assistant_id) {
+      return NextResponse.json({ error: 'Assistant ID is required' }, { status: 400 });
+    }
+
+    if (user_uid && user_uid !== profile.user_uid) {
+      return NextResponse.json(
+        { error: 'Forbidden: user_uid does not match authenticated user.' },
+        { status: 403 },
+      );
+    }
+
+    const resolvedPromptUrl = await resolvePromptUrl(request.headers, {
       promptUrl: prompt_url,
       knowledgeBaseUrl: knowledge_base_url,
       knowledgeBaseId: knowledge_base_id,
@@ -123,112 +149,65 @@ export async function POST(request: NextRequest) {
       requestUseCaseMap: use_case_prompt_map,
     });
 
-    console.log('[API /calling] Received request:', {
-      phone_number,
-      assistant_id,
-      trunk_name,
-      user_uid,
-      api_key: api_key ? `${api_key.substring(0, 20)}...` : 'NOT PROVIDED',
-      callee_info,
-      use_case,
-      resolved_prompt_url: resolvedPromptUrl || 'assistant_default',
-    });
-
-    // Validate required fields
-    if (!phone_number) {
-      return NextResponse.json(
-        { error: 'Phone number is required' },
-        { status: 400 },
-      );
-    }
-
-    if (!assistant_id) {
-      return NextResponse.json(
-        { error: 'Assistant ID is required' },
-        { status: 400 },
-      );
-    }
-
-    if (!api_key) {
-      return NextResponse.json(
-        { error: 'API key is required for billing. Please ensure you have an API key.' },
-        { status: 400 },
-      );
-    }
-
-    if (!user_uid) {
-      return NextResponse.json(
-        { error: 'user_uid is required to validate trunk ownership.' },
-        { status: 400 },
-      );
-    }
-
     // Format target phone number — must already be in E.164 format (+<country><number>)
-    let formattedPhone = phone_number.trim();
-    // Strip formatting characters (spaces, dashes, parens) but keep leading +
+    let formattedPhone = String(phone_number).trim();
     formattedPhone = formattedPhone.replace(/[^\d+]/g, '');
     if (!formattedPhone.startsWith('+')) {
       return NextResponse.json(
         {
           error:
             'Phone number must include a country code in E.164 format '
-            + '(e.g., +91 for India, +1 for US/Canada, +971 for UAE). '
-            + 'Please update your contacts to include the country code before calling.',
+            + '(e.g., +91 for India, +1 for US/Canada, +971 for UAE).',
         },
         { status: 400 },
       );
     }
 
-    // Map trunk name from UI selection to actual trunk name
-    const resolvedTrunkName = TRUNK_NAME_MAP[trunk_name?.toLowerCase()] || trunk_name || 'Vobiz-SIP';
-
-    console.log('[API /calling] Using Voice Agents API with trunk:', resolvedTrunkName);
-
-    // Build the correct API URL and payload per Shashwat's spec
+    const resolvedTrunkName = TRUNK_NAME_MAP[String(trunk_name || '').toLowerCase()] || trunk_name || 'Vobiz-SIP';
     const callUrl = `${VOICE_AGENTS_URL}/outbound-call/${encodeURIComponent(formattedPhone)}`;
+    const serviceToken = getServiceToken();
+    if (!serviceToken) {
+      return NextResponse.json(
+        { error: 'Server misconfigured: service token is not set.' },
+        { status: 500 },
+      );
+    }
 
     const metadata: Record<string, unknown> = {
       ...((callee_info && typeof callee_info === 'object') ? callee_info : {}),
     };
 
-    if (use_case && !metadata.use_case) {
-      metadata.use_case = use_case;
-    }
-    if (knowledge_base_id && !metadata.knowledge_base_id) {
-      metadata.knowledge_base_id = knowledge_base_id;
-    }
-    if (resolvedPromptUrl && !metadata.prompt_url) {
-      metadata.prompt_url = resolvedPromptUrl;
-    }
+    if (use_case && !metadata.use_case) metadata.use_case = use_case;
+    if (knowledge_base_id && !metadata.knowledge_base_id) metadata.knowledge_base_id = knowledge_base_id;
+    if (resolvedPromptUrl && !metadata.prompt_url) metadata.prompt_url = resolvedPromptUrl;
 
     const payload: Record<string, unknown> = {
-      assistant_id: assistant_id,
-      user_uid: user_uid,
+      assistant_id,
+      user_uid: profile.user_uid,
       metadata,
       telephony: {
         trunk_name: resolvedTrunkName,
       },
     };
+
     if (resolvedPromptUrl) {
       payload.prompt_url = resolvedPromptUrl;
     }
 
-    console.log('[API /calling] Calling Voice Agents API:', callUrl);
-    console.log('[API /calling] Payload:', JSON.stringify(payload));
-    console.log('[API /calling] Using API Key for auth');
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+
+    headers['Authorization'] = `Bearer ${serviceToken}`;
+    headers['X-API-Key'] = serviceToken;
 
     const response = await fetch(callUrl, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-API-Key': api_key, // User's API key for billing/transcripts
-      },
+      headers,
       body: JSON.stringify(payload),
     });
 
     const responseText = await response.text();
-    console.log('[API /calling] Voice Agents response:', response.status, responseText);
-
     if (!response.ok) {
       let errorMessage = 'Failed to initiate call';
       try {

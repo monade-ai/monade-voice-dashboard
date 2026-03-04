@@ -99,7 +99,7 @@ export function Sidebar() {
   const isDark = effectiveTheme === 'dark';
 
   // Get user display info
-  const displayName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User';
+  const displayName = user?.name || user?.email?.split('@')[0] || 'User';
   const displayEmail = user?.email || '';
   const initial = displayName.charAt(0).toUpperCase();
 

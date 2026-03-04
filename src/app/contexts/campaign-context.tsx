@@ -7,7 +7,6 @@ import { useAssistants } from '@/app/hooks/use-assistants-context';
 import { useMonadeUser } from '@/app/hooks/use-monade-user';
 import { useCampaignHistory } from '@/app/hooks/use-campaign-history';
 import { fetchJson } from '@/lib/http';
-import { MONADE_API_BASE } from '@/config';
 
 // Types
 export interface Contact {
@@ -58,6 +57,7 @@ interface CampaignContextType {
 }
 
 const CampaignContext = createContext<CampaignContextType | null>(null);
+const MONADE_PROXY_BASE = '/api/proxy';
 
 export function CampaignProvider({ children }: { children: React.ReactNode }) {
   // State
@@ -78,7 +78,7 @@ export function CampaignProvider({ children }: { children: React.ReactNode }) {
 
   // Hooks
   const { assistants } = useAssistants();
-  const { apiKey, userUid } = useMonadeUser();
+  const { userUid } = useMonadeUser();
   const { saveCampaign } = useCampaignHistory();
 
   const selectedAssistant = assistants.find(a => a.id === selectedAssistantId);
@@ -190,17 +190,6 @@ export function CampaignProvider({ children }: { children: React.ReactNode }) {
   const makeCall = async (contact: Contact): Promise<CampaignResult> => {
     const phone = formatPhoneNumber(contact.phoneNumber);
 
-    if (!apiKey) {
-      return {
-        phoneNumber: contact.phoneNumber,
-        calleeInfo: contact.calleeInfo,
-        call_id: '',
-        call_status: 'failed',
-        transcript: 'Error: No API key configured',
-        analyticsLoaded: false,
-      };
-    }
-
     try {
       const data = await fetchJson<any>('/api/calling', {
         method: 'POST',
@@ -209,7 +198,7 @@ export function CampaignProvider({ children }: { children: React.ReactNode }) {
           phone_number: phone,
           assistant_id: selectedAssistantId,
           trunk_name: selectedTrunk,
-          api_key: apiKey,
+          user_uid: userUid,
           callee_info: contact.calleeInfo,
         }),
         retry: { retries: 0 },
@@ -247,7 +236,7 @@ export function CampaignProvider({ children }: { children: React.ReactNode }) {
     // Helper to check for transcript
     const checkForTranscript = async (): Promise<string | null> => {
       try {
-        const data = await fetchJson<any>(`${MONADE_API_BASE}/api/users/${userUid}/transcripts`);
+        const data = await fetchJson<any>(`${MONADE_PROXY_BASE}/api/users/${userUid}/transcripts`);
         const transcripts = Array.isArray(data) ? data : data.transcripts || [];
 
         for (const t of transcripts) {
@@ -311,8 +300,8 @@ export function CampaignProvider({ children }: { children: React.ReactNode }) {
 
   // Start Campaign
   const startCampaign = async () => {
-    if (!selectedAssistantId || !selectedTrunk || !apiKey || !userUid || !contacts.length) {
-      toast.error('Missing configuration (Assistant, Trunk, API Key, or User)');
+    if (!selectedAssistantId || !selectedTrunk || !userUid || !contacts.length) {
+      toast.error('Missing configuration (Assistant, Trunk, or User)');
 
       return;
     }
@@ -496,7 +485,7 @@ export function CampaignProvider({ children }: { children: React.ReactNode }) {
 
           // Find call_id from transcript
           try {
-            const transcriptsData = await fetchJson<any>(`${MONADE_API_BASE}/api/users/${userUid}/transcripts`);
+            const transcriptsData = await fetchJson<any>(`${MONADE_PROXY_BASE}/api/users/${userUid}/transcripts`);
             const transcripts = Array.isArray(transcriptsData) ? transcriptsData : transcriptsData.transcripts || [];
             const match = transcripts.find((t: any) => {
               const tPhone = normalizePhone(t.phone_number || '');
@@ -513,7 +502,7 @@ export function CampaignProvider({ children }: { children: React.ReactNode }) {
           if (realCallId) {
             finalResults[idx].call_id = realCallId;
             try {
-              const d = await fetchJson<any>(`${MONADE_API_BASE}/api/analytics/${realCallId}`);
+              const d = await fetchJson<any>(`${MONADE_PROXY_BASE}/api/analytics/${realCallId}`);
               finalResults[idx].analytics = d.analytics || d;
             } catch (e) {
               console.error('Analytics fetch failed:', e);

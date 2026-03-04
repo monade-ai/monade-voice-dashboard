@@ -33,11 +33,18 @@ export interface UpdateUserRequest {
 // ============================================
 
 export interface MonadeApiKey {
-  id: number;
-  api_key: string;
-  user_uid: string;
-  created_at: string;
-  is_active: boolean;
+  id: string;
+  name?: string | null;
+  start?: string | null;
+  prefix?: string | null;
+  enabled: boolean;
+  createdAt: string;
+  expiresAt?: string | null;
+}
+
+export interface CreateMonadeApiKeyResponse {
+  key: string;
+  metadata: MonadeApiKey;
 }
 
 export interface ValidateApiKeyResponse {
@@ -205,5 +212,7 @@ export interface MonadeApiResponse<T> {
 // ============================================
 
 export const MONADE_API_CONFIG = {
-  BASE_URL: process.env.NEXT_PUBLIC_MONADE_API_BASE_URL || 'https://service.monade.ai/db_services',
+  BASE_URL: typeof window !== 'undefined'
+    ? '/api/proxy'
+    : process.env.MONADE_API_BASE_URL || 'https://service.monade.ai/db_services',
 };

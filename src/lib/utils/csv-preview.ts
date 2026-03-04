@@ -267,8 +267,7 @@ function detectPhoneColumn(headers: string[]): string | null {
 
 /**
  * Normalize a phone number for comparison.
- * Strips formatting characters but does NOT add a country code — callers are
- * responsible for ensuring numbers are in E.164 format (+<country><number>).
+ * Strips formatting and normalizes into E.164 for common Indian-number inputs.
  */
 function normalizePhoneNumber(phone: string): string {
   // Remove all non-digit characters except a leading +
@@ -279,7 +278,16 @@ function normalizePhoneNumber(phone: string): string {
     return normalized;
   }
 
-  // Return as-is — do NOT silently prepend any country code
+  // 10-digit numbers are treated as Indian mobile numbers by default.
+  if (/^\d{10}$/.test(normalized)) {
+    return `+91${normalized}`;
+  }
+
+  // If number already includes country code without '+', prefix it.
+  if (/^\d{11,15}$/.test(normalized)) {
+    return `+${normalized}`;
+  }
+
   return normalized;
 }
 

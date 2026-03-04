@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const MONADE_API_BASE = process.env.MONADE_API_BASE_URL ?? 'https://service.monade.ai/db_services';
-const MONADE_API_KEY = process.env.MONADE_API_KEY;
+import { buildForwardHeaders, getConfigServerBaseUrl } from '@/lib/auth/server-auth';
+
 const DEBUG_PROXY = process.env.NODE_ENV !== 'production';
 
 export async function GET(request: NextRequest) {
@@ -28,73 +28,51 @@ function isNetworkError(error: unknown) {
   if (!(error instanceof Error)) return false;
   const message = error.message.toLowerCase();
 
-  return message.includes('fetch failed') || message.includes('enotfound') || message.includes('enetunreach') || message.includes('econnrefused') || message.includes('aborted');
+  return message.includes('fetch failed')
+    || message.includes('enotfound')
+    || message.includes('enetunreach')
+    || message.includes('econnrefused')
+    || message.includes('aborted');
 }
 
 async function handleProxy(request: NextRequest, method: string) {
   try {
-    if (!MONADE_API_KEY) {
-      return NextResponse.json(
-        { error: 'Server misconfigured: MONADE_API_KEY is not set.' },
-        { status: 500, headers: { 'Cache-Control': 'no-store' } },
-      );
-    }
-
-    // Get the path after /api/proxy/
     const url = new URL(request.url);
     const path = url.pathname.replace('/api/proxy', '');
     const searchParams = url.search;
+    const targetUrl = `${getConfigServerBaseUrl()}${path}${searchParams}`;
 
-    const targetUrl = `${MONADE_API_BASE}${path}${searchParams}`;
     if (DEBUG_PROXY) {
       console.log(`[Proxy] ${method} ${targetUrl}`);
     }
 
-    // Build headers - only set Content-Type for methods with body
-    const headers: HeadersInit = {
-      'X-API-Key': MONADE_API_KEY,
-    };
-
-    const fetchOptions: RequestInit = {
+    const headers = buildForwardHeaders(request.headers, true);
+    const fetchOptions: RequestInit & { duplex?: 'half' } = {
       method,
       headers,
+      cache: 'no-store',
     };
 
-    // Add body and Content-Type for POST, PUT, PATCH only
-    if (['POST', 'PUT', 'PATCH'].includes(method)) {
-      try {
-        const body = await request.json();
-        if (DEBUG_PROXY) {
-          console.log(`[Proxy] ${method} body:`, JSON.stringify(body));
-        }
-        fetchOptions.body = JSON.stringify(body);
-        // Only set Content-Type when we actually have a body
-        (headers as Record<string, string>)['Content-Type'] = 'application/json';
-      } catch {
-        // No body or invalid JSON - don't set Content-Type
-      }
+    if (!['GET', 'HEAD'].includes(method)) {
+      fetchOptions.body = request.body;
+      fetchOptions.duplex = 'half';
     }
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15000);
     const response = await fetch(targetUrl, { ...fetchOptions, signal: controller.signal })
       .finally(() => clearTimeout(timeoutId));
+
     const responseText = await response.text();
-
-    // Log response for debugging
-    if (!response.ok) {
-      console.error(`[Proxy] Backend error — ${method} ${targetUrl}`);
-      console.error(`[Proxy] Status: ${response.status} ${response.statusText}`);
-      console.error(`[Proxy] Response headers:`, Object.fromEntries(response.headers.entries()));
-      console.error(`[Proxy] Response body:`, responseText);
-    }
-
-    // Try to parse as JSON
     let data;
     try {
       data = JSON.parse(responseText);
     } catch {
       data = responseText;
+    }
+
+    if (!response.ok && DEBUG_PROXY) {
+      console.error(`[Proxy] Backend returned ${response.status}:`, data);
     }
 
     return NextResponse.json(data, {

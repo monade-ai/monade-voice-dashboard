@@ -3,13 +3,11 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 
 import { ApiError, fetchJson } from '@/lib/http';
-import { createClient } from '@/utils/supabase/client';
-import { MONADE_API_CONFIG } from '@/types/monade-api.types';
+import { useAuth } from '@/contexts/auth-context';
 
 interface MonadeUserContextType {
     userUid: string | null;
     email: string | null;
-    apiKey: string | null; // User's default API key for billing
     loading: boolean;
     error: string | null;
     refetch: () => Promise<void>;
@@ -18,7 +16,6 @@ interface MonadeUserContextType {
 const MonadeUserContext = createContext<MonadeUserContextType>({
   userUid: null,
   email: null,
-  apiKey: null,
   loading: true,
   error: null,
   refetch: async () => { },
@@ -38,9 +35,9 @@ interface MonadeUserProviderProps {
 }
 
 export function MonadeUserProvider({ children }: MonadeUserProviderProps) {
+  const { user, isLoading: authLoading } = useAuth();
   const [userUid, setUserUid] = useState<string | null>(null);
   const [email, setEmail] = useState<string | null>(null);
-  const [apiKey, setApiKey] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -53,130 +50,61 @@ export function MonadeUserProvider({ children }: MonadeUserProviderProps) {
   };
 
   const fetchMonadeUser = useCallback(async () => {
+    if (authLoading) {
+      setLoading(true);
+
+      return;
+    }
+
+    if (!user?.email) {
+      setUserUid(null);
+      setEmail(null);
+      setError(null);
+      setLoading(false);
+
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
+      const data = await fetchJson<any>('/api/proxy/api/me', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        retry: { retries: 1 },
+      });
 
-      // Get Supabase session
-      const supabase = createClient();
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-
-      if (sessionError) {
-        console.error('[MonadeUser] Supabase session error:', sessionError);
-        setError('Failed to get session');
-        setLoading(false);
-
-        return;
-      }
-
-      if (!session?.user?.email) {
-        console.log('[MonadeUser] No authenticated user');
+      if (!data?.user_uid) {
+        setError('Invalid user profile response');
         setUserUid(null);
-        setEmail(null);
-        setApiKey(null);
-        setLoading(false);
+        setEmail(user.email);
 
         return;
       }
 
-      const userEmail = session.user.email;
-      setEmail(userEmail);
-      console.log('[MonadeUser] Fetching user_uid for email:', userEmail);
-
-      // Fetch user_uid from Monade API by email
-      try {
-        const data = await fetchJson<any>(
-          `${MONADE_API_CONFIG.BASE_URL}/api/users/email/${encodeURIComponent(userEmail)}`,
-          {
-            method: 'GET',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-          },
-        );
-
-        const uid = data.user_uid || data.user?.user_uid;
-
-        if (uid) {
-          console.log('[MonadeUser] Successfully fetched user_uid:', uid);
-          setUserUid(uid);
-
-          // Now fetch user's API keys
-          try {
-            const keysData = await fetchJson<any>(
-              `${MONADE_API_CONFIG.BASE_URL}/api/users/${uid}/api-keys`,
-              {
-                method: 'GET',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-              },
-            );
-
-            // Get the first active API key
-            const keys = Array.isArray(keysData) ? keysData : keysData.api_keys || [];
-            if (keys.length > 0) {
-              const firstKey = keys[0].key || keys[0].api_key || keys[0];
-              console.log('[MonadeUser] Found API key:', firstKey ? `${String(firstKey).substring(0, 20)}...` : 'none');
-              setApiKey(String(firstKey));
-            } else {
-              console.log('[MonadeUser] No API keys found for user');
-              setApiKey(null);
-            }
-          } catch (keyErr) {
-            console.error('[MonadeUser] Error fetching API keys:', keyErr);
-            setError('Could not load API keys. Please try again later.');
-          }
-        } else {
-          console.error('[MonadeUser] No user_uid in response:', data);
-          setError('Invalid user data');
-        }
-      } catch (fetchError) {
-        if (fetchError instanceof ApiError) {
-          if (fetchError.status === 404) {
-            console.error('[MonadeUser] User not found in Monade DB for email:', userEmail);
-          } else {
-            console.error('[MonadeUser] API error:', fetchError.status);
-          }
-          setError(getApiErrorMessage(fetchError.status ?? 0));
-        } else {
-          console.error('[MonadeUser] Failed to reach Monade API:', fetchError);
-          setError('Could not reach Monade API. Please try again later.');
-        }
-
-        return;
+      setUserUid(data.user_uid);
+      setEmail(data.email || user.email);
+    } catch (fetchError) {
+      if (fetchError instanceof ApiError) {
+        setError(getApiErrorMessage(fetchError.status ?? 0));
+      } else {
+        setError('Could not reach Monade API. Please try again later.');
       }
-    } catch (err) {
-      console.error('[MonadeUser] Error fetching user:', err);
-      setError('Failed to fetch user account');
+      setUserUid(null);
+      setEmail(user.email);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [authLoading, user]);
 
-  // Listen for auth state changes
   useEffect(() => {
     fetchMonadeUser();
-
-    const supabase = createClient();
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, _session) => {
-      console.log('[MonadeUser] Auth state changed:', event);
-      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-        fetchMonadeUser();
-      } else if (event === 'SIGNED_OUT') {
-        setUserUid(null);
-        setEmail(null);
-        setApiKey(null);
-      }
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
   }, [fetchMonadeUser]);
 
   return (
-    <MonadeUserContext.Provider value={{ userUid, email, apiKey, loading, error, refetch: fetchMonadeUser }}>
+    <MonadeUserContext.Provider value={{ userUid, email, loading, error, refetch: fetchMonadeUser }}>
       {children}
     </MonadeUserContext.Provider>
   );

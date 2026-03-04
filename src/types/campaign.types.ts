@@ -274,7 +274,9 @@ export const CAMPAIGN_API_CONFIG = {
   BASE_URL: typeof window !== 'undefined'
     ? '/api/campaigns'
     : (process.env.CAMPAIGN_SERVICE_BASE_URL || 'https://service.monade.ai/campaigns/api/v1'),
-  DB_SERVICES_URL: `${process.env.NEXT_PUBLIC_MONADE_API_BASE_URL || 'https://service.monade.ai/db_services'}/api`,
+  DB_SERVICES_URL: typeof window !== 'undefined'
+    ? '/api/proxy/api'
+    : `${process.env.MONADE_API_BASE_URL || 'https://service.monade.ai/db_services'}/api`,
   POLL_INTERVALS: {
     QUEUE_STATUS: 5000, // 5 seconds during active campaign
     CREDIT_STATUS: 30000, // 30 seconds

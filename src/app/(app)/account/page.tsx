@@ -11,19 +11,21 @@ import {
   HelpCircle,
   Globe,
 } from 'lucide-react';
+import { toast } from 'sonner';
 
-import { signOut } from '@/app/actions/auth';
+import { signOutSession } from '@/lib/auth/auth-client';
 import { useAuth } from '@/contexts/auth-context';
 
 export default function AccountPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
+  const [isSigningOut, setIsSigningOut] = React.useState(false);
 
   // User data from auth context
   const userData = {
     email: user?.email || 'admin@monade.ai',
     organization: 'No organization',
-    name: user?.email?.split('@')[0] || 'User',
+    name: user?.name || user?.email?.split('@')[0] || 'User',
   };
 
   return (
@@ -80,17 +82,26 @@ export default function AccountPage() {
             <HelpCircle className="w-5 h-5 text-gray-400" />
             <span className="text-gray-900">Help</span>
           </button>
-          {/* Logout using server action form */}
-          <form action={signOut}>
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full flex items-center gap-3 p-4 hover:bg-gray-50 transition-colors text-red-600 disabled:opacity-50"
-            >
-              <LogOut className="w-5 h-5" />
-              <span>Logout</span>
-            </button>
-          </form>
+          <button
+            type="button"
+            disabled={isLoading || isSigningOut}
+            onClick={async () => {
+              try {
+                setIsSigningOut(true);
+                await signOutSession();
+                router.push('/login');
+                router.refresh();
+              } catch (error) {
+                toast.error(error instanceof Error ? error.message : 'Failed to sign out');
+              } finally {
+                setIsSigningOut(false);
+              }
+            }}
+            className="w-full flex items-center gap-3 p-4 hover:bg-gray-50 transition-colors text-red-600 disabled:opacity-50"
+          >
+            <LogOut className="w-5 h-5" />
+            <span>{isSigningOut ? 'Logging out...' : 'Logout'}</span>
+          </button>
         </div>
 
         {/* Language */}

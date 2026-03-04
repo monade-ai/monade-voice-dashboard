@@ -5,7 +5,9 @@
 
 export const CONFIG = {
   MONADE_API: {
-    BASE_URL: process.env.NEXT_PUBLIC_MONADE_API_BASE_URL || 'https://service.monade.ai/db_services',
+    BASE_URL: process.env.NEXT_PUBLIC_CONFIG_SERVER_URL
+      || process.env.NEXT_PUBLIC_MONADE_API_BASE_URL
+      || 'https://service.monade.ai/db_services',
   },
 
   VOICE_AGENTS: {

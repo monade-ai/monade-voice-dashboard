@@ -24,7 +24,7 @@ import {
 } from '@/types/monade-api.types';
 import { fetchJson } from '@/lib/http';
 
-const { BASE_URL, DEFAULT_USER_UID } = MONADE_API_CONFIG;
+const { BASE_URL } = MONADE_API_CONFIG;
 
 /**
  * Base fetch function with error handling
@@ -98,18 +98,47 @@ export async function getUserAssistants(userUid: string): Promise<MonadeAssistan
 // ============================================
 
 export async function generateApiKey(userUid: string): Promise<MonadeApiKey> {
-  return fetchApi<MonadeApiKey>(`/api/users/${userUid}/api-keys`, {
+  const data = await fetchApi<any>('/api/auth/api-key/create', {
     method: 'POST',
+    body: JSON.stringify({ name: `Dashboard key for ${userUid}` }),
   });
+
+  const metadata = (data?.apiKey || data?.key || data?.data?.apiKey || data?.data || {}) as any;
+
+  return {
+    id: String(metadata.id || ''),
+    name: metadata.name ?? null,
+    start: metadata.start ?? null,
+    prefix: metadata.prefix ?? null,
+    enabled: metadata.enabled ?? true,
+    createdAt: metadata.createdAt || metadata.created_at || new Date().toISOString(),
+    expiresAt: metadata.expiresAt || metadata.expires_at || null,
+  };
 }
 
 export async function getUserApiKeys(userUid: string): Promise<MonadeApiKey[]> {
-  return fetchApi<MonadeApiKey[]>(`/api/users/${userUid}/api-keys`);
+  const data = await fetchApi<any[]>('/api/auth/api-key/list');
+  const keys = Array.isArray(data)
+    ? data
+    : Array.isArray((data as any)?.keys)
+      ? (data as any).keys
+      : [];
+
+  return keys.map((key: any) => ({
+    id: String(key.id || ''),
+    name: key.name ?? null,
+    start: key.start ?? null,
+    prefix: key.prefix ?? null,
+    enabled: key.enabled ?? true,
+    createdAt: key.createdAt || key.created_at || new Date().toISOString(),
+    expiresAt: key.expiresAt || key.expires_at || null,
+  }));
 }
 
-export async function deleteApiKey(apiKeyId: number): Promise<void> {
-  return fetchApi<void>(`/api/api-keys/${apiKeyId}`, {
-    method: 'DELETE',
+export async function deleteApiKey(apiKeyId: string): Promise<void> {
+  await fetchApi<void>('/api/auth/api-key/delete', {
+    method: 'POST',
+    body: JSON.stringify({ keyId: apiKeyId }),
   });
 }
 
@@ -269,6 +298,3 @@ export const monadeApi = {
 };
 
 export default monadeApi;
-
-// Export default user UID for convenience
-export { DEFAULT_USER_UID };
