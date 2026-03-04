@@ -9,22 +9,21 @@ import {
   Layers,
   PhoneCall,
   FileText,
-  Users,
+  BookOpen,
   Rocket,
   TrendingUp,
   History,
   Sun,
   Moon,
-  Settings,
   ChevronRight,
   Globe,
-  Radio,
   Server,
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/auth-context';
+import { useRunningCampaigns } from '@/app/hooks/use-running-campaigns';
 
 interface NavItemProps {
   href: string;
@@ -33,12 +32,15 @@ interface NavItemProps {
   isActive?: boolean;
   count?: number;
   isLive?: boolean;
+  target?: string;
 }
 
-function NavItem({ href, icon, label, isActive = false, count, isLive = false }: NavItemProps) {
+function NavItem({ href, icon, label, isActive = false, count, isLive = false, target }: NavItemProps) {
   return (
     <Link
       href={href}
+      target={target}
+      rel={target === '_blank' ? 'noopener noreferrer' : undefined}
       className={cn(
         'group relative flex items-center justify-between px-3 py-2 my-0.5 rounded-[4px] transition-all duration-200',
         isActive
@@ -90,6 +92,7 @@ export function Sidebar() {
   const { theme, setTheme, resolvedTheme } = useTheme();
   const { user } = useAuth();
   const [mounted, setMounted] = React.useState(false);
+  const runningCampaigns = useRunningCampaigns();
 
   React.useEffect(() => {
     setMounted(true);
@@ -157,21 +160,13 @@ export function Sidebar() {
           icon={<Rocket />}
           label="Campaigns"
           isActive={pathname === '/campaigns'}
-          count={3}
+          count={runningCampaigns}
         />
         <NavItem
           href="/hot-leads"
           icon={<TrendingUp />}
           label="Hot Leads"
           isActive={pathname === '/hot-leads'}
-          count={12}
-        />
-        <NavItem
-          href="/sessions"
-          icon={<Radio />}
-          label="Sessions"
-          isActive={pathname === '/sessions'}
-          isLive={true}
         />
 
         <CategoryLabel>Archive</CategoryLabel>
@@ -208,10 +203,11 @@ export function Sidebar() {
           isActive={pathname === '/phone-numbers'}
         />
         <NavItem
-          href="/community"
-          icon={<Users />}
-          label="Community"
-          isActive={pathname === '/community'}
+          href="https://monade-voice-docs.netlify.app/"
+          icon={<BookOpen />}
+          label="Documentation"
+          isActive={false}
+          target="_blank"
         />
       </nav>
 
@@ -251,13 +247,6 @@ export function Sidebar() {
           </button>
         </div>
 
-        <button
-          onClick={() => router.push('/settings')}
-          className="w-full mt-2 flex items-center justify-center gap-2 py-1.5 rounded-[4px] text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-all"
-        >
-          <Settings size={14} />
-          <span className="text-[10px] font-bold uppercase tracking-widest">Settings</span>
-        </button>
       </div>
     </div>
   );

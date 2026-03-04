@@ -17,6 +17,7 @@ import { motion } from 'framer-motion';
 
 import { useDashboardData } from '@/app/hooks/use-dashboard-data';
 import { useCredits } from '@/app/hooks/use-credits';
+import { useAuth } from '@/contexts/auth-context';
 import { useTranscripts, Transcript } from '@/app/hooks/use-transcripts';
 import { useUserAnalytics, CallAnalytics } from '@/app/hooks/use-analytics';
 import { useCallRecording } from '@/app/hooks/use-call-recording';
@@ -38,13 +39,45 @@ const TranscriptViewer = dynamic(
 
 // --- Helpers ---
 
-const getGreeting = () => {
+const getGreeting = (name: string): string => {
   const hour = new Date().getHours();
-  if (hour < 12) return 'Good morning';
-  if (hour < 17) return 'Good afternoon';
-  if (hour < 21) return 'Good evening';
+  const firstName = name.split(' ')[0];
 
-  return 'It\'s late! Hope you\'re having a good night';
+  const greetings: Record<string, string[]> = {
+    morning: [
+      `Good morning, ${firstName}.`,
+      `Rise and shine, ${firstName}.`,
+      `Morning, ${firstName}. Let's make it count.`,
+      `Early bird, ${firstName}?`,
+    ],
+    afternoon: [
+      `Good afternoon, ${firstName}.`,
+      `Hope lunch was good, ${firstName}.`,
+      `Afternoon, ${firstName}. Keep the momentum.`,
+      `Mid-day grind, ${firstName}.`,
+    ],
+    evening: [
+      `Good evening, ${firstName}.`,
+      `Evening, ${firstName}. Wrapping up?`,
+      `Still at it, ${firstName}?`,
+      `Golden hour, ${firstName}.`,
+    ],
+    lateNight: [
+      `Working late, huh ${firstName}?`,
+      `Moonlit chat, ${firstName}?`,
+      `The night shift, ${firstName}.`,
+      `Burning the midnight oil, ${firstName}?`,
+      `Insomnia or dedication, ${firstName}?`,
+    ],
+  };
+
+  let pool: string[];
+  if (hour >= 5 && hour < 12) pool = greetings.morning;
+  else if (hour >= 12 && hour < 17) pool = greetings.afternoon;
+  else if (hour >= 17 && hour < 21) pool = greetings.evening;
+  else pool = greetings.lateNight;
+
+  return pool[Math.floor(Math.random() * pool.length)];
 };
 
 const getRelativeTime = (dateString: string) => {
@@ -243,7 +276,9 @@ const TranscriptRow = ({
 // --- Page Component ---
 
 export default function DashboardPage() {
-  const [greeting, setGreeting] = useState('Hi!');
+  const { user } = useAuth();
+  const displayName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'there';
+  const [greeting, setGreeting] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedTranscript, setSelectedTranscript] = useState<Transcript | null>(null);
   const [filters, setFilters] = useState<FilterState>({
@@ -256,8 +291,8 @@ export default function DashboardPage() {
   const callsPerPage = 10;
 
   useEffect(() => {
-    setGreeting(getGreeting());
-  }, []);
+    setGreeting(getGreeting(displayName));
+  }, [displayName]);
 
   const { metrics } = useDashboardData();
   const { credits } = useCredits();
@@ -339,8 +374,7 @@ export default function DashboardPage() {
 
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
             <div className="space-y-0.5">
-              <h1 className="text-3xl font-medium tracking-tight">{greeting}, Friend.</h1>
-              <p className="text-muted-foreground text-sm leading-relaxed">Performance insights and real-time activity log.</p>
+              <h1 className="text-4xl font-medium tracking-tight">{greeting}</h1>
             </div>
             <div className="flex gap-3">
               <Button variant="outline" size="sm" className="gap-2 h-9 text-[10px] font-bold uppercase tracking-widest border-border hover:bg-[#facc15] hover:border-[#facc15] hover:text-black transition-all">
