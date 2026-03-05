@@ -117,6 +117,7 @@ export async function fetchJson<T = unknown>(url: string, options: FetchJsonOpti
 
       const response = await fetch(url, {
         ...options,
+        credentials: options.credentials ?? 'include',
         signal: controller?.signal ?? options.signal,
       });
 

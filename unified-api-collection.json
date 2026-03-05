@@ -1186,7 +1186,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"username\": \"John Doe\",\n  \"email\": \"john.doe@example.com\"\n}"
+                  "raw": "{\n  \"username\": \"John Doe\",\n  \"email\": \"john.doe@example.com\",\n  \"password\": \"SecurePassword123!\"\n}"
                 },
                 "url": {
                   "raw": "{{base_url}}/db_services/api/users",
@@ -1199,7 +1199,7 @@
                     "users"
                   ]
                 },
-                "description": "Create a new user account. This automatically generates an API key for the user. Returns user details and the generated API key."
+                "description": "Create a new user account with BetterAuth integration. Canonical backend onboarding route. Flow: (1) Creates BetterAuth user, (2) Creates/links Monade user via ba_user_id foreign key. Returns user details and BetterAuth session token. Use this signup path when frontend is backend-driven."
               },
               "response": []
             },
@@ -1355,71 +1355,6 @@
         {
           "name": "API Key Management",
           "item": [
-            {
-              "name": "Generate API Key",
-              "request": {
-                "method": "POST",
-                "header": [],
-                "url": {
-                  "raw": "{{base_url}}/db_services/api/users/{{user_uid}}/api-keys",
-                  "host": [
-                    "{{base_url}}"
-                  ],
-                  "path": [
-                    "db_services",
-                    "api",
-                    "users",
-                    "{{user_uid}}",
-                    "api-keys"
-                  ]
-                },
-                "description": "Generate a new API key for a specific user. The API key format is 'monade_{uuid}'."
-              },
-              "response": []
-            },
-            {
-              "name": "Get User's API Keys",
-              "request": {
-                "method": "GET",
-                "header": [],
-                "url": {
-                  "raw": "{{base_url}}/db_services/api/users/{{user_uid}}/api-keys",
-                  "host": [
-                    "{{base_url}}"
-                  ],
-                  "path": [
-                    "db_services",
-                    "api",
-                    "users",
-                    "{{user_uid}}",
-                    "api-keys"
-                  ]
-                },
-                "description": "Retrieve all API keys associated with a specific user."
-              },
-              "response": []
-            },
-            {
-              "name": "Delete API Key",
-              "request": {
-                "method": "DELETE",
-                "header": [],
-                "url": {
-                  "raw": "{{base_url}}/db_services/api/api-keys/{{api_key_id}}",
-                  "host": [
-                    "{{base_url}}"
-                  ],
-                  "path": [
-                    "db_services",
-                    "api",
-                    "api-keys",
-                    "{{api_key_id}}"
-                  ]
-                },
-                "description": "Delete a specific API key by its ID."
-              },
-              "response": []
-            },
             {
               "name": "Validate API Key",
               "request": {
@@ -1863,7 +1798,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"name\": \"Updated Trunk Name\",\n  \"address\": \"sip.newprovider.com\",\n  \"numbers\": [\"+1987654321\"]\n}"
+                  "raw": "{\n  \"name\": \"Updated Trunk Name\",\n  \"address\": \"sip.newprovider.com\",\n  \"numbers\": [\"+1987654321\"],\n  \"auth_username\": \"newuser\",\n  \"auth_password\": \"newpassword\"\n}"
                 },
                 "url": {
                   "raw": "{{base_url}}/db_services/api/users/{{user_uid}}/trunks/{{trunk_id}}",
@@ -1879,7 +1814,7 @@
                     "{{trunk_id}}"
                   ]
                 },
-                "description": "Update a specific trunk for a user"
+                "description": "Partial update \u2014 only fields included in the body are changed. Omitted fields (including auth_password) are left untouched in LiveKit. Trunk ID is preserved (no delete+recreate). All returned fields from LiveKit are synced back to DB."
               },
               "response": []
             },
@@ -1983,6 +1918,269 @@
                   ]
                 },
                 "description": "Link an existing global LiveKit trunk to a user. Fetches trunk details (name, address, numbers) from LiveKit and creates a DB record mapping it to the user."
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Inbound Trunk Management",
+          "item": [
+            {
+              "name": "Create User Inbound Trunk",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"My Inbound Trunk\",\n  \"numbers\": [\n    \"+1234567890\"\n  ],\n  \"allowed_numbers\": [],\n  \"krisp_enabled\": true\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/db_services/api/users/{{user_uid}}/inbound-trunks",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "db_services",
+                    "api",
+                    "users",
+                    "{{user_uid}}",
+                    "inbound-trunks"
+                  ]
+                },
+                "description": "Create a new inbound trunk for a user. Creates in LiveKit via provider API and saves to local DB with trunk_type='inbound'."
+              },
+              "response": []
+            },
+            {
+              "name": "List User Inbound Trunks",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/db_services/api/users/{{user_uid}}/inbound-trunks",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "db_services",
+                    "api",
+                    "users",
+                    "{{user_uid}}",
+                    "inbound-trunks"
+                  ]
+                },
+                "description": "List all inbound trunks for a user (trunk_type='inbound')."
+              },
+              "response": []
+            },
+            {
+              "name": "Get User Inbound Trunk",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/db_services/api/users/{{user_uid}}/inbound-trunks/{{trunk_id}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "db_services",
+                    "api",
+                    "users",
+                    "{{user_uid}}",
+                    "inbound-trunks",
+                    "{{trunk_id}}"
+                  ]
+                },
+                "description": "Get a specific inbound trunk for a user by LiveKit trunk ID."
+              },
+              "response": []
+            },
+            {
+              "name": "Update User Inbound Trunk",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Updated Trunk\",\n  \"numbers\": [\n    \"+1234567890\"\n  ],\n  \"allowed_numbers\": [\n    \"+1987654321\"\n  ],\n  \"krisp_enabled\": true\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/db_services/api/users/{{user_uid}}/inbound-trunks/{{trunk_id}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "db_services",
+                    "api",
+                    "users",
+                    "{{user_uid}}",
+                    "inbound-trunks",
+                    "{{trunk_id}}"
+                  ]
+                },
+                "description": "Update an inbound trunk. Updates both LiveKit (via provider API) and local DB."
+              },
+              "response": []
+            },
+            {
+              "name": "Unlink Inbound Trunk (DB only)",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/db_services/api/users/{{user_uid}}/inbound-trunks/{{trunk_id}}/unlink",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "db_services",
+                    "api",
+                    "users",
+                    "{{user_uid}}",
+                    "inbound-trunks",
+                    "{{trunk_id}}",
+                    "unlink"
+                  ]
+                },
+                "description": "Unlink inbound trunk from user (DB only). Trunk still exists in LiveKit. Also clears any assistant mappings."
+              },
+              "response": []
+            },
+            {
+              "name": "Delete Inbound Trunk Globally (\u26a0\ufe0f Service Only)",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{service_api_key}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/db_services/api/users/{{user_uid}}/inbound-trunks/{{trunk_id}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "db_services",
+                    "api",
+                    "users",
+                    "{{user_uid}}",
+                    "inbound-trunks",
+                    "{{trunk_id}}"
+                  ]
+                },
+                "description": "Delete inbound trunk globally from both LiveKit and DB. Service token required. Also deletes associated dispatch rules and clears assistant mappings."
+              },
+              "response": []
+            },
+            {
+              "name": "Map Assistant to Inbound Trunk (Bake)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"assistant_id\": \"{{assistant_id}}\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/db_services/api/users/{{user_uid}}/inbound-trunks/{{trunk_id}}/map-assistant",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "db_services",
+                    "api",
+                    "users",
+                    "{{user_uid}}",
+                    "inbound-trunks",
+                    "{{trunk_id}}",
+                    "map-assistant"
+                  ]
+                },
+                "description": "Explicitly map an assistant to an inbound trunk and bake the dispatch rule. NOTE: This happens automatically when creating/updating an assistant with call_direction='inbound' \u2014 this endpoint is for admin/service use."
+              },
+              "response": []
+            },
+            {
+              "name": "Unmap Assistant from Inbound Trunk",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"assistant_id\": \"{{assistant_id}}\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/db_services/api/users/{{user_uid}}/inbound-trunks/{{trunk_id}}/unmap-assistant",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "db_services",
+                    "api",
+                    "users",
+                    "{{user_uid}}",
+                    "inbound-trunks",
+                    "{{trunk_id}}",
+                    "unmap-assistant"
+                  ]
+                },
+                "description": "Unmap assistant from inbound trunk and delete the dispatch rule."
+              },
+              "response": []
+            },
+            {
+              "name": "Rebake Assistant Dispatch Rule",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"assistant_id\": \"{{assistant_id}}\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/db_services/api/users/{{user_uid}}/inbound-trunks/rebake-assistant",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "db_services",
+                    "api",
+                    "users",
+                    "{{user_uid}}",
+                    "inbound-trunks",
+                    "rebake-assistant"
+                  ]
+                },
+                "description": "Re-bake the dispatch rule for an assistant when its knowledge base is updated. NOTE: This happens automatically when updating an assistant's knowledgeBase field \u2014 this endpoint is for manual/admin use."
               },
               "response": []
             }
@@ -2827,6 +3025,234 @@
               "response": []
             }
           ]
+        },
+        {
+          "name": "BetterAuth (Authentication)",
+          "description": "BetterAuth-powered authentication endpoints. Handles signup, login, session management, and API key management. All /api/auth/* routes are public (no pre-existing auth required). Architecture note: `lib/auth.js` initializes BetterAuth and mounts these `/api/auth/*` handlers; `routes/_auth.js` is separate middleware that protects non-public `/api/*` routes by validating session/API key/service-token and enforcing user ownership. `_auth.js` does not create users; app access requires an existing BetterAuth -> Monade link (created via backend onboarding route `POST /api/users`).",
+          "item": [
+            {
+              "name": "Sign Up (Email + Password)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"John Doe\",\n  \"email\": \"john@example.com\",\n  \"password\": \"securePassword123\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/db_services/api/auth/sign-up/email",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "db_services",
+                    "api",
+                    "auth",
+                    "sign-up",
+                    "email"
+                  ]
+                },
+                "description": "Register a BetterAuth identity only (session/auth-layer). For backend-driven onboarding, use `POST /api/users` to create/link the Monade user record required by protected app APIs."
+              },
+              "response": []
+            },
+            {
+              "name": "Sign In (Email + Password)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"john@example.com\",\n  \"password\": \"securePassword123\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/db_services/api/auth/sign-in/email",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "db_services",
+                    "api",
+                    "auth",
+                    "sign-in",
+                    "email"
+                  ]
+                },
+                "description": "Authenticate with email and password. Returns a session cookie (Set-Cookie header) and user object. The cookie is used automatically for subsequent dashboard requests."
+              },
+              "response": []
+            },
+            {
+              "name": "Get Session",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{ba_api_key}}",
+                    "description": "BetterAuth API Key (or omit and use session cookie)",
+                    "disabled": true
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/db_services/api/auth/get-session",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "db_services",
+                    "api",
+                    "auth",
+                    "get-session"
+                  ]
+                },
+                "description": "Get the current session. Works with either a session cookie OR a BetterAuth API key (Authorization: Bearer <key>). Returns session and user object if authenticated, null otherwise. Use this after sign-in/sign-up to verify auth state and extract BetterAuth user identity."
+              },
+              "response": []
+            },
+            {
+              "name": "Sign Out",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/db_services/api/auth/sign-out",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "db_services",
+                    "api",
+                    "auth",
+                    "sign-out"
+                  ]
+                },
+                "description": "Sign out and invalidate the current session cookie."
+              },
+              "response": []
+            },
+            {
+              "name": "Create API Key",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"My SDK Key\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/db_services/api/auth/api-key/create",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "db_services",
+                    "api",
+                    "auth",
+                    "api-key",
+                    "create"
+                  ]
+                },
+                "description": "Create a new BetterAuth API key for the authenticated user. Requires an active session (cookie). The returned key can be used as 'Authorization: Bearer <key>' for SDK/API access."
+              },
+              "response": []
+            },
+            {
+              "name": "List API Keys",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/db_services/api/auth/api-key/list",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "db_services",
+                    "api",
+                    "auth",
+                    "api-key",
+                    "list"
+                  ]
+                },
+                "description": "List all API keys for the authenticated user. Requires an active session (cookie)."
+              },
+              "response": []
+            },
+            {
+              "name": "Delete API Key",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"keyId\": \"{{ba_api_key_id}}\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/db_services/api/auth/api-key/delete",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "db_services",
+                    "api",
+                    "auth",
+                    "api-key",
+                    "delete"
+                  ]
+                },
+                "description": "Revoke/delete a BetterAuth API key by its ID. Requires an active session (cookie)."
+              },
+              "response": []
+            },
+            {
+              "name": "Get Current User Profile (GET /api/me)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{ba_api_key}}",
+                    "description": "BetterAuth API Key (or omit and use session cookie)",
+                    "disabled": true
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/db_services/api/me",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "db_services",
+                    "api",
+                    "me"
+                  ]
+                },
+                "description": "Returns the authenticated user's Monade profile (user_uid, email, name, credits). Works with either session cookie or BetterAuth API key. This is the primary endpoint for app/business APIs after login because it resolves BetterAuth user -> Monade user_uid used by protected routes and ownership checks."
+              },
+              "response": []
+            }
+          ]
         }
       ]
     },
@@ -2875,7 +3301,7 @@
                     "trunks"
                   ]
                 },
-                "description": "Retrieve a list of all SIP trunks registered with LiveKit."
+                "description": "Retrieve a list of all SIP trunks registered with LiveKit. Returns both outbound (trunk_type='outbound') and inbound (trunk_type='inbound') trunks."
               },
               "response": []
             },
@@ -2903,7 +3329,7 @@
                     "trunks"
                   ]
                 },
-                "description": "Create a new SIP trunk in LiveKit. The trunk will be registered globally and can be used by any user."
+                "description": "Create a new SIP trunk in LiveKit. The trunk will be registered globally and can be used by any user. Outbound trunks (default) make calls; inbound trunks receive calls."
               },
               "response": []
             },
@@ -2939,7 +3365,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"name\": \"Updated Trunk Name\",\n  \"address\": \"sip.newprovider.com\",\n  \"numbers\": [\"+1987654321\"]\n}"
+                  "raw": "{\n  \"name\": \"Updated Trunk Name\",\n  \"address\": \"sip.newprovider.com\",\n  \"numbers\": [\"+1987654321\"],\n  \"auth_username\": \"newuser\",\n  \"auth_password\": \"newpassword\"\n}"
                 },
                 "url": {
                   "raw": "{{base_url}}/trunks/trunks/{{trunk_id}}",
@@ -2952,7 +3378,7 @@
                     "{{trunk_id}}"
                   ]
                 },
-                "description": "Update an existing SIP trunk. Note that this updates the trunk globally in LiveKit."
+                "description": "Partial update of a global SIP trunk in LiveKit. Only fields included in the body are changed \u2014 omitted fields (including auth_password) are left untouched. Trunk ID is preserved (no delete+recreate)."
               },
               "response": []
             },
@@ -2994,6 +3420,282 @@
                   ]
                 },
                 "description": "Retrieve a SIP trunk from LiveKit by its name."
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Outbound Calls",
+          "item": [
+            {
+              "name": "Make Outbound Call",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"phone_number\": \"+1234567890\",\n  \"user_uid\": \"user-uuid-here\",\n  \"trunk_id\": \"ST_xxxxxxxxxxxxxxx\",\n  \"trunk_name\": \"My SIP Trunk\",\n  \"assistant_id\": \"asst_xxxxxxxxxxxxxxx\",\n  \"metadata\": {\n    \"customer_id\": \"cust_123\",\n    \"campaign_id\": \"camp_456\"\n  }\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/trunks/calls",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "trunks",
+                    "calls"
+                  ]
+                },
+                "description": "Initiate an outbound SIP call using a user-specific trunk. Requires user_uid for trunk ownership validation. The selected trunk will be synced to LiveKit if needed, then an outbound call is placed. Agent dispatch is created with prompt metadata baked in."
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Inbound SIP Trunk Management",
+          "item": [
+            {
+              "name": "Create Inbound Trunk",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"My Inbound Trunk\",\n  \"numbers\": [\n    \"+1234567890\"\n  ],\n  \"allowed_numbers\": [],\n  \"krisp_enabled\": true\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/trunks/inbound-trunks",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "trunks",
+                    "inbound-trunks"
+                  ]
+                },
+                "description": "Create a new SIP inbound trunk in LiveKit for receiving incoming calls."
+              },
+              "response": []
+            },
+            {
+              "name": "List All Inbound Trunks",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/trunks/inbound-trunks",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "trunks",
+                    "inbound-trunks"
+                  ]
+                },
+                "description": "List all SIP inbound trunks from LiveKit."
+              },
+              "response": []
+            },
+            {
+              "name": "Get Inbound Trunk by ID",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/trunks/inbound-trunks/{{trunk_id}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "trunks",
+                    "inbound-trunks",
+                    "{{trunk_id}}"
+                  ]
+                },
+                "description": "Get a specific inbound trunk by its LiveKit trunk ID."
+              },
+              "response": []
+            },
+            {
+              "name": "Update Inbound Trunk",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Updated Inbound Trunk\",\n  \"numbers\": [\n    \"+1234567890\",\n    \"+1234567891\"\n  ],\n  \"allowed_numbers\": [\n    \"+1987654321\"\n  ],\n  \"krisp_enabled\": true\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/trunks/inbound-trunks/{{trunk_id}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "trunks",
+                    "inbound-trunks",
+                    "{{trunk_id}}"
+                  ]
+                },
+                "description": "Update an existing inbound trunk (partial update \u2014 only send fields to change)."
+              },
+              "response": []
+            },
+            {
+              "name": "Delete Inbound Trunk",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/trunks/inbound-trunks/{{trunk_id}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "trunks",
+                    "inbound-trunks",
+                    "{{trunk_id}}"
+                  ]
+                },
+                "description": "Delete an inbound trunk from LiveKit."
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Dispatch Rule Management",
+          "item": [
+            {
+              "name": "Create Dispatch Rule (Bake Prompt)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"assistant_id\": \"{{assistant_id}}\",\n  \"trunk_id\": \"{{trunk_id}}\",\n  \"agent_name\": \"voice-agent\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/trunks/dispatch-rules",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "trunks",
+                    "dispatch-rules"
+                  ]
+                },
+                "description": "Create a dispatch rule with pre-baked prompt. Fetches the assistant's knowledge base, builds the full prompt, and stores it in LiveKit so inbound calls get instant agent response."
+              },
+              "response": []
+            },
+            {
+              "name": "List All Dispatch Rules",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/trunks/dispatch-rules",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "trunks",
+                    "dispatch-rules"
+                  ]
+                },
+                "description": "List all SIP dispatch rules from LiveKit."
+              },
+              "response": []
+            },
+            {
+              "name": "Get Dispatch Rule by ID",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/trunks/dispatch-rules/{{dispatch_rule_id}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "trunks",
+                    "dispatch-rules",
+                    "{{dispatch_rule_id}}"
+                  ]
+                },
+                "description": "Get a specific dispatch rule by its ID."
+              },
+              "response": []
+            },
+            {
+              "name": "Rebake Dispatch Rule",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"assistant_id\": \"{{assistant_id}}\",\n  \"agent_name\": \"voice-agent\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/trunks/dispatch-rules/{{dispatch_rule_id}}/rebake",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "trunks",
+                    "dispatch-rules",
+                    "{{dispatch_rule_id}}",
+                    "rebake"
+                  ]
+                },
+                "description": "Re-bake a dispatch rule with fresh prompt data. Call this when an assistant's knowledge base is updated."
+              },
+              "response": []
+            },
+            {
+              "name": "Delete Dispatch Rule",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/trunks/dispatch-rules/{{dispatch_rule_id}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "trunks",
+                    "dispatch-rules",
+                    "{{dispatch_rule_id}}"
+                  ]
+                },
+                "description": "Delete a dispatch rule from LiveKit."
               },
               "response": []
             }
@@ -3164,7 +3866,7 @@
   "variable": [
     {
       "key": "base_url",
-      "value": "http://35.200.254.189",
+      "value": "https://service.monade.ai",
       "type": "string"
     },
     {
@@ -3237,6 +3939,18 @@
       "key": "room_name",
       "value": "",
       "type": "string"
+    },
+    {
+      "key": "ba_api_key",
+      "value": "",
+      "type": "string",
+      "description": "BetterAuth API key (returned from /api/auth/api-key/create)"
+    },
+    {
+      "key": "ba_api_key_id",
+      "value": "",
+      "type": "string",
+      "description": "BetterAuth API key ID (for delete operations)"
     }
   ]
 }

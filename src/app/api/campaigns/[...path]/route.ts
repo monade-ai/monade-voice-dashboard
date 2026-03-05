@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-import { createClient } from '@/utils/supabase/server';
 import { MONADE_API_CONFIG } from '@/types/monade-api.types';
 
 const CAMPAIGN_API_BASE = process.env.CAMPAIGN_SERVICE_BASE_URL
@@ -41,40 +40,31 @@ function isNetworkError(error: unknown) {
     || message.includes('aborted');
 }
 
-async function resolveSessionUserUid(): Promise<string | null> {
-  const supabase = await createClient();
-  const { data: { user }, error } = await supabase.auth.getUser();
-
-  if (error || !user?.email) {
-    return null;
-  }
-
-  const userEmail = user.email;
-  const response = await fetch(
-    `${MONADE_API_BASE}/api/users/email/${encodeURIComponent(userEmail)}`,
-    {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-API-Key': MONADE_API_KEY,
-      },
-    },
-  );
-
-  if (!response.ok) {
-    return null;
-  }
-
-  const data = await response.json().catch(() => ({}));
-
-  return data.user_uid || data.user?.user_uid || null;
-}
-
-async function resolveUserApiKey(userUid: string): Promise<string | null> {
-  const endpoint = `${MONADE_API_BASE}/api/users/${encodeURIComponent(userUid)}/api-keys`;
+function getSessionHeaders(request: NextRequest): HeadersInit {
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
   };
+  const cookie = request.headers.get('cookie');
+  if (cookie) {
+    headers.Cookie = cookie;
+  }
+  return headers;
+}
+
+async function resolveSessionUserUid(request: NextRequest): Promise<string | null> {
+  const response = await fetch(`${MONADE_API_BASE}/api/me`, {
+    method: 'GET',
+    headers: getSessionHeaders(request),
+  });
+
+  if (!response.ok) return null;
+  const data = await response.json().catch(() => ({}));
+  return data.user_uid || null;
+}
+
+async function resolveUserApiKey(request: NextRequest, userUid: string): Promise<string | null> {
+  const endpoint = `${MONADE_API_BASE}/api/users/${encodeURIComponent(userUid)}/api-keys`;
+  const headers = getSessionHeaders(request);
 
   const unauthResponse = await fetch(endpoint, { method: 'GET', headers });
   let response = unauthResponse;
@@ -123,16 +113,9 @@ async function handleProxy(request: NextRequest) {
     const monitoringUserUid = getMonitoringUserUid(path);
     const requiresAuth = path.startsWith('/campaigns') || path.startsWith('/monitoring');
 
-    if (requiresAuth && !MONADE_API_KEY) {
-      return NextResponse.json(
-        { error: 'Server misconfigured: MONADE_API_KEY is not set.' },
-        { status: 500, headers: { 'Cache-Control': 'no-store' } },
-      );
-    }
-
-    const sessionUserUid = requiresAuth ? await resolveSessionUserUid() : null;
+    const sessionUserUid = requiresAuth ? await resolveSessionUserUid(request) : null;
     const userApiKey = requiresAuth && sessionUserUid
-      ? await resolveUserApiKey(sessionUserUid)
+      ? await resolveUserApiKey(request, sessionUserUid)
       : null;
     const requestedUserUid = searchParams.get('user_uid');
 

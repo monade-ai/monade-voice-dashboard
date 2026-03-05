@@ -44,8 +44,6 @@
 
 import { redirect } from 'next/navigation';
 
-import { createActionClient } from '@/utils/supabase/action';
-
 export interface LoginActionState {
   success: boolean;
   error: string | null;
@@ -53,47 +51,18 @@ export interface LoginActionState {
 
 export async function login(
   _prevState: LoginActionState,
-  formData: FormData,
+  _formData: FormData,
 ): Promise<LoginActionState> {
-  const email = String(formData.get('email') || '').trim();
-  const password = String(formData.get('password') || '');
-
-  if (!email || !password) {
-    return { success: false, error: 'Email and password are required.' };
-  }
-
-  const supabase = await createActionClient();
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
-
-  if (error) {
-    return { success: false, error: error.message };
-  }
-
-  return { success: true, error: null };
+  return {
+    success: false,
+    error: 'Deprecated server action. Use client-side backend auth flow in /login page.',
+  };
 }
 
-export async function signup(formData: FormData) {
-  const email = formData.get('email') as string;
-  const password = formData.get('password') as string;
-  
-  // Create supabase client with proper cookie handling for server actions
-  const supabase = await createActionClient();
-
-  const { error } = await supabase.auth.signUp({
-    email,
-    password,
-  });
-
-  if (error) {
-    redirect('/login?message=' + encodeURIComponent(error.message));
-  }
-
-  redirect('/login?mode=signup&pending_onboarding=1&message=' + encodeURIComponent('Check email to continue signup process'));
+export async function signup(_formData: FormData) {
+  redirect('/login?message=' + encodeURIComponent('Deprecated server action. Use client-side backend auth flow.'));
 }
 
 export async function logout() {
-  const supabase = await createActionClient();
-  
-  await supabase.auth.signOut();
   redirect('/login');
 }

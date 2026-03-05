@@ -1,12 +1,17 @@
 import { redirect } from 'next/navigation';
 
-import { createClient } from '@/utils/supabase/server';
+import { backendServerGetMe } from '@/lib/auth/backend-auth-server';
 
 import { signOut } from './actions';
 
 export default async function ProtectedPage() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  let user: { email?: string } | null = null;
+  try {
+    const me = await backendServerGetMe();
+    user = { email: me?.email };
+  } catch {
+    user = null;
+  }
 
   if (!user) {
     redirect('/login');

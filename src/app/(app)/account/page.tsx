@@ -12,12 +12,20 @@ import {
   Globe,
 } from 'lucide-react';
 
-import { signOut } from '@/app/actions/auth';
+import { backendSignOut } from '@/lib/auth/backend-auth';
 import { useAuth } from '@/contexts/auth-context';
 
 export default function AccountPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
+
+  const handleSignOut = async () => {
+    try {
+      await backendSignOut();
+    } finally {
+      router.push('/login');
+    }
+  };
 
   // User data from auth context
   const userData = {
@@ -80,17 +88,15 @@ export default function AccountPage() {
             <HelpCircle className="w-5 h-5 text-gray-400" />
             <span className="text-gray-900">Help</span>
           </button>
-          {/* Logout using server action form */}
-          <form action={signOut}>
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full flex items-center gap-3 p-4 hover:bg-gray-50 transition-colors text-red-600 disabled:opacity-50"
-            >
-              <LogOut className="w-5 h-5" />
-              <span>Logout</span>
-            </button>
-          </form>
+          <button
+            type="button"
+            onClick={handleSignOut}
+            disabled={isLoading}
+            className="w-full flex items-center gap-3 p-4 hover:bg-gray-50 transition-colors text-red-600 disabled:opacity-50"
+          >
+            <LogOut className="w-5 h-5" />
+            <span>Logout</span>
+          </button>
         </div>
 
         {/* Language */}

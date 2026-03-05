@@ -1,13 +1,11 @@
 'use client';
 
-import React, { useActionState, useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GrainGradient } from '@paper-design/shaders-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
-import { createClient } from '@/utils/supabase/client';
-
-import { login, signup, type LoginActionState } from './actions';
+import { backendSignIn, backendSignUp } from '@/lib/auth/backend-auth';
 
 // --- Types ---
 type OnboardingStep = 'identity' | 'purpose' | 'handover';
@@ -51,8 +49,9 @@ function LoginComponent() {
     teamSize: '',
     origin: '',
   });
-  const initialLoginState: LoginActionState = { success: false, error: null };
-  const [loginState, loginAction, isLoggingIn] = useActionState(login, initialLoginState);
+  const [authSuccess, setAuthSuccess] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
   const [resetState, setResetState] = useState<{ error: string | null, success: string | null }>({
     error: null,
@@ -62,7 +61,7 @@ function LoginComponent() {
   const pendingOnboardingParam = searchParams.get('pending_onboarding');
 
   useEffect(() => {
-    if (!loginState.success || step !== 'identity') return;
+    if (!authSuccess || step !== 'identity') return;
 
     const shouldShowOnboarding = authMode === 'signup'
       && typeof window !== 'undefined'
@@ -76,7 +75,7 @@ function LoginComponent() {
     }
 
     router.push('/assistants');
-  }, [authMode, loginState.success, router, step]);
+  }, [authMode, authSuccess, router, step]);
 
   useEffect(() => {
     if (pendingOnboardingParam !== '1') return;
@@ -98,19 +97,44 @@ function LoginComponent() {
     setIsResetting(true);
     setResetState({ error: null, success: null });
     try {
-      const supabase = createClient();
-      const { error } = await supabase.auth.resetPasswordForEmail(email);
-      if (error) {
-        setResetState({ error: error.message, success: null });
-
-        return;
-      }
       setResetState({
-        error: null,
-        success: `Reset link sent to ${email}.`,
+        error: 'Password reset flow is not exposed in backend auth endpoints yet. Please contact support.',
+        success: null,
       });
     } finally {
       setIsResetting(false);
+    }
+  };
+
+  const handleIdentitySubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const email = formData.email.trim();
+    const password = formData.password;
+    const username = email.split('@')[0] || 'User';
+
+    if (!email || !password) {
+      setAuthError('Email and password are required.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setAuthError(null);
+    setAuthSuccess(false);
+
+    try {
+      if (authMode === 'signup') {
+        await backendSignUp({ username, email, password });
+        await backendSignIn({ email, password });
+        localStorage.setItem(PENDING_ONBOARDING_KEY, '1');
+      } else {
+        await backendSignIn({ email, password });
+      }
+
+      setAuthSuccess(true);
+    } catch (err) {
+      setAuthError(err instanceof Error ? err.message : 'Authentication failed.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -185,7 +209,7 @@ function LoginComponent() {
                   </div>
                 </FadeIn>
 
-                <form className="space-y-4" action={loginAction}>
+                <form className="space-y-4" onSubmit={handleIdentitySubmit}>
                   <FadeIn delay={0.1}>
                     <div className="space-y-1">
                       <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Email</label>
@@ -217,16 +241,15 @@ function LoginComponent() {
                   <FadeIn delay={0.3}>
                     <button
                       type="submit"
-                      disabled={authMode === 'signin' && isLoggingIn}
-                      formAction={authMode === 'signup' ? signup : undefined}
+                      disabled={isSubmitting}
                       className="mt-8 w-full bg-foreground text-background hover:bg-foreground/90 h-10 rounded-[4px] font-medium text-sm transition-all"
                     >
-                      {authMode === 'signin'
-                        ? (isLoggingIn ? 'Signing in...' : 'Continue')
-                        : 'Create account'}
+                      {isSubmitting
+                        ? (authMode === 'signin' ? 'Signing in...' : 'Creating account...')
+                        : (authMode === 'signin' ? 'Continue' : 'Create account')}
                     </button>
-                    {authMode === 'signin' && loginState.error && (
-                      <p className="mt-3 text-xs text-red-600">{loginState.error}</p>
+                    {authError && (
+                      <p className="mt-3 text-xs text-red-600">{authError}</p>
                     )}
                     {authMessage && (
                       <p className="mt-3 text-xs text-primary">{authMessage}</p>

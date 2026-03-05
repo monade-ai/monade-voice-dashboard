@@ -2,11 +2,10 @@
 
 import { redirect } from 'next/navigation';
 
-import { createClient } from '@/utils/supabase/server';
+import { backendServerSignOut } from '@/lib/auth/backend-auth-server';
 
 export async function signOut() {
-  const supabase = await createClient();
-  await supabase.auth.signOut();
+  await backendServerSignOut();
 
   return redirect('/login');
 }

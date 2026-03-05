@@ -1,27 +1,10 @@
 import { ApiError, fetchJson } from '@/lib/http';
-import { createClient } from '@/utils/supabase/client'; // Import the new client client
 
 // NOTE: External buckets API is disabled for production
 // This was pointing to localhost:8764 which is not available in production
 // Using localStorage fallback functions instead (see below)
 const API_BASE_URL = ''; // Disabled - use localStorage functions
 const API_DISABLED = API_BASE_URL === '';
-
-async function getSupabaseToken() {
-  try {
-    const supabase = createClient(); // Use client-side client
-    const { data: { session }, error } = await supabase.auth.getSession();
-
-    if (error || !session) {
-      throw new Error(error?.message || 'No authentication token available');
-    }
-
-    return session.access_token;
-  } catch (error) {
-    console.error('Error getting Supabase token:', error);
-    throw new Error('Authentication failed');
-  }
-}
 
 function getOrganizationContext(): { organizationId?: string } {
   // Get organization context from localStorage or auth provider
@@ -37,12 +20,10 @@ function getOrganizationContext(): { organizationId?: string } {
 
 async function fetchWithAuth(url: string, options: RequestInit = {}) {
   try {
-    const token = await getSupabaseToken();
     const orgContext = getOrganizationContext();
 
     const headers = {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
       'ngrok-skip-browser-warning': 'true',
       ...(orgContext.organizationId && { 'X-Organization-ID': orgContext.organizationId }),
       ...options.headers,
@@ -58,21 +39,9 @@ async function fetchWithAuth(url: string, options: RequestInit = {}) {
   } catch (error: any) {
     console.error('[fetchWithAuth] Request failed:', error);
 
-    // If authentication fails, try without auth as fallback
-    const authFailed = error.message.includes('Authentication failed')
-      || error.message.includes('No authentication token')
-      || (error instanceof ApiError && (error.status === 401 || error.status === 403));
-    if (authFailed) {
-      console.log('[fetchWithAuth] Trying request without authentication...');
-
-      const headers = {
-        'Content-Type': 'application/json',
-        ...options.headers,
-      };
-
-      return fetchJson(url, { ...options, headers });
+    if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
+      throw new Error('Not authenticated. Please sign in again.');
     }
-
     throw error;
   }
 }

@@ -71,53 +71,70 @@
 
 'use client';
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { User } from '@supabase/supabase-js';
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 
-import { createClient } from '@/utils/supabase/client';
+import { backendGetMe } from '@/lib/auth/backend-auth';
+
+type AuthUser = {
+  id: string;
+  email: string;
+  user_metadata: {
+    full_name?: string;
+  };
+};
 
 interface AuthContextType {
-  user: User | null;
+  user: AuthUser | null;
   isLoading: boolean;
+  refreshAuth: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [supabase] = useState(() => createClient());
+
+  const refreshAuth = useCallback(async () => {
+    try {
+      const me = await backendGetMe();
+      setUser({
+        id: me.user_uid,
+        email: me.email,
+        user_metadata: {
+          full_name: me.name || me.email?.split('@')[0],
+        },
+      });
+    } catch {
+      setUser(null);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
 
     const bootstrap = async () => {
-      const { data, error } = await supabase.auth.getSession();
-      if (!isMounted) return;
-      if (error) {
-        setUser(null);
-      } else {
-        setUser(data.session?.user ?? null);
-      }
-      setIsLoading(false);
+      await refreshAuth();
     };
 
     bootstrap();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const onFocus = () => {
       if (!isMounted) return;
-      setUser(session?.user ?? null);
-      setIsLoading(false);
-    });
+      refreshAuth();
+    };
+    window.addEventListener('focus', onFocus);
 
     return () => {
       isMounted = false;
-      subscription.unsubscribe();
+      window.removeEventListener('focus', onFocus);
     };
-  }, [supabase]);
+  }, [refreshAuth]);
 
   return (
-    <AuthContext.Provider value={{ user, isLoading }}>
+    <AuthContext.Provider value={{ user, isLoading, refreshAuth }}>
       {children}
     </AuthContext.Provider>
   );

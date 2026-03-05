@@ -1,7 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
-import { updateSession } from '@/utils/supabase/middleware';
-
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -13,7 +11,7 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  return updateSession(request);
+  return NextResponse.next();
 }
 
 export const config = {

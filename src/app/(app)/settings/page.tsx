@@ -15,9 +15,8 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { createClient } from '@/utils/supabase/client';
 import { useAuth } from '@/contexts/auth-context';
-import { signOut } from '@/app/actions/auth';
+import { backendSignOut } from '@/lib/auth/backend-auth';
 import { DashboardHeader } from '@/components/dashboard-header';
 import { PaperCard, PaperCardContent } from '@/components/ui/paper-card';
 import { Button } from '@/components/ui/button';
@@ -61,9 +60,15 @@ export default function SettingsPage() {
 
   const handleResetPassword = async () => {
     if (!user?.email) return;
-    const supabase = createClient();
-    await supabase.auth.resetPasswordForEmail(user.email);
-    toast.success('Reset link sent to ' + user.email);
+    toast.info('Password reset is not exposed in backend auth endpoints yet. Please contact support.');
+  };
+
+  const handleSignOut = async () => {
+    try {
+      await backendSignOut();
+    } finally {
+      router.push('/login');
+    }
   };
 
   return (
@@ -84,16 +89,15 @@ export default function SettingsPage() {
             <h1 className="text-5xl font-medium tracking-tighter text-foreground">Settings</h1>
             <p className="text-muted-foreground text-sm font-medium">Manage your account and preferences.</p>
           </div>
-          <form action={signOut}>
-            <Button
-              type="submit"
-              variant="destructive"
-              className="h-10 px-4 gap-2 rounded-[4px] text-[10px] font-bold uppercase tracking-widest"
-            >
-              <LogOut size={14} />
-                  Sign Out
-            </Button>
-          </form>
+          <Button
+            type="button"
+            onClick={handleSignOut}
+            variant="destructive"
+            className="h-10 px-4 gap-2 rounded-[4px] text-[10px] font-bold uppercase tracking-widest"
+          >
+            <LogOut size={14} />
+            Sign Out
+          </Button>
         </div>
 
         {/* --- Identity Section --- */}
