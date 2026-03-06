@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 // Voice Agents API for making outbound calls
 const VOICE_AGENTS_URL = process.env.NEXT_PUBLIC_VOICE_AGENTS_URL || 'https://service.monade.ai/voice_agents';
 const MONADE_API_BASE_URL = process.env.MONADE_API_BASE_URL || 'https://service.monade.ai/db_services';
+const VOICE_AGENTS_API_KEY = process.env.VOICE_AGENTS_API_KEY || process.env.MONADE_API_KEY;
 
 // Trunk name mapping - map UI selection to actual trunk names registered in backend
 const TRUNK_NAME_MAP: Record<string, string> = {
@@ -46,7 +47,31 @@ function getEnvUseCasePromptMap(): UseCasePromptMap {
   }
 }
 
+function getSessionHeaders(request: NextRequest): HeadersInit {
+  const headers: HeadersInit = { 'Content-Type': 'application/json' };
+  const cookie = request.headers.get('cookie');
+  if (cookie) {
+    headers.Cookie = cookie;
+  }
+  return headers;
+}
+
+async function resolveSessionUserUid(request: NextRequest): Promise<string | null> {
+  try {
+    const response = await fetch(`${MONADE_API_BASE_URL}/api/me`, {
+      method: 'GET',
+      headers: getSessionHeaders(request),
+    });
+    if (!response.ok) return null;
+    const data = await response.json().catch(() => ({}));
+    return typeof data?.user_uid === 'string' ? data.user_uid : null;
+  } catch {
+    return null;
+  }
+}
+
 async function resolvePromptUrl(params: {
+  request: NextRequest;
   promptUrl?: string;
   knowledgeBaseUrl?: string;
   knowledgeBaseId?: string;
@@ -66,9 +91,7 @@ async function resolvePromptUrl(params: {
         `${MONADE_API_BASE_URL}/api/knowledge-bases/${encodeURIComponent(knowledgeBaseId)}`,
         {
           method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers: getSessionHeaders(params.request),
         },
       );
 
@@ -116,6 +139,7 @@ export async function POST(request: NextRequest) {
     } = body;
 
     const resolvedPromptUrl = await resolvePromptUrl({
+      request,
       promptUrl: prompt_url,
       knowledgeBaseUrl: knowledge_base_url,
       knowledgeBaseId: knowledge_base_id,
@@ -123,12 +147,16 @@ export async function POST(request: NextRequest) {
       requestUseCaseMap: use_case_prompt_map,
     });
 
+    const sessionUserUid = await resolveSessionUserUid(request);
+    const effectiveUserUid = (typeof user_uid === 'string' ? user_uid.trim() : '') || sessionUserUid || '';
+    const effectiveApiKey = (typeof api_key === 'string' ? api_key.trim() : '') || VOICE_AGENTS_API_KEY || '';
+
     console.log('[API /calling] Received request:', {
       phone_number,
       assistant_id,
       trunk_name,
-      user_uid,
-      api_key: api_key ? `${api_key.substring(0, 20)}...` : 'NOT PROVIDED',
+      user_uid: effectiveUserUid || 'NOT PROVIDED',
+      api_key: effectiveApiKey ? `${effectiveApiKey.substring(0, 20)}...` : 'NOT PROVIDED',
       callee_info,
       use_case,
       resolved_prompt_url: resolvedPromptUrl || 'assistant_default',
@@ -149,17 +177,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!api_key) {
+    if (!effectiveApiKey) {
       return NextResponse.json(
-        { error: 'API key is required for billing. Please ensure you have an API key.' },
-        { status: 400 },
+        { error: 'Voice agents API key is not configured on server.' },
+        { status: 500 },
       );
     }
 
-    if (!user_uid) {
+    if (!effectiveUserUid) {
       return NextResponse.json(
-        { error: 'user_uid is required to validate trunk ownership.' },
-        { status: 400 },
+        { error: 'User is not authenticated. Please sign in again.' },
+        { status: 401 },
       );
     }
 
@@ -203,7 +231,7 @@ export async function POST(request: NextRequest) {
 
     const payload: Record<string, unknown> = {
       assistant_id: assistant_id,
-      user_uid: user_uid,
+      user_uid: effectiveUserUid,
       metadata,
       telephony: {
         trunk_name: resolvedTrunkName,
@@ -221,7 +249,7 @@ export async function POST(request: NextRequest) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-API-Key': api_key, // User's API key for billing/transcripts
+        'X-API-Key': effectiveApiKey,
       },
       body: JSON.stringify(payload),
     });

@@ -29,7 +29,7 @@ interface Assistant {
 export default function LiveKitAssistantDualButton({ assistant }: AssistantDualButtonProps) {
   const [mode, setMode] = useState<'chat' | 'talk'>('chat');
   const { assistants } = useAssistants();
-  const { apiKey, userUid } = useMonadeUser();
+  const { userUid } = useMonadeUser();
 
   // Get assistant data if string ID was passed
   const assistantData = typeof assistant === 'string'
@@ -52,7 +52,6 @@ export default function LiveKitAssistantDualButton({ assistant }: AssistantDualB
   } = useNewPhoneAssistant({
     assistantId: assistantData.id,
     assistantName: assistantData.name,
-    apiKey: apiKey, // Pass user's API key for billing
     userUid: userUid, // User UID for trunk ownership validation
   });
 

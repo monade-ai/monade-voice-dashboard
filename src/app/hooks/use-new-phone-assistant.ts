@@ -12,7 +12,6 @@ interface CalleeInfo {
 interface UseNewPhoneAssistantProps {
   assistantId: string;
   assistantName: string;
-  apiKey: string | null; // User's API key for billing
   userUid: string | null; // User UID for trunk ownership validation
 }
 
@@ -30,7 +29,6 @@ interface UseNewPhoneAssistantReturn {
 export function useNewPhoneAssistant({
   assistantId,
   assistantName,
-  apiKey,
   userUid,
 }: UseNewPhoneAssistantProps): UseNewPhoneAssistantReturn {
   const [callStatus, setCallStatus] = useState<'idle' | 'initiating' | 'connecting' | 'connected' | 'failed' | 'completed'>('idle');
@@ -44,14 +42,6 @@ export function useNewPhoneAssistant({
     if (!phoneNumber) {
       setError(new Error('Phone number is required'));
       console.error('[useNewPhoneAssistant] No phone number provided');
-
-      return;
-    }
-
-    if (!apiKey) {
-      setError(new Error('API key is required for billing. Please ensure you have an API key configured.'));
-      console.error('[useNewPhoneAssistant] No API key provided');
-      setCallStatus('failed');
 
       return;
     }
@@ -82,7 +72,7 @@ export function useNewPhoneAssistant({
         callee_info: calleeInfo,
         assistant_id: assistantId,
         trunk_name: trunkName,
-        api_key: apiKey ? `${apiKey.substring(0, 20)}...` : 'NOT PROVIDED',
+        api_key: 'SERVER_SIDE',
       });
 
       const responseData = await initiateNewCall({
@@ -90,7 +80,6 @@ export function useNewPhoneAssistant({
         callee_info: calleeInfo,
         assistant_id: assistantId,
         trunk_name: trunkName, // 'twilio' or 'vobiz'
-        api_key: apiKey, // User's API key for billing
         user_uid: userUid, // User UID for trunk ownership validation
       });
 
@@ -103,7 +92,7 @@ export function useNewPhoneAssistant({
       setError(err instanceof Error ? err : new Error('Unknown error initiating call'));
       console.error('[useNewPhoneAssistant] Error initiating phone call:', err);
     }
-  }, [assistantId, assistantName, apiKey, userUid]);
+  }, [assistantId, assistantName, userUid]);
 
   // End the call
   const endCall = useCallback(() => {

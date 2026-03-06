@@ -78,7 +78,7 @@ export function CampaignProvider({ children }: { children: React.ReactNode }) {
 
   // Hooks
   const { assistants } = useAssistants();
-  const { apiKey, userUid } = useMonadeUser();
+  const { userUid } = useMonadeUser();
   const { saveCampaign } = useCampaignHistory();
 
   const selectedAssistant = assistants.find(a => a.id === selectedAssistantId);
@@ -190,17 +190,6 @@ export function CampaignProvider({ children }: { children: React.ReactNode }) {
   const makeCall = async (contact: Contact): Promise<CampaignResult> => {
     const phone = formatPhoneNumber(contact.phoneNumber);
 
-    if (!apiKey) {
-      return {
-        phoneNumber: contact.phoneNumber,
-        calleeInfo: contact.calleeInfo,
-        call_id: '',
-        call_status: 'failed',
-        transcript: 'Error: No API key configured',
-        analyticsLoaded: false,
-      };
-    }
-
     try {
       const data = await fetchJson<any>('/api/calling', {
         method: 'POST',
@@ -209,7 +198,7 @@ export function CampaignProvider({ children }: { children: React.ReactNode }) {
           phone_number: phone,
           assistant_id: selectedAssistantId,
           trunk_name: selectedTrunk,
-          api_key: apiKey,
+          user_uid: userUid,
           callee_info: contact.calleeInfo,
         }),
         retry: { retries: 0 },
@@ -311,8 +300,8 @@ export function CampaignProvider({ children }: { children: React.ReactNode }) {
 
   // Start Campaign
   const startCampaign = async () => {
-    if (!selectedAssistantId || !selectedTrunk || !apiKey || !userUid || !contacts.length) {
-      toast.error('Missing configuration (Assistant, Trunk, API Key, or User)');
+    if (!selectedAssistantId || !selectedTrunk || !userUid || !contacts.length) {
+      toast.error('Missing configuration (Assistant, Trunk, or User)');
 
       return;
     }
