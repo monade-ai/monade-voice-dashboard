@@ -161,6 +161,7 @@ export async function uploadCampaignCSV(
     const response = await fetch(url, {
       method: 'POST',
       body: formData,
+      credentials: 'include',
       // Don't set Content-Type header - browser will set it with boundary
     });
 
