@@ -7,6 +7,7 @@ import { useAssistants } from '@/app/hooks/use-assistants-context';
 import { useMonadeUser } from '@/app/hooks/use-monade-user';
 import { useCampaignHistory } from '@/app/hooks/use-campaign-history';
 import { fetchJson } from '@/lib/http';
+import { initiateNewCall } from '@/lib/services/new-calling-service';
 import { MONADE_API_BASE } from '@/config';
 
 // Types
@@ -186,28 +187,23 @@ export function CampaignProvider({ children }: { children: React.ReactNode }) {
     return formatted;
   };
 
-  // Make Call API
+  // Make Call API — calls service.monade.ai directly (bypasses dashboard proxy)
   const makeCall = async (contact: Contact): Promise<CampaignResult> => {
     const phone = formatPhoneNumber(contact.phoneNumber);
 
     try {
-      const data = await fetchJson<any>('/api/voice-agents/outbound-call', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          phone_number: phone,
-          assistant_id: selectedAssistantId,
-          trunk_name: selectedTrunk,
-          user_uid: userUid,
-          callee_info: contact.calleeInfo,
-        }),
-        retry: { retries: 0 },
-      });
+      const data = await initiateNewCall({
+        phone_number: phone,
+        assistant_id: selectedAssistantId,
+        trunk_name: selectedTrunk,
+        user_uid: userUid!,
+        callee_info: contact.calleeInfo,
+      }) as any;
 
       return {
         phoneNumber: contact.phoneNumber,
         calleeInfo: contact.calleeInfo,
-        call_id: data.call_id || '',
+        call_id: data?.call_id || '',
         call_status: 'completed',
         transcript: '',
         analyticsLoaded: false,
