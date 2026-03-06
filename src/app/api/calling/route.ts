@@ -8,7 +8,6 @@ const RAW_VOICE_AGENTS_BASE = process.env.VOICE_AGENTS_URL
   || process.env.NEXT_PUBLIC_VOICE_AGENTS_URL
   || DEFAULT_VOICE_AGENTS_BASE;
 const MONADE_API_BASE_URL = process.env.MONADE_API_BASE_URL || 'https://service.monade.ai/db_services';
-const VOICE_AGENTS_API_KEY = process.env.VOICE_AGENTS_API_KEY || process.env.MONADE_API_KEY;
 
 function normalizeVoiceAgentsBase(rawBase: string): string {
   const normalized = rawBase.trim().replace(/\/+$/, '');
@@ -143,7 +142,7 @@ export async function POST(request: NextRequest) {
       callee_info, // Metadata about the callee (name, etc.)
       assistant_id, // Assistant ID (required)
       trunk_name, // Selected trunk: 'twilio' or 'vobiz' from UI dropdown
-      api_key, // User's API key for billing/transcripts
+      api_key, // Ignored for browser/dashboard flow (cookie auth is canonical)
       user_uid, // User UID for trunk ownership validation
       use_case, // Optional use case key to switch scripts per request
       prompt_url, // Optional direct prompt URL override
@@ -163,14 +162,14 @@ export async function POST(request: NextRequest) {
 
     const sessionUserUid = await resolveSessionUserUid(request);
     const effectiveUserUid = (typeof user_uid === 'string' ? user_uid.trim() : '') || sessionUserUid || '';
-    const effectiveApiKey = (typeof api_key === 'string' ? api_key.trim() : '') || VOICE_AGENTS_API_KEY || '';
 
     console.log('[API /calling] Received request:', {
       phone_number,
       assistant_id,
       trunk_name,
       user_uid: effectiveUserUid || 'NOT PROVIDED',
-      api_key: effectiveApiKey ? `${effectiveApiKey.substring(0, 20)}...` : 'NOT PROVIDED',
+      has_cookie: Boolean(request.headers.get('cookie')),
+      has_client_api_key: Boolean(typeof api_key === 'string' && api_key.trim()),
       callee_info,
       use_case,
       resolved_prompt_url: resolvedPromptUrl || 'assistant_default',
@@ -188,20 +187,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Assistant ID is required' },
         { status: 400 },
-      );
-    }
-
-    if (!effectiveApiKey) {
-      return NextResponse.json(
-        { error: 'Voice agents API key is not configured on server.' },
-        { status: 500 },
-      );
-    }
-
-    if (!effectiveUserUid) {
-      return NextResponse.json(
-        { error: 'User is not authenticated. Please sign in again.' },
-        { status: 401 },
       );
     }
 
@@ -245,26 +230,34 @@ export async function POST(request: NextRequest) {
 
     const payload: Record<string, unknown> = {
       assistant_id: assistant_id,
-      user_uid: effectiveUserUid,
       metadata,
       telephony: {
         trunk_name: resolvedTrunkName,
       },
     };
+    // Include explicit user_uid only when provided/derived; backend can derive from cookie auth.
+    if (effectiveUserUid) {
+      payload.user_uid = effectiveUserUid;
+    }
     if (resolvedPromptUrl) {
       payload.prompt_url = resolvedPromptUrl;
     }
 
     console.log('[API /calling] Calling Voice Agents API:', callUrl);
     console.log('[API /calling] Payload:', JSON.stringify(payload));
-    console.log('[API /calling] Using API Key for auth');
+    console.log('[API /calling] Using cookie-auth pass-through (no API key headers)');
+
+    const upstreamHeaders: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+    const cookieHeader = request.headers.get('cookie');
+    if (cookieHeader) {
+      upstreamHeaders.Cookie = cookieHeader;
+    }
 
     const response = await fetch(callUrl, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-API-Key': effectiveApiKey,
-      },
+      headers: upstreamHeaders,
       body: JSON.stringify(payload),
     });
 

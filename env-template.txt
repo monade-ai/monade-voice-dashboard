@@ -18,7 +18,7 @@ LIVEKIT_API_SECRET=
 
 # Voice Agents API (new outbound calling)
 NEXT_PUBLIC_VOICE_AGENTS_URL=https://service.monade.ai/voice_agents
-VOICE_AGENTS_API_KEY=monade_d8325992-cf93-4cdd-9c54-34ca18d72441
+#VOICE_AGENTS_API_KEY=monade_d8325992-cf93-4cdd-9c54-34ca18d72441
 
 # Supabase
 NEXT_PUBLIC_SUPABASE_URL=
