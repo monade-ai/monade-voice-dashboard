@@ -49,6 +49,25 @@ async function fetchApi<T>(
   }
 }
 
+async function fetchApiWithFallback<T>(
+  endpoints: string[],
+  options?: RequestInit,
+): Promise<T> {
+  let lastError: unknown;
+  for (const endpoint of endpoints) {
+    try {
+      return await fetchApi<T>(endpoint, options);
+    } catch (error) {
+      if ((error as { status?: number } | undefined)?.status !== 404) {
+        throw error;
+      }
+      lastError = error;
+    }
+  }
+
+  throw lastError ?? new Error('No API endpoints configured');
+}
+
 // ============================================
 // Health & Monitoring
 // ============================================
@@ -97,20 +116,29 @@ export async function getUserAssistants(userUid: string): Promise<MonadeAssistan
 // API Key Management
 // ============================================
 
-export async function generateApiKey(userUid: string): Promise<MonadeApiKey> {
-  return fetchApi<MonadeApiKey>(`/api/users/${userUid}/api-keys`, {
-    method: 'POST',
-  });
+export async function generateApiKey(_userUid?: string): Promise<MonadeApiKey> {
+  return fetchApiWithFallback<MonadeApiKey>(
+    ['/api/auth/api-key/create-api-key', '/api/auth/api-key/create'],
+    {
+      method: 'POST',
+    },
+  );
 }
 
-export async function getUserApiKeys(userUid: string): Promise<MonadeApiKey[]> {
-  return fetchApi<MonadeApiKey[]>(`/api/users/${userUid}/api-keys`);
+export async function getUserApiKeys(_userUid?: string): Promise<MonadeApiKey[]> {
+  return fetchApiWithFallback<MonadeApiKey[]>(
+    ['/api/auth/api-key/list-api-keys', '/api/auth/api-key/list'],
+  );
 }
 
 export async function deleteApiKey(apiKeyId: number): Promise<void> {
-  return fetchApi<void>(`/api/api-keys/${apiKeyId}`, {
-    method: 'DELETE',
-  });
+  await fetchApiWithFallback<unknown>(
+    ['/api/auth/api-key/delete-api-key', '/api/auth/api-key/delete'],
+    {
+      method: 'DELETE',
+      body: JSON.stringify({ keyId: String(apiKeyId) }),
+    },
+  );
 }
 
 export async function validateApiKey(apiKey: string): Promise<ValidateApiKeyResponse> {

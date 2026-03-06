@@ -75,7 +75,9 @@ export function WebhookManager() {
     if (!userUid) return;
     try {
       setLoading(true);
-      const res = await fetch(`${baseUrl}/api/users/${userUid}/webhooks`);
+      const res = await fetch(`${baseUrl}/api/users/${userUid}/webhooks`, {
+        credentials: 'include',
+      });
       if (res.ok) {
         const data = await res.json();
         setEndpoints(Array.isArray(data.endpoints) ? data.endpoints : []);
@@ -90,7 +92,9 @@ export function WebhookManager() {
   // Fetch supported event types
   const fetchSupportedEvents = async () => {
     try {
-      const res = await fetch(`${baseUrl}/api/webhooks/supported-events`);
+      const res = await fetch(`${baseUrl}/api/webhooks/supported-events`, {
+        credentials: 'include',
+      });
       if (res.ok) {
         const data = await res.json();
         setSupportedEvents(Array.isArray(data.event_types) ? data.event_types : []);
@@ -156,6 +160,7 @@ export function WebhookManager() {
       const res = await fetch(`${baseUrl}/api/users/${userUid}/webhooks`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           url: targetUrl,
           event_types: formEventTypes,
@@ -201,6 +206,7 @@ export function WebhookManager() {
       const res = await fetch(`${baseUrl}/api/users/${userUid}/webhooks/${editingEndpoint.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           url: targetUrl,
           event_types: formEventTypes,
@@ -231,6 +237,7 @@ export function WebhookManager() {
       const res = await fetch(`${baseUrl}/api/users/${userUid}/webhooks/${endpoint.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ is_active: !endpoint.is_active }),
       });
 
@@ -255,6 +262,7 @@ export function WebhookManager() {
     try {
       const res = await fetch(`${baseUrl}/api/users/${userUid}/webhooks/${id}`, {
         method: 'DELETE',
+        credentials: 'include',
       });
       if (res.ok) {
         setEndpoints(prev => prev.filter(ep => ep.id !== id));

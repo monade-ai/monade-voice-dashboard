@@ -63,20 +63,36 @@ async function resolveSessionUserUid(request: NextRequest): Promise<string | nul
 }
 
 async function resolveUserApiKey(request: NextRequest, userUid: string): Promise<string | null> {
-  const endpoint = `${MONADE_API_BASE}/api/users/${encodeURIComponent(userUid)}/api-keys`;
+  const endpoints = [
+    `${MONADE_API_BASE}/api/auth/api-key/list-api-keys`,
+    `${MONADE_API_BASE}/api/auth/api-key/list`,
+  ];
   const headers = getSessionHeaders(request);
 
-  const unauthResponse = await fetch(endpoint, { method: 'GET', headers });
-  let response = unauthResponse;
+  let response: Response | null = null;
+  for (const endpoint of endpoints) {
+    const candidate = await fetch(endpoint, { method: 'GET', headers });
+    if (candidate.ok || candidate.status !== 404) {
+      response = candidate;
+      break;
+    }
+  }
+  if (!response) return null;
 
   if (!response.ok && (response.status === 401 || response.status === 403) && MONADE_API_KEY) {
-    response = await fetch(endpoint, {
-      method: 'GET',
-      headers: {
-        ...headers,
-        'X-API-Key': MONADE_API_KEY,
-      },
-    });
+    for (const endpoint of endpoints) {
+      const candidate = await fetch(endpoint, {
+        method: 'GET',
+        headers: {
+          ...headers,
+          'X-API-Key': MONADE_API_KEY,
+        },
+      });
+      if (candidate.ok || candidate.status !== 404) {
+        response = candidate;
+        break;
+      }
+    }
   }
 
   if (!response.ok) {
@@ -84,7 +100,9 @@ async function resolveUserApiKey(request: NextRequest, userUid: string): Promise
   }
 
   const data = await response.json().catch(() => ([]));
-  const keys = Array.isArray(data) ? data : data.api_keys || [];
+  const keys = Array.isArray(data)
+    ? data
+    : (Array.isArray(data?.api_keys) ? data.api_keys : (Array.isArray(data?.keys) ? data.keys : []));
   const scopedKeys = keys.filter((key: any) => (
     !key?.user_uid || key?.user_uid === userUid
   ));

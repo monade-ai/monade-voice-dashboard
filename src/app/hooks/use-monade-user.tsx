@@ -44,14 +44,6 @@ export function MonadeUserProvider({ children }: MonadeUserProviderProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const getApiErrorMessage = (status: number) => {
-    if (status === 401 || status === 403) return 'You are not authorized to access this account.';
-    if (status === 404) return 'User account not found. Please contact admin.';
-    if (status >= 500) return 'Monade API is currently unavailable. Please try again later.';
-
-    return 'Failed to fetch user account';
-  };
-
   const fetchMonadeUser = useCallback(async () => {
     try {
       setLoading(true);
@@ -81,35 +73,56 @@ export function MonadeUserProvider({ children }: MonadeUserProviderProps) {
       console.log('[MonadeUser] Successfully fetched user_uid:', uid);
       setUserUid(uid);
 
-      // Now fetch user's API keys
+      // Best-effort API key lookup from Better Auth key endpoints.
       try {
-        const keysData = await fetchJson<any>(
-          `${MONADE_API_CONFIG.BASE_URL}/api/users/${uid}/api-keys`,
-          {
-            method: 'GET',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            credentials: 'include',
-          },
-        );
+        const candidates = [
+          `${MONADE_API_CONFIG.BASE_URL}/api/auth/api-key/list-api-keys`,
+          `${MONADE_API_CONFIG.BASE_URL}/api/auth/api-key/list`,
+        ];
 
-        const keys = Array.isArray(keysData) ? keysData : keysData.api_keys || [];
+        let keysData: any = null;
+        let resolved = false;
+        for (const endpoint of candidates) {
+          try {
+            keysData = await fetchJson<any>(endpoint, {
+              method: 'GET',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              credentials: 'include',
+            });
+            resolved = true;
+            break;
+          } catch (err) {
+            if (!(err instanceof ApiError) || err.status !== 404) {
+              throw err;
+            }
+          }
+        }
+        if (!resolved) {
+          setApiKey(null);
+          return;
+        }
+
+        const keys = Array.isArray(keysData)
+          ? keysData
+          : (Array.isArray(keysData?.api_keys) ? keysData.api_keys : (Array.isArray(keysData?.keys) ? keysData.keys : []));
         if (keys.length > 0) {
-          const firstKey = keys[0].key || keys[0].api_key || keys[0];
-          console.log('[MonadeUser] Found API key:', firstKey ? `${String(firstKey).substring(0, 20)}...` : 'none');
-          setApiKey(String(firstKey));
+          const firstKey = keys[0]?.key || keys[0]?.api_key || keys[0]?.token || null;
+          if (firstKey) {
+            console.log('[MonadeUser] Found API key:', `${String(firstKey).substring(0, 20)}...`);
+            setApiKey(String(firstKey));
+          } else {
+            // BetterAuth list endpoints can return masked metadata without raw key value.
+            setApiKey(null);
+          }
         } else {
           console.log('[MonadeUser] No API keys found for user');
           setApiKey(null);
         }
       } catch (keyErr) {
-        console.error('[MonadeUser] Error fetching API keys:', keyErr);
-        if (keyErr instanceof ApiError) {
-          setError(getApiErrorMessage(keyErr.status ?? 0));
-        } else {
-          setError('Could not load API keys. Please try again later.');
-        }
+        console.warn('[MonadeUser] API key list unavailable:', keyErr);
+        setApiKey(null);
       }
     } catch (err) {
       console.error('[MonadeUser] Error fetching user:', err);

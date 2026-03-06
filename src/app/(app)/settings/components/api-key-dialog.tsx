@@ -21,10 +21,15 @@ import { MONADE_API_CONFIG } from '@/types/monade-api.types';
 import { cn } from '@/lib/utils';
 
 interface ApiKey {
-  id: number;
-  api_key: string;
-  created_at: string;
-  is_active: boolean;
+  id: string;
+  api_key?: string;
+  key?: string;
+  prefix?: string;
+  name?: string;
+  created_at?: string;
+  createdAt?: string;
+  is_active?: boolean;
+  isActive?: boolean;
 }
 
 export function ApiKeyManager() {
@@ -34,6 +39,40 @@ export function ApiKeyManager() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [newKey, setNewKey] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const authApiKeyBase = `${MONADE_API_CONFIG.BASE_URL}/api/auth/api-key`;
+
+  const extractKeys = (payload: any): ApiKey[] => {
+    const raw = Array.isArray(payload)
+      ? payload
+      : (Array.isArray(payload?.api_keys)
+        ? payload.api_keys
+        : (Array.isArray(payload?.keys)
+          ? payload.keys
+          : (Array.isArray(payload?.data) ? payload.data : [])));
+
+    return raw.map((key: any) => ({
+      ...key,
+      id: String(key?.id ?? key?.keyId ?? key?.key_id ?? key?.prefix ?? Math.random()),
+    }));
+  };
+
+  const requestWithFallback = async (
+    candidates: string[],
+    init?: RequestInit,
+  ): Promise<Response> => {
+    let lastResponse: Response | null = null;
+    for (const url of candidates) {
+      const response = await fetch(url, {
+        ...init,
+        credentials: 'include',
+      });
+      if (response.ok) return response;
+      lastResponse = response;
+      if (response.status !== 404) return response;
+    }
+    if (lastResponse) return lastResponse;
+    throw new Error('No endpoint candidates provided');
+  };
 
   // Fetch Keys
   const fetchKeys = useCallback(async () => {
@@ -44,10 +83,13 @@ export function ApiKeyManager() {
     }
     try {
       setLoading(true);
-      const res = await fetch(`${MONADE_API_CONFIG.BASE_URL}/api/users/${userUid}/api-keys`);
+      const res = await requestWithFallback([
+        `${authApiKeyBase}/list-api-keys`,
+        `${authApiKeyBase}/list`,
+      ]);
       if (res.ok) {
         const data = await res.json();
-        setKeys(Array.isArray(data) ? data : []);
+        setKeys(extractKeys(data));
       } else {
         toast.error('Failed to fetch API keys');
       }
@@ -57,7 +99,7 @@ export function ApiKeyManager() {
     } finally {
       setLoading(false);
     }
-  }, [userUid]);
+  }, [authApiKeyBase, userUid]);
 
   useEffect(() => {
     if (userUid) {
@@ -72,15 +114,22 @@ export function ApiKeyManager() {
     if (!userUid) return;
     setIsGenerating(true);
     try {
-      const res = await fetch(`${MONADE_API_CONFIG.BASE_URL}/api/users/${userUid}/api-keys`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      });
+      const res = await requestWithFallback(
+        [
+          `${authApiKeyBase}/create-api-key`,
+          `${authApiKeyBase}/create`,
+        ],
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: `Dashboard Key ${new Date().toISOString()}` }),
+        },
+      );
       
       if (res.ok) {
         const data = await res.json();
         // The API returns the new key object
-        const key = data.api_key || data.key; 
+        const key = data?.api_key || data?.key || data?.token || data?.rawKey || null;
         setNewKey(key);
         await fetchKeys();
         toast.success('New Access Key Generated');
@@ -95,13 +144,21 @@ export function ApiKeyManager() {
   };
 
   // Delete Key
-  const handleDelete = async (id: number) => {
+  const handleDelete = async (id: string) => {
     if (!confirm('Are you sure? This will immediately revoke access for any application using this key.')) return;
     
     try {
-      const res = await fetch(`${MONADE_API_CONFIG.BASE_URL}/api/api-keys/${id}`, {
-        method: 'DELETE',
-      });
+      const res = await requestWithFallback(
+        [
+          `${authApiKeyBase}/delete-api-key`,
+          `${authApiKeyBase}/delete`,
+        ],
+        {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ keyId: id }),
+        },
+      );
       if (res.ok) {
         setKeys(prev => prev.filter(k => k.id !== id));
         toast.success('Key Revoked');
@@ -166,16 +223,16 @@ export function ApiKeyManager() {
                 </div>
                 <div className="flex flex-col">
                   <span className="text-xs font-mono font-medium text-foreground">
-                    {key.api_key.substring(0, 12)}...
+                    {(key.prefix || key.api_key || key.key || key.name || key.id).toString().substring(0, 18)}...
                   </span>
                   <span className="text-[9px] text-muted-foreground uppercase tracking-widest">
-                                Created {new Date(key.created_at).toLocaleDateString()}
+                                Created {new Date(key.created_at || key.createdAt || Date.now()).toLocaleDateString()}
                   </span>
                 </div>
               </div>
               <div className="flex items-center gap-1.5">
                 <button
-                  onClick={() => handleCopy(key.api_key)}
+                  onClick={() => handleCopy((key.api_key || key.key || key.prefix || key.id).toString())}
                   className="h-8 w-8 inline-flex items-center justify-center rounded-[4px] border border-border/30 text-muted-foreground hover:text-foreground hover:bg-background/80 transition-all"
                   title="Copy Key"
                 >
