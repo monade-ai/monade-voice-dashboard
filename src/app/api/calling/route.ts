@@ -1,9 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-// Voice Agents API for making outbound calls
-const VOICE_AGENTS_URL = process.env.NEXT_PUBLIC_VOICE_AGENTS_URL || 'https://service.monade.ai/voice_agents';
+// Voice Agents API for making outbound calls.
+// Use server envs first to avoid client/public misconfiguration affecting server routing.
+const DEFAULT_VOICE_AGENTS_BASE = 'https://service.monade.ai/voice_agents';
+const RAW_VOICE_AGENTS_BASE = process.env.VOICE_AGENTS_URL
+  || process.env.VOICE_AGENTS_BASE_URL
+  || process.env.NEXT_PUBLIC_VOICE_AGENTS_URL
+  || DEFAULT_VOICE_AGENTS_BASE;
 const MONADE_API_BASE_URL = process.env.MONADE_API_BASE_URL || 'https://service.monade.ai/db_services';
 const VOICE_AGENTS_API_KEY = process.env.VOICE_AGENTS_API_KEY || process.env.MONADE_API_KEY;
+
+function normalizeVoiceAgentsBase(rawBase: string): string {
+  const normalized = rawBase.trim().replace(/\/+$/, '');
+  // Guard known typo observed in envs/config shares.
+  const typoFixed = normalized.replace('service.moande.ai', 'service.monade.ai');
+  // Ensure base always points to /voice_agents namespace.
+  return typoFixed.endsWith('/voice_agents') ? typoFixed : `${typoFixed}/voice_agents`;
+}
+const VOICE_AGENTS_BASE = normalizeVoiceAgentsBase(RAW_VOICE_AGENTS_BASE);
 
 // Trunk name mapping - map UI selection to actual trunk names registered in backend
 const TRUNK_NAME_MAP: Record<string, string> = {
@@ -213,7 +227,7 @@ export async function POST(request: NextRequest) {
     console.log('[API /calling] Using Voice Agents API with trunk:', resolvedTrunkName);
 
     // Build the correct API URL and payload per Shashwat's spec
-    const callUrl = `${VOICE_AGENTS_URL}/outbound-call/${encodeURIComponent(formattedPhone)}`;
+    const callUrl = `${VOICE_AGENTS_BASE}/outbound-call/${encodeURIComponent(formattedPhone)}`;
 
     const metadata: Record<string, unknown> = {
       ...((callee_info && typeof callee_info === 'object') ? callee_info : {}),

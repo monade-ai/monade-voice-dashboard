@@ -191,7 +191,7 @@ export function CampaignProvider({ children }: { children: React.ReactNode }) {
     const phone = formatPhoneNumber(contact.phoneNumber);
 
     try {
-      const data = await fetchJson<any>('/api/calling', {
+      const data = await fetchJson<any>('/api/voice-agents/outbound-call', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

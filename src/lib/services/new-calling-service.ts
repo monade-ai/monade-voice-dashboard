@@ -49,12 +49,12 @@ export async function initiateNewCall(params: NewCallingParams): Promise<unknown
     use_case_prompt_map: params.use_case_prompt_map,
   };
 
-  console.log('[NewCallingService] SENDING POST to /api/calling with body:', JSON.stringify({
+  console.log('[NewCallingService] SENDING POST to /api/voice-agents/outbound-call with body:', JSON.stringify({
     ...payload,
     api_key: params.api_key ? `${params.api_key.substring(0, 20)}...` : 'SERVER_SIDE',
   }));
 
-  return fetchJson('/api/calling', {
+  return fetchJson('/api/voice-agents/outbound-call', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
