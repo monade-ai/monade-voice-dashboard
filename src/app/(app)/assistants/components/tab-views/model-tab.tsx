@@ -301,13 +301,12 @@ export default function ModelTab({ onChangesMade }: ModelTabProps) {
             <SelectContent>
               <SelectItem value="outbound">Outbound</SelectItem>
               <SelectItem value="inbound">Inbound</SelectItem>
-              <SelectItem value="both">Both</SelectItem>
             </SelectContent>
           </Select>
         </div>
 
         {/* Inbound Trunk Selector — shown when inbound or both */}
-        {(callDirection === 'inbound' || callDirection === 'both') && (
+        {callDirection === 'inbound' && (
           <div className="space-y-2 mt-6">
             <label className="text-sm font-medium">Inbound Trunk</label>
             <p className="text-xs text-gray-500 mb-2">
@@ -350,7 +349,7 @@ export default function ModelTab({ onChangesMade }: ModelTabProps) {
         )}
 
         {/* Dispatch Rule Status (read-only) */}
-        {(callDirection === 'inbound' || callDirection === 'both') && (
+        {callDirection === 'inbound' && (
           <div className="mt-4 flex items-center gap-2">
             <div className={`w-2 h-2 rounded-full ${currentAssistant?.dispatch_rule_id ? 'bg-green-500' : 'bg-gray-300'}`} />
             <span className="text-xs text-gray-500">
@@ -366,44 +365,24 @@ export default function ModelTab({ onChangesMade }: ModelTabProps) {
       <div className="border rounded-lg p-6 bg-gray-50">
         <h3 className="text-lg font-medium mb-2">Speaking Accent</h3>
         <p className="text-sm text-gray-600 mb-6">
-          Set the accent/locale for the agent's speech. Changes auto-trigger a rebake for inbound assistants.
+          Set the accent for the agent's speech (e.g. "Hinglish Indian", "British English", "en-US"). Changes auto-trigger a rebake for inbound assistants.
         </p>
         <div className="space-y-2">
           <label className="text-sm font-medium">Accent</label>
-          <Select
-            value={speakingAccent || 'none'}
-            onValueChange={(value) => {
-              const accent = value === 'none' ? '' : value;
+          <input
+            type="text"
+            value={speakingAccent}
+            onChange={(e) => {
+              const accent = e.target.value;
               setSpeakingAccent(accent);
               if (currentAssistant) {
                 updateAssistantLocally(currentAssistant.id, { speakingAccent: accent || null });
                 onChangesMade();
               }
             }}
-          >
-            <SelectTrigger className="w-full bg-white">
-              <SelectValue placeholder="Select accent" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">
-                <span className="text-gray-500 italic">— Default —</span>
-              </SelectItem>
-              <SelectItem value="en-US">English (US)</SelectItem>
-              <SelectItem value="en-GB">English (UK)</SelectItem>
-              <SelectItem value="en-IN">English (India)</SelectItem>
-              <SelectItem value="en-AU">English (Australia)</SelectItem>
-              <SelectItem value="hi-IN">Hindi (India)</SelectItem>
-              <SelectItem value="es-ES">Spanish (Spain)</SelectItem>
-              <SelectItem value="es-MX">Spanish (Mexico)</SelectItem>
-              <SelectItem value="fr-FR">French (France)</SelectItem>
-              <SelectItem value="de-DE">German (Germany)</SelectItem>
-              <SelectItem value="pt-BR">Portuguese (Brazil)</SelectItem>
-              <SelectItem value="ja-JP">Japanese</SelectItem>
-              <SelectItem value="ko-KR">Korean</SelectItem>
-              <SelectItem value="zh-CN">Chinese (Mandarin)</SelectItem>
-              <SelectItem value="ar-SA">Arabic (Saudi)</SelectItem>
-            </SelectContent>
-          </Select>
+            placeholder="e.g. Hinglish Indian, British English, en-US"
+            className="w-full px-3 py-2 border rounded-md bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
         </div>
       </div>
 
