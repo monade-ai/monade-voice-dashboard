@@ -24,6 +24,7 @@ import {
 import { useAssistants, Assistant } from '@/app/hooks/use-assistants-context';
 import { useLibrary } from '@/app/hooks/use-knowledge-base';
 import { useTrunks } from '@/app/hooks/use-trunks';
+import { useUserTrunks } from '@/app/hooks/use-user-trunks';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
@@ -74,6 +75,8 @@ export default function AssistantStudio() {
   } = useAssistants();
   const { items: libraryItems } = useLibrary();
   const { trunks, phoneNumbers } = useTrunks({ checkAssignments: false });
+  const { trunks: userTrunks } = useUserTrunks();
+  const inboundTrunks = userTrunks.filter(t => t.trunk_type === 'inbound');
   
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'saved' | 'error'>('idle');
@@ -90,7 +93,7 @@ export default function AssistantStudio() {
         updateAssistantLocally(assistant.id, assistant);
         setSyncStatus('saved');
       } else {
-        const { id, createdAt, knowledgeBase, ...updates } = assistant;
+        const { id, createdAt, knowledgeBase, dispatch_rule_id, ...updates } = assistant;
         await saveAssistantUpdates(id, {
           ...updates,
           knowledgeBaseId: knowledgeBase,
@@ -116,13 +119,10 @@ export default function AssistantStudio() {
     setIsDeploying(true);
     try {
       if (isDraft) {
+        const { id: _id, createdAt: _ca, dispatch_rule_id: _dr, knowledgeBase, ...rest } = currentAssistant;
         const published = await createAssistant(currentAssistant.id, {
-          name: currentAssistant.name,
-          phoneNumber: currentAssistant.phoneNumber,
-          description: currentAssistant.description,
-          model: currentAssistant.model,
-          voice: currentAssistant.voice,
-          knowledgeBaseId: currentAssistant.knowledgeBase,
+          ...rest,
+          knowledgeBaseId: knowledgeBase,
         });
         if (published) setCurrentAssistant(published);
       }
@@ -283,16 +283,97 @@ export default function AssistantStudio() {
 
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 px-1">Agent Description</label>
-                  <Input 
+                  <Input
                     value={currentAssistant.description || ''}
                     onChange={(e) => handleUpdate('description', e.target.value)}
                     placeholder="e.g. A friendly receptionist who books appointments..."
-                    className="bg-background border-border/40 h-12 text-base focus:border-primary transition-all rounded-md px-4" 
+                    className="bg-background border-border/40 h-12 text-base focus:border-primary transition-all rounded-md px-4"
                   />
                   <p className="text-[10px] text-muted-foreground/60 px-1 italic">
                                     Briefly define the agent's core purpose.
                   </p>
                 </div>
+
+                <div className="grid grid-cols-2 gap-8">
+                  {/* Call Direction */}
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 px-1">Call Direction</label>
+                    <Select
+                      value={currentAssistant.call_direction || 'outbound'}
+                      onValueChange={(value) => {
+                        handleUpdate('call_direction', value);
+                        if (value === 'outbound') {
+                          handleUpdate('inbound_trunk_id', null);
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="bg-background border-border/40 h-12 text-base focus:border-primary transition-all rounded-md px-4">
+                        <SelectValue placeholder="Select direction" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="outbound">Outbound</SelectItem>
+                        <SelectItem value="inbound">Inbound</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-[10px] text-muted-foreground/60 px-1 italic">
+                      Outbound for dialing out, Inbound for receiving calls.
+                    </p>
+                  </div>
+
+                  {/* Speaking Accent */}
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 px-1">Speaking Accent</label>
+                    <Input
+                      value={currentAssistant.speakingAccent || ''}
+                      onChange={(e) => handleUpdate('speakingAccent', e.target.value)}
+                      placeholder="e.g. Hinglish Indian, British English"
+                      className="bg-background border-border/40 h-12 text-base focus:border-primary transition-all rounded-md px-4"
+                    />
+                    <p className="text-[10px] text-muted-foreground/60 px-1 italic">
+                      Accent for the agent's speech synthesis.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Inbound Trunk — shown only for inbound direction */}
+                {currentAssistant.call_direction === 'inbound' && (
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 px-1">Inbound Trunk</label>
+                    <Select
+                      value={currentAssistant.inbound_trunk_id || '__none__'}
+                      onValueChange={(value) => handleUpdate('inbound_trunk_id', value === '__none__' ? null : value)}
+                    >
+                      <SelectTrigger className="bg-background border-border/40 h-12 text-base focus:border-primary transition-all rounded-md px-4">
+                        <SelectValue placeholder={inboundTrunks.length === 0 ? 'No inbound trunks available' : 'Select inbound trunk'} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">
+                          <span className="text-muted-foreground">None</span>
+                        </SelectItem>
+                        {inboundTrunks.map((trunk) => (
+                          <SelectItem key={trunk.id} value={trunk.livekit_trunk_id || trunk.id}>
+                            <div className="flex flex-col">
+                              <span className="font-medium">{trunk.name}</span>
+                              <span className="text-[10px] text-muted-foreground">{trunk.numbers?.join(', ')}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {inboundTrunks.length === 0 && (
+                      <p className="text-[10px] text-orange-500 px-1">No inbound trunks found. Create one in the Trunks page.</p>
+                    )}
+                    {/* Dispatch rule status */}
+                    <div className="flex items-center gap-2 px-1 mt-1">
+                      <div className={cn('w-2 h-2 rounded-full', currentAssistant.dispatch_rule_id ? 'bg-green-500' : 'bg-muted-foreground/30')} />
+                      <span className="text-[10px] text-muted-foreground/60">
+                        {currentAssistant.dispatch_rule_id
+                          ? `Dispatch rule active`
+                          : 'Dispatch rule will be created on save'}
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
             </WorkflowStep>
 
