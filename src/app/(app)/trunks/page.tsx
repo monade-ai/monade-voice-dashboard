@@ -7,18 +7,18 @@ import {
     Unlink,
     Loader2,
     Server,
-    Phone,
     Shield,
     Check,
     AlertTriangle,
     ChevronDown,
     ChevronRight,
+    X,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import { DashboardHeader } from '@/components/dashboard-header';
-import { PaperCard, PaperCardContent } from '@/components/ui/paper-card';
+import { PaperCard } from '@/components/ui/paper-card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -187,24 +187,46 @@ function TrunkCreateForm({
     onCancel: () => void;
     saving: boolean;
 }) {
+    const [trunkType, setTrunkType] = useState<'outbound' | 'inbound'>('outbound');
     const [name, setName] = useState('');
     const [address, setAddress] = useState('');
     const [numbersStr, setNumbersStr] = useState('');
     const [authUsername, setAuthUsername] = useState('');
     const [authPassword, setAuthPassword] = useState('');
+    const [allowedNumbersStr, setAllowedNumbersStr] = useState('');
+    const [krispEnabled, setKrispEnabled] = useState(true);
+
+    const isOutbound = trunkType === 'outbound';
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         const numbers = numbersStr.split(',').map(n => n.trim()).filter(Boolean);
-        const data: CreateTrunkData = {
-            name,
-            address,
-            numbers,
-            ...(authUsername ? { auth_username: authUsername } : {}),
-            ...(authPassword ? { auth_password: authPassword } : {}),
-        };
-        onSave(data);
+        if (isOutbound) {
+            const data: CreateTrunkData = {
+                trunk_type: 'outbound',
+                name,
+                address,
+                numbers,
+                ...(authUsername ? { auth_username: authUsername } : {}),
+                ...(authPassword ? { auth_password: authPassword } : {}),
+            };
+            onSave(data);
+        } else {
+            const allowedNumbers = allowedNumbersStr.split(',').map(n => n.trim()).filter(Boolean);
+            const data: CreateTrunkData = {
+                trunk_type: 'inbound',
+                name,
+                numbers,
+                allowed_numbers: allowedNumbers,
+                krisp_enabled: krispEnabled,
+            };
+            onSave(data);
+        }
     };
+
+    const canSubmit = isOutbound
+        ? !saving && !!name && !!address
+        : !saving && !!name && !!numbersStr.trim();
 
     return (
         <PaperCard className="bg-card/30 border-primary/20 shadow-none overflow-hidden mb-6">
@@ -218,6 +240,34 @@ function TrunkCreateForm({
                 </button>
             </div>
             <form onSubmit={handleSubmit} className="p-6 bg-card">
+                {/* Trunk Type Selector */}
+                <div className="flex gap-2 mb-6">
+                    <button
+                        type="button"
+                        onClick={() => setTrunkType('outbound')}
+                        className={cn(
+                            'px-4 py-2 rounded-[3px] text-[10px] font-bold uppercase tracking-widest transition-all',
+                            isOutbound
+                                ? 'bg-foreground text-background'
+                                : 'bg-muted/50 text-muted-foreground hover:text-foreground',
+                        )}
+                    >
+                        Outbound
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setTrunkType('inbound')}
+                        className={cn(
+                            'px-4 py-2 rounded-[3px] text-[10px] font-bold uppercase tracking-widest transition-all',
+                            !isOutbound
+                                ? 'bg-foreground text-background'
+                                : 'bg-muted/50 text-muted-foreground hover:text-foreground',
+                        )}
+                    >
+                        Inbound
+                    </button>
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
                     <div className="space-y-4">
                         <div className="space-y-1.5">
@@ -227,7 +277,7 @@ function TrunkCreateForm({
                                 value={name}
                                 onChange={(e) => setName(e.target.value)}
                                 required
-                                placeholder="e.g. Vobiz Sales"
+                                placeholder={isOutbound ? 'e.g. Vobiz Sales' : 'e.g. Support Inbound'}
                                 className="w-full h-9 px-3 rounded-[3px] border border-border/50 bg-background text-xs focus:outline-none focus:ring-1 focus:ring-primary/50 transition-all font-medium text-foreground"
                             />
                         </div>
@@ -242,37 +292,72 @@ function TrunkCreateForm({
                         </div>
                     </div>
                     <div className="space-y-4">
-                        <div className="space-y-1.5">
-                            <label className="text-[9px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60">SIP Base URI</label>
-                            <input
-                                type="text"
-                                value={address}
-                                onChange={(e) => setAddress(e.target.value)}
-                                required
-                                placeholder="sip.provider.com"
-                                className="w-full h-9 px-3 rounded-[3px] border border-border/50 bg-background text-xs focus:outline-none focus:ring-1 focus:ring-primary/50 transition-all font-mono"
-                            />
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-1.5">
-                                <label className="text-[9px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60">Auth Username</label>
-                                <input
-                                    type="text"
-                                    value={authUsername}
-                                    onChange={(e) => setAuthUsername(e.target.value)}
-                                    className="w-full h-9 px-3 rounded-[3px] border border-border/50 bg-background text-xs focus:outline-none focus:ring-1 focus:ring-primary/50 transition-all font-mono"
-                                />
-                            </div>
-                            <div className="space-y-1.5">
-                                <label className="text-[9px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60">Auth Password</label>
-                                <input
-                                    type="password"
-                                    value={authPassword}
-                                    onChange={(e) => setAuthPassword(e.target.value)}
-                                    className="w-full h-9 px-3 rounded-[3px] border border-border/50 bg-background text-xs focus:outline-none focus:ring-1 focus:ring-primary/50 transition-all font-mono tracking-widest"
-                                />
-                            </div>
-                        </div>
+                        {isOutbound ? (
+                            <>
+                                <div className="space-y-1.5">
+                                    <label className="text-[9px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60">SIP Base URI</label>
+                                    <input
+                                        type="text"
+                                        value={address}
+                                        onChange={(e) => setAddress(e.target.value)}
+                                        required
+                                        placeholder="sip.provider.com"
+                                        className="w-full h-9 px-3 rounded-[3px] border border-border/50 bg-background text-xs focus:outline-none focus:ring-1 focus:ring-primary/50 transition-all font-mono"
+                                    />
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-1.5">
+                                        <label className="text-[9px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60">Auth Username</label>
+                                        <input
+                                            type="text"
+                                            value={authUsername}
+                                            onChange={(e) => setAuthUsername(e.target.value)}
+                                            className="w-full h-9 px-3 rounded-[3px] border border-border/50 bg-background text-xs focus:outline-none focus:ring-1 focus:ring-primary/50 transition-all font-mono"
+                                        />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[9px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60">Auth Password</label>
+                                        <input
+                                            type="password"
+                                            value={authPassword}
+                                            onChange={(e) => setAuthPassword(e.target.value)}
+                                            className="w-full h-9 px-3 rounded-[3px] border border-border/50 bg-background text-xs focus:outline-none focus:ring-1 focus:ring-primary/50 transition-all font-mono tracking-widest"
+                                        />
+                                    </div>
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <div className="space-y-1.5">
+                                    <label className="text-[9px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60">Allowed Caller Numbers</label>
+                                    <textarea
+                                        value={allowedNumbersStr}
+                                        onChange={(e) => setAllowedNumbersStr(e.target.value)}
+                                        placeholder="+1234567890, +1234567891 (leave empty to allow all)"
+                                        className="w-full h-20 px-3 py-2 rounded-[3px] border border-border/50 bg-background text-xs focus:outline-none focus:ring-1 focus:ring-primary/50 transition-all font-mono resize-none leading-relaxed"
+                                    />
+                                    <p className="text-[9px] text-muted-foreground font-medium">Comma-separated. Empty allows all callers.</p>
+                                </div>
+                                <div className="flex items-center gap-3 mt-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setKrispEnabled(!krispEnabled)}
+                                        className={cn(
+                                            'w-8 h-5 rounded-full transition-colors relative',
+                                            krispEnabled ? 'bg-primary' : 'bg-muted-foreground/30',
+                                        )}
+                                    >
+                                        <span className={cn(
+                                            'absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform',
+                                            krispEnabled ? 'left-3.5' : 'left-0.5',
+                                        )} />
+                                    </button>
+                                    <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                                        Krisp Noise Cancellation
+                                    </label>
+                                </div>
+                            </>
+                        )}
                     </div>
                 </div>
                 <div className="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-border/30">
@@ -282,7 +367,7 @@ function TrunkCreateForm({
                     <Button
                         type="submit"
                         size="sm"
-                        disabled={saving || !name || !address}
+                        disabled={!canSubmit}
                         className="bg-primary text-black hover:bg-primary/90 text-[10px] font-bold uppercase tracking-widest gap-2 h-8 px-4"
                     >
                         {saving ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
@@ -354,9 +439,9 @@ function ExpandableTrunkCard({
                     {!isExpanded && (
                         <div className="hidden md:flex items-center justify-end gap-3 mr-4">
                             {trunk.auth_username ? (
-                                <Shield size={14} className="text-green-500/80" title="Authenticated" />
+                                <span title="Authenticated"><Shield size={14} className="text-green-500/80" /></span>
                             ) : (
-                                <Shield size={14} className="text-muted-foreground/30" title="No Auth" />
+                                <span title="No Auth"><Shield size={14} className="text-muted-foreground/30" /></span>
                             )}
                         </div>
                     )}
@@ -423,8 +508,10 @@ export default function TrunksPage() {
     };
 
     const handleUpdate = async (id: string, data: UpdateTrunkData) => {
+        const trunk = trunks.find(t => t.id === id);
+        if (!trunk) return;
         try {
-            await updateTrunk(id, data);
+            await updateTrunk(trunk, data);
             setExpandedTrunkId(null);
         } catch (err) {
             // Hook handles
@@ -432,8 +519,10 @@ export default function TrunksPage() {
     };
 
     const handleUnlink = async (id: string) => {
+        const trunk = trunks.find(t => t.id === id);
+        if (!trunk) return;
         try {
-            await unlinkTrunk(id);
+            await unlinkTrunk(trunk);
             setExpandedTrunkId(null);
         } catch (err) {
             // Hook handles
@@ -479,12 +568,6 @@ export default function TrunksPage() {
 
                 {/* Content */}
                 <div className="space-y-6">
-                    {/* Category Title */}
-                    <div className="flex items-center gap-3 border-b border-border/30 pb-2">
-                        <h2 className="text-sm font-semibold tracking-tight text-foreground uppercase tracking-wider">Outbound Trunks</h2>
-                        <span className="w-full h-px bg-border/20 flex-1" />
-                    </div>
-
                     <AnimatePresence>
                         {isCreating && (
                             <motion.div
@@ -526,18 +609,56 @@ export default function TrunksPage() {
                             </p>
                         </div>
                     ) : (
-                        <div className="space-y-3">
-                            {trunks.map((trunk) => (
-                                <ExpandableTrunkCard
-                                    key={trunk.id}
-                                    trunk={trunk}
-                                    onSave={handleUpdate}
-                                    onUnlink={handleUnlink}
-                                    saving={saving}
-                                    expandedTrunkId={expandedTrunkId}
-                                    setExpandedTrunkId={setExpandedTrunkId}
-                                />
-                            ))}
+                        <div className="space-y-8">
+                            {/* Outbound Trunks */}
+                            <div className="space-y-3">
+                                <div className="flex items-center gap-3 border-b border-border/30 pb-2">
+                                    <h2 className="text-sm font-semibold text-foreground uppercase tracking-wider">Outbound Trunks</h2>
+                                    <span className="w-full h-px bg-border/20 flex-1" />
+                                </div>
+                                {trunks.filter(t => t.trunk_type !== 'inbound').length === 0 ? (
+                                    <p className="text-xs text-muted-foreground italic py-4 text-center">No outbound trunks configured.</p>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {trunks.filter(t => t.trunk_type !== 'inbound').map((trunk) => (
+                                            <ExpandableTrunkCard
+                                                key={`${trunk.id}:outbound`}
+                                                trunk={trunk}
+                                                onSave={handleUpdate}
+                                                onUnlink={handleUnlink}
+                                                saving={saving}
+                                                expandedTrunkId={expandedTrunkId}
+                                                setExpandedTrunkId={setExpandedTrunkId}
+                                            />
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Inbound Trunks */}
+                            <div className="space-y-3">
+                                <div className="flex items-center gap-3 border-b border-border/30 pb-2">
+                                    <h2 className="text-sm font-semibold text-foreground uppercase tracking-wider">Inbound Trunks</h2>
+                                    <span className="w-full h-px bg-border/20 flex-1" />
+                                </div>
+                                {trunks.filter(t => t.trunk_type === 'inbound').length === 0 ? (
+                                    <p className="text-xs text-muted-foreground italic py-4 text-center">No inbound trunks configured.</p>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {trunks.filter(t => t.trunk_type === 'inbound').map((trunk) => (
+                                            <ExpandableTrunkCard
+                                                key={`${trunk.id}:inbound`}
+                                                trunk={trunk}
+                                                onSave={handleUpdate}
+                                                onUnlink={handleUnlink}
+                                                saving={saving}
+                                                expandedTrunkId={expandedTrunkId}
+                                                setExpandedTrunkId={setExpandedTrunkId}
+                                            />
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     )}
                 </div>

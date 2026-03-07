@@ -31,6 +31,11 @@ export interface Assistant {
   attachments?: string[];
   personalisation?: boolean;
   flowJson?: Record<string, unknown> | null;
+  // Inbound calling fields
+  call_direction?: 'inbound' | 'outbound' | 'both' | null;
+  inbound_trunk_id?: string | null;
+  dispatch_rule_id?: string | null;
+  speakingAccent?: string | null;
 }
 
 const extractCallProvider = (assistant: { tags?: string[]; callProvider?: string | null }) => {

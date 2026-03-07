@@ -69,7 +69,7 @@ export default function AssistantTabs({ editingAssistantId }: AssistantTabsProps
 
     setIsSaving(true);
     try {
-      const { id: _id, createdAt: _createdAt, knowledgeBase, ...restOfAssistant } = currentAssistant;
+      const { id: _id, createdAt: _createdAt, knowledgeBase, dispatch_rule_id: _drId, ...restOfAssistant } = currentAssistant;
       const updatePayload = {
         ...restOfAssistant,
         knowledgeBaseId: knowledgeBase !== undefined ? knowledgeBase : null,
@@ -88,7 +88,7 @@ export default function AssistantTabs({ editingAssistantId }: AssistantTabsProps
 
     setIsSaving(true);
     try {
-      const { id: localId, createdAt: _createdAt, knowledgeBase, ...restOfDraft } = currentAssistant;
+      const { id: localId, createdAt: _createdAt, knowledgeBase, dispatch_rule_id: _drId, ...restOfDraft } = currentAssistant;
       const createPayload = {
         ...restOfDraft,
         knowledgeBaseId: knowledgeBase !== undefined ? knowledgeBase : null,

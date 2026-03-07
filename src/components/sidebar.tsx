@@ -18,6 +18,8 @@ import {
   ChevronRight,
   Globe,
   Server,
+  Radio,
+  Key,
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 
@@ -197,10 +199,24 @@ export function Sidebar() {
           isActive={pathname === '/trunks'}
         />
         <NavItem
+          href="/sessions"
+          icon={<Radio />}
+          label="Live Sessions"
+          isActive={pathname === '/sessions'}
+        />
+        <NavItem
           href="/phone-numbers"
           icon={<PhoneCall />}
           label="Telephony"
           isActive={pathname === '/phone-numbers'}
+        />
+
+        <CategoryLabel>Developer</CategoryLabel>
+        <NavItem
+          href="/api-keys"
+          icon={<Key />}
+          label="API Keys"
+          isActive={pathname === '/api-keys'}
         />
         <NavItem
           href="https://monade-voice-docs.netlify.app/"

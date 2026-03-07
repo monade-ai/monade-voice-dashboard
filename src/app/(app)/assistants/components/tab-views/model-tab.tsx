@@ -6,6 +6,7 @@ import { useAssistants } from '@/app/hooks/use-assistants-context';
 import { useKnowledgeBase } from '@/app/hooks/use-knowledge-base';
 import { useContactsContext } from '@/app/(app)/contacts/contexts/contacts-context';
 import { useTrunks } from '@/app/hooks/use-trunks';
+import { useUserTrunks } from '@/app/hooks/use-user-trunks';
 import {
   Select,
   SelectContent,
@@ -26,8 +27,14 @@ export default function ModelTab({ onChangesMade }: ModelTabProps) {
   const { items: knowledgeBases = [] } = useKnowledgeBase();
   const { buckets } = useContactsContext();
   const { trunks } = useTrunks();
+  const { trunks: userTrunks } = useUserTrunks();
 
   const [callProvider, setCallProvider] = useState(currentAssistant?.callProvider || 'vobiz');
+  const [callDirection, setCallDirection] = useState<string>(currentAssistant?.call_direction || 'outbound');
+  const [inboundTrunkId, setInboundTrunkId] = useState<string>(currentAssistant?.inbound_trunk_id || '');
+  const [speakingAccent, setSpeakingAccent] = useState<string>(currentAssistant?.speakingAccent || '');
+
+  const inboundTrunks = userTrunks.filter(t => t.trunk_type === 'inbound');
   const resolveKnowledgeBaseId = (value?: string | null) => {
     if (!value) return '';
     const match = knowledgeBases.find(kb => kb.id === value || kb.url === value);
@@ -58,6 +65,9 @@ export default function ModelTab({ onChangesMade }: ModelTabProps) {
     setCallProvider(currentAssistant?.callProvider || 'vobiz');
     setKnowledgeBaseId(resolveKnowledgeBaseId(currentAssistant?.knowledgeBase));
     setContactBucketId(currentAssistant?.contact_bucket_id || '');
+    setCallDirection(currentAssistant?.call_direction || 'outbound');
+    setInboundTrunkId(currentAssistant?.inbound_trunk_id || '');
+    setSpeakingAccent(currentAssistant?.speakingAccent || '');
   }, [currentAssistant, knowledgeBases]);
 
   // Handle call provider change
@@ -259,6 +269,141 @@ export default function ModelTab({ onChangesMade }: ModelTabProps) {
               ⚠ No provider selected - click a provider to enable calls, or save without one
             </p>
           )}
+        </div>
+      </div>
+
+      {/* Call Direction Section */}
+      <div className="border rounded-lg p-6 bg-gray-50">
+        <h3 className="text-lg font-medium mb-2">Call Direction</h3>
+        <p className="text-sm text-gray-600 mb-6">
+          Configure whether this assistant handles inbound calls, outbound calls, or both.
+        </p>
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Direction</label>
+          <Select
+            value={callDirection}
+            onValueChange={(value) => {
+              setCallDirection(value);
+              if (currentAssistant) {
+                const updates: Record<string, any> = { call_direction: value };
+                if (value === 'outbound') {
+                  setInboundTrunkId('');
+                  updates.inbound_trunk_id = null;
+                }
+                updateAssistantLocally(currentAssistant.id, updates);
+                onChangesMade();
+              }
+            }}
+          >
+            <SelectTrigger className="w-full bg-white">
+              <SelectValue placeholder="Select direction" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="outbound">Outbound</SelectItem>
+              <SelectItem value="inbound">Inbound</SelectItem>
+              <SelectItem value="both">Both</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Inbound Trunk Selector — shown when inbound or both */}
+        {(callDirection === 'inbound' || callDirection === 'both') && (
+          <div className="space-y-2 mt-6">
+            <label className="text-sm font-medium">Inbound Trunk</label>
+            <p className="text-xs text-gray-500 mb-2">
+              Select which inbound trunk routes calls to this assistant.
+            </p>
+            <Select
+              value={inboundTrunkId || 'none'}
+              onValueChange={(value) => {
+                const trunkId = value === 'none' ? '' : value;
+                setInboundTrunkId(trunkId);
+                if (currentAssistant) {
+                  updateAssistantLocally(currentAssistant.id, { inbound_trunk_id: trunkId || null });
+                  onChangesMade();
+                }
+              }}
+            >
+              <SelectTrigger className="w-full bg-white">
+                <SelectValue placeholder={inboundTrunks.length === 0 ? 'No inbound trunks' : 'Select inbound trunk'} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">
+                  <span className="text-gray-500 italic">— None —</span>
+                </SelectItem>
+                {inboundTrunks.map((trunk) => (
+                  <SelectItem key={trunk.id} value={trunk.livekit_trunk_id || trunk.id}>
+                    <div className="flex flex-col">
+                      <span className="font-medium">{trunk.name}</span>
+                      <span className="text-xs text-gray-500">{trunk.numbers?.join(', ')}</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {inboundTrunks.length === 0 && (
+              <p className="text-xs text-orange-600 mt-1">
+                No inbound trunks found. Create one in the Trunks page first.
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Dispatch Rule Status (read-only) */}
+        {(callDirection === 'inbound' || callDirection === 'both') && (
+          <div className="mt-4 flex items-center gap-2">
+            <div className={`w-2 h-2 rounded-full ${currentAssistant?.dispatch_rule_id ? 'bg-green-500' : 'bg-gray-300'}`} />
+            <span className="text-xs text-gray-500">
+              {currentAssistant?.dispatch_rule_id
+                ? `Dispatch rule active (${currentAssistant.dispatch_rule_id.substring(0, 16)}...)`
+                : 'Dispatch rule not configured — will be created on save'}
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* Speaking Accent Section */}
+      <div className="border rounded-lg p-6 bg-gray-50">
+        <h3 className="text-lg font-medium mb-2">Speaking Accent</h3>
+        <p className="text-sm text-gray-600 mb-6">
+          Set the accent/locale for the agent's speech. Changes auto-trigger a rebake for inbound assistants.
+        </p>
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Accent</label>
+          <Select
+            value={speakingAccent || 'none'}
+            onValueChange={(value) => {
+              const accent = value === 'none' ? '' : value;
+              setSpeakingAccent(accent);
+              if (currentAssistant) {
+                updateAssistantLocally(currentAssistant.id, { speakingAccent: accent || null });
+                onChangesMade();
+              }
+            }}
+          >
+            <SelectTrigger className="w-full bg-white">
+              <SelectValue placeholder="Select accent" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">
+                <span className="text-gray-500 italic">— Default —</span>
+              </SelectItem>
+              <SelectItem value="en-US">English (US)</SelectItem>
+              <SelectItem value="en-GB">English (UK)</SelectItem>
+              <SelectItem value="en-IN">English (India)</SelectItem>
+              <SelectItem value="en-AU">English (Australia)</SelectItem>
+              <SelectItem value="hi-IN">Hindi (India)</SelectItem>
+              <SelectItem value="es-ES">Spanish (Spain)</SelectItem>
+              <SelectItem value="es-MX">Spanish (Mexico)</SelectItem>
+              <SelectItem value="fr-FR">French (France)</SelectItem>
+              <SelectItem value="de-DE">German (Germany)</SelectItem>
+              <SelectItem value="pt-BR">Portuguese (Brazil)</SelectItem>
+              <SelectItem value="ja-JP">Japanese</SelectItem>
+              <SelectItem value="ko-KR">Korean</SelectItem>
+              <SelectItem value="zh-CN">Chinese (Mandarin)</SelectItem>
+              <SelectItem value="ar-SA">Arabic (Saudi)</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
 

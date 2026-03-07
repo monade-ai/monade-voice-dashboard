@@ -74,6 +74,11 @@ export interface MonadeAssistant {
   attachments?: string[];
   personalisation?: boolean;
   flowJson?: Record<string, unknown> | null;
+  // Inbound calling fields
+  call_direction?: 'inbound' | 'outbound' | 'both' | null;
+  inbound_trunk_id?: string | null;
+  dispatch_rule_id?: string | null; // read-only, set by backend
+  speakingAccent?: string | null;
 }
 
 export interface CreateAssistantRequest {
@@ -96,6 +101,9 @@ export interface CreateAssistantRequest {
   attachments?: string[];
   personalisation?: boolean;
   flowJson?: Record<string, unknown> | null;
+  call_direction?: 'inbound' | 'outbound' | 'both' | null;
+  inbound_trunk_id?: string | null;
+  speakingAccent?: string | null;
 }
 
 export interface UpdateAssistantRequest {
@@ -117,6 +125,9 @@ export interface UpdateAssistantRequest {
   attachments?: string[];
   personalisation?: boolean;
   flowJson?: Record<string, unknown> | null;
+  call_direction?: 'inbound' | 'outbound' | 'both' | null;
+  inbound_trunk_id?: string | null;
+  speakingAccent?: string | null;
 }
 
 // ============================================
