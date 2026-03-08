@@ -7,7 +7,6 @@ import {
   Check,
   Trash2,
   Plus,
-  AlertTriangle,
   Loader2,
   ShieldCheck,
   Eye,
@@ -25,14 +24,6 @@ import { PaperCard, PaperCardContent } from '@/components/ui/paper-card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from '@/components/ui/dialog';
 import { useMonadeUser } from '@/app/hooks/use-monade-user';
 import { MONADE_API_BASE } from '@/config';
 import { fetchJson } from '@/lib/http';
@@ -45,6 +36,7 @@ interface BaApiKey {
   name?: string;
   start?: string;
   prefix?: string;
+  key?: string;
   enabled: boolean;
   requestCount?: number;
   remaining?: number | null;
@@ -59,23 +51,27 @@ const API_KEY_BASE = `${MONADE_API_BASE}/api/auth/api-key`;
 
 function ApiKeyRow({
   apiKey,
+  fullKey,
   onDelete,
   deleting,
 }: {
   apiKey: BaApiKey;
+  fullKey?: string;
   onDelete: (id: string) => void;
   deleting: boolean;
 }) {
   const [revealed, setRevealed] = useState(false);
   const [copied, setCopied] = useState(false);
-  const displayPrefix = apiKey.start || apiKey.prefix || '••••••••';
-  const maskedKey = `${displayPrefix}${'•'.repeat(20)}`;
-  const revealedKey = `${displayPrefix}...`;
+
+  const displayKey = fullKey || apiKey.key;
+  const prefix = apiKey.start || apiKey.prefix || '';
+  const maskedKey = `${prefix}${'•'.repeat(24)}`;
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(displayPrefix);
+    const textToCopy = displayKey || prefix;
+    navigator.clipboard.writeText(textToCopy);
     setCopied(true);
-    toast.success('Key prefix copied — use the full key (shown at creation) for auth');
+    toast.success(displayKey ? 'Full key copied' : 'Key prefix copied');
     setTimeout(() => setCopied(false), 2000);
   };
 
@@ -110,8 +106,8 @@ function ApiKeyRow({
               {apiKey.enabled ? 'Active' : 'Disabled'}
             </Badge>
           </div>
-          <span className="text-[11px] font-mono text-muted-foreground">
-            {revealed ? revealedKey : maskedKey}
+          <span className="text-[11px] font-mono text-muted-foreground select-all">
+            {revealed ? (displayKey || `${prefix}...`) : maskedKey}
           </span>
           <div className="flex items-center gap-3 mt-0.5">
             {apiKey.createdAt && (
@@ -138,14 +134,14 @@ function ApiKeyRow({
         <button
           onClick={() => setRevealed(!revealed)}
           className="h-8 w-8 inline-flex items-center justify-center rounded-[4px] border border-border/30 text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all"
-          title={revealed ? 'Hide' : 'Reveal prefix'}
+          title={revealed ? 'Hide key' : 'Show key'}
         >
           {revealed ? <EyeOff size={13} /> : <Eye size={13} />}
         </button>
         <button
           onClick={handleCopy}
           className="h-8 w-8 inline-flex items-center justify-center rounded-[4px] border border-border/30 text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all"
-          title="Copy prefix"
+          title={displayKey ? 'Copy full key' : 'Copy prefix'}
         >
           {copied ? <Check size={13} className="text-green-500" /> : <Copy size={13} />}
         </button>
@@ -169,12 +165,11 @@ export default function ApiKeysPage() {
   const { userUid, loading: userLoading } = useMonadeUser();
 
   const [keys, setKeys] = useState<BaApiKey[]>([]);
+  const [fullKeys, setFullKeys] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [newKeyName, setNewKeyName] = useState('');
-  const [newKeyValue, setNewKeyValue] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
 
   const extractKeys = (payload: unknown): BaApiKey[] => {
@@ -191,6 +186,7 @@ export default function ApiKeysPage() {
       name: k?.name,
       start: k?.start,
       prefix: k?.prefix,
+      key: k?.key,
       enabled: k?.enabled ?? true,
       requestCount: k?.requestCount ?? k?.request_count,
       remaining: k?.remaining,
@@ -232,11 +228,14 @@ export default function ApiKeysPage() {
         retry: { retries: 0 },
       });
       const fullKey = data?.key ?? data?.api_key ?? data?.rawKey ?? data?.token ?? null;
-      setNewKeyValue(fullKey);
+      const keyId = data?.id ?? data?.keyId ?? null;
+      if (fullKey && keyId) {
+        setFullKeys(prev => ({ ...prev, [String(keyId)]: fullKey }));
+      }
       setNewKeyName('');
       setShowCreateForm(false);
       await fetchKeys();
-      toast.success('API key created');
+      toast.success('API key created — click the eye icon to reveal it');
     } catch (err) {
       console.error('[ApiKeys] create error:', err);
       toast.error('Failed to create API key');
@@ -256,6 +255,11 @@ export default function ApiKeysPage() {
         retry: { retries: 0 },
       });
       setKeys(prev => prev.filter(k => k.id !== id));
+      setFullKeys(prev => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
       toast.success('Key revoked');
     } catch (err) {
       console.error('[ApiKeys] delete error:', err);
@@ -263,14 +267,6 @@ export default function ApiKeysPage() {
     } finally {
       setDeletingId(null);
     }
-  };
-
-  const handleCopyNewKey = () => {
-    if (!newKeyValue) return;
-    navigator.clipboard.writeText(newKeyValue);
-    setCopied(true);
-    toast.success('Key copied to clipboard');
-    setTimeout(() => setCopied(false), 2000);
   };
 
   return (
@@ -328,11 +324,11 @@ export default function ApiKeysPage() {
           <PaperCardContent className="p-4 flex items-start gap-3">
             <ShieldCheck size={16} className="text-primary mt-0.5 flex-shrink-0" />
             <div className="space-y-0.5">
-              <p className="text-xs font-semibold text-foreground">Keys are shown in full only once</p>
+              <p className="text-xs font-semibold text-foreground">How to use your API key</p>
               <p className="text-[11px] text-muted-foreground">
-                After creation, only the key prefix is stored and displayed. Use{' '}
+                Use{' '}
                 <code className="font-mono bg-muted px-1 rounded text-[10px]">Authorization: Bearer &lt;key&gt;</code>
-                {' '}in API requests.
+                {' '}in your API requests. Use the eye icon to reveal keys and the copy button to copy.
               </p>
             </div>
           </PaperCardContent>
@@ -401,6 +397,7 @@ export default function ApiKeysPage() {
               <ApiKeyRow
                 key={k.id}
                 apiKey={k}
+                fullKey={fullKeys[k.id]}
                 onDelete={handleDelete}
                 deleting={deletingId === k.id}
               />
@@ -408,63 +405,6 @@ export default function ApiKeysPage() {
           )}
         </div>
       </main>
-
-      {/* One-time reveal dialog */}
-      <Dialog open={!!newKeyValue} onOpenChange={(open) => !open && setNewKeyValue(null)}>
-        <DialogContent className="sm:max-w-md border-border/40 bg-background/95 backdrop-blur-xl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-lg font-medium tracking-tight">
-              <ShieldCheck className="text-green-500" size={20} />
-              Key Created
-            </DialogTitle>
-            <DialogDescription className="text-sm text-muted-foreground">
-              This is the only time the full key will be shown. Copy it now.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="p-5 bg-muted/30 border border-border/40 rounded-md space-y-4 my-2">
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                Secret Key
-              </label>
-              <div className="flex items-center gap-2">
-                <Input
-                  value={newKeyValue || ''}
-                  readOnly
-                  className="font-mono text-sm bg-background border-border/40 h-10"
-                />
-                <Button
-                  onClick={handleCopyNewKey}
-                  className={cn(
-                    'h-10 w-10 shrink-0 transition-colors',
-                    copied
-                      ? 'bg-green-500 hover:bg-green-600 text-white'
-                      : 'bg-primary hover:bg-primary/90 text-black',
-                  )}
-                >
-                  {copied ? <Check size={16} /> : <Copy size={16} />}
-                </Button>
-              </div>
-            </div>
-            <div className="flex gap-2 items-start p-3 bg-yellow-500/10 border border-yellow-500/20 rounded">
-              <AlertTriangle size={14} className="text-yellow-600 mt-0.5 flex-shrink-0" />
-              <p className="text-[10px] leading-relaxed font-medium text-yellow-700 dark:text-yellow-500">
-                Store this key securely. Monade cannot recover lost keys — you will need to create a new one.
-              </p>
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button
-              onClick={() => setNewKeyValue(null)}
-              disabled={!copied}
-              className="w-full bg-foreground text-background hover:bg-foreground/90"
-            >
-              {copied ? "I've saved this key" : 'Copy key to continue'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

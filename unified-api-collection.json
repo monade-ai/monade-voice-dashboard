@@ -1182,6 +1182,11 @@
                   {
                     "key": "Content-Type",
                     "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
                   }
                 ],
                 "body": {
@@ -1207,7 +1212,13 @@
               "name": "Get User by ID",
               "request": {
                 "method": "GET",
-                "header": [],
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
+                  }
+                ],
                 "url": {
                   "raw": "{{base_url}}/db_services/api/users/{{user_uid}}",
                   "host": [
@@ -1232,6 +1243,11 @@
                   {
                     "key": "Content-Type",
                     "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
                   }
                 ],
                 "body": {
@@ -1258,7 +1274,13 @@
               "name": "Delete User",
               "request": {
                 "method": "DELETE",
-                "header": [],
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
+                  }
+                ],
                 "url": {
                   "raw": "{{base_url}}/db_services/api/users/{{user_uid}}",
                   "host": [
@@ -1279,7 +1301,13 @@
               "name": "Get User's Assistants",
               "request": {
                 "method": "GET",
-                "header": [],
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
+                  }
+                ],
                 "url": {
                   "raw": "{{base_url}}/db_services/api/users/{{user_uid}}/assistants",
                   "host": [
@@ -1301,7 +1329,13 @@
               "name": "Get User UID by Email",
               "request": {
                 "method": "GET",
-                "header": [],
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
+                  }
+                ],
                 "url": {
                   "raw": "{{base_url}}/db_services/api/users/email/{{email}}",
                   "host": [
@@ -1327,6 +1361,11 @@
                   {
                     "key": "Content-Type",
                     "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
                   }
                 ],
                 "body": {
@@ -1359,7 +1398,13 @@
               "name": "Validate API Key",
               "request": {
                 "method": "GET",
-                "header": [],
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
+                  }
+                ],
                 "url": {
                   "raw": "{{base_url}}/db_services/api/api-keys/validate?api_key={{api_key}}",
                   "host": [
@@ -1391,7 +1436,13 @@
               "name": "Get User Credits",
               "request": {
                 "method": "GET",
-                "header": [],
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
+                  }
+                ],
                 "url": {
                   "raw": "{{base_url}}/db_services/api/users/{{user_uid}}/credits",
                   "host": [
@@ -1417,6 +1468,11 @@
                   {
                     "key": "Content-Type",
                     "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
                   }
                 ],
                 "body": {
@@ -1449,6 +1505,11 @@
                   {
                     "key": "Content-Type",
                     "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
                   }
                 ],
                 "body": {
@@ -1481,6 +1542,11 @@
                   {
                     "key": "Content-Type",
                     "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
                   }
                 ],
                 "body": {
@@ -1513,7 +1579,13 @@
               "name": "Get All Assistants",
               "request": {
                 "method": "GET",
-                "header": [],
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
+                  }
+                ],
                 "url": {
                   "raw": "{{base_url}}/db_services/api/assistants",
                   "host": [
@@ -1533,7 +1605,13 @@
               "name": "Get Assistant by Phone Number",
               "request": {
                 "method": "GET",
-                "header": [],
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
+                  }
+                ],
                 "url": {
                   "raw": "{{base_url}}/db_services/api/assistants/phone/{{phone_number}}",
                   "host": [
@@ -1555,7 +1633,13 @@
               "name": "Get Assistant by ID",
               "request": {
                 "method": "GET",
-                "header": [],
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
+                  }
+                ],
                 "url": {
                   "raw": "{{base_url}}/db_services/api/assistants/{{assistant_id}}",
                   "host": [
@@ -1576,7 +1660,13 @@
               "name": "Get Assistants by User ID",
               "request": {
                 "method": "GET",
-                "header": [],
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
+                  }
+                ],
                 "url": {
                   "raw": "{{base_url}}/db_services/api/assistants/user/{{user_uid}}",
                   "host": [
@@ -1602,6 +1692,11 @@
                   {
                     "key": "Content-Type",
                     "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
                   }
                 ],
                 "body": {
@@ -1631,6 +1726,11 @@
                   {
                     "key": "Content-Type",
                     "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
                   }
                 ],
                 "body": {
@@ -1657,7 +1757,13 @@
               "name": "Delete Assistant",
               "request": {
                 "method": "DELETE",
-                "header": [],
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
+                  }
+                ],
                 "url": {
                   "raw": "{{base_url}}/db_services/api/assistants/{{assistant_id}}",
                   "host": [
@@ -1682,6 +1788,11 @@
                   {
                     "key": "Content-Type",
                     "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
                   }
                 ],
                 "body": {
@@ -1704,6 +1815,311 @@
                 "description": "Update the speaking accent for a specific assistant."
               },
               "response": []
+            },
+            {
+              "name": "Get Assistant Tools Config",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/db_services/api/assistants/{{assistant_id}}/tools-config",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "db_services",
+                    "api",
+                    "assistants",
+                    "{{assistant_id}}",
+                    "tools-config"
+                  ]
+                },
+                "description": "Retrieve the tools configuration for a specific assistant. Returns enableTools master toggle and toolsConfig JSON with per-tool settings."
+              },
+              "response": []
+            },
+            {
+              "name": "Update Assistant Tools Config",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"toolsConfig\": {\n    \"max_tool_steps\": 3,\n    \"tools\": [\n      {\n        \"type\": \"vertex_rag\",\n        \"enabled\": true,\n        \"config\": {\n          \"rag_corpus\": \"projects/YOUR_PROJECT/locations/us-central1/ragCorpora/YOUR_CORPUS_ID\",\n          \"similarity_top_k\": 10,\n          \"vector_distance_threshold\": 0.3\n        }\n      }\n    ]\n  }\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/db_services/api/assistants/{{assistant_id}}/tools-config",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "db_services",
+                    "api",
+                    "assistants",
+                    "{{assistant_id}}",
+                    "tools-config"
+                  ]
+                },
+                "description": "Update the tools configuration for a specific assistant. Supports vertex_rag tool type. Set toolsConfig to null to remove all tools. Each tool has its own enabled toggle."
+              },
+              "response": []
+            },
+            {
+              "name": "Toggle Assistant Tools",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"enableTools\": true\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/db_services/api/assistants/{{assistant_id}}/tools-toggle",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "db_services",
+                    "api",
+                    "assistants",
+                    "{{assistant_id}}",
+                    "tools-toggle"
+                  ]
+                },
+                "description": "Master toggle to enable or disable all tools for a specific assistant. When enableTools is false, no tools are sent to the agent regardless of individual tool settings."
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "RAG Corpus Management",
+          "item": [
+            {
+              "name": "Create RAG Corpus (Upload File)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"user_uid\": \"{{user_uid}}\",\n  \"name\": \"Product FAQ\",\n  \"description\": \"Product documentation and FAQs\",\n  \"file_text\": \"Your document content here. This will be uploaded to GCS and imported into a Vertex AI RAG corpus.\",\n  \"filename\": \"product-faq.txt\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/db_services/api/rag-corpora",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "db_services",
+                    "api",
+                    "rag-corpora"
+                  ]
+                },
+                "description": "Create a new RAG corpus in Vertex AI and upload a file. The file is stored in GCS and imported into the corpus. Returns the corpus with its corpusResourceName which can be used in assistant toolsConfig. Provide either file_text (plain text) or file_base64 (base64 encoded file)."
+              },
+              "response": []
+            },
+            {
+              "name": "Add File to RAG Corpus",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"file_text\": \"Additional document content to add to the corpus.\",\n  \"filename\": \"additional-docs.txt\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/db_services/api/rag-corpora/{{rag_corpus_id}}/files",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "db_services",
+                    "api",
+                    "rag-corpora",
+                    "{{rag_corpus_id}}",
+                    "files"
+                  ]
+                },
+                "description": "Add a new file to an existing RAG corpus. The file is uploaded to GCS and imported into the Vertex AI corpus."
+              },
+              "response": []
+            },
+            {
+              "name": "List User RAG Corpora",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/db_services/api/rag-corpora/user/{{user_uid}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "db_services",
+                    "api",
+                    "rag-corpora",
+                    "user",
+                    "{{user_uid}}"
+                  ]
+                },
+                "description": "List all RAG corpora for a user. Use this to populate a dropdown for selecting which corpus to use with an assistant."
+              },
+              "response": []
+            },
+            {
+              "name": "Get RAG Corpus by ID",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/db_services/api/rag-corpora/{{rag_corpus_id}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "db_services",
+                    "api",
+                    "rag-corpora",
+                    "{{rag_corpus_id}}"
+                  ]
+                },
+                "description": "Get details of a specific RAG corpus including its corpusResourceName."
+              },
+              "response": []
+            },
+            {
+              "name": "Delete RAG Corpus",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/db_services/api/rag-corpora/{{rag_corpus_id}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "db_services",
+                    "api",
+                    "rag-corpora",
+                    "{{rag_corpus_id}}"
+                  ]
+                },
+                "description": "Delete a RAG corpus from both Vertex AI and the database. Also cascade-clears toolsConfig on any assistants using this corpus."
+              },
+              "response": []
+            },
+            {
+              "name": "Attach RAG Corpus to Assistant",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"rag_corpus_id\": \"{{rag_corpus_id}}\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/db_services/api/assistants/{{assistant_id}}/attach-rag",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "db_services",
+                    "api",
+                    "assistants",
+                    "{{assistant_id}}",
+                    "attach-rag"
+                  ]
+                },
+                "description": "Simple convenience endpoint to attach a RAG corpus to an assistant. Automatically builds toolsConfig JSON and enables tools. Frontend just sends the corpus DB ID — no need to craft complex JSON. Validates user ownership (corpus must belong to same user as assistant)."
+              },
+              "response": []
+            },
+            {
+              "name": "Detach RAG Corpus from Assistant",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/db_services/api/assistants/{{assistant_id}}/detach-rag",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "db_services",
+                    "api",
+                    "assistants",
+                    "{{assistant_id}}",
+                    "detach-rag"
+                  ]
+                },
+                "description": "Remove RAG corpus from an assistant. Resets toolsConfig to defaults and disables tools. No request body needed."
+              },
+              "response": []
             }
           ]
         },
@@ -1718,6 +2134,11 @@
                   {
                     "key": "Content-Type",
                     "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
                   }
                 ],
                 "body": {
@@ -1745,7 +2166,13 @@
               "name": "List User Trunks",
               "request": {
                 "method": "GET",
-                "header": [],
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
+                  }
+                ],
                 "url": {
                   "raw": "{{base_url}}/db_services/api/users/{{user_uid}}/trunks",
                   "host": [
@@ -1767,7 +2194,13 @@
               "name": "Get Specific User Trunk",
               "request": {
                 "method": "GET",
-                "header": [],
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
+                  }
+                ],
                 "url": {
                   "raw": "{{base_url}}/db_services/api/users/{{user_uid}}/trunks/{{trunk_id}}",
                   "host": [
@@ -1794,6 +2227,11 @@
                   {
                     "key": "Content-Type",
                     "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
                   }
                 ],
                 "body": {
@@ -1822,7 +2260,13 @@
               "name": "Unlink Trunk from User (DB only)",
               "request": {
                 "method": "DELETE",
-                "header": [],
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
+                  }
+                ],
                 "url": {
                   "raw": "{{base_url}}/db_services/api/users/{{user_uid}}/trunks/{{trunk_id}}/unlink",
                   "host": [
@@ -1846,7 +2290,13 @@
               "name": "Delete Trunk Globally (\u26a0\ufe0f WARNING)",
               "request": {
                 "method": "DELETE",
-                "header": [],
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
+                  }
+                ],
                 "url": {
                   "raw": "{{base_url}}/db_services/api/users/{{user_uid}}/trunks/{{trunk_id}}",
                   "host": [
@@ -1869,7 +2319,13 @@
               "name": "Get Trunk by Name",
               "request": {
                 "method": "GET",
-                "header": [],
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
+                  }
+                ],
                 "url": {
                   "raw": "{{base_url}}/db_services/api/users/{{user_uid}}/trunks/name/{{trunk_name}}",
                   "host": [
@@ -1897,6 +2353,11 @@
                   {
                     "key": "Content-Type",
                     "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
                   }
                 ],
                 "body": {
@@ -1934,6 +2395,11 @@
                   {
                     "key": "Content-Type",
                     "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
                   }
                 ],
                 "body": {
@@ -1961,7 +2427,13 @@
               "name": "List User Inbound Trunks",
               "request": {
                 "method": "GET",
-                "header": [],
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
+                  }
+                ],
                 "url": {
                   "raw": "{{base_url}}/db_services/api/users/{{user_uid}}/inbound-trunks",
                   "host": [
@@ -1983,7 +2455,13 @@
               "name": "Get User Inbound Trunk",
               "request": {
                 "method": "GET",
-                "header": [],
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
+                  }
+                ],
                 "url": {
                   "raw": "{{base_url}}/db_services/api/users/{{user_uid}}/inbound-trunks/{{trunk_id}}",
                   "host": [
@@ -2010,6 +2488,11 @@
                   {
                     "key": "Content-Type",
                     "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
                   }
                 ],
                 "body": {
@@ -2038,7 +2521,13 @@
               "name": "Unlink Inbound Trunk (DB only)",
               "request": {
                 "method": "DELETE",
-                "header": [],
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
+                  }
+                ],
                 "url": {
                   "raw": "{{base_url}}/db_services/api/users/{{user_uid}}/inbound-trunks/{{trunk_id}}/unlink",
                   "host": [
@@ -2094,6 +2583,11 @@
                   {
                     "key": "Content-Type",
                     "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
                   }
                 ],
                 "body": {
@@ -2127,6 +2621,11 @@
                   {
                     "key": "Content-Type",
                     "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
                   }
                 ],
                 "body": {
@@ -2160,6 +2659,11 @@
                   {
                     "key": "Content-Type",
                     "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
                   }
                 ],
                 "body": {
@@ -2197,6 +2701,11 @@
                   {
                     "key": "Content-Type",
                     "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
                   }
                 ],
                 "body": {
@@ -2226,6 +2735,11 @@
                   {
                     "key": "Content-Type",
                     "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
                   }
                 ],
                 "body": {
@@ -2251,7 +2765,13 @@
               "name": "Get All Knowledge Bases",
               "request": {
                 "method": "GET",
-                "header": [],
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
+                  }
+                ],
                 "url": {
                   "raw": "{{base_url}}/db_services/api/knowledge-bases",
                   "host": [
@@ -2271,7 +2791,13 @@
               "name": "Get User's Knowledge Bases",
               "request": {
                 "method": "GET",
-                "header": [],
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
+                  }
+                ],
                 "url": {
                   "raw": "{{base_url}}/db_services/api/users/{{user_uid}}/knowledge-bases",
                   "host": [
@@ -2293,7 +2819,13 @@
               "name": "Get Knowledge Base by ID",
               "request": {
                 "method": "GET",
-                "header": [],
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
+                  }
+                ],
                 "url": {
                   "raw": "{{base_url}}/db_services/api/knowledge-bases/{{kb_id}}",
                   "host": [
@@ -2314,7 +2846,13 @@
               "name": "Delete Knowledge Base",
               "request": {
                 "method": "DELETE",
-                "header": [],
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
+                  }
+                ],
                 "url": {
                   "raw": "{{base_url}}/db_services/api/knowledge-bases/{{kb_id}}",
                   "host": [
@@ -2344,6 +2882,11 @@
                   {
                     "key": "Content-Type",
                     "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
                   }
                 ],
                 "body": {
@@ -2369,7 +2912,13 @@
               "name": "Get User's Transcripts",
               "request": {
                 "method": "GET",
-                "header": [],
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
+                  }
+                ],
                 "url": {
                   "raw": "{{base_url}}/db_services/api/users/{{user_uid}}/transcripts",
                   "host": [
@@ -2400,6 +2949,11 @@
                   {
                     "key": "Content-Type",
                     "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
                   }
                 ],
                 "body": {
@@ -2425,7 +2979,13 @@
               "name": "Get Campaign by ID",
               "request": {
                 "method": "GET",
-                "header": [],
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
+                  }
+                ],
                 "url": {
                   "raw": "{{base_url}}/db_services/api/campaigns/{{campaign_id}}?user_uid={{user_uid}}",
                   "host": [
@@ -2452,7 +3012,13 @@
               "name": "List User Campaigns",
               "request": {
                 "method": "GET",
-                "header": [],
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
+                  }
+                ],
                 "url": {
                   "raw": "{{base_url}}/db_services/api/campaigns?user_uid={{user_uid}}&status={{status}}",
                   "host": [
@@ -2486,6 +3052,11 @@
                   {
                     "key": "Content-Type",
                     "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
                   }
                 ],
                 "body": {
@@ -2518,7 +3089,13 @@
               "name": "Delete Campaign",
               "request": {
                 "method": "DELETE",
-                "header": [],
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
+                  }
+                ],
                 "url": {
                   "raw": "{{base_url}}/db_services/api/campaigns/{{campaign_id}}?user_uid={{user_uid}}",
                   "host": [
@@ -2545,7 +3122,13 @@
               "name": "Start Campaign",
               "request": {
                 "method": "POST",
-                "header": [],
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
+                  }
+                ],
                 "url": {
                   "raw": "{{base_url}}/db_services/api/campaigns/{{campaign_id}}/start?user_uid={{user_uid}}",
                   "host": [
@@ -2573,7 +3156,13 @@
               "name": "Pause Campaign",
               "request": {
                 "method": "POST",
-                "header": [],
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
+                  }
+                ],
                 "url": {
                   "raw": "{{base_url}}/db_services/api/campaigns/{{campaign_id}}/pause?user_uid={{user_uid}}",
                   "host": [
@@ -2601,7 +3190,13 @@
               "name": "Stop Campaign",
               "request": {
                 "method": "POST",
-                "header": [],
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
+                  }
+                ],
                 "url": {
                   "raw": "{{base_url}}/db_services/api/campaigns/{{campaign_id}}/stop?user_uid={{user_uid}}",
                   "host": [
@@ -2629,7 +3224,13 @@
               "name": "Get Campaign Statistics",
               "request": {
                 "method": "GET",
-                "header": [],
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
+                  }
+                ],
                 "url": {
                   "raw": "{{base_url}}/db_services/api/campaigns/{{campaign_id}}/stats?user_uid={{user_uid}}",
                   "host": [
@@ -2666,6 +3267,11 @@
                   {
                     "key": "Content-Type",
                     "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
                   }
                 ],
                 "body": {
@@ -2691,7 +3297,13 @@
               "name": "Get User Analytics",
               "request": {
                 "method": "GET",
-                "header": [],
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
+                  }
+                ],
                 "url": {
                   "raw": "{{base_url}}/db_services/api/analytics?user_uid={{user_uid}}",
                   "host": [
@@ -2717,7 +3329,13 @@
               "name": "Get Analytics by Call ID",
               "request": {
                 "method": "GET",
-                "header": [],
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
+                  }
+                ],
                 "url": {
                   "raw": "{{base_url}}/db_services/api/analytics/{{call_id}}",
                   "host": [
@@ -2738,7 +3356,13 @@
               "name": "Get User Analytics by User ID",
               "request": {
                 "method": "GET",
-                "header": [],
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
+                  }
+                ],
                 "url": {
                   "raw": "{{base_url}}/db_services/api/analytics/user/{{user_uid}}",
                   "host": [
@@ -2790,7 +3414,13 @@
               "name": "Get User Analytics Statistics",
               "request": {
                 "method": "GET",
-                "header": [],
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
+                  }
+                ],
                 "url": {
                   "raw": "{{base_url}}/db_services/api/analytics/stats/{{user_uid}}",
                   "host": [
@@ -2812,7 +3442,13 @@
               "name": "Get Call Recording",
               "request": {
                 "method": "GET",
-                "header": [],
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
+                  }
+                ],
                 "url": {
                   "raw": "{{base_url}}/db_services/api/analytics/{{call_id}}/recording",
                   "host": [
@@ -2849,6 +3485,11 @@
                   {
                     "key": "Content-Type",
                     "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
                   }
                 ],
                 "body": {
@@ -2876,7 +3517,13 @@
               "name": "List User Webhook Endpoints",
               "request": {
                 "method": "GET",
-                "header": [],
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
+                  }
+                ],
                 "url": {
                   "raw": "{{base_url}}/db_services/api/users/{{user_uid}}/webhooks",
                   "host": [
@@ -2898,7 +3545,13 @@
               "name": "Get Webhook Endpoint by ID",
               "request": {
                 "method": "GET",
-                "header": [],
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
+                  }
+                ],
                 "url": {
                   "raw": "{{base_url}}/db_services/api/users/{{user_uid}}/webhooks/{{webhook_id}}",
                   "host": [
@@ -2925,6 +3578,11 @@
                   {
                     "key": "Content-Type",
                     "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
                   }
                 ],
                 "body": {
@@ -2953,7 +3611,13 @@
               "name": "Delete Webhook Endpoint",
               "request": {
                 "method": "DELETE",
-                "header": [],
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
+                  }
+                ],
                 "url": {
                   "raw": "{{base_url}}/db_services/api/users/{{user_uid}}/webhooks/{{webhook_id}}",
                   "host": [
@@ -2976,7 +3640,13 @@
               "name": "Get Supported Event Types",
               "request": {
                 "method": "GET",
-                "header": [],
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
+                  }
+                ],
                 "url": {
                   "raw": "{{base_url}}/db_services/api/webhooks/supported-events",
                   "host": [
@@ -2997,7 +3667,13 @@
               "name": "Lookup Active Endpoints (Internal)",
               "request": {
                 "method": "GET",
-                "header": [],
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
+                  }
+                ],
                 "url": {
                   "raw": "{{base_url}}/db_services/api/webhooks/lookup?user_uid={{user_uid}}&event_type=call_analytics.completed",
                   "host": [
@@ -3290,7 +3966,13 @@
               "name": "List All Trunks",
               "request": {
                 "method": "GET",
-                "header": [],
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
+                  }
+                ],
                 "url": {
                   "raw": "{{base_url}}/trunks/trunks",
                   "host": [
@@ -3337,7 +4019,13 @@
               "name": "Get Trunk by ID",
               "request": {
                 "method": "GET",
-                "header": [],
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
+                  }
+                ],
                 "url": {
                   "raw": "{{base_url}}/trunks/trunks/{{trunk_id}}",
                   "host": [
@@ -3386,7 +4074,13 @@
               "name": "Delete Trunk",
               "request": {
                 "method": "DELETE",
-                "header": [],
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
+                  }
+                ],
                 "url": {
                   "raw": "{{base_url}}/trunks/trunks/{{trunk_id}}",
                   "host": [
@@ -3406,7 +4100,13 @@
               "name": "Get Trunk by Name",
               "request": {
                 "method": "GET",
-                "header": [],
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
+                  }
+                ],
                 "url": {
                   "raw": "{{base_url}}/trunks/trunks/name/{{trunk_name}}",
                   "host": [
@@ -3932,6 +4632,11 @@
     },
     {
       "key": "webhook_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "rag_corpus_id",
       "value": "",
       "type": "string"
     },

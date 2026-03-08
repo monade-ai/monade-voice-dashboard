@@ -36,6 +36,9 @@ export interface Assistant {
   inbound_trunk_id?: string | null;
   dispatch_rule_id?: string | null;
   speakingAccent?: string | null;
+  // RAG / Tools fields
+  enableTools?: boolean;
+  toolsConfig?: any;
 }
 
 const extractCallProvider = (assistant: { tags?: string[]; callProvider?: string | null }) => {
@@ -59,6 +62,10 @@ type CreateAssistantData = {
   latencyMs?: number;
   tags?: string[]; // Optional in API request
   knowledgeBaseId?: string | null; // Use ID for creation link
+  // Inbound calling fields
+  call_direction?: 'inbound' | 'outbound' | 'both' | null;
+  inbound_trunk_id?: string | null;
+  speakingAccent?: string | null;
 };
 
 // Define the structure for updating an assistant (maps to PATCH body)

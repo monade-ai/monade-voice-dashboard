@@ -1,33 +1,31 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Trash2, 
-  Zap, 
-  Bot, 
-  Volume2, 
-  Layers, 
-  ShieldCheck, 
-  Phone,
+import React, { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
+import {
+  Trash2,
+  Zap,
+  Volume2,
   ArrowLeft,
-  ChevronDown,
   Loader2,
   Plus,
-  FileText,
   Settings2,
   Rocket,
   Layout,
-  FileCode,
+  Save,
+  Check,
+  Database,
+  ToggleLeft,
+  ToggleRight,
 } from 'lucide-react';
 
 import { useAssistants, Assistant } from '@/app/hooks/use-assistants-context';
 import { useLibrary } from '@/app/hooks/use-knowledge-base';
+import { useRagCorpus } from '@/app/hooks/use-rag-corpus';
 import { useTrunks } from '@/app/hooks/use-trunks';
 import { useUserTrunks } from '@/app/hooks/use-user-trunks';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -44,13 +42,12 @@ import DeleteConfirmationModal from '../delete-confirmation-modal';
 
 import LiveKitAssistantDualButton from './livekit-assistant-dual-button';
 
-// --- Sub-Components: Compressed Scandinavian Design ---
+// --- Sub-Components ---
 
 const WorkflowStep = ({ number, title, description, children, action }: { number: string, title: string, description: string, children: React.ReactNode, action?: React.ReactNode }) => (
   <div className="space-y-6 pb-12 border-b border-border/10 last:border-0 last:pb-0 relative">
     <div className="flex items-start justify-between">
       <div className="flex gap-6">
-        {/* Increased contrast background number */}
         <span className="text-6xl font-bold text-foreground/[0.15] select-none leading-none -mt-2 tabular-nums">{number}</span>
         <div className="space-y-1">
           <h3 className="text-2xl font-medium tracking-tighter text-foreground">{title}</h3>
@@ -66,52 +63,78 @@ const WorkflowStep = ({ number, title, description, children, action }: { number
 );
 
 export default function AssistantStudio() {
-  const { 
-    currentAssistant, 
-    setCurrentAssistant, 
-    saveAssistantUpdates, 
+  const {
+    currentAssistant,
+    setCurrentAssistant,
+    saveAssistantUpdates,
     createAssistant,
-    updateAssistantLocally, 
+    updateAssistantLocally,
   } = useAssistants();
   const { items: libraryItems } = useLibrary();
   const { trunks, phoneNumbers } = useTrunks({ checkAssignments: false });
   const { trunks: userTrunks } = useUserTrunks();
   const inboundTrunks = userTrunks.filter(t => t.trunk_type === 'inbound');
-  
+  const { corpora, attachToAssistant, detachFromAssistant, toggleTools } = useRagCorpus();
+
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'saved' | 'error'>('idle');
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saved' | 'error'>('idle');
   const [isDeploying, setIsDeploying] = useState(false);
   const [isWorkshopOpen, setIsWorkshopOpen] = useState(false);
-  
+  const [isTogglingTools, setIsTogglingTools] = useState(false);
+  const [isDirty, setIsDirty] = useState(false);
+
   const isDraft = currentAssistant?.id.startsWith('local-');
-  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const performAutoSave = useCallback(async (assistant: Assistant) => {
-    setSyncStatus('syncing');
-    try {
-      if (assistant.id.startsWith('local-')) {
-        updateAssistantLocally(assistant.id, assistant);
-        setSyncStatus('saved');
-      } else {
-        const { id, createdAt, knowledgeBase, dispatch_rule_id, ...updates } = assistant;
-        await saveAssistantUpdates(id, {
-          ...updates,
-          knowledgeBaseId: knowledgeBase,
-        });
-        setSyncStatus('saved');
-      }
-    } catch (err) {
-      setSyncStatus('error');
-    }
-  }, [updateAssistantLocally, saveAssistantUpdates]);
+  // Reset dirty flag when assistant changes
+  useEffect(() => {
+    setIsDirty(false);
+    setSaveStatus('idle');
+  }, [currentAssistant?.id]);
 
+  // Local-only update: updates state but does NOT save to backend
   const handleUpdate = (field: keyof Assistant, value: any) => {
     if (!currentAssistant) return;
-    const updatedAssistant = { ...currentAssistant, [field]: value };
-    setCurrentAssistant(updatedAssistant);
-    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-    setSyncStatus('idle');
-    saveTimeoutRef.current = setTimeout(() => performAutoSave(updatedAssistant), 1500);
+    const updated = { ...currentAssistant, [field]: value };
+    setCurrentAssistant(updated);
+    if (isDraft) {
+      updateAssistantLocally(updated.id, updated);
+    }
+    setIsDirty(true);
+    setSaveStatus('idle');
+  };
+
+  // Batch update multiple fields at once
+  const handleBatchUpdate = (updates: Partial<Assistant>) => {
+    if (!currentAssistant) return;
+    const updated = { ...currentAssistant, ...updates };
+    setCurrentAssistant(updated);
+    if (isDraft) {
+      updateAssistantLocally(updated.id, updated);
+    }
+    setIsDirty(true);
+    setSaveStatus('idle');
+  };
+
+  // Manual save button handler
+  const handleSave = async () => {
+    if (!currentAssistant || isDraft || isSaving) return;
+    setIsSaving(true);
+    setSaveStatus('idle');
+    try {
+      const { id, createdAt, knowledgeBase, dispatch_rule_id, ...updates } = currentAssistant;
+      await saveAssistantUpdates(id, {
+        ...updates,
+        knowledgeBaseId: knowledgeBase,
+      });
+      setIsDirty(false);
+      setSaveStatus('saved');
+      setTimeout(() => setSaveStatus('idle'), 2000);
+    } catch (err) {
+      setSaveStatus('error');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleDeploy = async () => {
@@ -124,7 +147,10 @@ export default function AssistantStudio() {
           ...rest,
           knowledgeBaseId: knowledgeBase,
         });
-        if (published) setCurrentAssistant(published);
+        if (published) {
+          setCurrentAssistant(published);
+          setIsDirty(false);
+        }
       }
     } finally {
       setIsDeploying(false);
@@ -133,6 +159,9 @@ export default function AssistantStudio() {
 
   if (!currentAssistant) return null;
 
+  const isInbound = currentAssistant.call_direction === 'inbound';
+
+  // Outbound trunk options
   const trunkOptions = trunks.length > 0 ? trunks.map((trunk) => ({
     value: trunk.name,
     label: trunk.name,
@@ -149,18 +178,14 @@ export default function AssistantStudio() {
   const selectedTrunkName = currentAssistant.callProvider || '';
   const filteredPhoneNumbers = phoneNumbers.filter((phone) => {
     if (!selectedTrunkName) return false;
-
     return phone.trunkName.toLowerCase() === selectedTrunkName.toLowerCase();
   });
   const uniqueFilteredPhoneNumbers = Array.from(
     new Map(filteredPhoneNumbers.map((phone) => [phone.number, phone])).values(),
   );
-  const hasSelectedPhoneInOptions = uniqueFilteredPhoneNumbers.some(
-    (phone) => phone.number === currentAssistant.phoneNumber,
-  );
 
   return (
-    <motion.div 
+    <motion.div
       initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 30 }}
       className="fixed inset-0 z-50 bg-background flex flex-col font-sans overflow-hidden shadow-2xl"
     >
@@ -177,14 +202,36 @@ export default function AssistantStudio() {
         </div>
 
         <div className="flex items-center gap-4">
-          <div className="flex items-center gap-6 mr-4 text-[10px] font-mono text-muted-foreground uppercase tracking-widest hidden lg:flex">
-            <div className="flex items-center gap-2">
-              <Zap size={12} className="text-primary" />
-              <span>{Math.floor(Math.random() * (834 - 678 + 1)) + 678}ms</span>
-            </div>
-          </div>
+          {/* Dirty indicator */}
+          {isDirty && !isDraft && (
+            <span className="text-[9px] font-bold uppercase tracking-widest text-orange-500">Unsaved changes</span>
+          )}
 
           <LiveKitAssistantDualButton assistant={currentAssistant} />
+
+          {/* Save button — only for published assistants */}
+          {!isDraft && (
+            <Button
+              onClick={handleSave}
+              disabled={isSaving || !isDirty}
+              className={cn(
+                'h-9 px-4 gap-2 text-[10px] font-bold uppercase tracking-widest transition-all',
+                saveStatus === 'saved'
+                  ? 'bg-green-500 hover:bg-green-600 text-white'
+                  : 'bg-foreground text-background hover:bg-foreground/90',
+              )}
+            >
+              {isSaving ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : saveStatus === 'saved' ? (
+                <Check size={14} />
+              ) : (
+                <Save size={14} />
+              )}
+              {isSaving ? 'Saving...' : saveStatus === 'saved' ? 'Saved' : 'Save'}
+            </Button>
+          )}
+
           <div className="h-4 w-px bg-border/40 mx-2" />
           <button onClick={() => setIsDeleteModalOpen(true)} className="p-2 text-muted-foreground hover:text-destructive transition-colors"><Trash2 size={18} /></button>
         </div>
@@ -193,117 +240,35 @@ export default function AssistantStudio() {
       {/* --- Main Workflow --- */}
       <div className="flex-1 overflow-y-auto custom-scrollbar bg-muted/[0.01]">
         <div className="max-w-6xl mx-auto p-8 md:p-12 grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-16">
-                
+
           <div className="space-y-16">
-                    
+
             {/* STEP 01: BASICS & DESCRIPTION */}
-            <WorkflowStep 
-              number="01" 
-              title="Identity & Role" 
+            <WorkflowStep
+              number="01"
+              title="Identity & Role"
               description="Identify your agent and describe exactly how it should behave."
             >
               <div className="space-y-8">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 px-1">Display Name</label>
-                  <Input
-                    value={currentAssistant.name}
-                    onChange={(e) => handleUpdate('name', e.target.value)}
-                    className="bg-background border-border/40 h-12 text-base font-medium focus:border-primary transition-all rounded-md px-4"
-                  />
-                </div>
-
                 <div className="grid grid-cols-2 gap-8">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 px-1">Trunk / Provider</label>
-                    <Select
-                      value={currentAssistant.callProvider || '__none__'}
-                      onValueChange={(value) => {
-                        const nextValue = value === '__none__' ? '' : value;
-                        handleUpdate('callProvider', nextValue);
-                        // Clear phone number when trunk changes
-                        if (nextValue !== currentAssistant.callProvider) {
-                          handleUpdate('phoneNumber', '');
-                        }
-                      }}
-                    >
-                      <SelectTrigger className="bg-background border-border/40 h-12 text-base focus:border-primary transition-all rounded-md px-4">
-                        <SelectValue placeholder="Select trunk" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="__none__">
-                          <span className="text-muted-foreground">None</span>
-                        </SelectItem>
-                        {trunkOptions.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            <div className="flex flex-col">
-                              <span className="font-medium">{option.label}</span>
-                              <span className="text-[10px] text-muted-foreground">{option.description}</span>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <p className="text-[10px] text-muted-foreground/60 px-1 italic">
-                      Select your SIP trunk or call provider.
-                    </p>
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 px-1">Display Name</label>
+                    <Input
+                      value={currentAssistant.name}
+                      onChange={(e) => handleUpdate('name', e.target.value)}
+                      className="bg-background border-border/40 h-12 text-base font-medium focus:border-primary transition-all rounded-md px-4"
+                    />
                   </div>
 
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 px-1">Phone Number</label>
-                    <Select
-                      value={currentAssistant.phoneNumber || '__none__'}
-                      onValueChange={(value) => handleUpdate('phoneNumber', value === '__none__' ? '' : value)}
-                      disabled={!selectedTrunkName}
-                    >
-                      <SelectTrigger className="bg-background border-border/40 h-12 font-mono text-base focus:border-primary transition-all rounded-md px-4 disabled:opacity-50">
-                        <SelectValue
-                          placeholder={selectedTrunkName
-                            ? `Select number from ${selectedTrunkName}`
-                            : 'Select a trunk first'}
-                        />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="__none__">
-                          <span className="text-muted-foreground">None</span>
-                        </SelectItem>
-                        {uniqueFilteredPhoneNumbers.map((phone) => (
-                          <SelectItem key={`${phone.trunkId || phone.trunkName}-${phone.number}`} value={phone.number}>
-                            {phone.number}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <p className="text-[10px] text-muted-foreground/60 px-1 italic">
-                      {selectedTrunkName
-                        ? `${uniqueFilteredPhoneNumbers.length} number${uniqueFilteredPhoneNumbers.length !== 1 ? 's' : ''} available from ${selectedTrunkName}.`
-                        : 'Choose a trunk to see available numbers.'}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 px-1">Agent Description</label>
-                  <Input
-                    value={currentAssistant.description || ''}
-                    onChange={(e) => handleUpdate('description', e.target.value)}
-                    placeholder="e.g. A friendly receptionist who books appointments..."
-                    className="bg-background border-border/40 h-12 text-base focus:border-primary transition-all rounded-md px-4"
-                  />
-                  <p className="text-[10px] text-muted-foreground/60 px-1 italic">
-                                    Briefly define the agent's core purpose.
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-2 gap-8">
-                  {/* Call Direction */}
                   <div className="space-y-2">
                     <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 px-1">Call Direction</label>
                     <Select
                       value={currentAssistant.call_direction || 'outbound'}
                       onValueChange={(value) => {
-                        handleUpdate('call_direction', value);
                         if (value === 'outbound') {
-                          handleUpdate('inbound_trunk_id', null);
+                          handleBatchUpdate({ call_direction: 'outbound', inbound_trunk_id: null });
+                        } else {
+                          handleBatchUpdate({ call_direction: 'inbound', callProvider: '', phoneNumber: '' });
                         }
                       }}
                     >
@@ -319,8 +284,134 @@ export default function AssistantStudio() {
                       Outbound for dialing out, Inbound for receiving calls.
                     </p>
                   </div>
+                </div>
 
-                  {/* Speaking Accent */}
+                {/* --- OUTBOUND CONFIG --- */}
+                {!isInbound && (
+                  <div className="grid grid-cols-2 gap-8">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 px-1">Trunk / Provider</label>
+                      <Select
+                        value={currentAssistant.callProvider || '__none__'}
+                        onValueChange={(value) => {
+                          const nextValue = value === '__none__' ? '' : value;
+                          // When trunk changes, clear phone and update trunk in one batch
+                          handleBatchUpdate({ callProvider: nextValue, phoneNumber: '' });
+                        }}
+                      >
+                        <SelectTrigger className="bg-background border-border/40 h-12 text-base focus:border-primary transition-all rounded-md px-4">
+                          <SelectValue placeholder="Select trunk" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">
+                            <span className="text-muted-foreground">None</span>
+                          </SelectItem>
+                          {trunkOptions.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              <div className="flex flex-col">
+                                <span className="font-medium">{option.label}</span>
+                                <span className="text-[10px] text-muted-foreground">{option.description}</span>
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-[10px] text-muted-foreground/60 px-1 italic">
+                        Select your SIP trunk or call provider.
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 px-1">Phone Number</label>
+                      <Select
+                        key={selectedTrunkName}
+                        value={currentAssistant.phoneNumber || '__none__'}
+                        onValueChange={(value) => handleUpdate('phoneNumber', value === '__none__' ? '' : value)}
+                        disabled={!selectedTrunkName}
+                      >
+                        <SelectTrigger className="bg-background border-border/40 h-12 font-mono text-base focus:border-primary transition-all rounded-md px-4 disabled:opacity-50">
+                          <SelectValue
+                            placeholder={selectedTrunkName
+                              ? `Select number from ${selectedTrunkName}`
+                              : 'Select a trunk first'}
+                          />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">
+                            <span className="text-muted-foreground">None</span>
+                          </SelectItem>
+                          {uniqueFilteredPhoneNumbers.map((phone) => (
+                            <SelectItem key={`${phone.trunkId || phone.trunkName}-${phone.number}`} value={phone.number}>
+                              {phone.number}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-[10px] text-muted-foreground/60 px-1 italic">
+                        {selectedTrunkName
+                          ? `${uniqueFilteredPhoneNumbers.length} number${uniqueFilteredPhoneNumbers.length !== 1 ? 's' : ''} available from ${selectedTrunkName}.`
+                          : 'Choose a trunk to see available numbers.'}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* --- INBOUND CONFIG --- */}
+                {isInbound && (
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 px-1">Inbound Trunk</label>
+                      <Select
+                        value={currentAssistant.inbound_trunk_id || '__none__'}
+                        onValueChange={(value) => handleUpdate('inbound_trunk_id', value === '__none__' ? null : value)}
+                      >
+                        <SelectTrigger className="bg-background border-border/40 h-12 text-base focus:border-primary transition-all rounded-md px-4">
+                          <SelectValue placeholder={inboundTrunks.length === 0 ? 'No inbound trunks available' : 'Select inbound trunk'} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">
+                            <span className="text-muted-foreground">None</span>
+                          </SelectItem>
+                          {inboundTrunks.map((trunk) => (
+                            <SelectItem key={trunk.id} value={trunk.livekit_trunk_id || trunk.id}>
+                              <div className="flex flex-col">
+                                <span className="font-medium">{trunk.name}</span>
+                                <span className="text-[10px] text-muted-foreground">{trunk.numbers?.join(', ')}</span>
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {inboundTrunks.length === 0 && (
+                        <p className="text-[10px] text-orange-500 px-1">No inbound trunks found. Create one in the Trunks page.</p>
+                      )}
+                      {/* Dispatch rule status */}
+                      <div className="flex items-center gap-2 px-1 mt-1">
+                        <div className={cn('w-2 h-2 rounded-full', currentAssistant.dispatch_rule_id ? 'bg-green-500' : 'bg-muted-foreground/30')} />
+                        <span className="text-[10px] text-muted-foreground/60">
+                          {currentAssistant.dispatch_rule_id
+                            ? 'Dispatch rule active'
+                            : 'Dispatch rule will be created on save'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-8">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 px-1">Agent Description</label>
+                    <Input
+                      value={currentAssistant.description || ''}
+                      onChange={(e) => handleUpdate('description', e.target.value)}
+                      placeholder="e.g. A friendly receptionist who books appointments..."
+                      className="bg-background border-border/40 h-12 text-base focus:border-primary transition-all rounded-md px-4"
+                    />
+                    <p className="text-[10px] text-muted-foreground/60 px-1 italic">
+                      Briefly define the agent's core purpose.
+                    </p>
+                  </div>
+
                   <div className="space-y-2">
                     <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 px-1">Speaking Accent</label>
                     <Input
@@ -334,72 +425,41 @@ export default function AssistantStudio() {
                     </p>
                   </div>
                 </div>
-
-                {/* Inbound Trunk — shown only for inbound direction */}
-                {currentAssistant.call_direction === 'inbound' && (
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 px-1">Inbound Trunk</label>
-                    <Select
-                      value={currentAssistant.inbound_trunk_id || '__none__'}
-                      onValueChange={(value) => handleUpdate('inbound_trunk_id', value === '__none__' ? null : value)}
-                    >
-                      <SelectTrigger className="bg-background border-border/40 h-12 text-base focus:border-primary transition-all rounded-md px-4">
-                        <SelectValue placeholder={inboundTrunks.length === 0 ? 'No inbound trunks available' : 'Select inbound trunk'} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="__none__">
-                          <span className="text-muted-foreground">None</span>
-                        </SelectItem>
-                        {inboundTrunks.map((trunk) => (
-                          <SelectItem key={trunk.id} value={trunk.livekit_trunk_id || trunk.id}>
-                            <div className="flex flex-col">
-                              <span className="font-medium">{trunk.name}</span>
-                              <span className="text-[10px] text-muted-foreground">{trunk.numbers?.join(', ')}</span>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {inboundTrunks.length === 0 && (
-                      <p className="text-[10px] text-orange-500 px-1">No inbound trunks found. Create one in the Trunks page.</p>
-                    )}
-                    {/* Dispatch rule status */}
-                    <div className="flex items-center gap-2 px-1 mt-1">
-                      <div className={cn('w-2 h-2 rounded-full', currentAssistant.dispatch_rule_id ? 'bg-green-500' : 'bg-muted-foreground/30')} />
-                      <span className="text-[10px] text-muted-foreground/60">
-                        {currentAssistant.dispatch_rule_id
-                          ? `Dispatch rule active`
-                          : 'Dispatch rule will be created on save'}
-                      </span>
-                    </div>
-                  </div>
-                )}
               </div>
             </WorkflowStep>
 
             {/* STEP 02: KNOWLEDGE */}
-            <WorkflowStep 
-              number="02" 
-              title="Knowledge" 
+            <WorkflowStep
+              number="02"
+              title="Knowledge"
               description="Equip your agent with the facts it needs to answer questions."
             >
               <div className="space-y-6">
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 px-1">Selected Brain</label>
-                  <select 
-                    value={currentAssistant.knowledgeBase || ''}
-                    onChange={(e) => handleUpdate('knowledgeBase', e.target.value)}
-                    className="w-full h-12 bg-background border border-border/40 rounded-md px-4 text-sm font-medium focus:border-primary outline-none transition-all cursor-pointer appearance-none shadow-sm"
+                  <Select
+                    value={currentAssistant.knowledgeBase || '__none__'}
+                    onValueChange={(value) => handleUpdate('knowledgeBase', value === '__none__' ? '' : value)}
                   >
-                    <option value="">No memory linked (Standard Mode)</option>
-                    {libraryItems.map(item => (
-                      <option key={item.id} value={item.id}>{item.filename}</option>
-                    ))}
-                  </select>
+                    <SelectTrigger className="bg-background border-border/40 h-12 text-base focus:border-primary transition-all rounded-md px-4">
+                      <SelectValue placeholder="Select knowledge base" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">
+                        <span className="text-muted-foreground">No memory linked (Standard Mode)</span>
+                      </SelectItem>
+                      {libraryItems.map(item => (
+                        <SelectItem key={item.id} value={item.id}>{item.filename}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-[10px] text-muted-foreground/60 px-1 italic">
+                    Attach a knowledge base so the agent can reference your documents.
+                  </p>
                 </div>
 
-                {/* Larger Dotted Create CTA */}
-                <div 
+                {/* Add new knowledge base */}
+                <div
                   onClick={() => setIsWorkshopOpen(true)}
                   className="group p-8 border-2 border-dashed border-border/40 hover:border-primary/40 rounded-md flex flex-col items-center justify-center gap-3 cursor-pointer bg-muted/[0.02] hover:bg-primary/[0.02] transition-all"
                 >
@@ -414,10 +474,147 @@ export default function AssistantStudio() {
               </div>
             </WorkflowStep>
 
-            {/* STEP 03: DEPLOYMENT (Now closer) */}
-            <WorkflowStep 
-              number="03" 
-              title="Deploy" 
+            {/* STEP 03: ADVANCED (RAG + Tools) */}
+            {!isDraft && (
+            <WorkflowStep
+              number="03"
+              title="Advanced"
+              description="Configure RAG retrieval and tool usage for this agent."
+            >
+              <div className="space-y-6">
+                {/* Tools Toggle */}
+                <div className="flex items-center justify-between p-4 rounded-md border border-border/40 bg-muted/[0.03]">
+                  <div className="flex items-center gap-3">
+                    {currentAssistant.enableTools ? (
+                      <ToggleRight size={20} className="text-green-500" />
+                    ) : (
+                      <ToggleLeft size={20} className="text-muted-foreground" />
+                    )}
+                    <div>
+                      <h4 className="text-sm font-bold tracking-tight">Tool Usage</h4>
+                      <p className="text-[10px] text-muted-foreground/60">
+                        {currentAssistant.enableTools
+                          ? 'Agent can use tools (RAG search) during calls'
+                          : 'Tools are disabled for this agent'}
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={isTogglingTools}
+                    onClick={async () => {
+                      setIsTogglingTools(true);
+                      const newValue = !currentAssistant.enableTools;
+                      const ok = await toggleTools(currentAssistant.id, newValue);
+                      if (ok) {
+                        setCurrentAssistant({ ...currentAssistant, enableTools: newValue });
+                      }
+                      setIsTogglingTools(false);
+                    }}
+                    className={cn(
+                      'text-[10px] font-bold uppercase tracking-widest h-8 px-4',
+                      currentAssistant.enableTools ? 'border-green-500/30 text-green-600' : '',
+                    )}
+                  >
+                    {isTogglingTools ? <Loader2 size={12} className="animate-spin" /> : (currentAssistant.enableTools ? 'Enabled' : 'Enable')}
+                  </Button>
+                </div>
+
+                {/* RAG Corpus Attach */}
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 px-1">RAG Corpus</label>
+                  <p className="text-[10px] text-muted-foreground/60 px-1 italic mb-2">
+                    Attach a RAG corpus so the agent can search through your documents during live calls. Create corpora from the RAG Corpora page.
+                  </p>
+                  {(() => {
+                    // Detect currently attached corpus
+                    const attachedResource = currentAssistant.toolsConfig?.tools
+                      ?.find((t: any) => t.type === 'vertex_rag' && t.enabled)
+                      ?.config?.rag_corpus;
+                    const attachedCorpus = attachedResource
+                      ? corpora.find(c => c.corpusResourceName === attachedResource)
+                      : null;
+
+                    return (
+                      <div className="space-y-3">
+                        {attachedCorpus ? (
+                          <div className="flex items-center justify-between p-4 rounded-md border border-green-500/30 bg-green-500/[0.03]">
+                            <div className="flex items-center gap-3">
+                              <Database size={16} className="text-green-500" />
+                              <div>
+                                <span className="text-sm font-bold text-foreground">{attachedCorpus.name}</span>
+                                <span className="text-[9px] text-muted-foreground block">{attachedCorpus.fileCount} files</span>
+                              </div>
+                            </div>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={async () => {
+                                const ok = await detachFromAssistant(currentAssistant.id);
+                                if (ok) {
+                                  setCurrentAssistant({
+                                    ...currentAssistant,
+                                    enableTools: false,
+                                    toolsConfig: null,
+                                  });
+                                }
+                              }}
+                              className="text-[10px] font-bold uppercase tracking-widest h-8 text-red-500 border-red-500/30 hover:bg-red-500/5"
+                            >
+                              Detach
+                            </Button>
+                          </div>
+                        ) : (
+                          <Select
+                            value="__none__"
+                            onValueChange={async (corpusId) => {
+                              if (corpusId === '__none__') return;
+                              const ok = await attachToAssistant(currentAssistant.id, corpusId);
+                              if (ok) {
+                                // Re-fetch assistant to get updated toolsConfig
+                                setCurrentAssistant({
+                                  ...currentAssistant,
+                                  enableTools: true,
+                                });
+                              }
+                            }}
+                          >
+                            <SelectTrigger className="bg-background border-border/40 h-12 text-base focus:border-primary transition-all rounded-md px-4">
+                              <SelectValue placeholder={corpora.length === 0 ? 'No corpora available' : 'Select a RAG corpus to attach'} />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="__none__">
+                                <span className="text-muted-foreground">No corpus attached</span>
+                              </SelectItem>
+                              {corpora.map(c => (
+                                <SelectItem key={c.id} value={c.id}>
+                                  <div className="flex flex-col">
+                                    <span className="font-medium">{c.name}</span>
+                                    <span className="text-[10px] text-muted-foreground">{c.fileCount} files</span>
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
+                        {corpora.length === 0 && (
+                          <p className="text-[10px] text-orange-500 px-1">
+                            No RAG corpora found. Create one from the RAG Corpora page in the sidebar.
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+            </WorkflowStep>
+            )}
+
+            {/* STEP 04: DEPLOYMENT */}
+            <WorkflowStep
+              number={isDraft ? '03' : '04'}
+              title="Deploy"
               description="Manage the operational lifecycle of this agent."
             >
               <div className="flex gap-6">
@@ -431,7 +628,7 @@ export default function AssistantStudio() {
                   {isDraft && <div className="absolute top-0 right-0 bg-primary text-black text-[8px] font-bold uppercase px-2 py-0.5 tracking-widest">Current</div>}
                 </div>
 
-                <button 
+                <button
                   onClick={handleDeploy}
                   disabled={!isDraft || isDeploying}
                   className={cn(
@@ -477,16 +674,17 @@ export default function AssistantStudio() {
               </div>
               <div className="space-y-4">
                 {[
+                  { label: 'Direction', value: isInbound ? 'Inbound' : 'Outbound' },
                   { label: 'Model', value: currentAssistant.model || 'GPT-4 Omni' },
-                  { label: 'Provider', value: 'Vobiz.ai' },
+                  { label: 'Accent', value: currentAssistant.speakingAccent || 'Default' },
+                  { label: 'Knowledge', value: libraryItems.find(kb => kb.id === currentAssistant.knowledgeBase)?.filename || 'None' },
                 ].map((spec) => (
                   <div key={spec.label} className="flex justify-between py-1 border-b border-border/10">
                     <span className="text-xs text-muted-foreground">{spec.label}</span>
-                    <span className="text-xs font-bold text-foreground">{spec.value}</span>
+                    <span className="text-xs font-bold text-foreground truncate ml-2 max-w-[160px]">{spec.value}</span>
                   </div>
                 ))}
               </div>
-
             </div>
           </aside>
         </div>
@@ -496,8 +694,4 @@ export default function AssistantStudio() {
       <DeleteConfirmationModal isOpen={isDeleteModalOpen} onClose={() => setIsDeleteModalOpen(false)} />
     </motion.div>
   );
-}
-
-function Separator({ orientation = 'horizontal', className }: { orientation?: 'horizontal' | 'vertical', className?: string }) {
-  return <div className={cn('bg-border shrink-0', orientation === 'horizontal' ? 'h-[1px] w-full' : 'h-full w-[1px]', className)} />;
 }

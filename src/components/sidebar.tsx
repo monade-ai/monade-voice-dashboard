@@ -20,6 +20,7 @@ import {
   Server,
   Radio,
   Key,
+  Database,
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 
@@ -189,6 +190,12 @@ export function Sidebar() {
           icon={<FileText />}
           label="Library"
           isActive={pathname === '/knowledge-base'}
+        />
+        <NavItem
+          href="/rag-corpus"
+          icon={<Database />}
+          label="RAG Corpora"
+          isActive={pathname === '/rag-corpus'}
         />
 
         <CategoryLabel>Connectivity</CategoryLabel>
