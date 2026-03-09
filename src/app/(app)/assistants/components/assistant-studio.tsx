@@ -323,34 +323,14 @@ export default function AssistantStudio() {
 
                     <div className="space-y-2">
                       <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 px-1">Phone Number</label>
-                      <Select
-                        key={selectedTrunkName}
-                        value={currentAssistant.phoneNumber || '__none__'}
-                        onValueChange={(value) => handleUpdate('phoneNumber', value === '__none__' ? '' : value)}
-                        disabled={!selectedTrunkName}
-                      >
-                        <SelectTrigger className="bg-background border-border/40 h-12 font-mono text-base focus:border-primary transition-all rounded-md px-4 disabled:opacity-50">
-                          <SelectValue
-                            placeholder={selectedTrunkName
-                              ? `Select number from ${selectedTrunkName}`
-                              : 'Select a trunk first'}
-                          />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="__none__">
-                            <span className="text-muted-foreground">None</span>
-                          </SelectItem>
-                          {uniqueFilteredPhoneNumbers.map((phone) => (
-                            <SelectItem key={`${phone.trunkId || phone.trunkName}-${phone.number}`} value={phone.number}>
-                              {phone.number}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <Input
+                        value={currentAssistant.phoneNumber || ''}
+                        onChange={(e) => handleUpdate('phoneNumber', e.target.value)}
+                        placeholder="e.g. +919876543210"
+                        className="bg-background border-border/40 h-12 font-mono text-base focus:border-primary transition-all rounded-md px-4"
+                      />
                       <p className="text-[10px] text-muted-foreground/60 px-1 italic">
-                        {selectedTrunkName
-                          ? `${uniqueFilteredPhoneNumbers.length} number${uniqueFilteredPhoneNumbers.length !== 1 ? 's' : ''} available from ${selectedTrunkName}.`
-                          : 'Choose a trunk to see available numbers.'}
+                        Enter the phone number to use for outbound calls.
                       </p>
                     </div>
                   </div>
