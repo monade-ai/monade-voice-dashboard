@@ -107,6 +107,21 @@ function CorpusCard({
   );
 }
 
+// ─── helper: read a File as base64 at submit time (avoids async race) ────────
+function readFileAsBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const result = ev.target?.result as string;
+      // result is "data:<mime>;base64,<data>" — strip the prefix
+      const base64 = result.split(',')[1];
+      resolve(base64);
+    };
+    reader.onerror = () => reject(new Error('Failed to read file'));
+    reader.readAsDataURL(file);
+  });
+}
+
 export default function RagCorpusPage() {
   const router = useRouter();
   const { corpora, loading, saving, fetchCorpora, createCorpus, addFile, deleteCorpus } = useRagCorpus();
@@ -118,59 +133,77 @@ export default function RagCorpusPage() {
   // Create form state
   const [newName, setNewName] = useState('');
   const [newDescription, setNewDescription] = useState('');
-  const [newFileContent, setNewFileContent] = useState('');
   const [newFilename, setNewFilename] = useState('');
   const [isUploading, setIsUploading] = useState(false);
+
+  // ── Store the actual File objects in refs so we read them at submit time ──
+  const selectedFileRef = useRef<File | null>(null);
+  const addSelectedFileRef = useRef<File | null>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const addFileInputRef = useRef<HTMLInputElement>(null);
 
   // Add file form state
-  const [addFileContent, setAddFileContent] = useState('');
   const [addFilename, setAddFilename] = useState('');
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, setContent: (s: string) => void, setName: (s: string) => void) => {
+  // ── Only store the filename for display; keep the raw File in a ref ────────
+  const handleFileUpload = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    setName: (s: string) => void,
+    fileRef: React.MutableRefObject<File | null>,
+  ) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setName(file.name);
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      setContent(ev.target?.result as string || '');
-    };
-    reader.readAsText(file);
+    fileRef.current = file;   // store raw File — no async read here
+    setName(file.name);       // just update display name
   };
 
   const handleCreate = async () => {
-    if (!newName.trim() || (!newFilename && !newFileContent.trim())) return;
+    if (!newName.trim() || !selectedFileRef.current) return;
     setIsUploading(true);
-    const result = await createCorpus({
-      name: newName.trim(),
-      description: newDescription.trim() || undefined,
-      file_text: newFileContent,
-      filename: newFilename || `${newName.trim().toLowerCase().replace(/\s+/g, '-')}.txt`,
-    });
-    if (result) {
-      setShowCreateDialog(false);
-      setNewName('');
-      setNewDescription('');
-      setNewFileContent('');
-      setNewFilename('');
+    try {
+      const file_base64 = await readFileAsBase64(selectedFileRef.current);
+      const result = await createCorpus({
+        name: newName.trim(),
+        description: newDescription.trim() || undefined,
+        file_base64,
+        filename: newFilename || `${newName.trim().toLowerCase().replace(/\s+/g, '-')}.txt`,
+      });
+      if (result) {
+        setShowCreateDialog(false);
+        setNewName('');
+        setNewDescription('');
+        setNewFilename('');
+        selectedFileRef.current = null;
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      }
+    } catch (err) {
+      console.error('File read error:', err);
+    } finally {
+      setIsUploading(false);
     }
-    setIsUploading(false);
   };
 
   const handleAddFile = async () => {
-    if (!showAddFileDialog || !addFileContent.trim()) return;
+    if (!showAddFileDialog || !addSelectedFileRef.current) return;
     setIsUploading(true);
-    const success = await addFile(showAddFileDialog, {
-      file_text: addFileContent,
-      filename: addFilename || 'document.txt',
-    });
-    if (success) {
-      setShowAddFileDialog(null);
-      setAddFileContent('');
-      setAddFilename('');
+    try {
+      const file_base64 = await readFileAsBase64(addSelectedFileRef.current);
+      const success = await addFile(showAddFileDialog, {
+        file_base64,
+        filename: addFilename || 'document.txt',
+      });
+      if (success) {
+        setShowAddFileDialog(null);
+        setAddFilename('');
+        addSelectedFileRef.current = null;
+        if (addFileInputRef.current) addFileInputRef.current.value = '';
+      }
+    } catch (err) {
+      console.error('File read error:', err);
+    } finally {
+      setIsUploading(false);
     }
-    setIsUploading(false);
   };
 
   const handleDelete = async (id: string) => {
@@ -325,7 +358,11 @@ export default function RagCorpusPage() {
                     </div>
                   </div>
                   <button
-                    onClick={() => { setNewFilename(''); setNewFileContent(''); if (fileInputRef.current) fileInputRef.current.value = ''; }}
+                    onClick={() => {
+                      setNewFilename('');
+                      selectedFileRef.current = null;
+                      if (fileInputRef.current) fileInputRef.current.value = '';
+                    }}
                     className="h-7 w-7 inline-flex items-center justify-center rounded-full text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-all"
                     title="Remove file"
                   >
@@ -351,7 +388,7 @@ export default function RagCorpusPage() {
                 type="file"
                 accept=".txt,.md,.csv,.json,.html,.xml"
                 className="hidden"
-                onChange={(e) => handleFileUpload(e, setNewFileContent, setNewFilename)}
+                onChange={(e) => handleFileUpload(e, setNewFilename, selectedFileRef)}
               />
             </div>
           </div>
@@ -362,7 +399,7 @@ export default function RagCorpusPage() {
             </Button>
             <Button
               onClick={handleCreate}
-              disabled={isUploading || !newName.trim() || (!newFilename && !newFileContent.trim())}
+              disabled={isUploading || !newName.trim() || !selectedFileRef.current}
               className="gap-2 bg-foreground text-background hover:bg-foreground/90"
             >
               {isUploading ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
@@ -396,7 +433,11 @@ export default function RagCorpusPage() {
                   </div>
                 </div>
                 <button
-                  onClick={() => { setAddFilename(''); setAddFileContent(''); if (addFileInputRef.current) addFileInputRef.current.value = ''; }}
+                  onClick={() => {
+                    setAddFilename('');
+                    addSelectedFileRef.current = null;
+                    if (addFileInputRef.current) addFileInputRef.current.value = '';
+                  }}
                   className="h-7 w-7 inline-flex items-center justify-center rounded-full text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-all"
                   title="Remove file"
                 >
@@ -422,7 +463,7 @@ export default function RagCorpusPage() {
               type="file"
               accept=".txt,.md,.csv,.json,.html,.xml"
               className="hidden"
-              onChange={(e) => handleFileUpload(e, setAddFileContent, setAddFilename)}
+              onChange={(e) => handleFileUpload(e, setAddFilename, addSelectedFileRef)}
             />
           </div>
 
@@ -432,7 +473,7 @@ export default function RagCorpusPage() {
             </Button>
             <Button
               onClick={handleAddFile}
-              disabled={isUploading || (!addFilename && !addFileContent.trim())}
+              disabled={isUploading || !addSelectedFileRef.current}
               className="gap-2 bg-foreground text-background hover:bg-foreground/90"
             >
               {isUploading ? <Loader2 size={14} className="animate-spin" /> : <FilePlus size={14} />}
