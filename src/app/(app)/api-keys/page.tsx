@@ -173,13 +173,16 @@ export default function ApiKeysPage() {
   const [showCreateForm, setShowCreateForm] = useState(false);
 
   const extractKeys = (payload: unknown): BaApiKey[] => {
+    const p = payload as any;
     const raw = Array.isArray(payload)
       ? payload
-      : (Array.isArray((payload as any)?.api_keys)
-        ? (payload as any).api_keys
-        : (Array.isArray((payload as any)?.keys)
-          ? (payload as any).keys
-          : (Array.isArray((payload as any)?.data) ? (payload as any).data : [])));
+      : (Array.isArray(p?.apiKeys)
+        ? p.apiKeys
+        : (Array.isArray(p?.api_keys)
+          ? p.api_keys
+          : (Array.isArray(p?.keys)
+            ? p.keys
+            : (Array.isArray(p?.data) ? p.data : []))));
 
     return (raw as any[]).map((k: any) => ({
       id: String(k?.id ?? k?.keyId ?? k?.key_id ?? Math.random()),

@@ -499,9 +499,7 @@ export default function AssistantStudio() {
                       </p>
                     </div>
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
+                  <button
                     disabled={isTogglingTools}
                     onClick={async () => {
                       setIsTogglingTools(true);
@@ -512,13 +510,19 @@ export default function AssistantStudio() {
                       }
                       setIsTogglingTools(false);
                     }}
-                    className={cn(
-                      'text-[10px] font-bold uppercase tracking-widest h-8 px-4',
-                      currentAssistant.enableTools ? 'border-green-500/30 text-green-600' : '',
-                    )}
+                    className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    style={{ backgroundColor: currentAssistant.enableTools ? '#22c55e' : 'hsl(var(--muted))' }}
                   >
-                    {isTogglingTools ? <Loader2 size={12} className="animate-spin" /> : (currentAssistant.enableTools ? 'Enabled' : 'Enable')}
-                  </Button>
+                    <span
+                      className={cn(
+                        'inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform',
+                        currentAssistant.enableTools ? 'translate-x-6' : 'translate-x-1',
+                      )}
+                    />
+                    {isTogglingTools && (
+                      <Loader2 size={10} className="absolute inset-0 m-auto animate-spin text-white" />
+                    )}
+                  </button>
                 </div>
 
                 {/* RAG Corpus Attach */}

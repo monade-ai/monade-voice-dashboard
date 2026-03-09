@@ -140,7 +140,7 @@ export default function RagCorpusPage() {
   };
 
   const handleCreate = async () => {
-    if (!newName.trim() || (!newFileContent.trim() && !newFilename)) return;
+    if (!newName.trim() || (!newFilename && !newFileContent.trim())) return;
     setIsUploading(true);
     const result = await createCorpus({
       name: newName.trim(),
@@ -315,13 +315,37 @@ export default function RagCorpusPage() {
             </div>
             <div className="space-y-1.5">
               <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Document</label>
-              <div
-                onClick={() => fileInputRef.current?.click()}
-                className="p-6 border-2 border-dashed border-border/40 hover:border-primary/40 rounded-md flex flex-col items-center justify-center gap-2 cursor-pointer bg-muted/[0.02] hover:bg-primary/[0.02] transition-all"
-              >
-                <FileUp size={20} className="text-muted-foreground" />
-                <p className="text-xs text-muted-foreground">{newFilename || 'Click to upload a text file'}</p>
-              </div>
+              {newFilename ? (
+                <div className="p-4 border border-green-500/30 bg-green-500/[0.03] rounded-md flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <FileUp size={18} className="text-green-500" />
+                    <div>
+                      <p className="text-sm font-medium text-foreground">{newFilename}</p>
+                      <p className="text-[10px] text-muted-foreground">Ready to upload</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => { setNewFilename(''); setNewFileContent(''); if (fileInputRef.current) fileInputRef.current.value = ''; }}
+                    className="h-7 w-7 inline-flex items-center justify-center rounded-full text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-all"
+                    title="Remove file"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              ) : (
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  className="p-8 border-2 border-dashed border-border/40 hover:border-primary/40 rounded-md flex flex-col items-center justify-center gap-3 cursor-pointer bg-muted/[0.02] hover:bg-primary/[0.02] transition-all"
+                >
+                  <div className="w-12 h-12 rounded-full bg-muted/50 flex items-center justify-center">
+                    <FileUp size={22} className="text-muted-foreground" />
+                  </div>
+                  <div className="text-center">
+                    <p className="text-sm font-medium text-foreground">Click to select a file</p>
+                    <p className="text-[10px] text-muted-foreground mt-1">.txt, .md, .csv, .json, .html, .xml</p>
+                  </div>
+                </div>
+              )}
               <input
                 ref={fileInputRef}
                 type="file"
@@ -329,18 +353,6 @@ export default function RagCorpusPage() {
                 className="hidden"
                 onChange={(e) => handleFileUpload(e, setNewFileContent, setNewFilename)}
               />
-              {!newFilename && (
-                <div className="space-y-1.5 mt-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Or paste text content</label>
-                  <textarea
-                    value={newFileContent}
-                    onChange={(e) => setNewFileContent(e.target.value)}
-                    placeholder="Paste your document content here..."
-                    rows={4}
-                    className="w-full px-3 py-2 border border-border/40 rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none"
-                  />
-                </div>
-              )}
             </div>
           </div>
 
@@ -350,7 +362,7 @@ export default function RagCorpusPage() {
             </Button>
             <Button
               onClick={handleCreate}
-              disabled={isUploading || !newName.trim() || (!newFileContent.trim())}
+              disabled={isUploading || !newName.trim() || (!newFilename && !newFileContent.trim())}
               className="gap-2 bg-foreground text-background hover:bg-foreground/90"
             >
               {isUploading ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
@@ -374,13 +386,37 @@ export default function RagCorpusPage() {
           </DialogHeader>
 
           <div className="space-y-4 my-2">
-            <div
-              onClick={() => addFileInputRef.current?.click()}
-              className="p-6 border-2 border-dashed border-border/40 hover:border-primary/40 rounded-md flex flex-col items-center justify-center gap-2 cursor-pointer bg-muted/[0.02] hover:bg-primary/[0.02] transition-all"
-            >
-              <FileUp size={20} className="text-muted-foreground" />
-              <p className="text-xs text-muted-foreground">{addFilename || 'Click to upload a text file'}</p>
-            </div>
+            {addFilename ? (
+              <div className="p-4 border border-green-500/30 bg-green-500/[0.03] rounded-md flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <FileUp size={18} className="text-green-500" />
+                  <div>
+                    <p className="text-sm font-medium text-foreground">{addFilename}</p>
+                    <p className="text-[10px] text-muted-foreground">Ready to upload</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => { setAddFilename(''); setAddFileContent(''); if (addFileInputRef.current) addFileInputRef.current.value = ''; }}
+                  className="h-7 w-7 inline-flex items-center justify-center rounded-full text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-all"
+                  title="Remove file"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            ) : (
+              <div
+                onClick={() => addFileInputRef.current?.click()}
+                className="p-8 border-2 border-dashed border-border/40 hover:border-primary/40 rounded-md flex flex-col items-center justify-center gap-3 cursor-pointer bg-muted/[0.02] hover:bg-primary/[0.02] transition-all"
+              >
+                <div className="w-12 h-12 rounded-full bg-muted/50 flex items-center justify-center">
+                  <FileUp size={22} className="text-muted-foreground" />
+                </div>
+                <div className="text-center">
+                  <p className="text-sm font-medium text-foreground">Click to select a file</p>
+                  <p className="text-[10px] text-muted-foreground mt-1">.txt, .md, .csv, .json, .html, .xml</p>
+                </div>
+              </div>
+            )}
             <input
               ref={addFileInputRef}
               type="file"
@@ -388,18 +424,6 @@ export default function RagCorpusPage() {
               className="hidden"
               onChange={(e) => handleFileUpload(e, setAddFileContent, setAddFilename)}
             />
-            {!addFilename && (
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Or paste text</label>
-                <textarea
-                  value={addFileContent}
-                  onChange={(e) => setAddFileContent(e.target.value)}
-                  placeholder="Paste document content..."
-                  rows={4}
-                  className="w-full px-3 py-2 border border-border/40 rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none"
-                />
-              </div>
-            )}
           </div>
 
           <DialogFooter className="gap-2">
@@ -408,7 +432,7 @@ export default function RagCorpusPage() {
             </Button>
             <Button
               onClick={handleAddFile}
-              disabled={isUploading || !addFileContent.trim()}
+              disabled={isUploading || (!addFilename && !addFileContent.trim())}
               className="gap-2 bg-foreground text-background hover:bg-foreground/90"
             >
               {isUploading ? <Loader2 size={14} className="animate-spin" /> : <FilePlus size={14} />}
