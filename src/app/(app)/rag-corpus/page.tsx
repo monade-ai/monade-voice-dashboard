@@ -163,6 +163,8 @@ export default function RagCorpusPage() {
     setIsUploading(true);
     try {
       const file_base64 = await readFileAsBase64(selectedFileRef.current);
+      // ADD THIS ↓
+      console.log('[DEBUG] Sending to createCorpus:', { name: newName.trim(), file_base64: file_base64?.slice(0, 50), filename: newFilename });
       const result = await createCorpus({
         name: newName.trim(),
         description: newDescription.trim() || undefined,
