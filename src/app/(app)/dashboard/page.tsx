@@ -222,7 +222,7 @@ const TranscriptRow = ({
                       <Play size={12} fill="currentColor" />
                     )}
                     {!isPlaying && !recordingLoading && <span className="text-[9px] uppercase">{displayDuration}</span>}
-                    {recordingLoading && <span className="text-[9px] uppercase">Loading</span>}
+                    {recordingLoading && <span className="text-[9px] uppercase">Preparing</span>}
                   </div>
 
                   {isPlaying && (

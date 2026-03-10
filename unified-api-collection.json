@@ -3471,6 +3471,76 @@
                 "description": "Fetch the call recording URL from Vobiz for a specific call. Uses sip_call_id (Vobiz call ID from sip.callIDFull) for direct 1:1 recording lookup via GET /Recording/{sip_call_id}/. On first request, fetches from Vobiz API and caches the recording_url in the database. Subsequent requests return the cached URL instantly. Returns recording_url (direct WAV/MP3 link for audio playback), recording_id, and duration_ms. Requires sip_call_id to be stored in the analytics record (propagated from LiveKit participant attributes). If the recording is not yet available (Vobiz processing delay), returns 404 with a 'try again' message."
               },
               "response": []
+            },
+            {
+              "name": "Prepare Call Recording (Async)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/db_services/api/analytics/{{call_id}}/recording/prepare",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "db_services",
+                    "api",
+                    "analytics",
+                    "{{call_id}}",
+                    "recording",
+                    "prepare"
+                  ],
+                  "variable": [
+                    {
+                      "key": "call_id",
+                      "value": "{{call_id}}"
+                    }
+                  ]
+                },
+                "description": "Kick off async recording preparation pipeline. The backend fetches the recording from Vobiz (using sip_call_id), downloads the audio file, uploads it to GCS temp storage, and generates a 30-minute signed URL for streaming/download.\n\nReturns immediately with status. Frontend should poll the /status endpoint every 2-3 seconds.\n\n**Response statuses:**\n- `{\"status\": \"processing\"}` — Pipeline started, poll /status for updates\n- `{\"status\": \"ready\", \"url\": \"...\", \"download_url\": \"...\"}` — Cache hit (repeat click within 30min), url is for streaming (<audio src>), download_url triggers browser download\n- `{\"status\": \"failed\", \"error\": \"...\"}` — Previous attempt failed\n\n**Error responses:**\n- 404: Analytics record not found or no sip_call_id available\n- 503: Cloud storage or Vobiz not configured\n\n**Notes:**\n- Preparation takes 15-40 seconds depending on file size\n- Signed URLs expire after 30 minutes; repeat requests within that window return cached URLs instantly\n- Both .mp3 and .wav formats are supported\n- The url field returns an inline signed URL (for <audio> playback with seeking support)\n- The download_url field returns an attachment signed URL (triggers browser save-as dialog)"
+              },
+              "response": []
+            },
+            {
+              "name": "Get Recording Preparation Status",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/db_services/api/analytics/{{call_id}}/recording/status",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "db_services",
+                    "api",
+                    "analytics",
+                    "{{call_id}}",
+                    "recording",
+                    "status"
+                  ],
+                  "variable": [
+                    {
+                      "key": "call_id",
+                      "value": "{{call_id}}"
+                    }
+                  ]
+                },
+                "description": "Poll this endpoint every 2-3 seconds after calling POST /recording/prepare to check if the recording is ready.\n\n**Response statuses:**\n- `{\"status\": \"processing\"}` — Still downloading/uploading, keep polling\n- `{\"status\": \"ready\", \"url\": \"https://storage.googleapis.com/...signed...\", \"download_url\": \"https://storage.googleapis.com/...signed...\"}` — Recording ready. Use `url` as <audio src> for streaming playback (supports seeking). Use `download_url` in an <a href download> for saving the file.\n- `{\"status\": \"failed\", \"error\": \"Recording not yet available from Vobiz\"}` — Pipeline failed, show error to user\n- `{\"status\": \"not_started\"}` — prepare was never called for this call_id\n\n**Frontend usage:**\n```js\n// Poll until ready\nconst poll = setInterval(async () => {\n  const res = await fetch(`/api/analytics/${callId}/recording/status`);\n  const data = await res.json();\n  if (data.status === 'ready') {\n    clearInterval(poll);\n    audioElement.src = data.url; // streaming playback\n    // data.download_url available for download button\n  } else if (data.status === 'failed') {\n    clearInterval(poll);\n    showError(data.error);\n  }\n}, 3000);\n```\n\n**Notes:**\n- Status is stored in Redis with 30min TTL matching the signed URL expiry\n- After TTL expires, status returns not_started and prepare must be called again\n- Both url and download_url are GCS signed URLs valid for 30 minutes"
+              },
+              "response": []
             }
           ]
         },

@@ -9,6 +9,7 @@ import {
   Play,
   Pause,
   Loader2,
+  Download,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
@@ -56,6 +57,8 @@ export const CallHistoryRow = React.memo(({
     formattedCurrentTime,
     progress,
     togglePlay,
+    downloadUrl,
+    recordingUrl,
   } = useCallRecording(
     transcript.call_id,
     analytics?.recording_url,
@@ -178,7 +181,7 @@ export const CallHistoryRow = React.memo(({
                       <Play size={12} fill="currentColor" />
                     )}
                     {!isPlaying && !recordingLoading && <span className="text-[9px] uppercase">{formattedDuration || formatDuration(duration)}</span>}
-                    {recordingLoading && <span className="text-[9px] uppercase">Loading</span>}
+                    {recordingLoading && <span className="text-[9px] uppercase">Preparing</span>}
                   </div>
 
                   {isPlaying && (
@@ -199,6 +202,26 @@ export const CallHistoryRow = React.memo(({
                   )}
                 </motion.button>
               </motion.div>
+
+              {(downloadUrl || recordingUrl) && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const url = downloadUrl || recordingUrl;
+                    if (!url) return;
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `recording-${transcript.call_id}.mp3`;
+                    a.target = '_blank';
+                    a.rel = 'noopener noreferrer';
+                    a.click();
+                  }}
+                  className="h-7 w-7 flex items-center justify-center rounded-full border border-border/30 text-muted-foreground hover:text-foreground hover:border-border/60 transition-all"
+                  title="Download recording"
+                >
+                  <Download size={11} />
+                </button>
+              )}
 
               <div className="flex items-center min-w-[14px] group-hover:hidden transition-all">
                 <MessageSquare

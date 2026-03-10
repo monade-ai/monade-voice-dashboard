@@ -21,6 +21,7 @@ interface AudioPillProps {
 export function AudioPill({ callId, sipCallId, recordingUrl: existingUrl, durationMs: existingDurationMs }: AudioPillProps) {
   const {
     recordingUrl,
+    downloadUrl,
     loading,
     error,
     errorType,
@@ -42,13 +43,16 @@ export function AudioPill({ callId, sipCallId, recordingUrl: existingUrl, durati
   }, [audioDuration, seek]);
 
   const handleDownload = useCallback(() => {
-    if (!recordingUrl) return;
+    // Prefer the dedicated download_url (triggers save-as), fall back to streaming url
+    const url = downloadUrl || recordingUrl;
+    if (!url) return;
     const a = document.createElement('a');
-    a.href = recordingUrl;
-    a.download = `recording-${callId}.wav`;
+    a.href = url;
+    a.download = `recording-${callId}.mp3`;
     a.target = '_blank';
+    a.rel = 'noopener noreferrer';
     a.click();
-  }, [recordingUrl, callId]);
+  }, [downloadUrl, recordingUrl, callId]);
 
   // No SIP call ID — recording not possible
   if (!sipCallId && !existingUrl && !recordingUrl) {
@@ -105,7 +109,7 @@ export function AudioPill({ callId, sipCallId, recordingUrl: existingUrl, durati
         <div className="flex items-center justify-between px-1">
           <span className="text-[10px] font-bold font-mono text-foreground tracking-tighter">{displayTime}</span>
           <div className="flex items-center gap-2">
-            {loading && <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-muted-foreground/40 animate-pulse">Loading...</span>}
+            {loading && <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-muted-foreground/40 animate-pulse">Preparing...</span>}
             <span className="text-[10px] font-bold font-mono text-muted-foreground/60">{displayDuration}</span>
           </div>
         </div>
@@ -138,7 +142,7 @@ export function AudioPill({ callId, sipCallId, recordingUrl: existingUrl, durati
             <DropdownMenuItem
               className="gap-3 cursor-pointer py-2.5"
               onClick={handleDownload}
-              disabled={!recordingUrl}
+              disabled={!recordingUrl && !downloadUrl}
             >
               <Download size={14} className="text-muted-foreground" />
               <span className="text-[11px] font-bold uppercase tracking-widest">Download Recording</span>
