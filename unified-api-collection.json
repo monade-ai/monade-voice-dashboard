@@ -4755,7 +4755,7 @@
       "key": "ba_api_key_id",
       "value": "",
       "type": "string",
-      "description": "BetterAuth API key ID (for delete operations)"
+      "description": "BetterAuth API key ID (for delete operations) "
     }
   ]
 }
