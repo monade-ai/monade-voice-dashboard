@@ -23,10 +23,14 @@ async function parseError(response: Response) {
 }
 
 export async function backendSignUp(params: { username: string; email: string; password: string }) {
-  const response = await fetch(`${API_BASE}/api/users`, {
+  const response = await fetch(`${API_BASE}/api/auth/sign-up/email`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(params),
+    body: JSON.stringify({
+      name: params.username,
+      email: params.email,
+      password: params.password,
+    }),
     credentials: 'include',
   });
   if (!response.ok) {
@@ -60,6 +64,17 @@ export async function backendSignOut() {
 
 export async function backendGetMe() {
   const response = await fetch(`${API_BASE}/api/me`, {
+    method: 'GET',
+    credentials: 'include',
+  });
+  if (!response.ok) {
+    throw new Error(await parseError(response));
+  }
+  return response.json();
+}
+
+export async function backendGetSession() {
+  const response = await fetch(`${API_BASE}/api/auth/get-session`, {
     method: 'GET',
     credentials: 'include',
   });

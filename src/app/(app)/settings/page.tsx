@@ -17,6 +17,7 @@ import { toast } from 'sonner';
 
 import { useAuth } from '@/contexts/auth-context';
 import { backendSignOut } from '@/lib/auth/backend-auth';
+import { clearClientAuthState } from '@/lib/auth/client-auth-state';
 import { DashboardHeader } from '@/components/dashboard-header';
 import { PaperCard, PaperCardContent } from '@/components/ui/paper-card';
 import { Button } from '@/components/ui/button';
@@ -66,8 +67,12 @@ export default function SettingsPage() {
   const handleSignOut = async () => {
     try {
       await backendSignOut();
+    } catch {
+      toast.error('Could not complete sign out cleanly. Redirecting to login.');
     } finally {
-      router.push('/login');
+      clearClientAuthState();
+      router.replace('/login');
+      router.refresh();
     }
   };
 

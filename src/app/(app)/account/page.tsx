@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 
 import { backendSignOut } from '@/lib/auth/backend-auth';
+import { clearClientAuthState } from '@/lib/auth/client-auth-state';
 import { useAuth } from '@/contexts/auth-context';
 
 export default function AccountPage() {
@@ -23,7 +24,9 @@ export default function AccountPage() {
     try {
       await backendSignOut();
     } finally {
-      router.push('/login');
+      clearClientAuthState();
+      router.replace('/login');
+      router.refresh();
     }
   };
 
