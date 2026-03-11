@@ -1,6 +1,7 @@
 // app/layout.tsx (Server Component)
 
 import type { Metadata } from 'next';
+import { Suspense } from 'react';
 import localFont from 'next/font/local';
 
 import './globals.css';
@@ -53,7 +54,9 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <ClientLayout>{children}</ClientLayout>
+        <Suspense fallback={<div className="min-h-screen bg-background" />}>
+          <ClientLayout>{children}</ClientLayout>
+        </Suspense>
       </body>
     </html>
   );
