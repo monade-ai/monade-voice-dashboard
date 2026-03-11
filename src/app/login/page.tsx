@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { GrainGradient } from '@paper-design/shaders-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
-import { backendSignIn, backendSignUp } from '@/lib/auth/backend-auth';
+import { BackendAuthError, backendGetMe, backendLinkSelf, backendSignIn, backendSignUp } from '@/lib/auth/backend-auth';
 
 // --- Types ---
 type OnboardingStep = 'identity' | 'purpose' | 'handover';
@@ -125,13 +125,30 @@ function LoginComponent() {
       if (authMode === 'signup') {
         await backendSignUp({ username, email, password });
         await backendSignIn({ email, password });
+        await backendLinkSelf({ username });
         localStorage.setItem(PENDING_ONBOARDING_KEY, '1');
       } else {
         await backendSignIn({ email, password });
+        await backendLinkSelf();
       }
+      await backendGetMe();
 
       setAuthSuccess(true);
     } catch (err) {
+      if (err instanceof BackendAuthError) {
+        if (err.code === 'AUTH_REQUIRED') {
+          setAuthError('Session was not established. Please try signing in again.');
+          return;
+        }
+        if (err.code === 'USER_NOT_LINKED') {
+          setAuthError('Your account could not be linked yet. Please try again in a moment.');
+          return;
+        }
+        if (err.code === 'EMAIL_ALREADY_LINKED') {
+          setAuthError('This email is already linked to another account. Please contact support.');
+          return;
+        }
+      }
       setAuthError(err instanceof Error ? err.message : 'Authentication failed.');
     } finally {
       setIsSubmitting(false);

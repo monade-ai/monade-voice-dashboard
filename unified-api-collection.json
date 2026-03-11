@@ -1204,7 +1204,37 @@
                     "users"
                   ]
                 },
-                "description": "Create a new user account with BetterAuth integration. Canonical backend onboarding route. Flow: (1) Creates BetterAuth user, (2) Creates/links Monade user via ba_user_id foreign key. Returns user details and BetterAuth session token. Use this signup path when frontend is backend-driven."
+                "description": "Create a new user account with BetterAuth integration. Protected route (requires valid auth). Flow: (1) Creates BetterAuth user, (2) Creates/links Monade user via ba_user_id foreign key. Returns user details and BetterAuth session token."
+              },
+              "response": []
+            },
+            {
+              "name": "Link Authenticated User (POST /api/users/link-self)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"username\": \"John Doe\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/db_services/api/users/link-self",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "db_services",
+                    "api",
+                    "users",
+                    "link-self"
+                  ]
+                },
+                "description": "Onboarding linking step for dashboard flow. Requires BetterAuth session cookie from sign-up/sign-in (send request with credentials/cookies). Links current authenticated BetterAuth user to Monade users table by ba_user_id, or creates the user if missing."
               },
               "response": []
             },
