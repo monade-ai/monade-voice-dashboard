@@ -20,6 +20,7 @@ import { Input } from '@/components/ui/input';
 import { ContactsProvider } from '../contacts/contexts/contacts-context';
 
 import { AssistantCard } from './components/assistant-card';
+import { AssistantsOnboarding } from '@/components/onboarding/assistants-onboarding';
 
 const AssistantStudio = dynamic(
   () => import('./components/assistant-studio'),
@@ -43,10 +44,16 @@ function AssistantsGallery() {
   const searchParams = useSearchParams();
   const [search, setSearch] = useState('');
   const [showBrief, setShowBrief] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   useEffect(() => {
     const isDismissed = localStorage.getItem('monade_studio_brief_dismissed');
     if (!isDismissed) setShowBrief(true);
+  }, []);
+
+  useEffect(() => {
+    const done = localStorage.getItem('monade_assistants_onboarding_v1');
+    if (!done) setShowOnboarding(true);
   }, []);
 
   const dismissBrief = () => {
@@ -118,7 +125,7 @@ function AssistantsGallery() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/60" />
               <Input placeholder="Find an assistant..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 h-10 w-64 bg-muted/10 border-border/40 text-xs focus:ring-primary focus:border-primary transition-all rounded-md" />
             </div>
-            <Button onClick={handleCreateDraft} className="h-10 px-4 gap-2 bg-foreground text-background hover:bg-foreground/90 transition-all rounded-[4px] text-[10px] font-bold uppercase tracking-[0.2em]"><Plus size={16} />Add Assistant</Button>
+            <Button data-onboarding="add-assistant" onClick={handleCreateDraft} className="h-10 px-4 gap-2 bg-foreground text-background hover:bg-foreground/90 transition-all rounded-[4px] text-[10px] font-bold uppercase tracking-[0.2em]"><Plus size={16} />Add Assistant</Button>
           </div>
         </div>
 
@@ -220,8 +227,15 @@ function AssistantsGallery() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             <AnimatePresence>
-              {filteredAssistants.map((assistant) => (
-                <motion.div key={assistant.id} layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+              {filteredAssistants.map((assistant, idx) => (
+                <motion.div
+                  key={assistant.id}
+                  layout
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  {...(idx === 0 ? { 'data-onboarding': 'first-assistant' } : {})}
+                >
                   <AssistantCard assistant={assistant} onSelect={setCurrentAssistant} />
                 </motion.div>
               ))}
@@ -232,6 +246,18 @@ function AssistantsGallery() {
 
       <AnimatePresence>
         {currentAssistant && <AssistantStudioWorkspace />}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showOnboarding && (
+          <AssistantsOnboarding
+            isOpen={showOnboarding}
+            onComplete={() => {
+              setShowOnboarding(false);
+              localStorage.setItem('monade_assistants_onboarding_v1', 'true');
+            }}
+          />
+        )}
       </AnimatePresence>
     </div>
   );
