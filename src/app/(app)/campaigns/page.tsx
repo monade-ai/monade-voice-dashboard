@@ -248,6 +248,7 @@ export default function CampaignsPage() {
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
 
   useEffect(() => {
     if (!error) return;
@@ -269,7 +270,7 @@ export default function CampaignsPage() {
           .map((campaign) => refreshCampaignStats(campaign.id)),
       );
     };
-    void bootstrap().catch(() => {});
+    void bootstrap().catch(() => {}).finally(() => setIsInitialLoad(false));
   }, [listCampaigns, refreshQueueStatus, refreshCreditStatus, refreshCampaignStats]);
 
   // Keep list/status reasonably fresh while viewing the list.
@@ -411,7 +412,7 @@ export default function CampaignsPage() {
               <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground w-[15%] text-right pr-2">Control</span>
             </div>
 
-            {loading && campaigns.length === 0 ? (
+            {(loading || isInitialLoad) && campaigns.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-20 gap-4">
                 <Loader2 className="animate-spin text-primary" />
                 <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Syncing Operations...</span>

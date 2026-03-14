@@ -23,10 +23,13 @@ export default function AccountPage() {
   const handleSignOut = async () => {
     try {
       await backendSignOut();
+    } catch {
+      // Sign out may fail but we still redirect to login
+  
     } finally {
       clearClientAuthState();
       router.replace('/login');
-      router.refresh();
+      // router.refresh();
     }
   };
 

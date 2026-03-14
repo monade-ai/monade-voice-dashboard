@@ -72,7 +72,7 @@ export default function SettingsPage() {
     } finally {
       clearClientAuthState();
       router.replace('/login');
-      router.refresh();
+      // router.refresh();
     }
   };
 

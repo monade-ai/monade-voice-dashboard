@@ -126,7 +126,7 @@ export default function HotLeadsPage() {
   const [selectedLead, setSelectedLead] = useState<CallAnalytics | null>(null);
   
   // Filter States
-  const [intentFilter, setIntentFilter] = useState<'all' | 'booked' | 'interested' | 'callback'>('all');
+  const [intentFilter, setIntentFilter] = useState<'all' | 'booked' | 'interested' | 'callback'>('interested');
   const [dateFilter, setDateFilter] = useState<'today' | '7d' | '30d' | 'all'>('all');
   const [confidenceFilter, setConfidenceFilter] = useState<'all' | 'high'>('all'); 
   
