@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import { Toaster } from 'sonner';
 
 import { Sidebar } from '@/components/sidebar';
-import { AuthProvider } from '@/contexts/auth-context';
+import { AuthProvider, useAuth } from '@/contexts/auth-context';
 import { CampaignProvider } from '@/app/contexts/campaign-context';
 import { MonadeUserProvider } from '@/app/hooks/use-monade-user';
 import { TranscriptsProvider } from '@/app/hooks/use-transcripts-context';
@@ -36,6 +36,19 @@ const percentile = (sortedValues: number[], p: number) => {
 
   return sortedValues[lower] * (1 - weight) + sortedValues[upper] * weight;
 };
+
+function AuthGuard({ children }: { children: React.ReactNode }) {
+  const { user, isLoading } = useAuth();
+
+  React.useEffect(() => {
+    if (!isLoading && user === null) {
+      window.location.replace('/login');
+    }
+  }, [user, isLoading]);
+
+  return <>{children}</>;
+}
+
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -88,6 +101,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthProvider>
+      <AuthGuard>
       <MonadeUserProvider>
         <div className="flex h-screen">
           <Toaster richColors position="bottom-center" />
@@ -103,6 +117,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </main>
         </div>
       </MonadeUserProvider>
+      </AuthGuard>
     </AuthProvider>
   );
 }

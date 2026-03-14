@@ -28,7 +28,7 @@ export default function AccountPage() {
   
     } finally {
       clearClientAuthState();
-      router.replace('/login');
+      window.location.replace('/login');
       // router.refresh();
     }
   };

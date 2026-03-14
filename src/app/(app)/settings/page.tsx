@@ -71,7 +71,7 @@ export default function SettingsPage() {
       toast.error('Could not complete sign out cleanly. Redirecting to login.');
     } finally {
       clearClientAuthState();
-      router.replace('/login');
+      window.location.replace('/login');
       // router.refresh();
     }
   };
