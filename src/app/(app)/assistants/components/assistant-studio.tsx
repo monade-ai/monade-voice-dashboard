@@ -78,7 +78,7 @@ export default function AssistantStudio() {
   const { trunks, phoneNumbers } = useTrunks({ checkAssignments: false });
   const { trunks: userTrunks } = useUserTrunks();
   const inboundTrunks = userTrunks.filter(t => t.trunk_type === 'inbound');
-  const { corpora, attachToAssistant, detachFromAssistant, toggleTools, toggleEndCallTool } = useRagCorpus();
+  const { corpora, attachToAssistant, detachFromAssistant, toggleTools, toggleEndCallTool, toggleVertexRagTool } = useRagCorpus();
 
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -86,6 +86,7 @@ export default function AssistantStudio() {
   const [isDeploying, setIsDeploying] = useState(false);
   const [isWorkshopOpen, setIsWorkshopOpen] = useState(false);
   const [isTogglingTools, setIsTogglingTools] = useState(false);
+  const [isTogglingRag, setIsTogglingRag] = useState(false);
   const [isTogglingCallCompletion, setIsTogglingCallCompletion] = useState(false);
   const [isSyncingTools, setIsSyncingTools] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
@@ -198,6 +199,8 @@ export default function AssistantStudio() {
   if (!currentAssistant) return null;
 
   const isInbound = currentAssistant.call_direction === 'inbound';
+  const ragTool = currentAssistant.toolsConfig?.tools?.find((t: any) => t.type === 'vertex_rag');
+  const hasAttachedRagCorpus = !!ragTool?.config?.rag_corpus;
 
   // Outbound trunk options
   const trunkOptions = trunks.length > 0 ? trunks.map((trunk) => ({
@@ -527,12 +530,17 @@ export default function AssistantStudio() {
                         await syncToolsFromBackend(currentAssistant.id);
                         setIsTogglingTools(false);
                       }}
-                      className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 disabled:opacity-50 disabled:cursor-not-allowed"
-                      style={{ backgroundColor: currentAssistant.enableTools ? '#22c55e' : 'hsl(var(--muted))' }}
+                      className={cn(
+                        'relative inline-flex h-6 w-11 items-center rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 disabled:opacity-50 disabled:cursor-not-allowed',
+                        currentAssistant.enableTools
+                          ? 'bg-green-500 border-green-500'
+                          : 'bg-muted border-border/70',
+                      )}
                     >
                       <span
                         className={cn(
-                          'inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform',
+                          'inline-block h-4 w-4 transform rounded-full shadow-sm transition-transform',
+                          currentAssistant.enableTools ? 'bg-background' : 'bg-muted-foreground/70',
                           currentAssistant.enableTools ? 'translate-x-6' : 'translate-x-1',
                         )}
                       />
@@ -545,6 +553,48 @@ export default function AssistantStudio() {
                   <div className="border-t border-border/30 pt-4 space-y-4">
                     {/* RAG Corpus Attach */}
                     <div className={cn('space-y-2', !currentAssistant.enableTools && 'opacity-50')}>
+                  <div className="flex items-center justify-between p-3 rounded-md border border-border/40 bg-background">
+                    <div className="flex items-center gap-3">
+                      {ragTool?.enabled ? (
+                        <ToggleRight size={20} className="text-green-500" />
+                      ) : (
+                        <ToggleLeft size={20} className="text-muted-foreground" />
+                      )}
+                      <div>
+                        <h5 className="text-sm font-semibold tracking-tight">RAG Retrieval</h5>
+                        <p className="text-[10px] text-muted-foreground/70">
+                          Enable or disable retrieval from the attached corpus.
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      disabled={isTogglingRag || !currentAssistant.enableTools || isSyncingTools || !hasAttachedRagCorpus}
+                      onClick={async () => {
+                        setIsTogglingRag(true);
+                        const isEnabled = !!ragTool?.enabled;
+                        await toggleVertexRagTool(currentAssistant.id, !isEnabled, currentAssistant.toolsConfig);
+                        await syncToolsFromBackend(currentAssistant.id);
+                        setIsTogglingRag(false);
+                      }}
+                      className={cn(
+                        'relative inline-flex h-6 w-11 items-center rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 disabled:opacity-50 disabled:cursor-not-allowed',
+                        ragTool?.enabled
+                          ? 'bg-green-500 border-green-500'
+                          : 'bg-muted border-border/70',
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          'inline-block h-4 w-4 transform rounded-full shadow-sm transition-transform',
+                          ragTool?.enabled ? 'bg-background' : 'bg-muted-foreground/70',
+                          ragTool?.enabled ? 'translate-x-6' : 'translate-x-1',
+                        )}
+                      />
+                      {isTogglingRag && (
+                        <Loader2 size={10} className="absolute inset-0 m-auto animate-spin text-foreground" />
+                      )}
+                    </button>
+                  </div>
                   <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 px-1">RAG Corpus</label>
                   <p className="text-[10px] text-muted-foreground/60 px-1 italic mb-2">
                     Attach a RAG corpus so the agent can search through your documents during live calls. Create corpora from the RAG Corpora page.
@@ -554,11 +604,14 @@ export default function AssistantStudio() {
                       Turn on Tool Usage first to configure RAG.
                     </p>
                   )}
+                  {currentAssistant.enableTools && !hasAttachedRagCorpus && (
+                    <p className="text-[10px] text-muted-foreground/70 px-1">
+                      Attach a corpus first to enable the RAG toggle.
+                    </p>
+                  )}
                   {(() => {
                     // Detect currently attached corpus
-                    const attachedResource = currentAssistant.toolsConfig?.tools
-                      ?.find((t: any) => t.type === 'vertex_rag' && t.enabled)
-                      ?.config?.rag_corpus;
+                    const attachedResource = ragTool?.config?.rag_corpus;
                     const attachedCorpus = attachedResource
                       ? corpora.find(c => c.corpusResourceName === attachedResource)
                       : null;
@@ -672,16 +725,17 @@ export default function AssistantStudio() {
                       await syncToolsFromBackend(currentAssistant.id);
                       setIsTogglingCallCompletion(false);
                     }}
-                    className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 disabled:opacity-50 disabled:cursor-not-allowed"
-                    style={{
-                      backgroundColor: currentAssistant.toolsConfig?.tools?.find((t: any) => t.type === 'end_call')?.enabled
-                        ? '#22c55e'
-                        : 'hsl(var(--muted))',
-                    }}
+                    className={cn(
+                      'relative inline-flex h-6 w-11 items-center rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 disabled:opacity-50 disabled:cursor-not-allowed',
+                      currentAssistant.toolsConfig?.tools?.find((t: any) => t.type === 'end_call')?.enabled
+                        ? 'bg-green-500 border-green-500'
+                        : 'bg-muted border-border/70',
+                    )}
                   >
                     <span
                       className={cn(
-                        'inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform',
+                        'inline-block h-4 w-4 transform rounded-full shadow-sm transition-transform',
+                        currentAssistant.toolsConfig?.tools?.find((t: any) => t.type === 'end_call')?.enabled ? 'bg-background' : 'bg-muted-foreground/70',
                         currentAssistant.toolsConfig?.tools?.find((t: any) => t.type === 'end_call')?.enabled ? 'translate-x-6' : 'translate-x-1',
                       )}
                     />

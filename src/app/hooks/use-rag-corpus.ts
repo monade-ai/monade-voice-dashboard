@@ -207,6 +207,55 @@ export function useRagCorpus() {
     [],
   );
 
+  const toggleVertexRagTool = useCallback(
+    async (
+      assistantId: string,
+      enabled: boolean,
+      currentToolsConfig?: any,
+    ): Promise<any | null> => {
+      try {
+        const existingTools = Array.isArray(currentToolsConfig?.tools)
+          ? currentToolsConfig.tools
+          : [];
+        const existingVertexRag = existingTools.find((tool: any) => tool?.type === 'vertex_rag');
+        const toolsWithoutVertexRag = existingTools.filter((tool: any) => tool?.type !== 'vertex_rag');
+        const vertexRagTool = {
+          type: 'vertex_rag',
+          enabled,
+          config: {
+            rag_corpus: existingVertexRag?.config?.rag_corpus ?? '',
+            similarity_top_k: existingVertexRag?.config?.similarity_top_k ?? 10,
+            vector_distance_threshold: existingVertexRag?.config?.vector_distance_threshold ?? 0.3,
+          },
+        };
+        const toolsConfig = {
+          max_tool_steps: currentToolsConfig?.max_tool_steps ?? 3,
+          tools: [...toolsWithoutVertexRag, vertexRagTool],
+        };
+
+        const result = await fetchJson<any>(
+          `${API_BASE}/api/assistants/${encodeURIComponent(assistantId)}/tools-config`,
+          {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ toolsConfig }),
+            retry: { retries: 0 },
+          },
+        );
+
+        toast.success(enabled ? 'RAG tool enabled' : 'RAG tool disabled');
+
+        return result;
+      } catch (err) {
+        console.error('[useRagCorpus] toggleVertexRagTool error:', err);
+        toast.error('Failed to update RAG tool');
+
+        return null;
+      }
+    },
+    [],
+  );
+
   useEffect(() => {
     if (!authLoading) fetchCorpora();
   }, [authLoading, fetchCorpora]);
@@ -223,5 +272,6 @@ export function useRagCorpus() {
     detachFromAssistant,
     toggleTools,
     toggleEndCallTool,
+    toggleVertexRagTool,
   };
 }
