@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
 import {
   Trash2,
@@ -39,6 +39,8 @@ import {
 import { PaperCard, PaperCardContent, PaperCardHeader } from '@/components/ui/paper-card';
 import { cn } from '@/lib/utils';
 import { LibraryWorkshop } from '@/app/(app)/knowledge-base/components/library-workshop';
+import { fetchJson } from '@/lib/http';
+import { MONADE_API_BASE } from '@/config';
 
 import DeleteConfirmationModal from '../delete-confirmation-modal';
 
@@ -85,15 +87,48 @@ export default function AssistantStudio() {
   const [isWorkshopOpen, setIsWorkshopOpen] = useState(false);
   const [isTogglingTools, setIsTogglingTools] = useState(false);
   const [isTogglingCallCompletion, setIsTogglingCallCompletion] = useState(false);
+  const [isSyncingTools, setIsSyncingTools] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
+  const currentAssistantRef = useRef<Assistant | null>(null);
 
   const isDraft = currentAssistant?.id.startsWith('local-');
+
+  const syncToolsFromBackend = useCallback(async (assistantId: string) => {
+    try {
+      setIsSyncingTools(true);
+      const data = await fetchJson<any>(`${MONADE_API_BASE}/api/assistants/${encodeURIComponent(assistantId)}/tools-config`, {
+        retry: { retries: 0 },
+      });
+      const nextEnableTools = data?.enableTools ?? data?.assistant?.enableTools;
+      const nextToolsConfig = data?.toolsConfig ?? data?.assistant?.toolsConfig;
+      const latestAssistant = currentAssistantRef.current;
+      if (!latestAssistant || latestAssistant.id !== assistantId) return;
+      setCurrentAssistant({
+        ...latestAssistant,
+        enableTools: nextEnableTools ?? latestAssistant.enableTools ?? false,
+        toolsConfig: nextToolsConfig ?? latestAssistant.toolsConfig ?? null,
+      });
+    } catch (err) {
+      console.error('[AssistantStudio] Failed to sync tools state from backend:', err);
+    } finally {
+      setIsSyncingTools(false);
+    }
+  }, [setCurrentAssistant]);
 
   // Reset dirty flag when assistant changes
   useEffect(() => {
     setIsDirty(false);
     setSaveStatus('idle');
   }, [currentAssistant?.id]);
+
+  useEffect(() => {
+    currentAssistantRef.current = currentAssistant;
+  }, [currentAssistant]);
+
+  useEffect(() => {
+    if (!currentAssistant || isDraft) return;
+    syncToolsFromBackend(currentAssistant.id);
+  }, [currentAssistant?.id, isDraft, syncToolsFromBackend]);
 
   // Local-only update: updates state but does NOT save to backend
   const handleUpdate = (field: keyof Assistant, value: any) => {
@@ -465,54 +500,51 @@ export default function AssistantStudio() {
               description="Configure RAG retrieval and tool usage for this agent."
             >
               <div className="space-y-6">
-                {/* Tools Toggle */}
-                <div className={cn(
-                  'flex items-center justify-between p-4 rounded-md border border-border/40 bg-muted/[0.03]',
-                  !currentAssistant.enableTools && 'opacity-50',
-                )}>
-                  <div className="flex items-center gap-3">
-                    {currentAssistant.enableTools ? (
-                      <ToggleRight size={20} className="text-green-500" />
-                    ) : (
-                      <ToggleLeft size={20} className="text-muted-foreground" />
-                    )}
-                    <div>
-                      <h4 className="text-sm font-bold tracking-tight">Tool Usage</h4>
-                      <p className="text-[10px] text-muted-foreground/60">
-                        {currentAssistant.enableTools
-                          ? 'Agent can use tools (RAG search) during calls'
-                          : 'Tools are disabled for this agent'}
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    disabled={isTogglingTools}
-                    onClick={async () => {
-                      setIsTogglingTools(true);
-                      const newValue = !currentAssistant.enableTools;
-                      const ok = await toggleTools(currentAssistant.id, newValue);
-                      if (ok) {
-                        setCurrentAssistant({ ...currentAssistant, enableTools: newValue });
-                      }
-                      setIsTogglingTools(false);
-                    }}
-                    className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 disabled:opacity-50 disabled:cursor-not-allowed"
-                    style={{ backgroundColor: currentAssistant.enableTools ? '#22c55e' : 'hsl(var(--muted))' }}
-                  >
-                    <span
-                      className={cn(
-                        'inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform',
-                        currentAssistant.enableTools ? 'translate-x-6' : 'translate-x-1',
+                <div className="space-y-4 p-4 rounded-md border border-border/40 bg-muted/[0.03]">
+                  {/* Tools Toggle */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      {currentAssistant.enableTools ? (
+                        <ToggleRight size={20} className="text-green-500" />
+                      ) : (
+                        <ToggleLeft size={20} className="text-muted-foreground" />
                       )}
-                    />
-                    {isTogglingTools && (
-                      <Loader2 size={10} className="absolute inset-0 m-auto animate-spin text-white" />
-                    )}
-                  </button>
-                </div>
+                      <div>
+                        <h4 className="text-sm font-bold tracking-tight">Tool Usage</h4>
+                        <p className="text-[10px] text-muted-foreground/60">
+                          {currentAssistant.enableTools
+                            ? 'Master switch is ON. Configure individual tools below.'
+                            : 'Master switch is OFF. All tools and function calling are disabled.'}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      disabled={isTogglingTools || isSyncingTools}
+                      onClick={async () => {
+                        setIsTogglingTools(true);
+                        const newValue = !currentAssistant.enableTools;
+                        await toggleTools(currentAssistant.id, newValue);
+                        await syncToolsFromBackend(currentAssistant.id);
+                        setIsTogglingTools(false);
+                      }}
+                      className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 disabled:opacity-50 disabled:cursor-not-allowed"
+                      style={{ backgroundColor: currentAssistant.enableTools ? '#22c55e' : 'hsl(var(--muted))' }}
+                    >
+                      <span
+                        className={cn(
+                          'inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform',
+                          currentAssistant.enableTools ? 'translate-x-6' : 'translate-x-1',
+                        )}
+                      />
+                      {(isTogglingTools || isSyncingTools) && (
+                        <Loader2 size={10} className="absolute inset-0 m-auto animate-spin text-white" />
+                      )}
+                    </button>
+                  </div>
 
-                {/* RAG Corpus Attach */}
-                <div className={cn('space-y-2', !currentAssistant.enableTools && 'opacity-50')}>
+                  <div className="border-t border-border/30 pt-4 space-y-4">
+                    {/* RAG Corpus Attach */}
+                    <div className={cn('space-y-2', !currentAssistant.enableTools && 'opacity-50')}>
                   <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 px-1">RAG Corpus</label>
                   <p className="text-[10px] text-muted-foreground/60 px-1 italic mb-2">
                     Attach a RAG corpus so the agent can search through your documents during live calls. Create corpora from the RAG Corpora page.
@@ -545,15 +577,11 @@ export default function AssistantStudio() {
                             <Button
                               variant="outline"
                               size="sm"
-                              disabled={!currentAssistant.enableTools}
+                              disabled={!currentAssistant.enableTools || isSyncingTools}
                               onClick={async () => {
                                 const ok = await detachFromAssistant(currentAssistant.id);
                                 if (ok) {
-                                  setCurrentAssistant({
-                                    ...currentAssistant,
-                                    enableTools: false,
-                                    toolsConfig: null,
-                                  });
+                                  await syncToolsFromBackend(currentAssistant.id);
                                 }
                               }}
                               className="text-[10px] font-bold uppercase tracking-widest h-8 text-red-500 border-red-500/30 hover:bg-red-500/5"
@@ -563,17 +591,13 @@ export default function AssistantStudio() {
                           </div>
                         ) : (
                           <Select
-                            disabled={!currentAssistant.enableTools}
+                            disabled={!currentAssistant.enableTools || isSyncingTools}
                             value="__none__"
                             onValueChange={async (corpusId) => {
                               if (corpusId === '__none__') return;
                               const ok = await attachToAssistant(currentAssistant.id, corpusId);
                               if (ok) {
-                                // Re-fetch assistant to get updated toolsConfig
-                                setCurrentAssistant({
-                                  ...currentAssistant,
-                                  enableTools: true,
-                                });
+                                await syncToolsFromBackend(currentAssistant.id);
                               }
                             }}
                           >
@@ -603,10 +627,10 @@ export default function AssistantStudio() {
                       </div>
                     );
                   })()}
-                </div>
+                    </div>
 
-                {/* Call Completion Tool Toggle */}
-                <div className="flex items-center justify-between p-4 rounded-md border border-border/40 bg-muted/[0.03]">
+                    {/* Call Completion Tool Toggle */}
+                    <div className={cn('flex items-center justify-between p-4 rounded-md border border-border/40 bg-background', !currentAssistant.enableTools && 'opacity-50')}>
                   <div className="flex items-center gap-3">
                     {currentAssistant.toolsConfig?.tools?.find((t: any) => t.type === 'end_call')?.enabled ? (
                       <ToggleRight size={20} className="text-green-500" />
@@ -639,28 +663,13 @@ export default function AssistantStudio() {
                     </div>
                   </div>
                   <button
-                    disabled={isTogglingCallCompletion || !currentAssistant.enableTools}
+                    disabled={isTogglingCallCompletion || !currentAssistant.enableTools || isSyncingTools}
                     onClick={async () => {
                       setIsTogglingCallCompletion(true);
                       const isEnabled = !!currentAssistant.toolsConfig?.tools?.find((t: any) => t.type === 'end_call')?.enabled;
                       const newValue = !isEnabled;
-                      const result = await toggleEndCallTool(currentAssistant.id, newValue, currentAssistant.toolsConfig);
-                      if (result) {
-                        const updatedToolsConfig = result?.toolsConfig || result?.assistant?.toolsConfig || {
-                          ...(currentAssistant.toolsConfig || {}),
-                          max_tool_steps: currentAssistant.toolsConfig?.max_tool_steps ?? 3,
-                          tools: [
-                            ...(Array.isArray(currentAssistant.toolsConfig?.tools)
-                              ? currentAssistant.toolsConfig.tools.filter((tool: any) => tool?.type !== 'end_call')
-                              : []),
-                            { type: 'end_call', enabled: newValue },
-                          ],
-                        };
-                        setCurrentAssistant({
-                          ...currentAssistant,
-                          toolsConfig: updatedToolsConfig,
-                        });
-                      }
+                      await toggleEndCallTool(currentAssistant.id, newValue, currentAssistant.toolsConfig);
+                      await syncToolsFromBackend(currentAssistant.id);
                       setIsTogglingCallCompletion(false);
                     }}
                     className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -680,6 +689,8 @@ export default function AssistantStudio() {
                       <Loader2 size={10} className="absolute inset-0 m-auto animate-spin text-white" />
                     )}
                   </button>
+                </div>
+                  </div>
                 </div>
               </div>
             </WorkflowStep>
