@@ -1880,7 +1880,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"toolsConfig\": {\n    \"max_tool_steps\": 3,\n    \"tools\": [\n      {\n        \"type\": \"vertex_rag\",\n        \"enabled\": true,\n        \"config\": {\n          \"rag_corpus\": \"projects/YOUR_PROJECT/locations/us-central1/ragCorpora/YOUR_CORPUS_ID\",\n          \"similarity_top_k\": 10,\n          \"vector_distance_threshold\": 0.3\n        }\n      }\n    ]\n  }\n}"
+                  "raw": "{\n  \"toolsConfig\": {\n    \"max_tool_steps\": 3,\n    \"tools\": [\n      {\n        \"type\": \"vertex_rag\",\n        \"enabled\": true,\n        \"config\": {\n          \"rag_corpus\": \"projects/YOUR_PROJECT/locations/us-central1/ragCorpora/YOUR_CORPUS_ID\",\n          \"similarity_top_k\": 10,\n          \"vector_distance_threshold\": 0.3\n        }\n      },\n      {\n        \"type\": \"end_call\",\n        \"enabled\": false\n      }\n    ]\n  }\n}"
                 },
                 "url": {
                   "raw": "{{base_url}}/db_services/api/assistants/{{assistant_id}}/tools-config",
@@ -1895,7 +1895,7 @@
                     "tools-config"
                   ]
                 },
-                "description": "Update the tools configuration for a specific assistant. Supports vertex_rag tool type. Set toolsConfig to null to remove all tools. Each tool has its own enabled toggle."
+                "description": "Update the tools configuration for a specific assistant. Supports vertex_rag and end_call tool types. Set toolsConfig to null to remove all tools. Each tool has its own enabled toggle. end_call is disabled by default and must be explicitly enabled. When active, it allows the agent to hang up when the conversation is complete. The enableTools master toggle must also be true for any tools to work."
               },
               "response": []
             },
@@ -4755,7 +4755,7 @@
       "key": "ba_api_key_id",
       "value": "",
       "type": "string",
-      "description": "BetterAuth API key ID (for delete operations) "
+      "description": "BetterAuth API key ID (for delete operations)"
     }
   ]
 }

@@ -17,6 +17,7 @@ import {
   Database,
   ToggleLeft,
   ToggleRight,
+  Info,
 } from 'lucide-react';
 
 import { useAssistants, Assistant } from '@/app/hooks/use-assistants-context';
@@ -27,6 +28,7 @@ import { useUserTrunks } from '@/app/hooks/use-user-trunks';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   Select,
   SelectContent,
@@ -74,7 +76,7 @@ export default function AssistantStudio() {
   const { trunks, phoneNumbers } = useTrunks({ checkAssignments: false });
   const { trunks: userTrunks } = useUserTrunks();
   const inboundTrunks = userTrunks.filter(t => t.trunk_type === 'inbound');
-  const { corpora, attachToAssistant, detachFromAssistant, toggleTools } = useRagCorpus();
+  const { corpora, attachToAssistant, detachFromAssistant, toggleTools, toggleEndCallTool } = useRagCorpus();
 
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -82,6 +84,7 @@ export default function AssistantStudio() {
   const [isDeploying, setIsDeploying] = useState(false);
   const [isWorkshopOpen, setIsWorkshopOpen] = useState(false);
   const [isTogglingTools, setIsTogglingTools] = useState(false);
+  const [isTogglingCallCompletion, setIsTogglingCallCompletion] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
 
   const isDraft = currentAssistant?.id.startsWith('local-');
@@ -463,7 +466,10 @@ export default function AssistantStudio() {
             >
               <div className="space-y-6">
                 {/* Tools Toggle */}
-                <div className="flex items-center justify-between p-4 rounded-md border border-border/40 bg-muted/[0.03]">
+                <div className={cn(
+                  'flex items-center justify-between p-4 rounded-md border border-border/40 bg-muted/[0.03]',
+                  !currentAssistant.enableTools && 'opacity-50',
+                )}>
                   <div className="flex items-center gap-3">
                     {currentAssistant.enableTools ? (
                       <ToggleRight size={20} className="text-green-500" />
@@ -506,11 +512,16 @@ export default function AssistantStudio() {
                 </div>
 
                 {/* RAG Corpus Attach */}
-                <div className="space-y-2">
+                <div className={cn('space-y-2', !currentAssistant.enableTools && 'opacity-50')}>
                   <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 px-1">RAG Corpus</label>
                   <p className="text-[10px] text-muted-foreground/60 px-1 italic mb-2">
                     Attach a RAG corpus so the agent can search through your documents during live calls. Create corpora from the RAG Corpora page.
                   </p>
+                  {!currentAssistant.enableTools && (
+                    <p className="text-[10px] text-muted-foreground/70 px-1">
+                      Turn on Tool Usage first to configure RAG.
+                    </p>
+                  )}
                   {(() => {
                     // Detect currently attached corpus
                     const attachedResource = currentAssistant.toolsConfig?.tools
@@ -534,6 +545,7 @@ export default function AssistantStudio() {
                             <Button
                               variant="outline"
                               size="sm"
+                              disabled={!currentAssistant.enableTools}
                               onClick={async () => {
                                 const ok = await detachFromAssistant(currentAssistant.id);
                                 if (ok) {
@@ -551,6 +563,7 @@ export default function AssistantStudio() {
                           </div>
                         ) : (
                           <Select
+                            disabled={!currentAssistant.enableTools}
                             value="__none__"
                             onValueChange={async (corpusId) => {
                               if (corpusId === '__none__') return;
@@ -590,6 +603,83 @@ export default function AssistantStudio() {
                       </div>
                     );
                   })()}
+                </div>
+
+                {/* Call Completion Tool Toggle */}
+                <div className="flex items-center justify-between p-4 rounded-md border border-border/40 bg-muted/[0.03]">
+                  <div className="flex items-center gap-3">
+                    {currentAssistant.toolsConfig?.tools?.find((t: any) => t.type === 'end_call')?.enabled ? (
+                      <ToggleRight size={20} className="text-green-500" />
+                    ) : (
+                      <ToggleLeft size={20} className="text-muted-foreground" />
+                    )}
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-sm font-bold tracking-tight">Auto Call Wrap-Up</h4>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              type="button"
+                              className="inline-flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+                              aria-label="About Auto Call Wrap-Up"
+                            >
+                              <Info size={13} />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="max-w-[260px] text-[11px] leading-relaxed">
+                            Allows the agent to use the call-end function to hang up when the conversation is complete.
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                      <p className="text-[10px] text-muted-foreground/60">
+                        {currentAssistant.enableTools
+                          ? 'Choose whether the agent can end calls using function calling'
+                          : 'Enable Tool Usage above for this to take effect during calls'}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    disabled={isTogglingCallCompletion || !currentAssistant.enableTools}
+                    onClick={async () => {
+                      setIsTogglingCallCompletion(true);
+                      const isEnabled = !!currentAssistant.toolsConfig?.tools?.find((t: any) => t.type === 'end_call')?.enabled;
+                      const newValue = !isEnabled;
+                      const result = await toggleEndCallTool(currentAssistant.id, newValue, currentAssistant.toolsConfig);
+                      if (result) {
+                        const updatedToolsConfig = result?.toolsConfig || result?.assistant?.toolsConfig || {
+                          ...(currentAssistant.toolsConfig || {}),
+                          max_tool_steps: currentAssistant.toolsConfig?.max_tool_steps ?? 3,
+                          tools: [
+                            ...(Array.isArray(currentAssistant.toolsConfig?.tools)
+                              ? currentAssistant.toolsConfig.tools.filter((tool: any) => tool?.type !== 'end_call')
+                              : []),
+                            { type: 'end_call', enabled: newValue },
+                          ],
+                        };
+                        setCurrentAssistant({
+                          ...currentAssistant,
+                          toolsConfig: updatedToolsConfig,
+                        });
+                      }
+                      setIsTogglingCallCompletion(false);
+                    }}
+                    className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    style={{
+                      backgroundColor: currentAssistant.toolsConfig?.tools?.find((t: any) => t.type === 'end_call')?.enabled
+                        ? '#22c55e'
+                        : 'hsl(var(--muted))',
+                    }}
+                  >
+                    <span
+                      className={cn(
+                        'inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform',
+                        currentAssistant.toolsConfig?.tools?.find((t: any) => t.type === 'end_call')?.enabled ? 'translate-x-6' : 'translate-x-1',
+                      )}
+                    />
+                    {isTogglingCallCompletion && (
+                      <Loader2 size={10} className="absolute inset-0 m-auto animate-spin text-white" />
+                    )}
+                  </button>
                 </div>
               </div>
             </WorkflowStep>

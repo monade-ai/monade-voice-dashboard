@@ -167,6 +167,46 @@ export function useRagCorpus() {
     }
   }, []);
 
+  const toggleEndCallTool = useCallback(
+    async (
+      assistantId: string,
+      enabled: boolean,
+      currentToolsConfig?: any,
+    ): Promise<any | null> => {
+      try {
+        const existingTools = Array.isArray(currentToolsConfig?.tools)
+          ? currentToolsConfig.tools
+          : [];
+        const toolsWithoutEndCall = existingTools.filter((tool: any) => tool?.type !== 'end_call');
+        const endCallTool = { type: 'end_call', enabled };
+        const toolsConfig = {
+          max_tool_steps: currentToolsConfig?.max_tool_steps ?? 3,
+          tools: [...toolsWithoutEndCall, endCallTool],
+        };
+
+        const result = await fetchJson<any>(
+          `${API_BASE}/api/assistants/${encodeURIComponent(assistantId)}/tools-config`,
+          {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ toolsConfig }),
+            retry: { retries: 0 },
+          },
+        );
+
+        toast.success(enabled ? 'Call completion tool enabled' : 'Call completion tool disabled');
+
+        return result;
+      } catch (err) {
+        console.error('[useRagCorpus] toggleEndCallTool error:', err);
+        toast.error('Failed to update call completion tool');
+
+        return null;
+      }
+    },
+    [],
+  );
+
   useEffect(() => {
     if (!authLoading) fetchCorpora();
   }, [authLoading, fetchCorpora]);
@@ -182,5 +222,6 @@ export function useRagCorpus() {
     attachToAssistant,
     detachFromAssistant,
     toggleTools,
+    toggleEndCallTool,
   };
 }
