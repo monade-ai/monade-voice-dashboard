@@ -64,14 +64,17 @@ function ApiKeyRow({
   const [copied, setCopied] = useState(false);
 
   const displayKey = fullKey || apiKey.key;
-  const prefix = apiKey.start || apiKey.prefix || '';
+  const prefix = apiKey.start || apiKey.prefix || (displayKey ? displayKey.slice(0, 10) : '');
   const maskedKey = `${prefix}${'•'.repeat(24)}`;
 
   const handleCopy = () => {
-    const textToCopy = displayKey || prefix;
-    navigator.clipboard.writeText(textToCopy);
+    if (!displayKey) {
+      toast.error('Full key is not available for this entry');
+      return;
+    }
+    navigator.clipboard.writeText(displayKey);
     setCopied(true);
-    toast.success(displayKey ? 'Full key copied' : 'Key prefix copied');
+    toast.success('Full key copied');
     setTimeout(() => setCopied(false), 2000);
   };
 
@@ -141,7 +144,7 @@ function ApiKeyRow({
         <button
           onClick={handleCopy}
           className="h-8 w-8 inline-flex items-center justify-center rounded-[4px] border border-border/30 text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all"
-          title={displayKey ? 'Copy full key' : 'Copy prefix'}
+          title="Copy full key"
         >
           {copied ? <Check size={13} className="text-green-500" /> : <Copy size={13} />}
         </button>
@@ -189,8 +192,8 @@ export default function ApiKeysPage() {
       name: k?.name,
       start: k?.start,
       prefix: k?.prefix,
-      key: k?.key,
-      enabled: k?.enabled ?? true,
+      key: k?.key ?? k?.api_key ?? k?.rawKey ?? k?.token ?? k?.value ?? undefined,
+      enabled: k?.enabled ?? k?.is_active ?? true,
       requestCount: k?.requestCount ?? k?.request_count,
       remaining: k?.remaining,
       expiresAt: k?.expiresAt ?? k?.expires_at,
@@ -230,8 +233,9 @@ export default function ApiKeysPage() {
         body: JSON.stringify({ name: newKeyName.trim() || `Key ${new Date().toLocaleDateString()}` }),
         retry: { retries: 0 },
       });
-      const fullKey = data?.key ?? data?.api_key ?? data?.rawKey ?? data?.token ?? null;
-      const keyId = data?.id ?? data?.keyId ?? null;
+      const payload = data?.data ?? data;
+      const fullKey = payload?.key ?? payload?.api_key ?? payload?.rawKey ?? payload?.token ?? payload?.value ?? null;
+      const keyId = payload?.id ?? payload?.keyId ?? payload?.key_id ?? null;
       if (fullKey && keyId) {
         setFullKeys(prev => ({ ...prev, [String(keyId)]: fullKey }));
       }
