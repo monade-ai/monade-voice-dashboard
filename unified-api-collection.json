@@ -1415,7 +1415,7 @@
                     "topup-credits"
                   ]
                 },
-                "description": "Top up both total_credits and available_credits for a user by adding the specified amount to both fields. The amount must be greater than 0."
+                "description": "Top up both total_credits and available_credits for a user. If a live Redis wallet exists for an active call, the system mirrors the increment to Redis first (non-blocking to billing) so real-time billing state stays in sync. Amount must be greater than 0."
               },
               "response": []
             }
@@ -1597,6 +1597,79 @@
                   ]
                 },
                 "description": "Directly update a user's available credits to a specific amount. This is typically used by the billing service to sync the final balance from Redis to the database."
+              },
+              "response": []
+            },
+            {
+              "name": "Top Up User Credits",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"amount\": 100\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/db_services/api/users/{{user_uid}}/topup-credits",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "db_services",
+                    "api",
+                    "users",
+                    "{{user_uid}}",
+                    "topup-credits"
+                  ]
+                },
+                "description": "Top up both total_credits and available_credits for a user. If a live Redis wallet exists for an active call, the system mirrors the increment to Redis first (non-blocking to billing) so real-time billing state stays in sync. Amount must be greater than 0."
+              },
+              "response": []
+            },
+            {
+              "name": "Settle Call Credits (Delta)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{api_key}}",
+                    "description": "API Key or Service Token for authentication"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"call_id\": \"{{call_id}}\",\n  \"spent_credits\": 3.0\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/db_services/api/users/{{user_uid}}/credits/settle-call",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "db_services",
+                    "api",
+                    "users",
+                    "{{user_uid}}",
+                    "credits",
+                    "settle-call"
+                  ]
+                },
+                "description": "Idempotent call settlement by spent credit delta. Safe with mid-call topups. Does not overwrite DB absolute balance."
               },
               "response": []
             }
@@ -2119,7 +2192,7 @@
                     "attach-rag"
                   ]
                 },
-                "description": "Simple convenience endpoint to attach a RAG corpus to an assistant. Automatically builds toolsConfig JSON and enables tools. Frontend just sends the corpus DB ID — no need to craft complex JSON. Validates user ownership (corpus must belong to same user as assistant)."
+                "description": "Simple convenience endpoint to attach a RAG corpus to an assistant. Automatically builds toolsConfig JSON and enables tools. Frontend just sends the corpus DB ID \u2014 no need to craft complex JSON. Validates user ownership (corpus must belong to same user as assistant)."
               },
               "response": []
             },
@@ -3533,7 +3606,7 @@
                     }
                   ]
                 },
-                "description": "Kick off async recording preparation pipeline. The backend fetches the recording from Vobiz (using sip_call_id), downloads the audio file, uploads it to GCS temp storage, and generates a 30-minute signed URL for streaming/download.\n\nReturns immediately with status. Frontend should poll the /status endpoint every 2-3 seconds.\n\n**Response statuses:**\n- `{\"status\": \"processing\"}` — Pipeline started, poll /status for updates\n- `{\"status\": \"ready\", \"url\": \"...\", \"download_url\": \"...\"}` — Cache hit (repeat click within 30min), url is for streaming (<audio src>), download_url triggers browser download\n- `{\"status\": \"failed\", \"error\": \"...\"}` — Previous attempt failed\n\n**Error responses:**\n- 404: Analytics record not found or no sip_call_id available\n- 503: Cloud storage or Vobiz not configured\n\n**Notes:**\n- Preparation takes 15-40 seconds depending on file size\n- Signed URLs expire after 30 minutes; repeat requests within that window return cached URLs instantly\n- Both .mp3 and .wav formats are supported\n- The url field returns an inline signed URL (for <audio> playback with seeking support)\n- The download_url field returns an attachment signed URL (triggers browser save-as dialog)"
+                "description": "Kick off async recording preparation pipeline. The backend fetches the recording from Vobiz (using sip_call_id), downloads the audio file, uploads it to GCS temp storage, and generates a 30-minute signed URL for streaming/download.\n\nReturns immediately with status. Frontend should poll the /status endpoint every 2-3 seconds.\n\n**Response statuses:**\n- `{\"status\": \"processing\"}` \u2014 Pipeline started, poll /status for updates\n- `{\"status\": \"ready\", \"url\": \"...\", \"download_url\": \"...\"}` \u2014 Cache hit (repeat click within 30min), url is for streaming (<audio src>), download_url triggers browser download\n- `{\"status\": \"failed\", \"error\": \"...\"}` \u2014 Previous attempt failed\n\n**Error responses:**\n- 404: Analytics record not found or no sip_call_id available\n- 503: Cloud storage or Vobiz not configured\n\n**Notes:**\n- Preparation takes 15-40 seconds depending on file size\n- Signed URLs expire after 30 minutes; repeat requests within that window return cached URLs instantly\n- Both .mp3 and .wav formats are supported\n- The url field returns an inline signed URL (for <audio> playback with seeking support)\n- The download_url field returns an attachment signed URL (triggers browser save-as dialog)"
               },
               "response": []
             },
@@ -3568,7 +3641,7 @@
                     }
                   ]
                 },
-                "description": "Poll this endpoint every 2-3 seconds after calling POST /recording/prepare to check if the recording is ready.\n\n**Response statuses:**\n- `{\"status\": \"processing\"}` — Still downloading/uploading, keep polling\n- `{\"status\": \"ready\", \"url\": \"https://storage.googleapis.com/...signed...\", \"download_url\": \"https://storage.googleapis.com/...signed...\"}` — Recording ready. Use `url` as <audio src> for streaming playback (supports seeking). Use `download_url` in an <a href download> for saving the file.\n- `{\"status\": \"failed\", \"error\": \"Recording not yet available from Vobiz\"}` — Pipeline failed, show error to user\n- `{\"status\": \"not_started\"}` — prepare was never called for this call_id\n\n**Frontend usage:**\n```js\n// Poll until ready\nconst poll = setInterval(async () => {\n  const res = await fetch(`/api/analytics/${callId}/recording/status`);\n  const data = await res.json();\n  if (data.status === 'ready') {\n    clearInterval(poll);\n    audioElement.src = data.url; // streaming playback\n    // data.download_url available for download button\n  } else if (data.status === 'failed') {\n    clearInterval(poll);\n    showError(data.error);\n  }\n}, 3000);\n```\n\n**Notes:**\n- Status is stored in Redis with 30min TTL matching the signed URL expiry\n- After TTL expires, status returns not_started and prepare must be called again\n- Both url and download_url are GCS signed URLs valid for 30 minutes"
+                "description": "Poll this endpoint every 2-3 seconds after calling POST /recording/prepare to check if the recording is ready.\n\n**Response statuses:**\n- `{\"status\": \"processing\"}` \u2014 Still downloading/uploading, keep polling\n- `{\"status\": \"ready\", \"url\": \"https://storage.googleapis.com/...signed...\", \"download_url\": \"https://storage.googleapis.com/...signed...\"}` \u2014 Recording ready. Use `url` as <audio src> for streaming playback (supports seeking). Use `download_url` in an <a href download> for saving the file.\n- `{\"status\": \"failed\", \"error\": \"Recording not yet available from Vobiz\"}` \u2014 Pipeline failed, show error to user\n- `{\"status\": \"not_started\"}` \u2014 prepare was never called for this call_id\n\n**Frontend usage:**\n```js\n// Poll until ready\nconst poll = setInterval(async () => {\n  const res = await fetch(`/api/analytics/${callId}/recording/status`);\n  const data = await res.json();\n  if (data.status === 'ready') {\n    clearInterval(poll);\n    audioElement.src = data.url; // streaming playback\n    // data.download_url available for download button\n  } else if (data.status === 'failed') {\n    clearInterval(poll);\n    showError(data.error);\n  }\n}, 3000);\n```\n\n**Notes:**\n- Status is stored in Redis with 30min TTL matching the signed URL expiry\n- After TTL expires, status returns not_started and prepare must be called again\n- Both url and download_url are GCS signed URLs valid for 30 minutes"
               },
               "response": []
             }
@@ -4556,7 +4629,7 @@
                     }
                   ]
                 },
-                "description": "List all active call sessions for a user. Returns each session's phone_number, room_name, call_id, duration_seconds, and started_at timestamp. Use this to populate a dashboard showing live calls."
+                "description": "List active sessions for a specific user from per-user Redis active call sets. Returns call_id, room_name, phone_number, target_phone_number, call_direction, started_at, duration_seconds. Auto-heals stale Redis entries when call hashes are missing."
               },
               "response": []
             }
@@ -4635,6 +4708,126 @@
                   ]
                 },
                 "description": "Disconnect an active call by phone number. Looks up the room from Redis and sends a graceful disconnect signal. Since one phone number can only have one active call, this is a safe 1:1 lookup. Returns the matched room_name and call_id. Agent says farewell and disconnects within ~30 seconds."
+              },
+              "response": []
+            },
+            {
+              "name": "Graceful Disconnect All User Sessions",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"reason\": \"manual_disconnect\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/session-manager/sessions/{{user_uid}}/disconnect/graceful",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "session-manager",
+                    "sessions",
+                    "{{user_uid}}",
+                    "disconnect",
+                    "graceful"
+                  ],
+                  "variable": [
+                    {
+                      "key": "user_uid",
+                      "value": "{{user_uid}}",
+                      "description": "Monade user UID"
+                    }
+                  ]
+                },
+                "description": "Send graceful disconnect signals to all active rooms for a user."
+              },
+              "response": []
+            },
+            {
+              "name": "Instant Disconnect All User Sessions",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"reason\": \"wallet_exhausted\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/session-manager/sessions/{{user_uid}}/disconnect/instant",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "session-manager",
+                    "sessions",
+                    "{{user_uid}}",
+                    "disconnect",
+                    "instant"
+                  ],
+                  "variable": [
+                    {
+                      "key": "user_uid",
+                      "value": "{{user_uid}}",
+                      "description": "Monade user UID"
+                    }
+                  ]
+                },
+                "description": "Instantly terminate all active rooms for a user by deleting LiveKit rooms and cleaning Redis call state."
+              },
+              "response": []
+            },
+            {
+              "name": "Disconnect User Call By Phone (Mode)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"mode\": \"instant\",\n  \"reason\": \"user_requested\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/session-manager/sessions/{{user_uid}}/disconnect/by-phone/{{phone_number}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "session-manager",
+                    "sessions",
+                    "{{user_uid}}",
+                    "disconnect",
+                    "by-phone",
+                    "{{phone_number}}"
+                  ],
+                  "variable": [
+                    {
+                      "key": "user_uid",
+                      "value": "{{user_uid}}",
+                      "description": "Monade user UID"
+                    },
+                    {
+                      "key": "phone_number",
+                      "value": "{{phone_number}}",
+                      "description": "Callee/destination phone number"
+                    }
+                  ]
+                },
+                "description": "Disconnect one active call by callee phone number. mode=instant deletes room+cleans Redis. mode=graceful sends graceful signal."
               },
               "response": []
             }

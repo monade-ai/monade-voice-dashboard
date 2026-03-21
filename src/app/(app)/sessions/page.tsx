@@ -17,7 +17,7 @@ import { PaperCard, PaperCardContent } from '@/components/ui/paper-card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { useSessions, ActiveSession } from '@/app/hooks/use-sessions';
+import { useSessions, ActiveSession, DisconnectMode } from '@/app/hooks/use-sessions';
 
 // --- Helpers ---
 
@@ -47,7 +47,7 @@ function SessionCard({
     isDisconnecting,
 }: {
     session: ActiveSession;
-    onDisconnect: () => void;
+    onDisconnect: (mode: DisconnectMode) => void;
     isDisconnecting: boolean;
 }) {
     const [elapsed, setElapsed] = useState(session.duration_seconds || 0);
@@ -63,6 +63,9 @@ function SessionCard({
         return () => clearInterval(interval);
     }, [session.started_at, session.duration_seconds]);
 
+    const displayPhone = session.target_phone_number || session.phone_number || 'Unknown';
+    const direction = session.call_direction || 'unknown';
+
     return (
         <PaperCard variant="default" className="bg-card/50 border-border/40">
             <PaperCardContent className="p-6">
@@ -73,20 +76,35 @@ function SessionCard({
                         </div>
                         <div className="flex flex-col">
                             <span className="text-base font-semibold tracking-tight text-foreground">
-                                {session.phone_number}
+                                {displayPhone}
                             </span>
                             <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-mono">
                                 {session.call_id?.substring(0, 12) || 'N/A'}
                             </span>
                         </div>
                     </div>
-                    <div className="flex items-center gap-1.5">
-                        <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                        <span className="text-[10px] font-bold uppercase tracking-widest text-green-600">Live</span>
+                    <div className="flex items-center gap-2">
+                        <Badge
+                            variant="outline"
+                            className={cn(
+                                'text-[8px] font-bold px-1.5 py-0.5 rounded-[2px] uppercase tracking-widest font-mono',
+                                direction === 'outbound'
+                                    ? 'border-blue-500/30 text-blue-500 bg-blue-500/5'
+                                    : direction === 'inbound'
+                                        ? 'border-purple-500/30 text-purple-500 bg-purple-500/5'
+                                        : 'border-border text-muted-foreground',
+                            )}
+                        >
+                            {direction}
+                        </Badge>
+                        <div className="flex items-center gap-1.5">
+                            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                            <span className="text-[10px] font-bold uppercase tracking-widest text-green-600">Live</span>
+                        </div>
                     </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4 mb-6">
+                <div className="grid grid-cols-2 gap-4 mb-4">
                     <div className="space-y-1">
                         <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-muted-foreground/50">Duration</p>
                         <div className="flex items-center gap-1.5">
@@ -102,35 +120,69 @@ function SessionCard({
                     </div>
                 </div>
 
+                {/* Show both phone numbers if target differs from source */}
+                {session.target_phone_number && session.phone_number && session.target_phone_number !== session.phone_number && (
+                    <div className="grid grid-cols-2 gap-4 mb-4">
+                        <div className="space-y-1">
+                            <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-muted-foreground/50">From</p>
+                            <span className="text-[11px] font-mono text-muted-foreground">{session.phone_number}</span>
+                        </div>
+                        <div className="space-y-1">
+                            <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-muted-foreground/50">To</p>
+                            <span className="text-[11px] font-mono text-foreground">{session.target_phone_number}</span>
+                        </div>
+                    </div>
+                )}
+
                 <div className="mb-6">
                     <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-muted-foreground/50 mb-1">Room</p>
                     <span className="text-[11px] font-mono text-muted-foreground break-all">{session.room_name}</span>
                 </div>
 
-                <button
-                    onClick={onDisconnect}
-                    disabled={isDisconnecting}
-                    className={cn(
-                        'w-full h-10 rounded-[4px] flex items-center justify-center gap-2',
-                        'bg-red-500/10 text-red-500 border border-red-500/20',
-                        'hover:bg-red-500 hover:text-white hover:border-red-500',
-                        'transition-all duration-200',
-                        'text-[10px] font-bold uppercase tracking-widest',
-                        'disabled:opacity-50 disabled:cursor-not-allowed',
-                    )}
-                >
-                    {isDisconnecting ? (
-                        <>
+                <div className="flex gap-2">
+                    <button
+                        onClick={() => onDisconnect('graceful')}
+                        disabled={isDisconnecting}
+                        className={cn(
+                            'flex-1 h-10 rounded-[4px] flex items-center justify-center gap-2',
+                            'bg-orange-500/10 text-orange-500 border border-orange-500/20',
+                            'hover:bg-orange-500 hover:text-white hover:border-orange-500',
+                            'transition-all duration-200',
+                            'text-[10px] font-bold uppercase tracking-widest',
+                            'disabled:opacity-50 disabled:cursor-not-allowed',
+                        )}
+                    >
+                        {isDisconnecting ? (
                             <Loader2 size={14} className="animate-spin" />
-                            Disconnecting...
-                        </>
-                    ) : (
-                        <>
-                            <PhoneOff size={14} />
-                            Disconnect Call
-                        </>
-                    )}
-                </button>
+                        ) : (
+                            <>
+                                <PhoneOff size={14} />
+                                Graceful
+                            </>
+                        )}
+                    </button>
+                    <button
+                        onClick={() => onDisconnect('instant')}
+                        disabled={isDisconnecting}
+                        className={cn(
+                            'flex-1 h-10 rounded-[4px] flex items-center justify-center gap-2',
+                            'bg-red-500/10 text-red-500 border border-red-500/20',
+                            'hover:bg-red-500 hover:text-white hover:border-red-500',
+                            'transition-all duration-200',
+                            'text-[10px] font-bold uppercase tracking-widest',
+                            'disabled:opacity-50 disabled:cursor-not-allowed',
+                        )}
+                    >
+                        {isDisconnecting ? (
+                            <Loader2 size={14} className="animate-spin" />
+                        ) : (
+                            <>
+                                <PhoneOff size={14} />
+                                Instant
+                            </>
+                        )}
+                    </button>
+                </div>
             </PaperCardContent>
         </PaperCard>
     );
@@ -229,7 +281,7 @@ export default function SessionsPage() {
                             <SessionCard
                                 key={session.room_name}
                                 session={session}
-                                onDisconnect={() => disconnectSession(session.room_name)}
+                                onDisconnect={(mode) => disconnectSession(session.room_name, mode)}
                                 isDisconnecting={disconnecting === session.room_name}
                             />
                         ))}

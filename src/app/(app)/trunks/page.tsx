@@ -39,26 +39,39 @@ function TrunkEditForm({
     onUnlink: () => void;
     saving: boolean;
 }) {
+    const isInbound = trunk.trunk_type === 'inbound';
     const [name, setName] = useState(trunk.name || '');
     const [address, setAddress] = useState(trunk.address || '');
     const [numbersStr, setNumbersStr] = useState(trunk.numbers?.join(', ') || '');
     const [authUsername, setAuthUsername] = useState(trunk.auth_username || '');
     const [authPassword, setAuthPassword] = useState('');
+    const [allowedNumbersStr, setAllowedNumbersStr] = useState(trunk.allowed_numbers?.join(', ') || '');
+    const [krispEnabled, setKrispEnabled] = useState(trunk.krisp_enabled ?? true);
 
     const [showUnlinkConfirm, setShowUnlinkConfirm] = useState(false);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         const numbers = numbersStr.split(',').map(n => n.trim()).filter(Boolean);
-        const data: UpdateTrunkData = {
-            name,
-            address,
-            numbers,
-            // Only send auth details if they are filled in (or clear them if empty)
-            auth_username: authUsername,
-            ...(authPassword ? { auth_password: authPassword } : {}),
-        };
-        onSave(data);
+        if (isInbound) {
+            const allowedNumbers = allowedNumbersStr.split(',').map(n => n.trim()).filter(Boolean);
+            const data: UpdateTrunkData = {
+                name,
+                numbers,
+                allowed_numbers: allowedNumbers,
+                krisp_enabled: krispEnabled,
+            };
+            onSave(data);
+        } else {
+            const data: UpdateTrunkData = {
+                name,
+                address,
+                numbers,
+                auth_username: authUsername,
+                ...(authPassword ? { auth_password: authPassword } : {}),
+            };
+            onSave(data);
+        }
     };
 
     if (showUnlinkConfirm) {
@@ -83,6 +96,10 @@ function TrunkEditForm({
             </div>
         );
     }
+
+    const canSubmit = isInbound
+        ? !saving && !!name
+        : !saving && !!name && !!address;
 
     return (
         <form onSubmit={handleSubmit} className="p-6 bg-muted/20 border-t border-border/20 rounded-b-[4px]">
@@ -111,40 +128,75 @@ function TrunkEditForm({
                     </div>
                 </div>
 
-                {/* Right Column */}
+                {/* Right Column - different for inbound vs outbound */}
                 <div className="space-y-4">
-                    <div className="space-y-1.5">
-                        <label className="text-[9px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60">SIP Base URI</label>
-                        <input
-                            type="text"
-                            value={address}
-                            onChange={(e) => setAddress(e.target.value)}
-                            required
-                            className="w-full h-9 px-3 rounded-[3px] border border-border/50 bg-background text-xs focus:outline-none focus:ring-1 focus:ring-primary/50 transition-all font-mono"
-                        />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-1.5">
-                            <label className="text-[9px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60">Auth Username</label>
-                            <input
-                                type="text"
-                                value={authUsername}
-                                onChange={(e) => setAuthUsername(e.target.value)}
-                                placeholder="Leaves blank if none"
-                                className="w-full h-9 px-3 rounded-[3px] border border-border/50 bg-background text-xs focus:outline-none focus:ring-1 focus:ring-primary/50 transition-all font-mono"
-                            />
-                        </div>
-                        <div className="space-y-1.5">
-                            <label className="text-[9px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60">Auth Password</label>
-                            <input
-                                type="password"
-                                value={authPassword}
-                                onChange={(e) => setAuthPassword(e.target.value)}
-                                placeholder="••••••••"
-                                className="w-full h-9 px-3 rounded-[3px] border border-border/50 bg-background text-xs focus:outline-none focus:ring-1 focus:ring-primary/50 transition-all font-mono tracking-widest"
-                            />
-                        </div>
-                    </div>
+                    {isInbound ? (
+                        <>
+                            <div className="space-y-1.5">
+                                <label className="text-[9px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60">Allowed Caller Numbers</label>
+                                <textarea
+                                    value={allowedNumbersStr}
+                                    onChange={(e) => setAllowedNumbersStr(e.target.value)}
+                                    placeholder="+1234567890, +1234567891 (leave empty to allow all)"
+                                    className="w-full h-20 px-3 py-2 rounded-[3px] border border-border/50 bg-background text-xs focus:outline-none focus:ring-1 focus:ring-primary/50 transition-all font-mono resize-none leading-relaxed"
+                                />
+                                <p className="text-[9px] text-muted-foreground font-medium">Comma-separated. Empty allows all callers.</p>
+                            </div>
+                            <div className="flex items-center gap-3 mt-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setKrispEnabled(!krispEnabled)}
+                                    className={cn(
+                                        'w-8 h-5 rounded-full transition-colors relative',
+                                        krispEnabled ? 'bg-primary' : 'bg-muted-foreground/30',
+                                    )}
+                                >
+                                    <span className={cn(
+                                        'absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform',
+                                        krispEnabled ? 'left-3.5' : 'left-0.5',
+                                    )} />
+                                </button>
+                                <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                                    Krisp Noise Cancellation
+                                </label>
+                            </div>
+                        </>
+                    ) : (
+                        <>
+                            <div className="space-y-1.5">
+                                <label className="text-[9px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60">SIP Base URI</label>
+                                <input
+                                    type="text"
+                                    value={address}
+                                    onChange={(e) => setAddress(e.target.value)}
+                                    required
+                                    className="w-full h-9 px-3 rounded-[3px] border border-border/50 bg-background text-xs focus:outline-none focus:ring-1 focus:ring-primary/50 transition-all font-mono"
+                                />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1.5">
+                                    <label className="text-[9px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60">Auth Username</label>
+                                    <input
+                                        type="text"
+                                        value={authUsername}
+                                        onChange={(e) => setAuthUsername(e.target.value)}
+                                        placeholder="Leaves blank if none"
+                                        className="w-full h-9 px-3 rounded-[3px] border border-border/50 bg-background text-xs focus:outline-none focus:ring-1 focus:ring-primary/50 transition-all font-mono"
+                                    />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-[9px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60">Auth Password</label>
+                                    <input
+                                        type="password"
+                                        value={authPassword}
+                                        onChange={(e) => setAuthPassword(e.target.value)}
+                                        placeholder="••••••••"
+                                        className="w-full h-9 px-3 rounded-[3px] border border-border/50 bg-background text-xs focus:outline-none focus:ring-1 focus:ring-primary/50 transition-all font-mono tracking-widest"
+                                    />
+                                </div>
+                            </div>
+                        </>
+                    )}
                 </div>
             </div>
 
@@ -164,7 +216,7 @@ function TrunkEditForm({
                     <Button
                         type="submit"
                         size="sm"
-                        disabled={saving || !name || !address}
+                        disabled={!canSubmit}
                         className="bg-foreground text-background hover:bg-foreground/90 text-[10px] font-bold uppercase tracking-widest gap-2 h-8 px-4"
                     >
                         {saving ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}

@@ -380,40 +380,55 @@ export default function AssistantStudio() {
                 {/* --- INBOUND CONFIG --- */}
                 {isInbound && (
                   <div className="space-y-4">
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 px-1">Inbound Trunk</label>
-                      <Select
-                        value={currentAssistant.inbound_trunk_id || '__none__'}
-                        onValueChange={(value) => handleUpdate('inbound_trunk_id', value === '__none__' ? null : value)}
-                      >
-                        <SelectTrigger className="bg-background border-border/40 h-12 text-base focus:border-primary transition-all rounded-md px-4">
-                          <SelectValue placeholder={inboundTrunks.length === 0 ? 'No inbound trunks available' : 'Select inbound trunk'} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="__none__">
-                            <span className="text-muted-foreground">None</span>
-                          </SelectItem>
-                          {inboundTrunks.map((trunk) => (
-                            <SelectItem key={trunk.id} value={trunk.livekit_trunk_id || trunk.id}>
-                              <div className="flex flex-col">
-                                <span className="font-medium">{trunk.name}</span>
-                                <span className="text-[10px] text-muted-foreground">{trunk.numbers?.join(', ')}</span>
-                              </div>
+                    <div className="grid grid-cols-2 gap-8">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 px-1">Inbound Trunk</label>
+                        <Select
+                          value={currentAssistant.inbound_trunk_id || '__none__'}
+                          onValueChange={(value) => handleUpdate('inbound_trunk_id', value === '__none__' ? null : value)}
+                        >
+                          <SelectTrigger className="bg-background border-border/40 h-12 text-base focus:border-primary transition-all rounded-md px-4">
+                            <SelectValue placeholder={inboundTrunks.length === 0 ? 'No inbound trunks available' : 'Select inbound trunk'} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__none__">
+                              <span className="text-muted-foreground">None</span>
                             </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      {inboundTrunks.length === 0 && (
-                        <p className="text-[10px] text-orange-500 px-1">No inbound trunks found. Create one in the Trunks page.</p>
-                      )}
-                      {/* Dispatch rule status */}
-                      <div className="flex items-center gap-2 px-1 mt-1">
-                        <div className={cn('w-2 h-2 rounded-full', currentAssistant.dispatch_rule_id ? 'bg-green-500' : 'bg-muted-foreground/30')} />
-                        <span className="text-[10px] text-muted-foreground/60">
-                          {currentAssistant.dispatch_rule_id
-                            ? 'Dispatch rule active'
-                            : 'Dispatch rule will be created on save'}
-                        </span>
+                            {inboundTrunks.map((trunk) => (
+                              <SelectItem key={trunk.id} value={trunk.livekit_trunk_id || trunk.id}>
+                                <div className="flex flex-col">
+                                  <span className="font-medium">{trunk.name}</span>
+                                  <span className="text-[10px] text-muted-foreground">{trunk.numbers?.join(', ')}</span>
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {inboundTrunks.length === 0 && (
+                          <p className="text-[10px] text-orange-500 px-1">No inbound trunks found. Create one in the Trunks page.</p>
+                        )}
+                        {/* Dispatch rule status */}
+                        <div className="flex items-center gap-2 px-1 mt-1">
+                          <div className={cn('w-2 h-2 rounded-full', currentAssistant.dispatch_rule_id ? 'bg-green-500' : 'bg-muted-foreground/30')} />
+                          <span className="text-[10px] text-muted-foreground/60">
+                            {currentAssistant.dispatch_rule_id
+                              ? 'Dispatch rule active'
+                              : 'Dispatch rule will be created on save'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 px-1">Phone Number</label>
+                        <Input
+                          value={currentAssistant.phoneNumber || ''}
+                          onChange={(e) => handleUpdate('phoneNumber', e.target.value)}
+                          placeholder="e.g. +919876543210"
+                          className="bg-background border-border/40 h-12 font-mono text-base focus:border-primary transition-all rounded-md px-4"
+                        />
+                        <p className="text-[10px] text-muted-foreground/60 px-1 italic">
+                          Must be unique per assistant. Used as an identifier.
+                        </p>
                       </div>
                     </div>
                   </div>

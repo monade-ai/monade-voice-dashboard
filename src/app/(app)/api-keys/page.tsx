@@ -46,6 +46,7 @@ interface BaApiKey {
 }
 
 const API_KEY_BASE = `${MONADE_API_BASE}/api/auth/api-key`;
+const FULL_KEYS_STORAGE_KEY = 'monade_full_api_keys_cache_v1';
 
 // --- Key Row ---
 
@@ -110,7 +111,7 @@ function ApiKeyRow({
             </Badge>
           </div>
           <span className="text-[11px] font-mono text-muted-foreground select-all">
-            {revealed ? (displayKey || `${prefix}...`) : maskedKey}
+            {revealed ? (displayKey || 'Full key unavailable (one-time secret)') : maskedKey}
           </span>
           <div className="flex items-center gap-3 mt-0.5">
             {apiKey.createdAt && (
@@ -143,8 +144,9 @@ function ApiKeyRow({
         </button>
         <button
           onClick={handleCopy}
-          className="h-8 w-8 inline-flex items-center justify-center rounded-[4px] border border-border/30 text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all"
-          title="Copy full key"
+          disabled={!displayKey}
+          className="h-8 w-8 inline-flex items-center justify-center rounded-[4px] border border-border/30 text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+          title={displayKey ? 'Copy full key' : 'Full key unavailable for this entry'}
         >
           {copied ? <Check size={13} className="text-green-500" /> : <Copy size={13} />}
         </button>
@@ -174,6 +176,29 @@ export default function ApiKeysPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [newKeyName, setNewKeyName] = useState('');
   const [showCreateForm, setShowCreateForm] = useState(false);
+
+  const loadCachedFullKeys = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const raw = localStorage.getItem(FULL_KEYS_STORAGE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object') {
+        setFullKeys(parsed);
+      }
+    } catch (err) {
+      console.error('[ApiKeys] failed to load cached full keys:', err);
+    }
+  }, []);
+
+  const persistCachedFullKeys = useCallback((next: Record<string, string>) => {
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem(FULL_KEYS_STORAGE_KEY, JSON.stringify(next));
+    } catch (err) {
+      console.error('[ApiKeys] failed to persist full keys cache:', err);
+    }
+  }, []);
 
   const extractKeys = (payload: unknown): BaApiKey[] => {
     const p = payload as any;
@@ -223,6 +248,10 @@ export default function ApiKeysPage() {
     if (!userLoading) fetchKeys();
   }, [userLoading, fetchKeys]);
 
+  useEffect(() => {
+    loadCachedFullKeys();
+  }, [loadCachedFullKeys]);
+
   const handleCreate = async () => {
     if (!userUid) return;
     setCreating(true);
@@ -237,7 +266,11 @@ export default function ApiKeysPage() {
       const fullKey = payload?.key ?? payload?.api_key ?? payload?.rawKey ?? payload?.token ?? payload?.value ?? null;
       const keyId = payload?.id ?? payload?.keyId ?? payload?.key_id ?? null;
       if (fullKey && keyId) {
-        setFullKeys(prev => ({ ...prev, [String(keyId)]: fullKey }));
+        setFullKeys(prev => {
+          const next = { ...prev, [String(keyId)]: fullKey };
+          persistCachedFullKeys(next);
+          return next;
+        });
       }
       setNewKeyName('');
       setShowCreateForm(false);
@@ -265,6 +298,7 @@ export default function ApiKeysPage() {
       setFullKeys(prev => {
         const next = { ...prev };
         delete next[id];
+        persistCachedFullKeys(next);
         return next;
       });
       toast.success('Key revoked');
@@ -335,7 +369,7 @@ export default function ApiKeysPage() {
               <p className="text-[11px] text-muted-foreground">
                 Use{' '}
                 <code className="font-mono bg-muted px-1 rounded text-[10px]">Authorization: Bearer &lt;key&gt;</code>
-                {' '}in your API requests. Use the eye icon to reveal keys and the copy button to copy.
+                {' '}in your API requests. Full keys are one-time secrets from backend, so save/copy them when created.
               </p>
             </div>
           </PaperCardContent>
