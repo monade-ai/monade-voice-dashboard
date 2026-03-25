@@ -29,6 +29,8 @@ interface TranscriptViewerProps {
   transcriptUrl: string;
   callId: string;
   onClose: () => void;
+  /** Pre-fetched analytics (from batch endpoint) — avoids redundant single-call fetch and ensures billing_data is available */
+  initialAnalytics?: import('@/app/hooks/use-analytics').CallAnalytics | null;
 }
 
 // --- Helper Components ---
@@ -50,12 +52,16 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
   transcriptUrl,
   callId,
   onClose,
+  initialAnalytics,
 }) => {
   const [messages, setMessages] = useState<TranscriptMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
 
-  const { analytics, loading: analyticsLoading, fetchByCallId } = useCallAnalytics();
+  const { analytics: fetchedAnalytics, loading: analyticsLoading, fetchByCallId } = useCallAnalytics();
+
+  // Prefer pre-fetched analytics (has billing_data from batch endpoint), fall back to single-call fetch
+  const analytics = initialAnalytics ?? fetchedAnalytics;
 
   // Get real customer name or fallback
   const customerName = analytics?.key_discoveries?.customer_name || 'Lead';

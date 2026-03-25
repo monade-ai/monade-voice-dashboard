@@ -36,7 +36,7 @@ export default function WalletPage() {
 
   // Logic
   const pricePerMinute = 12;
-  const balance = credits?.available_credits || 0;
+  const balance = Number(credits?.available_credits) || 0;
   const minutesRemaining = Math.floor(balance / pricePerMinute);
 
   const [autoPay, setAutoPay] = useState(false);

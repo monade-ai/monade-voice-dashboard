@@ -230,7 +230,7 @@ export default function SubscriptionsPage() {
   const { subscriptions, loading: subsLoading, actionLoading, unsubscribe, refetch: refetchSubs } = useSubscriptions();
   const { entries: ledgerEntries, total: ledgerTotal, page: ledgerPage, totalPages: ledgerTotalPages, loading: ledgerLoading, fetchLedger } = useLedger();
 
-  const balance = credits?.available_credits ?? 0;
+  const balance = Number(credits?.available_credits) || 0;
   const creditValueInr = pricing.credit_value_inr_default || getConfig('credit_value_inr_default') || '4.0';
   const voiceCostPerMin = getConfig('voice_cost_per_minute') || '1.0';
   const recordingSurcharge = getConfig('recording_surcharge_per_minute') || '0.5';

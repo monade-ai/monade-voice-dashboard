@@ -394,6 +394,7 @@ export default function CallHistoryPage() {
           transcriptUrl={selectedTranscript.transcript_url}
           callId={selectedTranscript.call_id}
           onClose={() => setSelectedTranscript(null)}
+          initialAnalytics={selectedTranscript.analytics}
         />
       )}
     </ErrorBoundary>
