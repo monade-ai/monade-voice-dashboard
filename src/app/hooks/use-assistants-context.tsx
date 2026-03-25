@@ -39,6 +39,8 @@ export interface Assistant {
   // RAG / Tools fields
   enableTools?: boolean;
   toolsConfig?: any;
+  // Billing fields
+  enableRecording?: boolean;
 }
 
 const extractCallProvider = (assistant: { tags?: string[]; callProvider?: string | null }) => {

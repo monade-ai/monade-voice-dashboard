@@ -25,6 +25,16 @@ const userAnalyticsCache = new Map<string, CachedUserAnalytics>();
 const userAnalyticsInFlight = new Map<string, Promise<CallAnalytics[]>>();
 
 // Analytics data structure matching actual API response
+export interface BillingData {
+  assistant_id?: string;
+  credits_used?: number;
+  cost_per_minute?: number;
+  recording_enabled?: boolean;
+  recording_surcharge_total?: number;
+  call_direction?: string;
+  settlement_status?: string;
+}
+
 export interface CallAnalytics {
   id?: string;
   call_id: string;
@@ -40,7 +50,8 @@ export interface CallAnalytics {
     customer_language?: string;
     objections_raised?: string[];
     next_steps?: string | null;
-    [key: string]: string | string[] | null | undefined;
+    duration_seconds?: number;
+    [key: string]: string | string[] | number | null | undefined;
   };
   call_quality: string; // e.g., "high", "medium", "low", "abrupt_end"
   use_case: string;
@@ -53,6 +64,11 @@ export interface CallAnalytics {
   sip_call_id?: string;
   recording_url?: string | null;
   recording_duration_ms?: string | null;
+  // Billing audit data (arrives ~3-4s after call ends)
+  call_started_at?: string;
+  call_ended_at?: string;
+  duration_seconds?: number;
+  billing_data?: BillingData | null;
 }
 
 // Hook to fetch analytics for a specific call

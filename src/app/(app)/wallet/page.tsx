@@ -1,18 +1,22 @@
 'use client';
 
 import React, { useState } from 'react';
-import { 
-  ArrowLeft, 
-  TrendingDown, 
-  Zap, 
-  ShieldCheck, 
+import {
+  ArrowLeft,
+  TrendingDown,
+  Zap,
+  ShieldCheck,
   ChevronRight,
+  ChevronLeft,
   AlertCircle,
+  TrendingUp,
+  Loader2,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 import { Button } from '@/components/ui/button';
 import { useCredits } from '@/app/hooks/use-credits';
+import { useLedger, LedgerEntry } from '@/app/hooks/use-billing';
 import { PaperCard, PaperCardContent, PaperCardHeader, PaperCardTitle } from '@/components/ui/paper-card';
 import { DashboardHeader } from '@/components/dashboard-header';
 import { Badge } from '@/components/ui/badge';
@@ -28,12 +32,13 @@ const formatCurrency = (num: number) => `₹${Math.round(num).toLocaleString()}`
 export default function WalletPage() {
   const router = useRouter();
   const { credits, loading, error } = useCredits();
-  
+  const { entries: ledgerEntries, total: ledgerTotal, page: ledgerPage, totalPages: ledgerTotalPages, loading: ledgerLoading, fetchLedger } = useLedger();
+
   // Logic
-  const pricePerMinute = 12; 
+  const pricePerMinute = 12;
   const balance = credits?.available_credits || 0;
   const minutesRemaining = Math.floor(balance / pricePerMinute);
-  
+
   const [autoPay, setAutoPay] = useState(false);
 
   return (
@@ -52,7 +57,15 @@ export default function WalletPage() {
               <ArrowLeft size={12} />
                     Overview
             </button>
-            <h1 className="text-5xl font-medium tracking-tighter text-foreground">Credit Operations</h1>
+            <div className="flex items-center gap-4">
+              <h1 className="text-5xl font-medium tracking-tighter text-foreground">Credit Operations</h1>
+              <Badge
+                variant="outline"
+                className="text-[10px] font-bold px-2 py-0.5 rounded-[2px] border-primary/40 text-primary bg-primary/5 uppercase tracking-widest"
+              >
+                Beta
+              </Badge>
+            </div>
             <p className="text-muted-foreground text-sm max-w-sm font-medium">Account balance and usage telemetry.</p>
           </div>
           <div className="hidden md:flex items-center gap-3">
@@ -140,19 +153,98 @@ export default function WalletPage() {
             {/* Audit Ledger */}
             <section className="space-y-4">
               <div className="flex items-center justify-between">
-                <h3 className="text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground/60">Activity Ledger</h3>
-                <button className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50 cursor-not-allowed" disabled>
-                  Export CSV
-                </button>
+                <div className="flex items-center gap-3">
+                  <h3 className="text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground/60">Activity Ledger</h3>
+                  <Badge variant="outline" className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-[2px] border-border text-muted-foreground uppercase tracking-widest">
+                    {ledgerTotal} entries
+                  </Badge>
+                </div>
               </div>
-              <div className="bg-card/30 rounded-md border border-border/20 shadow-sm p-8 text-center">
-                <p className="text-xs text-muted-foreground italic">
-                  No transaction history is available yet.
-                </p>
-                <p className="text-[10px] text-muted-foreground/70 mt-2 uppercase tracking-widest">
-                  Ledger data will appear here once backend audit entries are enabled.
-                </p>
-              </div>
+
+              {ledgerLoading && ledgerEntries.length === 0 ? (
+                <div className="bg-card/30 rounded-md border border-border/20 shadow-sm p-8 text-center">
+                  <Loader2 className="w-5 h-5 animate-spin text-primary mx-auto" />
+                </div>
+              ) : ledgerEntries.length === 0 ? (
+                <div className="bg-card/30 rounded-md border border-border/20 shadow-sm p-8 text-center">
+                  <p className="text-xs text-muted-foreground italic">
+                    No transactions yet. Top-ups and charges will appear here.
+                  </p>
+                </div>
+              ) : (
+                <div className="overflow-hidden rounded-md border border-border/20">
+                  <table className="w-full text-left">
+                    <thead>
+                      <tr className="border-b border-border/40 bg-muted/20">
+                        <th className="py-3 px-4 text-[9px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60">Date</th>
+                        <th className="py-3 px-4 text-[9px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60">Type</th>
+                        <th className="py-3 px-4 text-[9px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60">Description</th>
+                        <th className="py-3 px-4 text-right text-[9px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60">Amount</th>
+                        <th className="py-3 px-4 text-right text-[9px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60">Balance</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {ledgerEntries.map(entry => {
+                        const isCredit = entry.direction === 'credit';
+                        return (
+                          <tr key={entry.id} className="border-b border-border/10 hover:bg-muted/20 transition-colors">
+                            <td className="py-3 px-4">
+                              <span className="text-xs text-foreground">
+                                {new Date(entry.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' })}
+                              </span>
+                            </td>
+                            <td className="py-3 px-4">
+                              <div className="flex items-center gap-1.5">
+                                {isCredit ? <TrendingUp size={10} className="text-green-500" /> : <TrendingDown size={10} className="text-red-500" />}
+                                <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                                  {entry.event_type.replace(/_/g, ' ')}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="py-3 px-4">
+                              <span className="text-xs text-muted-foreground">{entry.description}</span>
+                            </td>
+                            <td className="py-3 px-4 text-right">
+                              <span className={cn('text-xs font-bold font-mono', isCredit ? 'text-green-500' : 'text-red-500')}>
+                                {isCredit ? '+' : '-'}{parseFloat(entry.amount).toFixed(2)}
+                              </span>
+                            </td>
+                            <td className="py-3 px-4 text-right">
+                              <span className="text-xs font-mono text-muted-foreground">
+                                {parseFloat(entry.balance_after).toFixed(2)}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+
+                  {ledgerTotalPages > 1 && (
+                    <div className="px-4 py-3 flex items-center justify-between border-t border-border/20">
+                      <span className="text-[10px] font-bold font-mono text-muted-foreground uppercase tracking-widest">
+                        Page {ledgerPage} of {ledgerTotalPages}
+                      </span>
+                      <div className="flex items-center gap-4">
+                        <button
+                          onClick={() => fetchLedger({ page: ledgerPage - 1 })}
+                          disabled={ledgerPage <= 1 || ledgerLoading}
+                          className="text-muted-foreground hover:text-primary disabled:opacity-20 transition-colors"
+                        >
+                          <ChevronLeft size={16} />
+                        </button>
+                        <button
+                          onClick={() => fetchLedger({ page: ledgerPage + 1 })}
+                          disabled={ledgerPage >= ledgerTotalPages || ledgerLoading}
+                          className="text-muted-foreground hover:text-primary disabled:opacity-20 transition-colors"
+                        >
+                          <ChevronRight size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </section>
           </div>
 

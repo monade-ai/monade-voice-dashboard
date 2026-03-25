@@ -461,6 +461,38 @@ export default function AssistantStudio() {
                     </p>
                   </div>
                 </div>
+
+                {/* Call Recording Toggle */}
+                <div className="flex items-center justify-between p-4 rounded-md border border-border/40 bg-muted/[0.03]">
+                  <div className="flex items-center gap-3">
+                    <div>
+                      <h4 className="text-sm font-bold tracking-tight">Call Recording</h4>
+                      <p className="text-[10px] text-muted-foreground/60">
+                        {currentAssistant.enableRecording !== false
+                          ? 'Calls will be recorded. Billed at base rate + 0.5 credits/min recording surcharge.'
+                          : 'No recording. Billed at base rate only.'}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleUpdate('enableRecording', currentAssistant.enableRecording === false)}
+                    className={cn(
+                      'relative inline-flex h-6 w-11 items-center rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50',
+                      currentAssistant.enableRecording !== false
+                        ? 'bg-green-500 border-green-500'
+                        : 'bg-muted border-border/70',
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        'inline-block h-4 w-4 transform rounded-full shadow-sm transition-transform',
+                        currentAssistant.enableRecording !== false ? 'bg-background' : 'bg-muted-foreground/70',
+                        currentAssistant.enableRecording !== false ? 'translate-x-6' : 'translate-x-1',
+                      )}
+                    />
+                  </button>
+                </div>
               </div>
             </WorkflowStep>
 

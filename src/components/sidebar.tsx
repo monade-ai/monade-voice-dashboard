@@ -21,6 +21,8 @@ import {
   Radio,
   Key,
   Database,
+  CreditCard,
+  Zap,
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 
@@ -216,6 +218,20 @@ export function Sidebar() {
           icon={<PhoneCall />}
           label="Telephony"
           isActive={pathname === '/phone-numbers'}
+        />
+
+        <CategoryLabel>Billing</CategoryLabel>
+        <NavItem
+          href="/wallet"
+          icon={<CreditCard />}
+          label="Credits"
+          isActive={pathname === '/wallet'}
+        />
+        <NavItem
+          href="/subscriptions"
+          icon={<Zap />}
+          label="Subscriptions"
+          isActive={pathname === '/subscriptions'}
         />
 
         <CategoryLabel>Developer</CategoryLabel>

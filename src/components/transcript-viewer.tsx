@@ -193,6 +193,68 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
               </div>
             </div>
 
+            {/* Billing Breakdown — only for newer entries with billing_data */}
+            {analytics?.billing_data ? (
+              <div className="space-y-4 pt-4 border-t border-border/20">
+                <h3 className="text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground">Billing</h3>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-muted-foreground">Credits Used</span>
+                    <span className="font-bold text-foreground">
+                      {typeof analytics.billing_data.credits_used === 'number'
+                        ? analytics.billing_data.credits_used.toFixed(2)
+                        : '—'}
+                    </span>
+                  </div>
+                  {analytics.billing_data.cost_per_minute != null && (
+                    <div className="flex justify-between text-xs">
+                      <span className="text-muted-foreground">Base Rate</span>
+                      <span className="font-medium text-foreground">{analytics.billing_data.cost_per_minute} cr/min</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-xs">
+                    <span className="text-muted-foreground">Recording</span>
+                    <span className="font-medium text-foreground">
+                      {analytics.billing_data.recording_enabled ? 'Yes' : 'No'}
+                      {analytics.billing_data.recording_enabled && analytics.billing_data.recording_surcharge_total != null
+                        ? ` (+${analytics.billing_data.recording_surcharge_total.toFixed(2)} cr)`
+                        : ''}
+                    </span>
+                  </div>
+                  {analytics.billing_data.call_direction && (
+                    <div className="flex justify-between text-xs">
+                      <span className="text-muted-foreground">Direction</span>
+                      <span className="font-medium text-foreground capitalize">{analytics.billing_data.call_direction}</span>
+                    </div>
+                  )}
+                  {analytics.duration_seconds != null && (
+                    <div className="flex justify-between text-xs">
+                      <span className="text-muted-foreground">Duration</span>
+                      <span className="font-medium text-foreground">
+                        {Math.floor(analytics.duration_seconds / 60)}m {analytics.duration_seconds % 60}s
+                      </span>
+                    </div>
+                  )}
+                  {analytics.call_started_at && analytics.call_ended_at && (
+                    <div className="flex justify-between text-xs">
+                      <span className="text-muted-foreground">Time</span>
+                      <span className="font-medium text-foreground text-[10px]">
+                        {new Date(analytics.call_started_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })}
+                        {' — '}
+                        {new Date(analytics.call_ended_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })}
+                        {' IST'}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : !analyticsLoading && analytics ? (
+              <div className="pt-4 border-t border-border/20">
+                <p className="text-[10px] text-muted-foreground/50 italic uppercase tracking-widest">
+                  Billing data unavailable for this entry
+                </p>
+              </div>
+            ) : null}
 
           </div>
         </div>

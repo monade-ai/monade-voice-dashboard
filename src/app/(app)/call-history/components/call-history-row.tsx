@@ -15,7 +15,7 @@ import { motion } from 'framer-motion';
 
 import { LeadIcon } from '@/components/ui/lead-icon';
 import { cn } from '@/lib/utils';
-import { CallAnalytics } from '@/app/hooks/use-analytics';
+import { CallAnalytics, BillingData } from '@/app/hooks/use-analytics';
 import { Transcript } from '@/app/hooks/use-transcripts';
 import { useCallRecording } from '@/app/hooks/use-call-recording';
 
@@ -70,9 +70,10 @@ export const CallHistoryRow = React.memo(({
   const verdict = analytics?.verdict ? analytics.verdict.replace('_', ' ') : (isEngaged ? 'Conversation' : 'No Answer');
   const summary = analytics?.summary || (isEngaged ? 'Call transcript available for review.' : 'No interaction recorded.');
   const quality = analytics?.call_quality || 'N/A';
-  const duration = typeof analytics?.key_discoveries?.duration_seconds === 'number' 
-    ? analytics.key_discoveries.duration_seconds 
-    : undefined;
+  const duration = typeof analytics?.key_discoveries?.duration_seconds === 'number'
+    ? analytics.key_discoveries.duration_seconds
+    : (analytics?.duration_seconds ?? undefined);
+  const billing = analytics?.billing_data;
 
   const dotColor = useMemo(() => {
     const colors: Record<string, string> = {
@@ -125,6 +126,22 @@ export const CallHistoryRow = React.memo(({
               </span>
             </div>
           )}
+          {billing && typeof billing.credits_used === 'number' ? (
+            <div className="flex items-center gap-1.5 mt-0.5">
+              <span className="text-[9px] font-bold text-orange-500 uppercase tracking-wider">
+                {billing.credits_used.toFixed(2)} cr
+              </span>
+              {billing.recording_enabled && (
+                <span className="text-[8px] text-muted-foreground/60 uppercase tracking-wider">
+                  +rec
+                </span>
+              )}
+            </div>
+          ) : isEngaged && !billing ? (
+            <span className="text-[8px] text-muted-foreground/30 uppercase tracking-wider mt-0.5">
+              No billing data
+            </span>
+          ) : null}
         </div>
       </td>
 
