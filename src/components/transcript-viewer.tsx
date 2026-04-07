@@ -1,12 +1,14 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import {
   X,
   Loader2,
   Clipboard,
   Check,
+  Sparkles,
+  RefreshCw,
 } from 'lucide-react';
 
 import { useCallAnalytics } from '@/app/hooks/use-analytics';
@@ -14,6 +16,7 @@ import { PaperCard, PaperCardContent, PaperCardHeader, PaperCardTitle } from '@/
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { AudioPill } from '@/components/ui/audio-pill';
+import { MONADE_API_BASE } from '@/config';
 import { fetchJson } from '@/lib/http';
 import { cn } from '@/lib/utils';
 
@@ -23,6 +26,27 @@ interface TranscriptMessage {
   role: 'user' | 'assistant' | 'system';
   content: string;
   timestamp?: string;
+  speakerName?: string | null;
+}
+
+interface EnhancedTranscriptResponse {
+  status: 'ready' | 'processing' | 'failed' | 'not_started';
+  call_id: string;
+  enhanced_transcript_url?: string;
+  transcript?: Array<{
+    timestamp?: string;
+    end_timestamp?: string;
+    sender?: string;
+    speaker_name?: string | null;
+    text?: string;
+  }>;
+  metadata?: {
+    generated_at?: string;
+    source?: string;
+    model?: string;
+  };
+  error?: string;
+  warning?: string;
 }
 
 interface TranscriptViewerProps {
@@ -57,6 +81,18 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
   const [messages, setMessages] = useState<TranscriptMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [activeTranscriptView, setActiveTranscriptView] = useState<'original' | 'enhanced'>('original');
+  const [enhancedTranscript, setEnhancedTranscript] = useState<{
+    status: 'idle' | 'checking' | 'processing' | 'ready' | 'failed';
+    messages: TranscriptMessage[];
+    generatedAt?: string;
+    source?: string;
+    model?: string;
+    error?: string;
+  }>({
+    status: 'checking',
+    messages: [],
+  });
 
   const { analytics: fetchedAnalytics, loading: analyticsLoading, fetchByCallId } = useCallAnalytics();
 
@@ -65,6 +101,70 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
 
   // Get real customer name or fallback
   const customerName = analytics?.key_discoveries?.customer_name || 'Lead';
+  const activeMessages = activeTranscriptView === 'enhanced' ? enhancedTranscript.messages : messages;
+  const hasEnhancedTranscript = enhancedTranscript.status === 'ready' && enhancedTranscript.messages.length > 0;
+
+  const mapEnhancedTranscriptMessages = (entries: EnhancedTranscriptResponse['transcript'] = []): TranscriptMessage[] => (
+    entries.reduce<TranscriptMessage[]>((acc, entry) => {
+      const text = entry.text?.trim();
+      if (!text) return acc;
+
+      acc.push({
+        role: entry.sender === 'assistant' ? 'assistant' : 'user',
+        content: text,
+        timestamp: entry.timestamp,
+        speakerName: entry.speaker_name ?? null,
+      });
+
+      return acc;
+    }, [])
+  );
+  const enhancedTranscriptUrl = `${MONADE_API_BASE}/api/analytics/${encodeURIComponent(callId)}/enhanced-transcript`;
+
+  const applyEnhancedTranscriptResponse = (data: EnhancedTranscriptResponse, options?: { activateOnReady?: boolean }) => {
+    if (data.status === 'ready') {
+      const nextMessages = mapEnhancedTranscriptMessages(data.transcript);
+
+      setEnhancedTranscript({
+        status: nextMessages.length > 0 ? 'ready' : 'failed',
+        messages: nextMessages,
+        generatedAt: data.metadata?.generated_at,
+        source: data.metadata?.source,
+        model: data.metadata?.model,
+        error: nextMessages.length > 0 ? data.warning : 'Enhanced transcript was ready, but no transcript lines were returned.',
+      });
+
+      if (nextMessages.length > 0 && options?.activateOnReady !== false) {
+        setActiveTranscriptView('enhanced');
+      }
+
+      return;
+    }
+
+    if (data.status === 'processing') {
+      setEnhancedTranscript((current) => ({
+        ...current,
+        status: 'processing',
+        error: undefined,
+      }));
+      return;
+    }
+
+    if (data.status === 'failed') {
+      setEnhancedTranscript((current) => ({
+        ...current,
+        status: 'failed',
+        error: data.error || 'Enhanced transcript failed.',
+      }));
+      return;
+    }
+
+    setEnhancedTranscript((current) => ({
+      ...current,
+      status: 'idle',
+      error: undefined,
+    }));
+  };
 
   useEffect(() => {
     if (callId) fetchByCallId(callId);
@@ -122,11 +222,120 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
     fetchTranscript();
   }, [transcriptUrl]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    const checkEnhancedTranscript = async () => {
+      try {
+        const data = await fetchJson<EnhancedTranscriptResponse>(enhancedTranscriptUrl, {
+          retry: { retries: 0 },
+        });
+
+        if (cancelled) return;
+        applyEnhancedTranscriptResponse(data);
+      } catch {
+        if (!cancelled) {
+          setEnhancedTranscript({
+            status: 'idle',
+            messages: [],
+          });
+        }
+      }
+    };
+
+    setEnhancedTranscript({
+      status: 'checking',
+      messages: [],
+    });
+    setActiveTranscriptView('original');
+    checkEnhancedTranscript();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [callId, enhancedTranscriptUrl]);
+
+  useEffect(() => {
+    if (enhancedTranscript.status !== 'processing') return;
+
+    let cancelled = false;
+    let pollTimeoutId: number | undefined;
+
+    const poll = async () => {
+      try {
+        const data = await fetchJson<EnhancedTranscriptResponse>(enhancedTranscriptUrl, {
+          retry: { retries: 0 },
+        });
+
+        if (cancelled) return;
+        applyEnhancedTranscriptResponse(data);
+
+        if (data.status === 'processing') {
+          pollTimeoutId = window.setTimeout(poll, 2500);
+        }
+      } catch (error) {
+        if (cancelled) return;
+
+        setEnhancedTranscript((current) => ({
+          ...current,
+          status: 'failed',
+          error: error instanceof Error ? error.message : 'Failed while checking transcript enhancement.',
+        }));
+      }
+    };
+
+    pollTimeoutId = window.setTimeout(poll, 2500);
+
+    return () => {
+      cancelled = true;
+      if (pollTimeoutId) {
+        window.clearTimeout(pollTimeoutId);
+      }
+    };
+  }, [enhancedTranscript.status, enhancedTranscriptUrl]);
+
+  const handleEnhanceTranscript = async () => {
+    try {
+      setEnhancedTranscript((current) => ({
+        ...current,
+        status: 'processing',
+        error: undefined,
+      }));
+
+      const data = await fetchJson<EnhancedTranscriptResponse>(enhancedTranscriptUrl, {
+        method: 'POST',
+        retry: { retries: 0 },
+      });
+
+      applyEnhancedTranscriptResponse(data);
+    } catch (error) {
+      setEnhancedTranscript((current) => ({
+        ...current,
+        status: 'failed',
+        error: error instanceof Error ? error.message : 'Unable to enhance transcript right now.',
+      }));
+    }
+  };
+
   const handleCopy = () => {
     if (!analytics?.summary) return;
     navigator.clipboard.writeText(analytics.summary);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const formatEnhancedTimestamp = (value?: string) => {
+    if (!value) return null;
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return null;
+
+    return date.toLocaleString('en-IN', {
+      hour: '2-digit',
+      minute: '2-digit',
+      day: '2-digit',
+      month: 'short',
+      timeZone: 'Asia/Kolkata',
+    });
   };
 
   return (
@@ -272,24 +481,181 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
             <div className="flex items-center gap-4">
               <h2 className="text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground">Conversation Log</h2>
               <Separator orientation="vertical" className="h-3 opacity-20" />
-
+              {hasEnhancedTranscript ? (
+                <Badge variant="outline" className="h-6 rounded-full border-primary/25 bg-primary/5 px-2.5 text-[9px] font-bold uppercase tracking-[0.25em] text-primary">
+                  Refined Ready
+                </Badge>
+              ) : null}
             </div>
-            <button onClick={onClose} className="p-1 hover:bg-muted rounded-md transition-colors">
-              <X size={16} className="text-muted-foreground hover:text-foreground" />
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleEnhanceTranscript}
+                disabled={enhancedTranscript.status === 'processing'}
+                className={cn(
+                  'inline-flex items-center gap-2 rounded-full border px-3.5 py-2 text-[10px] font-bold uppercase tracking-[0.24em] transition-all',
+                  enhancedTranscript.status === 'processing'
+                    ? 'border-primary/20 bg-primary/10 text-primary/70'
+                    : 'border-border/60 bg-background text-foreground hover:border-primary/30 hover:bg-primary/5 hover:text-primary',
+                )}
+              >
+                {enhancedTranscript.status === 'processing' ? (
+                  <Loader2 size={12} className="animate-spin" />
+                ) : enhancedTranscript.status === 'failed' ? (
+                  <RefreshCw size={12} />
+                ) : (
+                  <Sparkles size={12} />
+                )}
+                {enhancedTranscript.status === 'processing'
+                  ? 'Preparing Enhancement'
+                  : enhancedTranscript.status === 'failed'
+                    ? 'Retry Enhancement'
+                    : hasEnhancedTranscript
+                      ? 'Refresh Enhanced View'
+                      : 'Enhance Transcript'}
+              </button>
+              <button onClick={onClose} className="p-1 hover:bg-muted rounded-md transition-colors">
+                <X size={16} className="text-muted-foreground hover:text-foreground" />
+              </button>
+            </div>
           </div>
 
           <div className="flex-1 overflow-y-auto p-6 md:p-10 custom-scrollbar">
             <div className="max-w-xl mx-auto space-y-4">
+              <AnimatePresence initial={false}>
+                {enhancedTranscript.status === 'processing' ? (
+                  <motion.div
+                    key="enhancing-state"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="mb-6 overflow-hidden rounded-2xl border border-primary/15 bg-primary/[0.06]"
+                  >
+                    <div className="h-1 w-full bg-primary/10">
+                      <motion.div
+                        className="h-full bg-primary"
+                        initial={{ x: '-100%' }}
+                        animate={{ x: '100%' }}
+                        transition={{ repeat: Infinity, duration: 1.4, ease: 'easeInOut' }}
+                      />
+                    </div>
+                    <div className="flex items-start gap-4 px-5 py-4">
+                      <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-full bg-primary text-black">
+                        <Sparkles size={14} />
+                      </div>
+                      <div className="flex-1 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <p className="text-[10px] font-bold uppercase tracking-[0.26em] text-primary">Preparing Enhanced Log</p>
+                          <div className="flex items-center gap-1">
+                            {[0, 1, 2].map((index) => (
+                              <motion.span
+                                key={index}
+                                className="h-1.5 w-1.5 rounded-full bg-primary/80"
+                                animate={{ opacity: [0.25, 1, 0.25], y: [0, -2, 0] }}
+                                transition={{ repeat: Infinity, duration: 1, delay: index * 0.12 }}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                        <p className="text-sm leading-relaxed text-foreground/80">
+                          We&apos;re restructuring the conversation into a cleaner, more reliable transcript. It will open here automatically as soon as it&apos;s ready.
+                        </p>
+                      </div>
+                    </div>
+                  </motion.div>
+                ) : null}
+
+                {hasEnhancedTranscript ? (
+                  <motion.div
+                    key="enhanced-ready-card"
+                    initial={{ opacity: 0, y: 14 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="mb-6"
+                  >
+                    <PaperCard variant="mesh" shaderProps={{ positions: 20, grainOverlay: 0.85 }} className="border-primary/15 bg-primary/[0.05]">
+                      <PaperCardHeader className="flex flex-row items-start justify-between gap-4 p-5 pb-3">
+                        <div className="space-y-2">
+                          <PaperCardTitle className="flex items-center gap-2 text-[10px] uppercase tracking-[0.28em] text-primary">
+                            <Sparkles size={12} />
+                            Refined Conversation
+                          </PaperCardTitle>
+                          <p className="text-sm leading-relaxed text-foreground/80">
+                            A cleaner transcript is ready. You can move between the original log and the enhanced version instantly.
+                          </p>
+                        </div>
+                        <Badge variant="outline" className="border-primary/25 bg-background/80 text-[9px] font-bold uppercase tracking-[0.24em] text-primary">
+                          Ready
+                        </Badge>
+                      </PaperCardHeader>
+                      <PaperCardContent className="flex flex-col gap-4 p-5 pt-0 md:flex-row md:items-center md:justify-between">
+                        <div className="flex flex-wrap items-center gap-2 text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                          {enhancedTranscript.generatedAt ? <span>Generated {formatEnhancedTimestamp(enhancedTranscript.generatedAt)}</span> : null}
+                          {enhancedTranscript.model ? <span>{enhancedTranscript.model}</span> : null}
+                          {enhancedTranscript.source ? <span>{enhancedTranscript.source.replaceAll('_', ' ')}</span> : null}
+                        </div>
+                        <div className="inline-flex rounded-full border border-border/50 bg-background/70 p-1">
+                          <button
+                            onClick={() => setActiveTranscriptView('original')}
+                            className={cn(
+                              'rounded-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.2em] transition-colors',
+                              activeTranscriptView === 'original'
+                                ? 'bg-foreground text-background'
+                                : 'text-muted-foreground hover:text-foreground',
+                            )}
+                          >
+                            Original
+                          </button>
+                          <button
+                            onClick={() => setActiveTranscriptView('enhanced')}
+                            className={cn(
+                              'rounded-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.2em] transition-colors',
+                              activeTranscriptView === 'enhanced'
+                                ? 'bg-primary text-black'
+                                : 'text-muted-foreground hover:text-foreground',
+                            )}
+                          >
+                            Enhanced
+                          </button>
+                        </div>
+                      </PaperCardContent>
+                    </PaperCard>
+                  </motion.div>
+                ) : null}
+
+                {enhancedTranscript.status === 'failed' && enhancedTranscript.error ? (
+                  <motion.div
+                    key="enhanced-failed"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="mb-6 rounded-2xl border border-border/50 bg-muted/20 px-5 py-4"
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="space-y-1">
+                        <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-muted-foreground">Enhancement Unavailable</p>
+                        <p className="text-sm text-foreground/80">{enhancedTranscript.error}</p>
+                      </div>
+                      <button
+                        onClick={handleEnhanceTranscript}
+                        className="inline-flex items-center gap-2 rounded-full border border-border/60 px-3 py-2 text-[10px] font-bold uppercase tracking-[0.22em] text-foreground transition-colors hover:border-primary/30 hover:text-primary"
+                      >
+                        <RefreshCw size={12} />
+                        Retry
+                      </button>
+                    </div>
+                  </motion.div>
+                ) : null}
+              </AnimatePresence>
+
               {loading ? (
                 <div className="flex flex-col items-center justify-center py-20 gap-4">
                   <Loader2 className="w-5 h-5 animate-spin text-primary" />
                   <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Synchronizing Signal...</p>
                 </div>
-              ) : messages.length === 0 ? (
+              ) : activeMessages.length === 0 ? (
                 <div className="text-center py-20 italic text-muted-foreground text-sm">Empty session.</div>
               ) : (
-                messages.map((m, i) => (
+                activeMessages.map((m, i) => (
                   <div
                     key={i}
                     className={cn(
@@ -301,7 +667,7 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
                       'text-[9px] font-bold uppercase tracking-widest mb-1 px-1',
                       m.role === 'assistant' ? 'text-primary' : 'text-muted-foreground',
                     )}>
-                      {m.role === 'assistant' ? 'Agent' : customerName}
+                      {m.role === 'assistant' ? (m.speakerName || 'Agent') : (m.speakerName || customerName)}
                     </span>
                     <div
                       className={cn(
