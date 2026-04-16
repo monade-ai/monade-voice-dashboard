@@ -66,6 +66,20 @@ const WorkflowStep = ({ number, title, description, children, action }: { number
   </div>
 );
 
+const DEFAULT_BACKGROUND_AUDIO = {
+  enabled: false,
+  ambient_clip: 'OFFICE_AMBIENCE',
+  ambient_volume: 8,
+};
+
+const clampBackgroundVolume = (value: number) => Math.min(25, Math.max(0, value));
+
+const readBackgroundAudio = (toolsConfig: any) => ({
+  ...DEFAULT_BACKGROUND_AUDIO,
+  ...(toolsConfig?.background_audio || {}),
+  ambient_volume: clampBackgroundVolume(Number(toolsConfig?.background_audio?.ambient_volume ?? DEFAULT_BACKGROUND_AUDIO.ambient_volume) || 0),
+});
+
 export default function AssistantStudio() {
   const {
     currentAssistant,
@@ -78,7 +92,7 @@ export default function AssistantStudio() {
   const { trunks, phoneNumbers } = useTrunks({ checkAssignments: false });
   const { trunks: userTrunks } = useUserTrunks();
   const inboundTrunks = userTrunks.filter(t => t.trunk_type === 'inbound');
-  const { corpora, attachToAssistant, detachFromAssistant, toggleTools, toggleEndCallTool, toggleVertexRagTool } = useRagCorpus();
+  const { corpora, attachToAssistant, detachFromAssistant, toggleTools, toggleEndCallTool, toggleVertexRagTool, updateBackgroundAudio } = useRagCorpus();
 
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -88,11 +102,14 @@ export default function AssistantStudio() {
   const [isTogglingTools, setIsTogglingTools] = useState(false);
   const [isTogglingRag, setIsTogglingRag] = useState(false);
   const [isTogglingCallCompletion, setIsTogglingCallCompletion] = useState(false);
+  const [isUpdatingBackgroundAudio, setIsUpdatingBackgroundAudio] = useState(false);
+  const [backgroundVolumeInput, setBackgroundVolumeInput] = useState(String(DEFAULT_BACKGROUND_AUDIO.ambient_volume));
   const [isSyncingTools, setIsSyncingTools] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
   const currentAssistantRef = useRef<Assistant | null>(null);
 
   const isDraft = currentAssistant?.id.startsWith('local-');
+  const backgroundAudio = readBackgroundAudio(currentAssistant?.toolsConfig);
 
   const syncToolsFromBackend = useCallback(async (assistantId: string) => {
     try {
@@ -125,6 +142,10 @@ export default function AssistantStudio() {
   useEffect(() => {
     currentAssistantRef.current = currentAssistant;
   }, [currentAssistant]);
+
+  useEffect(() => {
+    setBackgroundVolumeInput(String(readBackgroundAudio(currentAssistant?.toolsConfig).ambient_volume));
+  }, [currentAssistant?.id, currentAssistant?.toolsConfig]);
 
   useEffect(() => {
     if (!currentAssistant || isDraft) return;
@@ -201,6 +222,34 @@ export default function AssistantStudio() {
   const isInbound = currentAssistant.call_direction === 'inbound';
   const ragTool = currentAssistant.toolsConfig?.tools?.find((t: any) => t.type === 'vertex_rag');
   const hasAttachedRagCorpus = !!ragTool?.config?.rag_corpus;
+
+  const saveBackgroundAudio = async (updates: Partial<typeof DEFAULT_BACKGROUND_AUDIO>) => {
+    if (!currentAssistant || isUpdatingBackgroundAudio || isSyncingTools) return;
+    const nextConfig = {
+      ...backgroundAudio,
+      ...updates,
+      ambient_clip: updates.ambient_clip || backgroundAudio.ambient_clip,
+      ambient_volume: clampBackgroundVolume(Number(updates.ambient_volume ?? backgroundAudio.ambient_volume) || 0),
+    };
+    setIsUpdatingBackgroundAudio(true);
+    try {
+      await updateBackgroundAudio(currentAssistant.id, {
+        enabled: nextConfig.enabled,
+        ambient_clip: nextConfig.ambient_clip as 'OFFICE_AMBIENCE' | 'KEYBOARD_TYPING' | 'KEYBOARD_TYPING2',
+        ambient_volume: nextConfig.ambient_volume,
+      });
+      await syncToolsFromBackend(currentAssistant.id);
+    } finally {
+      setIsUpdatingBackgroundAudio(false);
+    }
+  };
+
+  const commitBackgroundVolumeInput = () => {
+    const parsedVolume = Number.parseFloat(backgroundVolumeInput);
+    const nextVolume = clampBackgroundVolume(Number.isFinite(parsedVolume) ? parsedVolume : DEFAULT_BACKGROUND_AUDIO.ambient_volume);
+    setBackgroundVolumeInput(String(nextVolume));
+    void saveBackgroundAudio({ ambient_volume: nextVolume });
+  };
 
   // Outbound trunk options
   const trunkOptions = trunks.length > 0 ? trunks.map((trunk) => ({
@@ -729,6 +778,128 @@ export default function AssistantStudio() {
                   })()}
                     </div>
 
+                    {/* Background Audio Controls */}
+                    <div className="space-y-4 p-4 rounded-md border border-border/40 bg-background">
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-3 min-w-0">
+                          {backgroundAudio.enabled ? (
+                            <ToggleRight size={20} className="text-green-500 shrink-0" />
+                          ) : (
+                            <ToggleLeft size={20} className="text-muted-foreground shrink-0" />
+                          )}
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <h5 className="text-sm font-semibold tracking-tight">Background Audio</h5>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <button
+                                    type="button"
+                                    className="inline-flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+                                    aria-label="About Background Audio"
+                                  >
+                                    <Info size={13} />
+                                  </button>
+                                </TooltipTrigger>
+                                <TooltipContent side="top" className="max-w-[270px] text-[11px] leading-relaxed">
+                                  Ambient call audio is independent of the Tool Usage master switch and is currently used on outbound calls.
+                                </TooltipContent>
+                              </Tooltip>
+                            </div>
+                            <p className="text-[10px] text-muted-foreground/70">
+                              Add a subtle office bed behind the agent voice.
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          disabled={isUpdatingBackgroundAudio || isSyncingTools}
+                          onClick={() => saveBackgroundAudio({ enabled: !backgroundAudio.enabled })}
+                          className={cn(
+                            'relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 disabled:opacity-50 disabled:cursor-not-allowed',
+                            backgroundAudio.enabled
+                              ? 'bg-green-500 border-green-500'
+                              : 'bg-muted border-border/70',
+                          )}
+                        >
+                          <span
+                            className={cn(
+                              'inline-block h-4 w-4 transform rounded-full shadow-sm transition-transform',
+                              backgroundAudio.enabled ? 'bg-background' : 'bg-muted-foreground/70',
+                              backgroundAudio.enabled ? 'translate-x-6' : 'translate-x-1',
+                            )}
+                          />
+                          {isUpdatingBackgroundAudio && (
+                            <Loader2 size={10} className="absolute inset-0 m-auto animate-spin text-white" />
+                          )}
+                        </button>
+                      </div>
+
+                      <div className={cn('space-y-4', !backgroundAudio.enabled && 'opacity-50')}>
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 px-1">Ambient Clip</label>
+                          <Select
+                            disabled={isUpdatingBackgroundAudio || isSyncingTools}
+                            value={backgroundAudio.ambient_clip}
+                            onValueChange={(value) => saveBackgroundAudio({ ambient_clip: value as typeof DEFAULT_BACKGROUND_AUDIO.ambient_clip })}
+                          >
+                            <SelectTrigger className="bg-muted/[0.02] border-border/40 h-10 text-sm focus:border-primary transition-all rounded-md px-3">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="OFFICE_AMBIENCE">Office ambience</SelectItem>
+                              <SelectItem value="KEYBOARD_TYPING">Keyboard typing</SelectItem>
+                              <SelectItem value="KEYBOARD_TYPING2">Keyboard typing 2</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between gap-3">
+                            <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 px-1">Volume</label>
+                            <div className="flex items-center gap-2">
+                              <Volume2 size={14} className="text-muted-foreground" />
+                              <Input
+                                type="number"
+                                min={0}
+                                max={25}
+                                step={0.5}
+                                disabled={isUpdatingBackgroundAudio || isSyncingTools}
+                                value={backgroundVolumeInput}
+                                onChange={(e) => {
+                                  setBackgroundVolumeInput(e.target.value);
+                                }}
+                                onBlur={commitBackgroundVolumeInput}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    e.currentTarget.blur();
+                                  }
+                                }}
+                                className="h-8 w-20 bg-muted/[0.02] text-center text-xs font-semibold"
+                              />
+                            </div>
+                          </div>
+                          <input
+                            type="range"
+                            min={0}
+                            max={25}
+                            step={0.5}
+                            disabled={isUpdatingBackgroundAudio || isSyncingTools}
+                            value={clampBackgroundVolume(Number.parseFloat(backgroundVolumeInput) || 0)}
+                            onChange={(e) => {
+                              const nextVolume = Number(e.target.value);
+                              setBackgroundVolumeInput(String(nextVolume));
+                            }}
+                            onBlur={commitBackgroundVolumeInput}
+                            onMouseUp={commitBackgroundVolumeInput}
+                            onTouchEnd={commitBackgroundVolumeInput}
+                            className="w-full accent-primary disabled:opacity-50"
+                          />
+                          <p className="text-[10px] text-muted-foreground/60 px-1 italic">
+                            UI range is 0-25. Values are sent as numeric `ambient_volume` for the backend.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
                     {/* Call Completion Tool Toggle */}
                     <div className={cn('flex items-center justify-between p-4 rounded-md border border-border/40 bg-background', !currentAssistant.enableTools && 'opacity-50')}>
                   <div className="flex items-center gap-3">
@@ -757,7 +928,7 @@ export default function AssistantStudio() {
                       </div>
                       <p className="text-[10px] text-muted-foreground/60">
                         {currentAssistant.enableTools
-                          ? 'Choose whether the agent can end calls using function calling'
+                          ? 'Choose whether the agent can disconnect calls using function calling'
                           : 'Enable Tool Usage above for this to take effect during calls'}
                       </p>
                     </div>

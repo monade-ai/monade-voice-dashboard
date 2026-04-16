@@ -29,6 +29,12 @@ export interface CreateRagCorpusData {
   filename: string;
 }
 
+export interface BackgroundAudioConfig {
+  enabled: boolean;
+  ambient_clip?: 'OFFICE_AMBIENCE' | 'KEYBOARD_TYPING' | 'KEYBOARD_TYPING2';
+  ambient_volume?: number;
+}
+
 export function useRagCorpus() {
   const { userUid, loading: authLoading } = useMonadeUser();
   const [corpora, setCorpora] = useState<RagCorpus[]>([]);
@@ -182,6 +188,9 @@ export function useRagCorpus() {
         const toolsConfig = {
           max_tool_steps: currentToolsConfig?.max_tool_steps ?? 3,
           tools: [...toolsWithoutEndCall, endCallTool],
+          ...(currentToolsConfig?.background_audio
+            ? { background_audio: currentToolsConfig.background_audio }
+            : {}),
         };
 
         const result = await fetchJson<any>(
@@ -231,6 +240,9 @@ export function useRagCorpus() {
         const toolsConfig = {
           max_tool_steps: currentToolsConfig?.max_tool_steps ?? 3,
           tools: [...toolsWithoutVertexRag, vertexRagTool],
+          ...(currentToolsConfig?.background_audio
+            ? { background_audio: currentToolsConfig.background_audio }
+            : {}),
         };
 
         const result = await fetchJson<any>(
@@ -256,6 +268,39 @@ export function useRagCorpus() {
     [],
   );
 
+  const updateBackgroundAudio = useCallback(
+    async (
+      assistantId: string,
+      config: BackgroundAudioConfig,
+    ): Promise<any | null> => {
+      try {
+        const result = await fetchJson<any>(
+          `${API_BASE}/api/assistants/${encodeURIComponent(assistantId)}/background-audio`,
+          {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              enabled: config.enabled,
+              ambient_clip: config.ambient_clip ?? 'OFFICE_AMBIENCE',
+              ambient_volume: Number(config.ambient_volume ?? 8),
+            }),
+            retry: { retries: 0 },
+          },
+        );
+
+        toast.success(config.enabled ? 'Background audio enabled' : 'Background audio disabled');
+
+        return result;
+      } catch (err) {
+        console.error('[useRagCorpus] updateBackgroundAudio error:', err);
+        toast.error('Failed to update background audio');
+
+        return null;
+      }
+    },
+    [],
+  );
+
   useEffect(() => {
     if (!authLoading) fetchCorpora();
   }, [authLoading, fetchCorpora]);
@@ -273,5 +318,6 @@ export function useRagCorpus() {
     toggleTools,
     toggleEndCallTool,
     toggleVertexRagTool,
+    updateBackgroundAudio,
   };
 }
