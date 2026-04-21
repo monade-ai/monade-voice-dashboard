@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
+import { toast } from 'sonner';
 import {
   Trash2,
   Zap,
@@ -79,6 +80,24 @@ const readBackgroundAudio = (toolsConfig: any) => ({
   ...(toolsConfig?.background_audio || {}),
   ambient_volume: clampBackgroundVolume(Number(toolsConfig?.background_audio?.ambient_volume ?? DEFAULT_BACKGROUND_AUDIO.ambient_volume) || 0),
 });
+
+const getDispatchRuleIds = (assistant: Assistant) => {
+  const rawIds = [
+    assistant.dispatch_rule_id,
+    ...(((assistant as any).dispatch_rule_ids || []) as unknown[]),
+  ];
+
+  return Array.from(new Set(rawIds.filter((id): id is string => typeof id === 'string' && id.length > 0)));
+};
+
+const readRebakedDispatchRuleId = (response: any) => (
+  response?.dispatch_rule_id
+  || response?.new_dispatch_rule_id
+  || response?.rule_id
+  || response?.dispatchRuleId
+  || response?.dispatch_rule?.id
+  || response?.rule?.id
+);
 
 export default function AssistantStudio() {
   const {
@@ -220,17 +239,47 @@ export default function AssistantStudio() {
   if (!currentAssistant) return null;
 
   const isInbound = currentAssistant.call_direction === 'inbound';
+  const isInboundBound = currentAssistant.call_direction === 'inbound' || currentAssistant.call_direction === 'both';
   const ragTool = currentAssistant.toolsConfig?.tools?.find((t: any) => t.type === 'vertex_rag');
   const hasAttachedRagCorpus = !!ragTool?.config?.rag_corpus;
 
-  const saveBackgroundAudio = async (updates: Partial<typeof DEFAULT_BACKGROUND_AUDIO>) => {
-    if (!currentAssistant || isUpdatingBackgroundAudio || isSyncingTools) return;
+  const buildBackgroundAudioConfig = (updates: Partial<typeof DEFAULT_BACKGROUND_AUDIO> = {}) => {
     const nextConfig = {
       ...backgroundAudio,
       ...updates,
       ambient_clip: updates.ambient_clip || backgroundAudio.ambient_clip,
       ambient_volume: clampBackgroundVolume(Number(updates.ambient_volume ?? backgroundAudio.ambient_volume) || 0),
     };
+
+    return nextConfig;
+  };
+
+  const applyBackgroundAudioLocally = (nextConfig: typeof DEFAULT_BACKGROUND_AUDIO) => {
+    if (!currentAssistant) return;
+    const updatedAssistant = {
+      ...currentAssistant,
+      toolsConfig: {
+        ...(currentAssistant.toolsConfig || {}),
+        background_audio: nextConfig,
+      },
+    };
+    setCurrentAssistant(updatedAssistant);
+    updateAssistantLocally(updatedAssistant.id, updatedAssistant);
+  };
+
+  const stageBackgroundAudio = (updates: Partial<typeof DEFAULT_BACKGROUND_AUDIO>) => {
+    const nextConfig = buildBackgroundAudioConfig(updates);
+    applyBackgroundAudioLocally(nextConfig);
+  };
+
+  const saveBackgroundAudio = async (updates: Partial<typeof DEFAULT_BACKGROUND_AUDIO>) => {
+    if (!currentAssistant || isUpdatingBackgroundAudio || isSyncingTools) return;
+    const nextConfig = buildBackgroundAudioConfig(updates);
+    if (isInboundBound) {
+      stageBackgroundAudio(updates);
+
+      return;
+    }
     setIsUpdatingBackgroundAudio(true);
     try {
       await updateBackgroundAudio(currentAssistant.id, {
@@ -244,10 +293,69 @@ export default function AssistantStudio() {
     }
   };
 
+  const saveAndApplyInboundBackgroundAudio = async () => {
+    if (!currentAssistant || isUpdatingBackgroundAudio || isSyncingTools) return;
+    const parsedVolume = Number.parseFloat(backgroundVolumeInput);
+    const nextVolume = clampBackgroundVolume(Number.isFinite(parsedVolume) ? parsedVolume : DEFAULT_BACKGROUND_AUDIO.ambient_volume);
+    const nextConfig = buildBackgroundAudioConfig({ ambient_volume: nextVolume });
+    const dispatchRuleIds = getDispatchRuleIds(currentAssistant);
+    const needsInboundRebake = isInboundBound && !!currentAssistant.inbound_trunk_id;
+
+    setBackgroundVolumeInput(String(nextVolume));
+    setIsUpdatingBackgroundAudio(true);
+    try {
+      await updateBackgroundAudio(currentAssistant.id, {
+        enabled: nextConfig.enabled,
+        ambient_clip: nextConfig.ambient_clip as 'OFFICE_AMBIENCE' | 'KEYBOARD_TYPING' | 'KEYBOARD_TYPING2',
+        ambient_volume: nextConfig.ambient_volume,
+      }, { silent: true, throwOnError: true });
+
+      if (needsInboundRebake && dispatchRuleIds.length === 0) {
+        applyBackgroundAudioLocally(nextConfig);
+        toast.error('Background audio saved, but this inbound assistant has no dispatch rule to rebake yet. Save the inbound routing first.');
+
+        return;
+      }
+
+      let latestDispatchRuleId = currentAssistant.dispatch_rule_id ?? null;
+      const rebakedDispatchRuleIds: string[] = [];
+      for (const ruleId of dispatchRuleIds) {
+        const response = await fetchJson<any>(
+          `${MONADE_API_BASE}/dispatch-rules/${encodeURIComponent(ruleId)}/rebake`,
+          {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ assistant_id: currentAssistant.id }),
+            retry: { retries: 0 },
+          },
+        );
+        const nextRuleId = readRebakedDispatchRuleId(response) ?? ruleId;
+        latestDispatchRuleId = nextRuleId;
+        rebakedDispatchRuleIds.push(nextRuleId);
+      }
+
+      await syncToolsFromBackend(currentAssistant.id);
+      applyBackgroundAudioLocally(nextConfig);
+      if (latestDispatchRuleId !== currentAssistant.dispatch_rule_id) {
+        updateAssistantLocally(currentAssistant.id, {
+          dispatch_rule_id: latestDispatchRuleId,
+          ...(rebakedDispatchRuleIds.length > 1 ? { dispatch_rule_ids: rebakedDispatchRuleIds } : {}),
+        } as Partial<Assistant>);
+      }
+      toast.success(dispatchRuleIds.length > 0 ? 'Background audio saved and applied to inbound calls' : 'Background audio saved');
+    } catch (err) {
+      console.error('[AssistantStudio] Failed to save/apply inbound background audio:', err);
+      toast.error(err instanceof Error ? err.message : 'Failed to save background audio');
+    } finally {
+      setIsUpdatingBackgroundAudio(false);
+    }
+  };
+
   const commitBackgroundVolumeInput = () => {
     const parsedVolume = Number.parseFloat(backgroundVolumeInput);
     const nextVolume = clampBackgroundVolume(Number.isFinite(parsedVolume) ? parsedVolume : DEFAULT_BACKGROUND_AUDIO.ambient_volume);
     setBackgroundVolumeInput(String(nextVolume));
+    if (isInboundBound) return;
     void saveBackgroundAudio({ ambient_volume: nextVolume });
   };
 
@@ -801,12 +909,13 @@ export default function AssistantStudio() {
                                   </button>
                                 </TooltipTrigger>
                                 <TooltipContent side="top" className="max-w-[270px] text-[11px] leading-relaxed">
-                                  Ambient call audio is independent of the Tool Usage master switch and is currently used on outbound calls.
+                                  Ambient call audio is independent of the Tool Usage master switch. Inbound changes are applied when you save and rebake the dispatch rule.
                                 </TooltipContent>
                               </Tooltip>
                             </div>
                             <p className="text-[10px] text-muted-foreground/70">
                               Add a subtle office bed behind the agent voice.
+                              {isInboundBound ? ' Save & apply when you are ready to update inbound routing.' : ''}
                             </p>
                           </div>
                         </div>
@@ -898,6 +1007,22 @@ export default function AssistantStudio() {
                           </p>
                         </div>
                       </div>
+                      {isInboundBound && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={saveAndApplyInboundBackgroundAudio}
+                          disabled={isUpdatingBackgroundAudio || isSyncingTools}
+                          className="w-full justify-center gap-2"
+                        >
+                          {isUpdatingBackgroundAudio || isSyncingTools ? (
+                            <Loader2 size={14} className="animate-spin" />
+                          ) : (
+                            <Save size={14} />
+                          )}
+                          Save & apply
+                        </Button>
+                      )}
                     </div>
 
                     {/* Call Completion Tool Toggle */}

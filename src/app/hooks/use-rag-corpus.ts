@@ -272,6 +272,7 @@ export function useRagCorpus() {
     async (
       assistantId: string,
       config: BackgroundAudioConfig,
+      options?: { silent?: boolean; throwOnError?: boolean },
     ): Promise<any | null> => {
       try {
         const result = await fetchJson<any>(
@@ -288,12 +289,19 @@ export function useRagCorpus() {
           },
         );
 
-        toast.success(config.enabled ? 'Background audio enabled' : 'Background audio disabled');
+        if (!options?.silent) {
+          toast.success(config.enabled ? 'Background audio enabled' : 'Background audio disabled');
+        }
 
         return result;
       } catch (err) {
         console.error('[useRagCorpus] updateBackgroundAudio error:', err);
-        toast.error('Failed to update background audio');
+        if (!options?.silent) {
+          toast.error(err instanceof Error ? err.message : 'Failed to update background audio');
+        }
+        if (options?.throwOnError) {
+          throw err;
+        }
 
         return null;
       }

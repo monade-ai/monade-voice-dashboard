@@ -8,7 +8,7 @@ A short guide for wiring background ambient audio into the assistant editor UI. 
 
 - **No new schema.** Config lives inside the existing `Assistant.toolsConfig` JSON field under a top-level `background_audio` key.
 - **Ambient audio is NOT a function tool.** It's independent of the `enableTools` master toggle — you can turn it on even when all tools are disabled.
-- **Outbound path only for now.** Inbound parity will come later; don't rely on it yet.
+- **Outbound and inbound both supported.** Inbound has one extra step — see the "Inbound calls" section below.
 - **Two endpoints available** — use whichever fits your UI:
   - Dedicated: `PATCH /api/assistants/:id/background-audio` (recommended for a toggle/slider UI)
   - Full config: `PATCH /api/assistants/:id/tools-config` (send entire `toolsConfig` if you already manage tools together)
@@ -126,6 +126,19 @@ Same validation rules apply.
 
 ---
 
+## Interaction with RAG / end_call (read carefully)
+
+All routes that write `toolsConfig` now follow one rule: **touch only the block you own, preserve every other top-level key and every other tool entry**. This matters because `toolsConfig` is a shared JSON document — if a route replaced it wholesale, unrelated features like ambient audio would get silently wiped.
+
+- `PATCH /api/assistants/:id/background-audio` — writes only the `background_audio` block. RAG, end_call, `max_tool_steps`, and any unknown sibling keys are preserved.
+- `PATCH /api/assistants/:id/attach-rag` — writes only the `vertex_rag` entry inside `tools`. `background_audio`, `end_call`, other tool entries, and unknown sibling keys are preserved. Always sets `enableTools: true` (the user just opted into a function tool).
+- `PATCH /api/assistants/:id/detach-rag` — flips only the `vertex_rag` entry to `enabled: false` and clears its `rag_corpus`. All other tools and top-level keys are preserved. `enableTools` is set based on whether **any other function tool is still enabled** — it is no longer blindly forced to `false`. `background_audio` is not a function tool and never affects `enableTools`.
+- `background_audio` stays independent of `enableTools` in every flow — don't couple them in the UI.
+
+**Practical implication for the frontend:** you can save background-audio settings, then attach or detach RAG, and the ambient audio settings will still be intact. Same in the other direction. No need to save everything in one bundle.
+
+---
+
 ## UI suggestions
 
 - **Toggle** controls `enabled`.
@@ -154,15 +167,31 @@ For your situational awareness (frontend doesn't need to do anything here):
      "metadata": { /* user per-call personalization */ }
    }
    ```
-3. The agent ([agent/src/agent.py](../agent/src/agent.py)) reads `dispatch_metadata["background_audio"]` and, if enabled, constructs a `BackgroundAudioPlayer` with the chosen clip + volume and publishes it as a second microphone-source track into the room. The SIP bridge mixes it into the phone audio.
-4. On call teardown, the player is `aclose()`'d as part of the shutdown callback chain — no frontend or backend action required.
+3. On an inbound call, the path is baked: [provider-trunk-configs/inbound_trunk_api.py](../provider-trunk-configs/inbound_trunk_api.py) `_build_dispatch_metadata()` reads `toolsConfig.background_audio` from the assistant at dispatch-rule creation (or rebake) time and embeds it as the same top-level `background_audio` key inside the dispatch rule's baked metadata. LiveKit replays that baked metadata for every inbound call. Same dispatch contract as outbound — the agent doesn't distinguish.
+4. The agent ([agent/src/agent.py](../agent/src/agent.py)) reads `dispatch_metadata["background_audio"]` and, if enabled, constructs a `BackgroundAudioPlayer` with the chosen clip + volume and publishes it as a second microphone-source track into the room. The SIP bridge mixes it into the phone audio.
+5. On call teardown, the player is `aclose()`'d as part of the shutdown callback chain — no frontend or backend action required.
+
+---
+
+## Inbound calls — important: rebake after changing ambient settings
+
+Inbound dispatch metadata is **pre-baked at dispatch-rule creation time** (see [provider-trunk-configs/inbound_trunk_api.py](../provider-trunk-configs/inbound_trunk_api.py)). The baked copy is what LiveKit hands to the agent on every inbound call; it does NOT re-read the assistant row each time.
+
+So the flow for inbound is:
+
+1. `PATCH /api/assistants/:id/background-audio` — saves new ambient settings on the assistant (same endpoint as outbound).
+2. **`PUT /dispatch-rules/{rule_id}/rebake`** — re-bakes the existing inbound dispatch rule with the updated assistant data. Without this step, inbound callers keep hearing the *old* baked settings (or silence, if there was nothing baked before).
+
+Rule of thumb: every time you change anything on an inbound-connected assistant's `toolsConfig.background_audio` (or prompt, or KB), hit rebake. Outbound has no equivalent step — it reads fresh on every call.
+
+The UI can hide this behind a single "Save & apply to inbound" button that calls `PATCH /background-audio` and then `PUT /dispatch-rules/{rule_id}/rebake` for each dispatch rule tied to this assistant.
 
 ---
 
 ## Gotchas
 
 - **Don't put background audio in the `tools` array.** It's a top-level sibling of `tools`, not a function tool. Putting it in `tools` will fail validation.
-- **Inbound calls don't get ambient audio yet.** The inbound dispatch-rule builder ([provider-trunk-configs/inbound_trunk_api.py](../provider-trunk-configs/inbound_trunk_api.py)) does not forward `background_audio` today. Setting it on an inbound-only assistant is a no-op until that's wired. Plan to follow up.
+- **Inbound requires a rebake after settings change** (see section above). Outbound is fresh-read on every call, so no rebake needed there.
 - **Volume is counter-intuitive.** Telephony (G.711 codec) heavily compresses dynamic range; volumes like `1.0` are inaudible on a phone call. Start at `8.0` and let users tune from there.
 - **"Thinking" sound is not exposed.** LiveKit's `BackgroundAudioPlayer` also supports a `thinking_sound`, but Gemini Live skips the THINKING state (LISTENING → SPEAKING directly), so it's a no-op in our stack. We've deliberately left it out of the dispatch contract.
 - **Defaults if you send nothing.** If `toolsConfig.background_audio` is absent on the assistant record, the agent will not publish any ambient track — existing assistants behave exactly as before.
