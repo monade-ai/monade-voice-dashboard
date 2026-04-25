@@ -17,7 +17,7 @@ export interface Assistant {
   description?: string;
   model?: string;
   provider?: string;
-  voice?: string;
+  voice?: string | null;
   callProvider?: string; // 'twilio' | 'vobiz' - which trunk to use for outbound calls
   costPerMin?: number;
   latencyMs?: number;
@@ -58,7 +58,7 @@ type CreateAssistantData = {
   description?: string;
   model?: string;
   provider?: string;
-  voice?: string;
+  voice?: string | null;
   callProvider?: string; // which trunk to use
   costPerMin?: number;
   latencyMs?: number;
@@ -413,18 +413,19 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
         retry: { retries: 0 },
       });
       const existingAssistant = assistants.find(a => a.id === id);
-      const responseTags = updatedAssistantResponse.tags ?? existingAssistant?.tags ?? [];
-      const responseKnowledgeBase = updatedAssistantResponse.knowledgeBase ?? existingAssistant?.knowledgeBase ?? null;
+      const editingAssistant = currentAssistant?.id === id ? currentAssistant : existingAssistant;
+      const responseTags = updatedAssistantResponse.tags ?? editingAssistant?.tags ?? [];
+      const responseKnowledgeBase = updatedAssistantResponse.knowledgeBase ?? editingAssistant?.knowledgeBase ?? null;
       const processedAssistant: Assistant = {
-        ...existingAssistant,
+        ...editingAssistant,
         ...updatedAssistantResponse,
         callProvider: extractCallProvider({
           tags: responseTags,
-          callProvider: updatedAssistantResponse.callProvider ?? existingAssistant?.callProvider,
+          callProvider: updatedAssistantResponse.callProvider ?? editingAssistant?.callProvider,
         }),
         createdAt: updatedAssistantResponse.createdAt
           ? new Date(updatedAssistantResponse.createdAt)
-          : (existingAssistant?.createdAt || new Date()),
+          : (editingAssistant?.createdAt || new Date()),
         knowledgeBase: responseKnowledgeBase,
         tags: responseTags,
       };

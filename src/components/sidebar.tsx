@@ -23,6 +23,8 @@ import {
   Database,
   CreditCard,
   Zap,
+  Sparkles,
+  Target,
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 
@@ -172,6 +174,20 @@ export function Sidebar() {
           icon={<TrendingUp />}
           label="Hot Leads"
           isActive={pathname === '/hot-leads'}
+        />
+
+        <CategoryLabel>Intelligence</CategoryLabel>
+        <NavItem
+          href="/qualification-studio"
+          icon={<Target />}
+          label="Qualification Studio"
+          isActive={pathname.startsWith('/qualification-studio')}
+        />
+        <NavItem
+          href="/template-library"
+          icon={<Sparkles />}
+          label="Template Library"
+          isActive={pathname.startsWith('/template-library')}
         />
 
         <CategoryLabel>Archive</CategoryLabel>

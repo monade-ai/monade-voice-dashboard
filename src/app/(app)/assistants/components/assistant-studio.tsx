@@ -5,7 +5,6 @@ import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import {
   Trash2,
-  Zap,
   Volume2,
   ArrowLeft,
   Loader2,
@@ -99,6 +98,15 @@ const readRebakedDispatchRuleId = (response: any) => (
   || response?.rule?.id
 );
 
+const GEMINI_VOICE_OPTIONS = [
+  { value: 'Kore', label: 'Kore', tone: 'Neutral and professional.' },
+  { value: 'Puck', label: 'Puck', tone: 'Conversational and friendly.' },
+  { value: 'Charon', label: 'Charon', tone: 'Deep and authoritative.' },
+  { value: 'Fenrir', label: 'Fenrir', tone: 'Warm and approachable.' },
+  { value: 'Aoede', label: 'Aoede', tone: 'Breezy and energetic.' },
+  { value: 'Zephyr', label: 'Zephyr', tone: 'Bright.' },
+] as const;
+
 export default function AssistantStudio() {
   const {
     currentAssistant,
@@ -125,10 +133,15 @@ export default function AssistantStudio() {
   const [backgroundVolumeInput, setBackgroundVolumeInput] = useState(String(DEFAULT_BACKGROUND_AUDIO.ambient_volume));
   const [isSyncingTools, setIsSyncingTools] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
+  const [savedVoiceValue, setSavedVoiceValue] = useState<string | null>(null);
   const currentAssistantRef = useRef<Assistant | null>(null);
 
   const isDraft = currentAssistant?.id.startsWith('local-');
   const backgroundAudio = readBackgroundAudio(currentAssistant?.toolsConfig);
+  const selectedVoiceValue = currentAssistant?.voice || null;
+  const selectedVoiceMeta = GEMINI_VOICE_OPTIONS.find((voice) => voice.value === selectedVoiceValue)
+    || GEMINI_VOICE_OPTIONS.find((voice) => voice.value === 'Kore');
+  const hasUnsavedVoiceChange = (selectedVoiceValue || null) !== savedVoiceValue;
 
   const syncToolsFromBackend = useCallback(async (assistantId: string) => {
     try {
@@ -167,9 +180,13 @@ export default function AssistantStudio() {
   }, [currentAssistant?.id, currentAssistant?.toolsConfig]);
 
   useEffect(() => {
+    setSavedVoiceValue(currentAssistant?.voice || null);
+  }, [currentAssistant?.id, currentAssistant?.voice]);
+
+  useEffect(() => {
     if (!currentAssistant || isDraft) return;
     syncToolsFromBackend(currentAssistant.id);
-  }, [currentAssistant?.id, isDraft, syncToolsFromBackend]);
+  }, [currentAssistant, isDraft, syncToolsFromBackend]);
 
   // Local-only update: updates state but does NOT save to backend
   const handleUpdate = (field: keyof Assistant, value: any) => {
@@ -201,15 +218,16 @@ export default function AssistantStudio() {
     setIsSaving(true);
     setSaveStatus('idle');
     try {
-      const { id, createdAt, knowledgeBase, dispatch_rule_id, ...updates } = currentAssistant;
+      const { id, createdAt: _createdAt, knowledgeBase, dispatch_rule_id: _dispatchRuleId, ...updates } = currentAssistant;
       await saveAssistantUpdates(id, {
         ...updates,
         knowledgeBaseId: knowledgeBase,
       });
+      setSavedVoiceValue(currentAssistant.voice || null);
       setIsDirty(false);
       setSaveStatus('saved');
       setTimeout(() => setSaveStatus('idle'), 2000);
-    } catch (err) {
+    } catch (_err) {
       setSaveStatus('error');
     } finally {
       setIsSaving(false);
@@ -228,6 +246,7 @@ export default function AssistantStudio() {
         });
         if (published) {
           setCurrentAssistant(published);
+          setSavedVoiceValue(published.voice || null);
           setIsDirty(false);
         }
       }
@@ -1141,11 +1160,41 @@ export default function AssistantStudio() {
                 </div>
               </PaperCardHeader>
               <PaperCardContent className="p-6 pt-4 space-y-6">
-                <div className="p-4 rounded-md bg-muted/30 border border-border/20 group hover:border-primary/40 cursor-pointer transition-all">
-                  <span className="text-sm font-bold text-foreground block">{currentAssistant.voice || 'Aarav'}</span>
-                  <span className="text-[9px] text-muted-foreground uppercase tracking-widest mt-1 block">Male / Professional</span>
+                <div className="space-y-3">
+                  <Select
+                    value={selectedVoiceValue || '__default__'}
+                    onValueChange={(value) => handleUpdate('voice', value === '__default__' ? null : value)}
+                  >
+                    <SelectTrigger className="w-full h-12 border-border/40 bg-muted/20 text-left">
+                      <SelectValue placeholder="Select voice" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__default__">Default (Kore)</SelectItem>
+                      {GEMINI_VOICE_OPTIONS.map((voice) => (
+                        <SelectItem key={voice.value} value={voice.value}>
+                          {voice.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <div className="p-4 rounded-md bg-muted/30 border border-border/20">
+                    <span className="text-sm font-bold text-foreground block">{selectedVoiceMeta?.label || 'Kore'}</span>
+                    <span className="text-[10px] text-muted-foreground mt-1 block">{selectedVoiceMeta?.tone || 'Neutral and professional.'}</span>
+                    {hasUnsavedVoiceChange && (
+                      <span className="text-[9px] uppercase tracking-widest text-primary mt-3 block">
+                        {isDraft ? 'Publish to apply voice.' : 'Save assistant to apply voice.'}
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <Button variant="outline" className="w-full h-10 border-border/40 text-[10px] font-bold uppercase tracking-widest hover:bg-primary transition-all">Test Voice</Button>
+                <Button
+                  variant="outline"
+                  disabled
+                  className="w-full h-10 border-border/40 text-[10px] font-bold uppercase tracking-widest opacity-70"
+                >
+                  Samples Soon
+                </Button>
               </PaperCardContent>
             </PaperCard>
 

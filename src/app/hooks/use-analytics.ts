@@ -24,6 +24,16 @@ const callAnalyticsInFlight = new Map<string, Promise<CallAnalytics | null>>();
 const userAnalyticsCache = new Map<string, CachedUserAnalytics>();
 const userAnalyticsInFlight = new Map<string, Promise<CallAnalytics[]>>();
 
+export function invalidateAnalyticsCaches(callId?: string) {
+  if (callId) {
+    callAnalyticsCache.delete(callId);
+    callAnalyticsInFlight.delete(callId);
+  }
+
+  userAnalyticsCache.clear();
+  userAnalyticsInFlight.clear();
+}
+
 // Analytics data structure matching actual API response
 export interface BillingData {
   assistant_id?: string;
@@ -39,6 +49,7 @@ export interface CallAnalytics {
   id?: string;
   call_id: string;
   user_uid?: string;
+  post_processing_template_id?: string | null;
   verdict: string; // e.g., "interested", "not_interested", "callback"
   confidence_score: number; // 0-100
   summary: string;
@@ -61,6 +72,7 @@ export interface CallAnalytics {
   phone_number?: string;
   campaign_id?: string;
   created_at?: string;
+  updated_at?: string;
   sip_call_id?: string;
   recording_url?: string | null;
   recording_duration_ms?: string | null;
@@ -69,6 +81,7 @@ export interface CallAnalytics {
   call_ended_at?: string;
   duration_seconds?: number;
   billing_data?: BillingData | null;
+  analytics_history?: Array<Record<string, unknown>>;
 }
 
 // Hook to fetch analytics for a specific call

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   X,
@@ -9,13 +9,24 @@ import {
   Check,
   Sparkles,
   RefreshCw,
+  Wand2,
+  GitCompare,
 } from 'lucide-react';
 
-import { useCallAnalytics } from '@/app/hooks/use-analytics';
+import { invalidateAnalyticsCaches, useCallAnalytics } from '@/app/hooks/use-analytics';
+import { usePostProcessingTemplates } from '@/app/hooks/use-post-processing-templates';
 import { PaperCard, PaperCardContent, PaperCardHeader, PaperCardTitle } from '@/components/ui/paper-card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { AudioPill } from '@/components/ui/audio-pill';
+import { Button } from '@/components/ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { MONADE_API_BASE } from '@/config';
 import { fetchJson } from '@/lib/http';
 import { cn } from '@/lib/utils';
@@ -57,6 +68,15 @@ interface TranscriptViewerProps {
   initialAnalytics?: import('@/app/hooks/use-analytics').CallAnalytics | null;
 }
 
+interface ReanalyzeResponse {
+  committed: boolean;
+  template_id?: string | null;
+  template_name?: string;
+  analysis: import('@/app/hooks/use-analytics').CallAnalytics;
+  history_length?: number;
+  updated_at?: string;
+}
+
 // --- Helper Components ---
 
 const FactItem = ({ label, value }: { label: string, value: any }) => {
@@ -68,6 +88,21 @@ const FactItem = ({ label, value }: { label: string, value: any }) => {
       <p className="text-xs font-medium text-foreground">{Array.isArray(value) ? value.join(', ') : String(value)}</p>
     </div>
   );
+};
+
+const FALLBACK_FACT_KEYS = [
+  { key: 'customer_name', label: 'Customer' },
+  { key: 'customer_location', label: 'Location' },
+  { key: 'service_type', label: 'Service' },
+  { key: 'price_quoted', label: 'Price Quoted' },
+  { key: 'customer_language', label: 'Language' },
+  { key: 'next_steps', label: 'Next Steps' },
+];
+
+const getFallbackTemplateLabel = (verdict?: string) => {
+  if (!verdict) return 'Processing';
+
+  return verdict.replace(/_/g, ' ');
 };
 
 // --- Main Component ---
@@ -93,16 +128,31 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
     status: 'checking',
     messages: [],
   });
+  const [templateForAnalytics, setTemplateForAnalytics] = useState<any | null>(null);
+  const [templateForPreview, setTemplateForPreview] = useState<any | null>(null);
+  const [templateLookupState, setTemplateLookupState] = useState<'idle' | 'loading' | 'missing'>('idle');
+  const [reanalyzeTemplateId, setReanalyzeTemplateId] = useState<'__active__' | string>('__active__');
+  const [reanalyzeLoading, setReanalyzeLoading] = useState(false);
+  const [reanalyzeSaving, setReanalyzeSaving] = useState(false);
+  const [reanalyzeError, setReanalyzeError] = useState<string | null>(null);
+  const [previewAnalysis, setPreviewAnalysis] = useState<ReanalyzeResponse | null>(null);
 
   const { analytics: fetchedAnalytics, loading: analyticsLoading, fetchByCallId } = useCallAnalytics();
+  const {
+    templates,
+    resolvedTemplate,
+    fetchTemplate,
+    fetchResolvedTemplate,
+  } = usePostProcessingTemplates();
 
   // Prefer pre-fetched analytics (has billing_data from batch endpoint), fall back to single-call fetch
-  const analytics = initialAnalytics ?? fetchedAnalytics;
+  const analytics = fetchedAnalytics ?? initialAnalytics ?? null;
 
   // Get real customer name or fallback
   const customerName = analytics?.key_discoveries?.customer_name || 'Lead';
   const activeMessages = activeTranscriptView === 'enhanced' ? enhancedTranscript.messages : messages;
   const hasEnhancedTranscript = enhancedTranscript.status === 'ready' && enhancedTranscript.messages.length > 0;
+  const currentTemplateId = analytics?.post_processing_template_id || null;
 
   const mapEnhancedTranscriptMessages = (entries: EnhancedTranscriptResponse['transcript'] = []): TranscriptMessage[] => (
     entries.reduce<TranscriptMessage[]>((acc, entry) => {
@@ -121,7 +171,7 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
   );
   const enhancedTranscriptUrl = `${MONADE_API_BASE}/api/analytics/${encodeURIComponent(callId)}/enhanced-transcript`;
 
-  const applyEnhancedTranscriptResponse = (data: EnhancedTranscriptResponse, options?: { activateOnReady?: boolean }) => {
+  const applyEnhancedTranscriptResponse = useCallback((data: EnhancedTranscriptResponse, options?: { activateOnReady?: boolean }) => {
     if (data.status === 'ready') {
       const nextMessages = mapEnhancedTranscriptMessages(data.transcript);
 
@@ -147,6 +197,7 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
         status: 'processing',
         error: undefined,
       }));
+
       return;
     }
 
@@ -156,6 +207,7 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
         status: 'failed',
         error: data.error || 'Enhanced transcript failed.',
       }));
+
       return;
     }
 
@@ -164,11 +216,86 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
       status: 'idle',
       error: undefined,
     }));
-  };
+  }, []);
 
   useEffect(() => {
     if (callId) fetchByCallId(callId);
   }, [callId, fetchByCallId]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadAnalyticsTemplate = async () => {
+      setTemplateLookupState('loading');
+      setTemplateForAnalytics(null);
+
+      try {
+        if (currentTemplateId) {
+          const template = await fetchTemplate(currentTemplateId);
+          if (!cancelled) {
+            setTemplateForAnalytics(template);
+            setTemplateLookupState(template ? 'idle' : 'missing');
+          }
+
+          return;
+        }
+
+        const resolved = resolvedTemplate ?? await fetchResolvedTemplate();
+        if (!cancelled) {
+          setTemplateForAnalytics(resolved);
+          setTemplateLookupState(resolved ? 'idle' : 'missing');
+        }
+      } catch {
+        if (!cancelled) {
+          setTemplateLookupState('missing');
+          setTemplateForAnalytics(null);
+        }
+      }
+    };
+
+    if (analytics) {
+      loadAnalyticsTemplate();
+    } else {
+      setTemplateLookupState('idle');
+      setTemplateForAnalytics(null);
+    }
+
+    return () => {
+      cancelled = true;
+    };
+  }, [analytics, currentTemplateId, fetchResolvedTemplate, fetchTemplate, resolvedTemplate]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadPreviewTemplate = async () => {
+      try {
+        if (reanalyzeTemplateId === '__active__') {
+          const resolved = resolvedTemplate ?? await fetchResolvedTemplate();
+          if (!cancelled) {
+            setTemplateForPreview(resolved);
+          }
+
+          return;
+        }
+
+        const template = await fetchTemplate(reanalyzeTemplateId);
+        if (!cancelled) {
+          setTemplateForPreview(template);
+        }
+      } catch {
+        if (!cancelled) {
+          setTemplateForPreview(null);
+        }
+      }
+    };
+
+    loadPreviewTemplate();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [fetchResolvedTemplate, fetchTemplate, reanalyzeTemplateId, resolvedTemplate]);
 
   useEffect(() => {
     const fetchTranscript = async () => {
@@ -253,7 +380,7 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [callId, enhancedTranscriptUrl]);
+  }, [applyEnhancedTranscriptResponse, callId, enhancedTranscriptUrl]);
 
   useEffect(() => {
     if (enhancedTranscript.status !== 'processing') return;
@@ -292,7 +419,7 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
         window.clearTimeout(pollTimeoutId);
       }
     };
-  }, [enhancedTranscript.status, enhancedTranscriptUrl]);
+  }, [applyEnhancedTranscriptResponse, enhancedTranscript.status, enhancedTranscriptUrl]);
 
   const handleEnhanceTranscript = async () => {
     try {
@@ -338,6 +465,91 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
     });
   };
 
+  const currentTemplateContent = templateForAnalytics?.content ?? null;
+  const currentTemplateName = templateForAnalytics?.name ?? 'Default Monade Rules';
+  const renderedFacts = useMemo(() => {
+    if (!analytics) return [];
+
+    const dynamicFacts = currentTemplateContent?.data_points?.length
+      ? currentTemplateContent.data_points
+        .map((dataPoint: any) => ({
+          label: dataPoint.label,
+          value: analytics.key_discoveries?.[dataPoint.key],
+        }))
+        .filter((item: { label: string; value: unknown }) => (
+          item.value !== undefined && item.value !== null && (!Array.isArray(item.value) || item.value.length > 0)
+        ))
+      : [];
+
+    if (dynamicFacts.length > 0) {
+      return dynamicFacts;
+    }
+
+    return FALLBACK_FACT_KEYS
+      .map((fact) => ({
+        label: fact.label,
+        value: analytics.key_discoveries?.[fact.key],
+      }))
+      .filter((item) => item.value !== undefined && item.value !== null && (!Array.isArray(item.value) || item.value.length > 0));
+  }, [analytics, currentTemplateContent]);
+
+  const currentVerdictLabel = useMemo(() => {
+    const matchingBucket = currentTemplateContent?.qualification_buckets?.find(
+      (bucket: any) => bucket.key === analytics?.verdict,
+    );
+
+    return matchingBucket?.label || getFallbackTemplateLabel(analytics?.verdict);
+  }, [analytics?.verdict, currentTemplateContent]);
+
+  const previewVerdictLabel = useMemo(() => {
+    const previewTemplateContent = templateForPreview?.content ?? currentTemplateContent;
+    const matchingBucket = previewTemplateContent?.qualification_buckets?.find(
+      (bucket: any) => bucket.key === previewAnalysis?.analysis?.verdict,
+    );
+
+    return matchingBucket?.label
+      || getFallbackTemplateLabel(previewAnalysis?.analysis?.verdict);
+  }, [currentTemplateContent, previewAnalysis?.analysis?.verdict, templateForPreview]);
+
+  const handleReanalyze = async (commit = false) => {
+    try {
+      if (commit) {
+        setReanalyzeSaving(true);
+      } else {
+        setReanalyzeLoading(true);
+      }
+      setReanalyzeError(null);
+
+      const body: Record<string, unknown> = {
+        call_id: callId,
+        commit,
+      };
+
+      if (reanalyzeTemplateId !== '__active__') {
+        body.template_id = reanalyzeTemplateId;
+      }
+
+      const result = await fetchJson<ReanalyzeResponse>(`${MONADE_API_BASE}/api/post-processing/reanalyze`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        retry: { retries: 0 },
+      });
+
+      setPreviewAnalysis(result);
+
+      if (commit) {
+        invalidateAnalyticsCaches(callId);
+        await fetchByCallId(callId, true);
+      }
+    } catch (error) {
+      setReanalyzeError(error instanceof Error ? error.message : 'Unable to re-analyze this call right now.');
+    } finally {
+      setReanalyzeLoading(false);
+      setReanalyzeSaving(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-8">
       <motion.div
@@ -371,8 +583,18 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
                 </Badge>
               </div>
               <h1 className="text-3xl font-medium tracking-tight mt-4 capitalize">
-                {analytics?.verdict?.replace('_', ' ') || 'Processing...'}
+                {currentVerdictLabel || 'Processing...'}
               </h1>
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                <Badge variant="outline" className="text-[9px] font-bold uppercase tracking-widest border-border/60 bg-background">
+                  {currentTemplateName}
+                </Badge>
+                {templateLookupState === 'missing' && (
+                  <Badge variant="outline" className="text-[9px] font-bold uppercase tracking-widest border-orange-500/30 text-orange-500 bg-orange-500/5">
+                    Template Metadata Missing
+                  </Badge>
+                )}
+              </div>
             </div>
 
             <PaperCard variant="mesh" shaderProps={{ positions: 20, grainOverlay: 0.9 }} className="border-border/40">
@@ -399,14 +621,104 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
             <div className="space-y-6 pt-4">
               <h3 className="text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground">Extracted Facts</h3>
               <div className="grid grid-cols-2 gap-x-8 gap-y-6">
-                <FactItem label="Customer" value={analytics?.key_discoveries?.customer_name} />
-                <FactItem label="Location" value={analytics?.key_discoveries?.customer_location} />
-                <FactItem label="Service" value={analytics?.key_discoveries?.service_type} />
-                <FactItem label="Price Quoted" value={analytics?.key_discoveries?.price_quoted} />
-                <FactItem label="Language" value={analytics?.key_discoveries?.customer_language} />
-                <FactItem label="Next Steps" value={analytics?.key_discoveries?.next_steps} />
+                {renderedFacts.map((fact) => (
+                  <FactItem key={fact.label} label={fact.label} value={fact.value} />
+                ))}
               </div>
             </div>
+
+            <PaperCard className="border-primary/15 bg-primary/[0.04]">
+              <PaperCardHeader className="p-5 pb-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <PaperCardTitle className="flex items-center gap-2 text-primary">
+                      <Wand2 size={12} />
+                      Qualification Sandbox
+                    </PaperCardTitle>
+                    <p className="mt-2 text-xs text-muted-foreground leading-relaxed">
+                      Preview different qualification rules on this call before applying them.
+                    </p>
+                  </div>
+                </div>
+              </PaperCardHeader>
+              <PaperCardContent className="p-5 pt-0 space-y-4">
+                <div className="space-y-2">
+                  <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60">Ruleset</span>
+                  <Select value={reanalyzeTemplateId} onValueChange={(value) => setReanalyzeTemplateId(value as '__active__' | string)}>
+                    <SelectTrigger className="h-10 bg-background border-border/40">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__active__">Use Current Live Ruleset</SelectItem>
+                      {templates.map((template) => (
+                        <SelectItem key={template.id} value={template.id}>
+                          {template.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="flex gap-3">
+                  <Button
+                    type="button"
+                    onClick={() => handleReanalyze(false)}
+                    disabled={reanalyzeLoading || reanalyzeSaving}
+                    className="flex-1 h-10 text-[10px] font-bold uppercase tracking-[0.2em]"
+                  >
+                    {reanalyzeLoading ? <Loader2 size={14} className="mr-2 animate-spin" /> : <GitCompare size={14} className="mr-2" />}
+                    Preview
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => handleReanalyze(true)}
+                    disabled={reanalyzeLoading || reanalyzeSaving || !previewAnalysis}
+                    className="flex-1 h-10 text-[10px] font-bold uppercase tracking-[0.2em] border-border/40"
+                  >
+                    {reanalyzeSaving ? <Loader2 size={14} className="mr-2 animate-spin" /> : <Wand2 size={14} className="mr-2" />}
+                    Apply
+                  </Button>
+                </div>
+
+                {reanalyzeError && (
+                  <p className="text-xs text-destructive">{reanalyzeError}</p>
+                )}
+
+                {previewAnalysis && (
+                  <div className="rounded-md border border-border/20 bg-background/80 p-4 space-y-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-[9px] font-bold uppercase tracking-[0.22em] text-muted-foreground/60">
+                        Preview Result
+                      </span>
+                      <Badge variant="outline" className="text-[9px] uppercase tracking-[0.18em] border-primary/25 text-primary">
+                        {previewAnalysis.template_name || 'Selected Rules'}
+                      </Badge>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="rounded-md border border-border/20 bg-muted/10 p-3">
+                        <span className="text-[8px] font-bold uppercase tracking-[0.18em] text-muted-foreground/60">Current</span>
+                        <p className="mt-2 text-sm font-semibold text-foreground capitalize">{currentVerdictLabel}</p>
+                        <p className="mt-1 text-[11px] text-muted-foreground">{analytics?.confidence_score ?? 0}% confidence</p>
+                      </div>
+                      <div className="rounded-md border border-primary/20 bg-primary/[0.05] p-3">
+                        <span className="text-[8px] font-bold uppercase tracking-[0.18em] text-primary/80">Preview</span>
+                        <p className="mt-2 text-sm font-semibold text-foreground capitalize">{previewVerdictLabel}</p>
+                        <p className="mt-1 text-[11px] text-muted-foreground">{previewAnalysis.analysis.confidence_score ?? 0}% confidence</p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <span className="text-[8px] font-bold uppercase tracking-[0.18em] text-muted-foreground/60">Updated Summary</span>
+                      <p className="text-xs leading-relaxed text-foreground/85">
+                        {previewAnalysis.analysis.summary}
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </PaperCardContent>
+            </PaperCard>
 
             {/* Billing Breakdown — only for newer entries with billing_data */}
             {analytics?.billing_data ? (
