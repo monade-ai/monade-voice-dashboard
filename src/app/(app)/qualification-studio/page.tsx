@@ -184,8 +184,9 @@ const validateForm = (form: FormState): ValidationState => {
   });
 
   form.custom_instructions.forEach((instruction, index) => {
-    if (instruction.length > 300) {
-      nextErrors.instructionErrors[index] = 'Guidance lines must stay under 300 characters.';
+    const wordCount = instruction.trim().split(/\s+/).filter(Boolean).length;
+    if (wordCount > 500) {
+      nextErrors.instructionErrors[index] = 'Guidance lines must stay under 500 words.';
     }
   });
 

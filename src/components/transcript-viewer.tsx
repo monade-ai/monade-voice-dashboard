@@ -574,7 +574,7 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
               analytics?.verdict === 'callback' ? 'bg-primary' : 'bg-muted-foreground/20',
           )} />
 
-          <div className="p-8 flex flex-col h-full overflow-y-auto custom-scrollbar space-y-8">
+          <div className="p-8 flex flex-col flex-1 min-h-0 overflow-y-auto custom-scrollbar space-y-8">
             <div>
               <div className="flex items-center justify-between mb-2">
                 <h2 className="text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground">AI Intelligence</h2>
@@ -606,9 +606,11 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
                   <div className="h-20 flex items-center justify-center"><Loader2 className="w-4 h-4 animate-spin text-muted-foreground" /></div>
                 ) : (
                   <div className="space-y-4">
-                    <p className="text-sm leading-relaxed text-foreground/90 italic">
-                      &quot;{analytics?.summary || 'Analyzing conversation context...'}&quot;
-                    </p>
+                    <div className="max-h-[40vh] overflow-y-auto custom-scrollbar pr-1">
+                      <p className="text-sm leading-relaxed text-foreground/90 italic">
+                        &quot;{analytics?.summary || 'Analyzing conversation context...'}&quot;
+                      </p>
+                    </div>
                     <button onClick={handleCopy} className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground hover:text-primary transition-colors">
                       {copied ? <Check size={12} className="text-green-500" /> : <Clipboard size={12} />}
                       {copied ? 'Copied' : ''}
