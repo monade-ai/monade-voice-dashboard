@@ -567,14 +567,14 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
         className="relative bg-background border border-border shadow-2xl rounded-md w-full max-w-6xl h-[85vh] flex overflow-hidden flex-col md:flex-row"
       >
         {/* --- Left Pane: AI Intelligence --- */}
-        <div className="w-full md:w-[38%] border-r border-border bg-muted/5 flex flex-col h-full relative overflow-hidden">
+        <div className="w-full md:w-[38%] border-r border-border bg-muted/5 h-[40vh] md:h-full relative overflow-hidden">
           <div className={cn(
-            'absolute top-0 left-0 w-full h-1',
+            'absolute top-0 left-0 w-full h-1 z-10',
             analytics?.verdict === 'interested' ? 'bg-green-500' :
               analytics?.verdict === 'callback' ? 'bg-primary' : 'bg-muted-foreground/20',
           )} />
 
-          <div className="p-8 flex flex-col flex-1 min-h-0 overflow-y-auto custom-scrollbar space-y-8">
+          <div className="absolute inset-0 p-8 overflow-y-auto custom-scrollbar space-y-8">
             <div>
               <div className="flex items-center justify-between mb-2">
                 <h2 className="text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground">AI Intelligence</h2>
