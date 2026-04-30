@@ -13,6 +13,7 @@ export interface MonadeUser {
   name?: string;
   available_credits: number;
   total_credits: number;
+  autoEnhancedTranscript?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -26,6 +27,10 @@ export interface UpdateUserRequest {
   name?: string;
   email_id?: string;
   available_credits?: number;
+}
+
+export interface UpdateAutoEnhancedTranscriptRequest {
+  enabled: boolean;
 }
 
 // ============================================

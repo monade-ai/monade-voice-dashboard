@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
   ArrowLeft, 
@@ -12,6 +12,7 @@ import {
   CreditCard,
   History,
   ArrowUpRight,
+  Sparkles,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -24,6 +25,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { LeadIcon } from '@/components/ui/lead-icon';
+import { cn } from '@/lib/utils';
+import { getUserById, updateAutoEnhancedTranscript } from '@/lib/services/monade-api.service';
 
 import { ApiKeyManager } from './components/api-key-dialog';
 import { WebhookManager } from './components/webhook-manager';
@@ -58,10 +61,69 @@ const SettingRow = ({
 export default function SettingsPage() {
   const router = useRouter();
   const { user } = useAuth();
+  const [autoEnhancedTranscript, setAutoEnhancedTranscript] = useState(false);
+  const [isLoadingAutoEnhanced, setIsLoadingAutoEnhanced] = useState(true);
+  const [isSavingAutoEnhanced, setIsSavingAutoEnhanced] = useState(false);
 
   const handleResetPassword = async () => {
     if (!user?.email) return;
     toast.info('Password reset is not exposed in backend auth endpoints yet. Please contact support.');
+  };
+
+  useEffect(() => {
+    if (!user?.id) {
+      setIsLoadingAutoEnhanced(false);
+      return;
+    }
+
+    let isActive = true;
+
+    const loadAutoEnhancedTranscript = async () => {
+      try {
+        setIsLoadingAutoEnhanced(true);
+        const monadeUser = await getUserById(user.id);
+        if (!isActive) return;
+        setAutoEnhancedTranscript(Boolean(monadeUser.autoEnhancedTranscript));
+      } catch (error) {
+        console.error('[SettingsPage] Failed to load auto enhanced transcript setting:', error);
+        if (!isActive) return;
+        toast.error('Could not load enhanced transcript preference.');
+      } finally {
+        if (isActive) {
+          setIsLoadingAutoEnhanced(false);
+        }
+      }
+    };
+
+    loadAutoEnhancedTranscript();
+
+    return () => {
+      isActive = false;
+    };
+  }, [user?.id]);
+
+  const handleToggleAutoEnhancedTranscript = async () => {
+    if (!user?.id || isSavingAutoEnhanced || isLoadingAutoEnhanced) return;
+
+    const nextValue = !autoEnhancedTranscript;
+    setAutoEnhancedTranscript(nextValue);
+    setIsSavingAutoEnhanced(true);
+
+    try {
+      const response = await updateAutoEnhancedTranscript(user.id, nextValue);
+      setAutoEnhancedTranscript(Boolean(response.autoEnhancedTranscript));
+      toast.success(
+        nextValue
+          ? 'Auto-enhanced transcripts enabled for outbound calls.'
+          : 'Auto-enhanced transcripts turned off.',
+      );
+    } catch (error) {
+      console.error('[SettingsPage] Failed to update auto enhanced transcript setting:', error);
+      setAutoEnhancedTranscript(!nextValue);
+      toast.error('Could not update enhanced transcript preference.');
+    } finally {
+      setIsSavingAutoEnhanced(false);
+    }
   };
 
   const handleSignOut = async () => {
@@ -136,6 +198,77 @@ export default function SettingsPage() {
                   <Badge variant="outline" className="text-[9px] uppercase tracking-widest border-green-500/30 text-green-600 bg-green-500/5">Verified User</Badge>
                   <Badge variant="outline" className="text-[9px] uppercase tracking-widest border-border/40 text-muted-foreground">ID: {user?.id.substring(0, 8)}...</Badge>
                 </div>
+              </div>
+            </PaperCardContent>
+          </PaperCard>
+        </section>
+
+        <section className="space-y-6">
+          <h2 className="text-[10px] font-bold uppercase tracking-[0.3em] text-foreground/60">Call Preferences</h2>
+          <PaperCard className="border-border/40 bg-background shadow-sm">
+            <PaperCardContent className="p-8">
+              <div className="flex items-start justify-between gap-6">
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-md bg-primary/10 text-primary flex items-center justify-center">
+                      <Sparkles size={18} />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-semibold text-foreground">Auto-generate enhanced transcript</h3>
+                      <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
+                        Outbound calls only
+                      </p>
+                    </div>
+                  </div>
+                  <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
+                    When enabled, every completed outbound call is automatically sent to the enhanced transcript pipeline
+                    once the recording is ready. Inbound calls are not affected.
+                  </p>
+                  <p className="text-xs leading-5 text-muted-foreground/90">
+                    Cost note: each enhanced transcript runs Gemini on the call audio. If you only need this sometimes,
+                    leave it off and generate enhanced transcripts manually per call.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={autoEnhancedTranscript}
+                  aria-label="Toggle auto-generate enhanced transcript for outbound calls"
+                  onClick={handleToggleAutoEnhancedTranscript}
+                  disabled={!user?.id || isLoadingAutoEnhanced || isSavingAutoEnhanced}
+                  className={cn(
+                    'relative mt-1 inline-flex h-8 w-14 shrink-0 items-center rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60',
+                    autoEnhancedTranscript
+                      ? 'border-primary bg-primary'
+                      : 'border-border/70 bg-muted',
+                  )}
+                >
+                  <span
+                    className={cn(
+                      'inline-block h-6 w-6 transform rounded-full bg-background shadow-sm transition-transform',
+                      autoEnhancedTranscript ? 'translate-x-7' : 'translate-x-1',
+                    )}
+                  />
+                </button>
+              </div>
+
+              <div className="mt-6 flex items-center gap-3">
+                <Badge
+                  variant="outline"
+                  className="text-[9px] uppercase tracking-widest border-border/40 text-muted-foreground"
+                >
+                  {isLoadingAutoEnhanced
+                    ? 'Loading'
+                    : isSavingAutoEnhanced
+                      ? 'Saving'
+                      : autoEnhancedTranscript
+                        ? 'Enabled'
+                        : 'Disabled'}
+                </Badge>
+                <span className="text-xs text-muted-foreground">
+                  Completed outbound calls usually start processing within 1 to 3 minutes after the call ends.
+                </span>
               </div>
             </PaperCardContent>
           </PaperCard>

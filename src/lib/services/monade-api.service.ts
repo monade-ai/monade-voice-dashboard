@@ -13,6 +13,7 @@ import {
   CreditBalance,
   CreateUserRequest,
   UpdateUserRequest,
+  UpdateAutoEnhancedTranscriptRequest,
   CreateAssistantRequest,
   UpdateAssistantRequest,
   CreateKnowledgeBaseRequest,
@@ -100,6 +101,19 @@ export async function updateUser(userUid: string, data: UpdateUserRequest): Prom
     method: 'PUT',
     body: JSON.stringify(data),
   });
+}
+
+export async function updateAutoEnhancedTranscript(
+  userUid: string,
+  enabled: boolean,
+): Promise<Pick<MonadeUser, 'user_uid' | 'autoEnhancedTranscript'>> {
+  return fetchApi<Pick<MonadeUser, 'user_uid' | 'autoEnhancedTranscript'>>(
+    `/api/users/${userUid}/auto-enhanced-transcript`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify({ enabled } as UpdateAutoEnhancedTranscriptRequest),
+    },
+  );
 }
 
 export async function deleteUser(userUid: string): Promise<void> {
