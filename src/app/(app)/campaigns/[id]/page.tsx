@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import {
@@ -35,12 +35,20 @@ import { DashboardHeader } from '@/components/dashboard-header';
 import { useCampaignApi } from '@/app/hooks/use-campaign-api';
 import { campaignApi } from '@/lib/services/campaign-api.service';
 import { downloadCSV, generateCSV, loadCSVPreview } from '@/lib/utils/csv-preview';
+import {
+  buildCampaignEnrichmentRequests,
+  buildClientCampaignExport,
+  CampaignAnalyticsExportRecord,
+  CampaignCallAttemptExportRow,
+  CampaignExportEnrichment,
+} from '@/lib/utils/campaign-client-export';
 import { fetchJson } from '@/lib/http';
 import {
   Campaign,
   CampaignStatus,
   CampaignContact,
   CampaignContactStatus,
+  CampaignRecordingStatus,
   CSVPreviewCache,
   CAMPAIGN_API_CONFIG,
   canStartCampaign,
@@ -84,54 +92,10 @@ interface ActivityEvent {
   callId: string | null;
 }
 
-interface CampaignCallLogRow {
-  [key: string]: string;
-  export_generated_at_utc: string;
-  campaign_id: string;
-  contact_id: string;
-  phone_number: string;
-  contact_name: string;
-  contact_status: string;
-  attempt_number: string;
-  attempt_status: string;
-  provider_call_id: string;
-  provider_participant_id: string;
-  provider_room_name: string;
-  provider_dispatch_id: string;
-  duration_seconds: string;
-  attempt_message: string;
-  attempt_timestamp_utc: string;
-  attempt_timestamp_local: string;
-  assigned_at_utc: string;
-  completed_at_utc: string;
-  contact_created_at_utc: string;
-  contact_updated_at_utc: string;
-  transcript_call_id: string;
-  transcript_url: string;
-  transcript_created_at_utc: string;
-  analysis_verdict: string;
-  analysis_summary: string;
-  analysis_confidence_score: string;
-  transcript_message_count: string;
-  transcript_text: string;
-  metadata_json: string;
-}
-
-interface CampaignAnalyticsExportRecord {
-  call_id?: string;
-  transcript_url?: string;
-  phone_number?: string;
-  campaign_id?: string | null;
-  created_at?: string;
-  analytics?: {
-    verdict?: string;
-    summary?: string;
-    confidence_score?: number;
-  } | null;
-}
+type CampaignCallLogRow = CampaignCallAttemptExportRow;
 
 interface CsvDownloadProgress {
-  phase: 'contacts' | 'analytics' | 'transcripts' | 'csv';
+  phase: 'contacts' | 'analytics' | 'transcripts' | 'enrichment' | 'csv';
   done: number;
   total: number;
   message: string;
@@ -185,8 +149,8 @@ const formatAbsoluteTime = (value: string | null | undefined): string => {
   return format(new Date(timestamp), 'PP p');
 };
 
-const formatRelativeTime = (value: string | null | undefined): string => {
-  const timestamp = parseDate(value);
+const formatRelativeTime = (value: string | number | null | undefined): string => {
+  const timestamp = typeof value === 'number' ? value : parseDate(value);
   if (timestamp === null) return '—';
 
   return formatDistanceToNow(new Date(timestamp), { addSuffix: true });
@@ -394,6 +358,9 @@ const buildCampaignCallLogRows = (
         transcript_message_count: '',
         transcript_text: '',
         metadata_json: metadataJson,
+        sip_call_id: '',
+        recording_url: '',
+        analytics_json: null,
       });
     });
   });
@@ -596,6 +563,8 @@ export default function CampaignDetailPage() {
   const [isUploading, setIsUploading] = useState(false);
   const [isDownloadingLogs, setIsDownloadingLogs] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState<CsvDownloadProgress | null>(null);
+  const [recordingStatus, setRecordingStatus] = useState<CampaignRecordingStatus | null>(null);
+  const [isRefreshingRecordingStatus, setIsRefreshingRecordingStatus] = useState(false);
   const [retryDraftValue, setRetryDraftValue] = useState<number>(CAMPAIGN_API_CONFIG.DEFAULTS.MAX_RETRIES);
   const [isSavingRetries, setIsSavingRetries] = useState(false);
   const [contactQuery, setContactQuery] = useState('');
@@ -648,6 +617,42 @@ export default function CampaignDetailPage() {
     if (!campaign || isEditingParams) return;
     setEditDraft(toCampaignEditDraft(campaign));
   }, [campaign, isEditingParams]);
+
+  const refreshRecordingStatus = useCallback(async (refreshMissing = true) => {
+    if (!campaign) return;
+
+    setIsRefreshingRecordingStatus(true);
+    try {
+      const status = await campaignApi.getCampaignRecordingStatus(
+        campaign.user_uid,
+        campaign.id,
+        { refreshMissing, maxRefresh: 25 },
+      );
+      setRecordingStatus(status);
+    } catch (error) {
+      console.warn('Failed to refresh campaign recording readiness:', error);
+    } finally {
+      setIsRefreshingRecordingStatus(false);
+    }
+  }, [campaign]);
+
+  useEffect(() => {
+    if (!campaign) return;
+    void refreshRecordingStatus(true);
+  }, [campaign, refreshRecordingStatus]);
+
+  useEffect(() => {
+    if (!campaign || !recordingStatus || recordingStatus.pending_recordings <= 0) return;
+    const latestActivity = parseDate(campaign.completed_at) ?? parseDate(campaign.updated_at) ?? 0;
+    const isInsideRecordingDelayWindow = Date.now() - latestActivity <= 6 * 60 * 1000;
+    if (campaign.status !== 'active' && !isInsideRecordingDelayWindow) return;
+
+    const interval = setInterval(() => {
+      void refreshRecordingStatus(true);
+    }, 30_000);
+
+    return () => clearInterval(interval);
+  }, [campaign, recordingStatus, refreshRecordingStatus]);
 
   useEffect(() => {
     if (!campaign || campaign.status !== 'active') return;
@@ -779,6 +784,7 @@ export default function CampaignDetailPage() {
       refreshQueueStatus(),
       refreshCampaignStats(campaignId),
       refreshCampaignContacts(campaignId, { limit: 300 }),
+      refreshRecordingStatus(true),
     ]);
     toast.success('Telemetry refreshed');
   };
@@ -1081,14 +1087,20 @@ export default function CampaignDetailPage() {
         usedAnalyticsIndices.set(phoneKey, used);
 
         const selected = candidates[selectedIndex];
+        const analytics = selected.analytics && typeof selected.analytics === 'object'
+          ? selected.analytics
+          : null;
         row.transcript_call_id = selected.call_id ?? '';
         row.transcript_url = selected.transcript_url ?? '';
         row.transcript_created_at_utc = toUtcIso(selected.created_at);
-        row.analysis_verdict = selected.analytics?.verdict ?? '';
-        row.analysis_summary = selected.analytics?.summary ?? '';
-        row.analysis_confidence_score = typeof selected.analytics?.confidence_score === 'number'
-          ? String(selected.analytics.confidence_score)
+        row.analysis_verdict = typeof analytics?.verdict === 'string' ? analytics.verdict : '';
+        row.analysis_summary = typeof analytics?.summary === 'string' ? analytics.summary : '';
+        row.analysis_confidence_score = typeof analytics?.confidence_score === 'number'
+          ? String(analytics.confidence_score)
           : '';
+        row.sip_call_id = selected.sip_call_id ?? '';
+        row.recording_url = selected.recording_url ?? '';
+        row.analytics_json = analytics;
       });
 
       setDownloadProgress({
@@ -1170,49 +1182,65 @@ export default function CampaignDetailPage() {
         });
       }
 
+      const enrichmentRequests = buildCampaignEnrichmentRequests(rows);
+      let enrichmentsByCallId: Record<string, CampaignExportEnrichment> = {};
+
+      if (enrichmentRequests.length > 0) {
+        setDownloadProgress({
+          phase: 'enrichment',
+          done: 0,
+          total: enrichmentRequests.length,
+          message: `Extracting reasons and feedback (${enrichmentRequests.length} calls)...`,
+        });
+
+        try {
+          const enrichmentResponse = await fetchJson<{ enrichments?: Record<string, CampaignExportEnrichment> }>(
+            '/api/campaign-export/enrich',
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ calls: enrichmentRequests }),
+              retry: { retries: 0 },
+            },
+          );
+          enrichmentsByCallId = enrichmentResponse.enrichments ?? {};
+        } catch (enrichmentError) {
+          console.warn('Failed to enrich campaign export calls:', enrichmentError);
+        }
+      }
+
       setDownloadProgress({
         phase: 'csv',
         done: 1,
         total: 1,
-        message: 'Generating CSV file...',
+        message: 'Generating client campaign CSV file...',
       });
 
-      const fields = [
-        'export_generated_at_utc',
-        'campaign_id',
-        'contact_id',
-        'phone_number',
-        'contact_name',
-        'contact_status',
-        'attempt_number',
-        'attempt_status',
-        'provider_call_id',
-        'provider_participant_id',
-        'provider_room_name',
-        'provider_dispatch_id',
-        'duration_seconds',
-        'attempt_message',
-        'attempt_timestamp_utc',
-        'attempt_timestamp_local',
-        'assigned_at_utc',
-        'completed_at_utc',
-        'contact_created_at_utc',
-        'contact_updated_at_utc',
-        'transcript_call_id',
-        'transcript_url',
-        'transcript_created_at_utc',
-        'analysis_verdict',
-        'analysis_summary',
-        'analysis_confidence_score',
-        'transcript_message_count',
-        'transcript_text',
-        'metadata_json',
-      ];
-      const csvContent = generateCSV(rows, fields);
+      const exportResult = buildClientCampaignExport(rows, enrichmentsByCallId);
+      if (exportResult.totalCalls > 0) {
+        setRecordingStatus((current) => ({
+          user_uid: campaign.user_uid,
+          campaign_id: campaign.id,
+          total_calls: exportResult.totalCalls,
+          available_recordings: exportResult.availableRecordings,
+          pending_recordings: Math.max(exportResult.totalCalls - exportResult.availableRecordings, 0),
+          missing_sip_call_id: current?.missing_sip_call_id,
+          refreshed_recordings: current?.refreshed_recordings,
+          lookup_errors: current?.lookup_errors,
+          vobiz_configured: current?.vobiz_configured,
+        }));
+      }
+
+      const csvContent = generateCSV(
+        exportResult.rows as unknown as Parameters<typeof generateCSV>[0],
+        exportResult.fields,
+      );
       const timestamp = format(new Date(), 'yyyyMMdd_HHmmss');
       const safeCampaignName = campaign.name.replace(/[^a-zA-Z0-9_-]+/g, '_');
-      downloadCSV(csvContent, `${safeCampaignName}_${campaign.id}_call_logs_${timestamp}.csv`);
-      toast.success(`Downloaded ${rows.length} campaign call log rows.`);
+      downloadCSV(csvContent, `${safeCampaignName}_${campaign.id}_client_export_${timestamp}.csv`);
+      toast.success(`Downloaded ${exportResult.rows.length} lead rows.`);
     } catch (error) {
       console.error('Failed to download campaign call logs:', error);
       toast.error('Failed to download campaign call logs.');
@@ -1279,6 +1307,9 @@ export default function CampaignDetailPage() {
   const statusConfig = getStatusConfig(campaign.status);
   const currentCampaignStats = campaignStats[campaignId];
   const hasContactTelemetry = contacts.length > 0;
+  const recordingReadinessLabel = recordingStatus
+    ? `Recordings ${recordingStatus.available_recordings}/${recordingStatus.total_calls}`
+    : (isRefreshingRecordingStatus ? 'Recordings checking...' : 'Recordings --/--');
 
   const progress = getCampaignProgress(campaign, currentCampaignStats);
   const completedCalls = hasContactTelemetry
@@ -1353,10 +1384,10 @@ export default function CampaignDetailPage() {
               disabled={isDownloadingLogs}
               className="h-10 max-w-[320px] border-border text-[10px] font-bold uppercase tracking-widest gap-2 truncate"
               aria-label="Download campaign call logs"
-              title={downloadProgress?.message ?? 'Download campaign call logs'}
+              title={downloadProgress?.message ?? `Download client export. ${recordingReadinessLabel}`}
             >
               {isDownloadingLogs ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
-              {isDownloadingLogs ? (downloadProgress?.message ?? 'Preparing CSV...') : 'Download CSV'}
+              {isDownloadingLogs ? (downloadProgress?.message ?? 'Preparing CSV...') : `Download CSV · ${recordingReadinessLabel}`}
             </Button>
             {canStartCampaign(campaign.status) && (
               <Button

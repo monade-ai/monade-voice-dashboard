@@ -17,6 +17,7 @@ import {
   CampaignAnalytics,
   UserAnalyticsStats,
   CampaignAnalyticsDetail,
+  CampaignRecordingStatus,
   CampaignContact,
   CAMPAIGN_API_CONFIG,
 } from '@/types/campaign.types';
@@ -350,6 +351,25 @@ export async function getUserAnalyticsDetail(
   );
 }
 
+/**
+ * Get campaign recording readiness and optionally refresh missing Vobiz URLs.
+ */
+export async function getCampaignRecordingStatus(
+  userUid: string,
+  campaignId: string,
+  options: { refreshMissing?: boolean; maxRefresh?: number } = {},
+): Promise<CampaignRecordingStatus> {
+  const params = new URLSearchParams();
+  params.set('refresh_missing', String(options.refreshMissing ?? true));
+  if (options.maxRefresh !== undefined) {
+    params.set('max_refresh', String(options.maxRefresh));
+  }
+
+  return fetchDbServicesApi<CampaignRecordingStatus>(
+    `/analytics/user/${encodeURIComponent(userUid)}/campaign/${encodeURIComponent(campaignId)}/recordings/status?${params.toString()}`,
+  );
+}
+
 // ============================================
 // Convenience Object Export
 // ============================================
@@ -383,6 +403,7 @@ export const campaignApi = {
   getUserStats: getUserAnalyticsStats,
   getDetailedAnalytics: getCampaignAnalyticsDetail,
   getUserDetailedAnalytics: getUserAnalyticsDetail,
+  getCampaignRecordingStatus,
 };
 
 export default campaignApi;

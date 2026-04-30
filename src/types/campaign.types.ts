@@ -198,6 +198,18 @@ export interface CampaignAnalyticsDetail {
   calls: CampaignCallRecord[];
 }
 
+export interface CampaignRecordingStatus {
+  user_uid: string;
+  campaign_id: string;
+  total_calls: number;
+  available_recordings: number;
+  pending_recordings: number;
+  missing_sip_call_id?: number;
+  refreshed_recordings?: number;
+  lookup_errors?: number;
+  vobiz_configured?: boolean;
+}
+
 export interface CampaignCallRecord {
   call_id: string;
   phone_number: string;
@@ -207,6 +219,9 @@ export interface CampaignCallRecord {
   summary: string;
   key_discoveries: string[];
   transcript_url?: string;
+  sip_call_id?: string | null;
+  recording_url?: string | null;
+  analytics?: Record<string, unknown> | null;
   created_at: string;
 }
 
