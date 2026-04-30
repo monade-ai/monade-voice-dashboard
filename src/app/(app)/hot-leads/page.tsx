@@ -2,13 +2,11 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import dynamic from 'next/dynamic';
-import { 
-  Search, 
-  ArrowUpRight, 
+import {
+  Search,
+  ArrowUpRight,
   CalendarDays,
   Target,
-  CheckCircle2,
-  Clock,
   Loader2,
   ChevronDown,
   ChevronLeft,
@@ -16,6 +14,7 @@ import {
 } from 'lucide-react';
 
 import { useUserAnalytics, CallAnalytics } from '@/app/hooks/use-analytics';
+import { QualificationBucket, usePostProcessingTemplates } from '@/app/hooks/use-post-processing-templates';
 import { DashboardHeader } from '@/components/dashboard-header';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -39,14 +38,34 @@ const TranscriptViewer = dynamic(
 
 // --- Helpers (Memoized externally or stable) ---
 
-const getVerdictConfig = (verdict: string | undefined) => {
-  if (!verdict) return { label: 'Unknown', color: 'text-muted-foreground', bg: 'bg-muted', border: 'border-border' };
-  const v = verdict.toLowerCase();
-  if (v.includes('book') || v.includes('success') || v.includes('demo')) return { label: 'Conversion', color: 'text-green-500', bg: 'bg-green-500/10', border: 'border-green-500/20' };
-  if (v.includes('interest')) return { label: 'Qualified', color: 'text-primary', bg: 'bg-primary/10', border: 'border-primary/20' };
-  if (v.includes('callback')) return { label: 'Follow Up', color: 'text-orange-500', bg: 'bg-orange-500/10', border: 'border-orange-500/20' };
+const BUCKET_PALETTE = [
+  { color: 'text-green-500', bg: 'bg-green-500/10', border: 'border-green-500/20', accent: 'text-green-600' },
+  { color: 'text-primary', bg: 'bg-primary/10', border: 'border-primary/20', accent: 'text-primary' },
+  { color: 'text-orange-500', bg: 'bg-orange-500/10', border: 'border-orange-500/20', accent: 'text-orange-500' },
+  { color: 'text-blue-500', bg: 'bg-blue-500/10', border: 'border-blue-500/20', accent: 'text-blue-500' },
+  { color: 'text-purple-500', bg: 'bg-purple-500/10', border: 'border-purple-500/20', accent: 'text-purple-500' },
+  { color: 'text-pink-500', bg: 'bg-pink-500/10', border: 'border-pink-500/20', accent: 'text-pink-500' },
+];
 
-  return { label: 'Neutral', color: 'text-muted-foreground', bg: 'bg-muted', border: 'border-border' };
+const NEUTRAL_CONFIG = {
+  label: 'Unknown', color: 'text-muted-foreground', bg: 'bg-muted', border: 'border-border', accent: 'text-muted-foreground',
+};
+
+const humanizeKey = (key: string) => key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+
+const resolveVerdictConfig = (
+  verdict: string | undefined,
+  bucketIndex: Map<string, { bucket: QualificationBucket; index: number }>,
+) => {
+  if (!verdict) return NEUTRAL_CONFIG;
+  const match = bucketIndex.get(verdict.toLowerCase());
+  if (match) {
+    const palette = BUCKET_PALETTE[match.index % BUCKET_PALETTE.length];
+
+    return { label: match.bucket.label || humanizeKey(match.bucket.key), ...palette };
+  }
+
+  return { ...NEUTRAL_CONFIG, label: humanizeKey(verdict) };
 };
 
 const formatCurrency = (val: string | undefined) => {
@@ -57,8 +76,12 @@ const formatCurrency = (val: string | undefined) => {
 
 // --- Component: DealRow (Memoized for Performance) ---
 
-const DealRow = React.memo(({ lead, onClick }: { lead: CallAnalytics, onClick: () => void }) => {
-  const config = getVerdictConfig(lead.verdict);
+const DealRow = React.memo(({ lead, onClick, bucketIndex }: {
+  lead: CallAnalytics;
+  onClick: () => void;
+  bucketIndex: Map<string, { bucket: QualificationBucket; index: number }>;
+}) => {
+  const config = resolveVerdictConfig(lead.verdict, bucketIndex);
   const confidence = lead.confidence_score || 0;
   const price = formatCurrency(lead.key_discoveries?.price_quoted as string);
   const confidenceColor = confidence >= 80 ? 'text-green-500' : confidence >= 50 ? 'text-yellow-500' : 'text-red-500';
@@ -122,38 +145,66 @@ DealRow.displayName = 'DealRow';
 
 export default function HotLeadsPage() {
   const { analytics: allAnalytics, loading, fetchAll } = useUserAnalytics();
+  const { resolvedTemplate } = usePostProcessingTemplates();
   const [search, setSearch] = useState('');
   const [selectedLead, setSelectedLead] = useState<CallAnalytics | null>(null);
-  
+
   // Filter States
-  const [intentFilter, setIntentFilter] = useState<'all' | 'booked' | 'interested' | 'callback'>('interested');
+  const [intentFilter, setIntentFilter] = useState<string>('all');
   const [dateFilter, setDateFilter] = useState<'today' | '7d' | '30d' | 'all'>('all');
-  const [confidenceFilter, setConfidenceFilter] = useState<'all' | 'high'>('all'); 
-  
+  const [confidenceFilter, setConfidenceFilter] = useState<'all' | 'high'>('all');
+
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
+  // Build bucket lookup from active template
+  const buckets = useMemo<QualificationBucket[]>(
+    () => resolvedTemplate?.content?.qualification_buckets || [],
+    [resolvedTemplate],
+  );
+  const bucketIndex = useMemo(() => {
+    const map = new Map<string, { bucket: QualificationBucket; index: number }>();
+    buckets.forEach((bucket, index) => {
+      if (bucket.key) map.set(bucket.key.toLowerCase(), { bucket, index });
+    });
+
+    return map;
+  }, [buckets]);
+
+  // Heuristic: hide buckets that look explicitly negative from the "hot leads" curation
+  const isNegativeKey = useCallback((key: string) => {
+    const k = key.toLowerCase();
+
+    return k.includes('not_') || k.startsWith('not')
+      || k.includes('failed') || k.includes('dnc') || k.includes('wrong')
+      || k.includes('disconnect') || k.includes('declined') || k.includes('reject');
+  }, []);
+
+  const positiveBuckets = useMemo(
+    () => buckets.filter((bucket) => !isNegativeKey(bucket.key || '')),
+    [buckets, isNegativeKey],
+  );
+
   // Memoized Filter Logic (Heavy Calculation)
   const hotLeads = useMemo(() => {
     return allAnalytics.filter(a => {
       if ((a.confidence_score || 0) < 50) return false;
       const v = (a.verdict || '').toLowerCase();
-      if (v.includes('not') || v.includes('failed') || v.includes('dnc') || v.includes('wrong')) return false;
-        
+      if (!v) return false;
+      if (isNegativeKey(v)) return false;
+
       // Search
       if (search && !a.phone_number?.includes(search) && !a.summary?.toLowerCase().includes(search.toLowerCase())) return false;
-        
-      // Intent
-      if (intentFilter === 'booked' && !(v.includes('book') || v.includes('success'))) return false;
-      if (intentFilter === 'interested' && !v.includes('interest')) return false;
-      if (intentFilter === 'callback' && !v.includes('callback')) return false;
-        
+
+      // Intent (exact bucket key match)
+      if (intentFilter !== 'all' && v !== intentFilter.toLowerCase()) return false;
+
       // Confidence
       if (confidenceFilter === 'high' && (a.confidence_score || 0) < 80) return false;
-        
+
       // Date
       const leadDate = new Date(a.created_at || Date.now());
       const now = new Date();
@@ -161,10 +212,10 @@ export default function HotLeadsPage() {
       if (dateFilter === 'today' && diffDays > 1) return false;
       if (dateFilter === '7d' && diffDays > 7) return false;
       if (dateFilter === '30d' && diffDays > 30) return false;
-        
+
       return true;
     }).sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
-  }, [allAnalytics, search, intentFilter, dateFilter, confidenceFilter]);
+  }, [allAnalytics, search, intentFilter, dateFilter, confidenceFilter, isNegativeKey]);
 
   // Pagination Logic
   const totalPages = Math.ceil(hotLeads.length / itemsPerPage);
@@ -174,13 +225,13 @@ export default function HotLeadsPage() {
     return hotLeads.slice(start, start + itemsPerPage);
   }, [hotLeads, currentPage]);
 
-  // Stats Logic (Memoized)
-  const stats = useMemo(() => ({
-    total: hotLeads.length,
-    interested: hotLeads.filter(l => l.verdict?.includes('interest')).length,
-    booked: hotLeads.filter(l => l.verdict?.includes('book') || l.verdict?.includes('success')).length,
-    callbacks: hotLeads.filter(l => l.verdict?.includes('callback')).length,
-  }), [hotLeads]);
+  // Stats Logic — dynamic per-bucket count for the active template's positive buckets
+  const bucketStats = useMemo(() => {
+    return positiveBuckets.map((bucket) => ({
+      bucket,
+      count: hotLeads.filter((l) => (l.verdict || '').toLowerCase() === bucket.key.toLowerCase()).length,
+    }));
+  }, [hotLeads, positiveBuckets]);
 
   // Handlers (Stabilized)
   const handlePageChange = useCallback((newPage: number) => {
@@ -240,16 +291,26 @@ export default function HotLeadsPage() {
         <div className="flex items-center gap-4 border-b border-border/20 pb-6 overflow-x-auto">
           <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 shrink-0">Target Intent:</span>
           <div className="flex gap-2">
-            {['all', 'booked', 'interested', 'callback'].map((f) => (
-              <button 
-                key={f}
-                onClick={() => setIntentFilter(f as any)}
+            <button
+              key="all"
+              onClick={() => setIntentFilter('all')}
+              className={cn(
+                'px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all border',
+                intentFilter === 'all' ? 'bg-foreground text-background border-foreground' : 'bg-transparent text-muted-foreground border-transparent hover:bg-muted/50',
+              )}
+            >
+              All
+            </button>
+            {positiveBuckets.map((bucket) => (
+              <button
+                key={bucket.key}
+                onClick={() => setIntentFilter(bucket.key)}
                 className={cn(
-                  'px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all border',
-                  intentFilter === f ? 'bg-foreground text-background border-foreground' : 'bg-transparent text-muted-foreground border-transparent hover:bg-muted/50',
+                  'px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all border whitespace-nowrap',
+                  intentFilter === bucket.key ? 'bg-foreground text-background border-foreground' : 'bg-transparent text-muted-foreground border-transparent hover:bg-muted/50',
                 )}
               >
-                {f}
+                {bucket.label || humanizeKey(bucket.key)}
               </button>
             ))}
           </div>
@@ -266,47 +327,53 @@ export default function HotLeadsPage() {
           </button>
         </div>
 
-        {/* Pipeline Telemetry */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <PaperCard variant="default" className="bg-green-500/[0.02] border-green-500/20">
-            <PaperCardContent className="p-6 flex items-center justify-between">
-              <div className="space-y-1">
-                <span className="text-[9px] font-bold uppercase tracking-widest text-green-600">Conversions</span>
-                <div className="flex items-center gap-2">
-                  <span className="text-3xl font-bold font-mono text-foreground">{stats.booked}</span>
-                  <span className="text-xs text-muted-foreground">Booked</span>
-                </div>
-              </div>
-              <CheckCircle2 size={24} className="text-green-500 opacity-20" />
-            </PaperCardContent>
-          </PaperCard>
+        {/* Pipeline Telemetry — dynamic per-bucket counts from the active qualification template */}
+        {bucketStats.length > 0 ? (
+          <div className={cn(
+            'grid grid-cols-1 gap-6',
+            bucketStats.length === 1 ? 'md:grid-cols-1' : bucketStats.length === 2 ? 'md:grid-cols-2' : 'md:grid-cols-3',
+          )}>
+            {bucketStats.slice(0, 6).map(({ bucket, count }, index) => {
+              const palette = BUCKET_PALETTE[index % BUCKET_PALETTE.length];
 
-          <PaperCard variant="default" className="bg-primary/[0.02] border-primary/20">
-            <PaperCardContent className="p-6 flex items-center justify-between">
-              <div className="space-y-1">
-                <span className="text-[9px] font-bold uppercase tracking-widest text-primary">Qualified</span>
-                <div className="flex items-center gap-2">
-                  <span className="text-3xl font-bold font-mono text-foreground">{stats.interested}</span>
-                  <span className="text-xs text-muted-foreground">Interested</span>
+              return (
+                <PaperCard
+                  key={bucket.key}
+                  variant="default"
+                  className={cn('border', palette.border, palette.bg.replace('/10', '/[0.02]'))}
+                >
+                  <PaperCardContent className="p-6 flex items-center justify-between">
+                    <div className="space-y-1">
+                      <span className={cn('text-[9px] font-bold uppercase tracking-widest', palette.accent)}>
+                        {bucket.label || humanizeKey(bucket.key)}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-3xl font-bold font-mono text-foreground">{count}</span>
+                        <span className="text-xs text-muted-foreground">Leads</span>
+                      </div>
+                    </div>
+                    <Target size={24} className={cn(palette.color, 'opacity-20')} />
+                  </PaperCardContent>
+                </PaperCard>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <PaperCard variant="default" className="bg-primary/[0.02] border-primary/20">
+              <PaperCardContent className="p-6 flex items-center justify-between">
+                <div className="space-y-1">
+                  <span className="text-[9px] font-bold uppercase tracking-widest text-primary">Qualified Leads</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-3xl font-bold font-mono text-foreground">{hotLeads.length}</span>
+                    <span className="text-xs text-muted-foreground">Total</span>
+                  </div>
                 </div>
-              </div>
-              <Target size={24} className="text-primary opacity-20" />
-            </PaperCardContent>
-          </PaperCard>
-
-          <PaperCard variant="default" className="bg-orange-500/[0.02] border-orange-500/20">
-            <PaperCardContent className="p-6 flex items-center justify-between">
-              <div className="space-y-1">
-                <span className="text-[9px] font-bold uppercase tracking-widest text-orange-500">Pipeline</span>
-                <div className="flex items-center gap-2">
-                  <span className="text-3xl font-bold font-mono text-foreground">{stats.callbacks}</span>
-                  <span className="text-xs text-muted-foreground">Follow-ups</span>
-                </div>
-              </div>
-              <Clock size={24} className="text-orange-500 opacity-20" />
-            </PaperCardContent>
-          </PaperCard>
-        </div>
+                <Target size={24} className="text-primary opacity-20" />
+              </PaperCardContent>
+            </PaperCard>
+          </div>
+        )}
 
         {/* The Deal Ledger */}
         <section className="space-y-6 pb-32">
@@ -332,10 +399,11 @@ export default function HotLeadsPage() {
             ) : (
               <div className="flex flex-col flex-1">
                 {paginatedLeads.map((lead) => (
-                  <DealRow 
-                    key={lead.call_id} 
-                    lead={lead} 
-                    onClick={() => handleSelectLead(lead)} 
+                  <DealRow
+                    key={lead.call_id}
+                    lead={lead}
+                    bucketIndex={bucketIndex}
+                    onClick={() => handleSelectLead(lead)}
                   />
                 ))}
               </div>
