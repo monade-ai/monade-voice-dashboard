@@ -184,9 +184,9 @@ export default function AssistantStudio() {
   }, [currentAssistant?.id, currentAssistant?.voice]);
 
   useEffect(() => {
-    if (!currentAssistant || isDraft) return;
+    if (!currentAssistant?.id || isDraft) return;
     syncToolsFromBackend(currentAssistant.id);
-  }, [currentAssistant, isDraft, syncToolsFromBackend]);
+  }, [currentAssistant?.id, isDraft, syncToolsFromBackend]);
 
   // Local-only update: updates state but does NOT save to backend
   const handleUpdate = (field: keyof Assistant, value: any) => {
