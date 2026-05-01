@@ -7,6 +7,7 @@ export type ClientAttemptTag = 'Qualified' | 'Not Interested' | 'Did not pick-up
 export interface CampaignAnalyticsExportRecord {
   call_id?: string;
   transcript_url?: string;
+  enhanced_transcript_url?: string | null;
   phone_number?: string;
   campaign_id?: string | null;
   created_at?: string;
@@ -39,6 +40,7 @@ export interface CampaignCallAttemptExportRow {
   contact_updated_at_utc: string;
   transcript_call_id: string;
   transcript_url: string;
+  enhanced_transcript_url: string;
   transcript_created_at_utc: string;
   analysis_verdict: string;
   analysis_summary: string;

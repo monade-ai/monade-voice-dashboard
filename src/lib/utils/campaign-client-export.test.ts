@@ -30,6 +30,7 @@ const makeAttempt = (overrides: Partial<CampaignCallAttemptExportRow> = {}): Cam
   contact_updated_at_utc: '',
   transcript_call_id: 'call_1',
   transcript_url: 'https://storage.googleapis.com/bucket/transcript.jsonl',
+  enhanced_transcript_url: '',
   transcript_created_at_utc: '',
   analysis_verdict: 'call_disconnected',
   analysis_summary: 'Summary',

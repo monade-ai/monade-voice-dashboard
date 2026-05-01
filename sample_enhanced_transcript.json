@@ -1,0 +1,169 @@
+{
+    "metadata": {
+        "call_id": "AJ_3f5q7uVQUjAc",
+        "analytics_id": "e313bfde-2018-40f6-acb6-61e7724df1fc",
+        "user_uid": "091cf311-6949-42fd-b1d2-de3bb4b3bf48",
+        "phone_number": "7292938385",
+        "sip_call_id": "7N5TdbNO0NAYsdZcDJCzfPd2LiW",
+        "assistant_name": "the single",
+        "customer_name": "Santosh",
+        "source": "gemini_enhanced_audio_transcript",
+        "model": "gemini-2.0-flash",
+        "generated_at": "2026-05-01T13:17:24.067Z",
+        "original_transcript_url": "https://storage.googleapis.com/monade_india/transcripts/user_091cf311-6949-42fd-b1d2-de3bb4b3bf48/call_AJ_3f5q7uVQUjAc_20260501_131457.jsonl"
+    }
+}
+{
+    "timestamp": null,
+    "end_timestamp": null,
+    "sender": "assistant",
+    "speaker_name": "assistant",
+    "text": "हेलो, एम आई स्पीकिंग विद संतोष जी?"
+}
+{
+    "timestamp": null,
+    "end_timestamp": null,
+    "sender": "user",
+    "speaker_name": "Santosh",
+    "text": "यस बोलिए"
+}
+{
+    "timestamp": null,
+    "end_timestamp": null,
+    "sender": "assistant",
+    "speaker_name": "assistant",
+    "text": "संतोष जी आप सुनता है?"
+}
+{
+    "timestamp": null,
+    "end_timestamp": null,
+    "sender": "user",
+    "speaker_name": "Santosh",
+    "text": "हां सुन रहा हूं"
+}
+{
+    "timestamp": null,
+    "end_timestamp": null,
+    "sender": "assistant",
+    "speaker_name": "assistant",
+    "text": "कॉलिंग फ्रॉम कॉलेज विद्या। यू हैड शोन सम इंटरेस्ट ऑन आवर वेबसाइट रिगार्डिंग ऑनलाइन प्रोग्राम्स। डू यू हैव टू थ्री मिनट्स राइट नाउ?"
+}
+{
+    "timestamp": null,
+    "end_timestamp": null,
+    "sender": "user",
+    "speaker_name": "Santosh",
+    "text": "यस सर। एम ए पॉलिटिकल साइंस"
+}
+{
+    "timestamp": null,
+    "end_timestamp": null,
+    "sender": "assistant",
+    "speaker_name": "assistant",
+    "text": "डू कॉलेज विद्या?"
+}
+{
+    "timestamp": null,
+    "end_timestamp": null,
+    "sender": "user",
+    "speaker_name": "Santosh",
+    "text": "आई वांट टू एडमिट एम ए पॉलिटिकल साइंस मास्टर डिग्री"
+}
+{
+    "timestamp": null,
+    "end_timestamp": null,
+    "sender": "assistant",
+    "speaker_name": "assistant",
+    "text": "जैसे एमिटी, मणिपाल, जैन और बहुत सारी। सो मैं कुछ क्वेश्चन पूछूंगी ताकि मैं आपको सही काउंसलर से कनेक्ट कर सकूं। साउंड्स गुड?"
+}
+{
+    "timestamp": null,
+    "end_timestamp": null,
+    "sender": "user",
+    "speaker_name": "Santosh",
+    "text": "जी"
+}
+{
+    "timestamp": null,
+    "end_timestamp": null,
+    "sender": "assistant",
+    "speaker_name": "assistant",
+    "text": "अच्छा सो एम ए पॉलिटिकल साइंस के लिए आप एडमिशन देख रहे हैं? ग्रेजुएशन आपने कब और कितना परसेंटेज आया था ग्रेजुएशन में?"
+}
+{
+    "timestamp": null,
+    "end_timestamp": null,
+    "sender": "user",
+    "speaker_name": "Santosh",
+    "text": "52%"
+}
+{
+    "timestamp": null,
+    "end_timestamp": null,
+    "sender": "assistant",
+    "speaker_name": "assistant",
+    "text": "गॉट इट। अच्छा और अभी आप वर्किंग है या स्टडी?"
+}
+{
+    "timestamp": null,
+    "end_timestamp": null,
+    "sender": "user",
+    "speaker_name": "Santosh",
+    "text": "स्टडी वर्किंग में"
+}
+{
+    "timestamp": null,
+    "end_timestamp": null,
+    "sender": "assistant",
+    "speaker_name": "assistant",
+    "text": "ठीक है। इस कोर्स के लिए पॉलिटिकल साइंस में"
+}
+{
+    "timestamp": null,
+    "end_timestamp": null,
+    "sender": "assistant",
+    "speaker_name": "assistant",
+    "text": "अच्छा सो एम ए पॉलिटिकल साइंस के लिए आप फीस पूछ रहे हैं?"
+}
+{
+    "timestamp": null,
+    "end_timestamp": null,
+    "sender": "user",
+    "speaker_name": "Santosh",
+    "text": "जी"
+}
+{
+    "timestamp": null,
+    "end_timestamp": null,
+    "sender": "assistant",
+    "speaker_name": "assistant",
+    "text": "फीस यूजुअली यूनिवर्सिटी पर डिपेंड करती है। पॉलिटिकल साइंस प्रोग्राम्स का एवरेज फीस 30000 से 50000 पर सेमेस्टर तक हो सकता है। आपका बजट रेंज क्या है?"
+}
+{
+    "timestamp": null,
+    "end_timestamp": null,
+    "sender": "user",
+    "speaker_name": "Santosh",
+    "text": "50"
+}
+{
+    "timestamp": null,
+    "end_timestamp": null,
+    "sender": "assistant",
+    "speaker_name": "assistant",
+    "text": "ठीक है। संतोष जी अब मैं आपका प्रोफाइल काउंसलर के पास बुक कर देती हूं। वो आपको सारे यूनिवर्सिटी ऑप्शंस और फीस के बारे में डिटेल में बता देंगे। कल सुबह 9:00 से 12:00 के"
+}
+{
+    "timestamp": null,
+    "end_timestamp": null,
+    "sender": "user",
+    "speaker_name": "Santosh",
+    "text": "whatsapp में डाल दीजिए"
+}
+{
+    "timestamp": null,
+    "end_timestamp": null,
+    "sender": "assistant",
+    "speaker_name": "assistant",
+    "text": "डन"
+}
