@@ -183,13 +183,6 @@ const validateForm = (form: FormState): ValidationState => {
     if (rowErrors.length > 0) nextErrors.dataPointErrors[dataPoint.rowId] = rowErrors;
   });
 
-  form.custom_instructions.forEach((instruction, index) => {
-    const wordCount = instruction.trim().split(/\s+/).filter(Boolean).length;
-    if (wordCount > 500) {
-      nextErrors.instructionErrors[index] = 'Guidance lines must stay under 500 words.';
-    }
-  });
-
   return nextErrors;
 };
 
