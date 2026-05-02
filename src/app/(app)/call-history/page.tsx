@@ -49,11 +49,40 @@ export default function CallHistoryPage() {
     }
   }, [transcripts.length, fetchAnalytics]);
 
+  // Union transcripts and analytics by call_id so calls that have analytics but no
+  // transcript file (common for inbound/missed/failed calls) still show up. Source of
+  // truth for "all calls happened" is the union, not the transcript list alone.
   const mergedTranscripts = useMemo(() => {
-    return transcripts.map(t => ({
-      ...t,
-      analytics: allAnalytics.find(a => a.call_id === t.call_id),
-    }));
+    const byCallId = new Map<string, MergedTranscript>();
+
+    transcripts.forEach((t) => {
+      byCallId.set(t.call_id, { ...t });
+    });
+
+    allAnalytics.forEach((a) => {
+      if (!a.call_id) return;
+      const existing = byCallId.get(a.call_id);
+      if (existing) {
+        existing.analytics = a;
+      } else {
+        // Synthesize a Transcript-shaped record for analytics-only calls.
+        byCallId.set(a.call_id, {
+          id: a.id ?? a.call_id,
+          user_uid: a.user_uid ?? '',
+          call_id: a.call_id,
+          phone_number: a.phone_number ?? '',
+          transcript_url: a.transcript_url ?? '',
+          created_at: a.created_at ?? new Date().toISOString(),
+          updated_at: a.updated_at ?? a.created_at ?? new Date().toISOString(),
+          has_conversation: !!(a.summary || a.transcript_url),
+          analytics: a,
+        });
+      }
+    });
+
+    return Array.from(byCallId.values()).sort((x, y) => (
+      new Date(y.created_at).getTime() - new Date(x.created_at).getTime()
+    ));
   }, [transcripts, allAnalytics]);
 
   // Get unique campaigns for filter from analytics-linked records.
