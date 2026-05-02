@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback, useRef, useEffect } from 'react';
+import { toast } from 'sonner';
 
 import { ApiError, fetchJson } from '@/lib/http';
 import { MONADE_API_BASE } from '@/config';
@@ -31,11 +32,13 @@ interface CachedRecording {
   url: string;
   downloadUrl: string | null;
   durationMs: number | null;
+  cachedAt: number;
 }
 
 // --- Client-side cache ---
 
 const recordingCache = new Map<string, CachedRecording>();
+const toastCooldowns = new Map<string, number>();
 
 // --- Global singleton audio for one-at-a-time playback ---
 
@@ -43,8 +46,33 @@ let globalAudio: HTMLAudioElement | null = null;
 let globalActiveCallId: string | null = null;
 const listeners = new Set<() => void>();
 
+const SIGNED_URL_TTL_MS = 29 * 60 * 1000;
+const TOAST_COOLDOWN_MS = 6000;
+
 function notifyListeners() {
   listeners.forEach((fn) => fn());
+}
+
+function shouldUseCachedRecording(cached?: CachedRecording) {
+  return Boolean(cached && (Date.now() - cached.cachedAt) < SIGNED_URL_TTL_MS);
+}
+
+function getFreshCachedRecording(callId: string) {
+  const cached = recordingCache.get(callId);
+  return shouldUseCachedRecording(cached) ? cached : null;
+}
+
+function clearCachedRecording(callId: string) {
+  recordingCache.delete(callId);
+}
+
+function showRecordingToast(key: string, title: string, description: string) {
+  const now = Date.now();
+  const lastShownAt = toastCooldowns.get(key) ?? 0;
+  if ((now - lastShownAt) < TOAST_COOLDOWN_MS) return;
+
+  toast(title, { description });
+  toastCooldowns.set(key, now);
 }
 
 function getOrCreateAudio(): HTMLAudioElement {
@@ -58,6 +86,18 @@ function getOrCreateAudio(): HTMLAudioElement {
       notifyListeners();
     });
     globalAudio.addEventListener('playing', () => {
+      notifyListeners();
+    });
+    globalAudio.addEventListener('error', () => {
+      if (globalActiveCallId) {
+        clearCachedRecording(globalActiveCallId);
+        showRecordingToast(
+          `recording-expired:${globalActiveCallId}`,
+          'Recording link expired',
+          'Please try again. We will fetch a fresh secure link for playback.',
+        );
+      }
+      globalActiveCallId = null;
       notifyListeners();
     });
   }
@@ -126,25 +166,22 @@ export function useCallRecording(callId: string, existingRecordingUrl?: string |
     };
   }, []);
 
-  // Initialize from existing data or cache
+  // Initialize from cache only. The analytics `recording_url` field comes from the
+  // legacy endpoint path, so we treat it as an availability hint rather than a
+  // streamable URL. Playback/download should only use signed URLs returned by
+  // the prepare -> status flow.
   useEffect(() => {
-    if (existingRecordingUrl) {
-      setRecordingUrl(existingRecordingUrl);
-      if (existingDurationMs) {
-        setDurationMs(parseFloat(existingDurationMs));
-      }
-      recordingCache.set(callId, {
-        url: existingRecordingUrl,
-        downloadUrl: null,
-        durationMs: existingDurationMs ? parseFloat(existingDurationMs) : null,
-      });
-    } else {
-      const cached = recordingCache.get(callId);
-      if (cached) {
-        setRecordingUrl(cached.url);
-        setDownloadUrl(cached.downloadUrl);
-        setDurationMs(cached.durationMs);
-      }
+    if (existingDurationMs) {
+      setDurationMs(parseFloat(existingDurationMs));
+    }
+
+    const cached = recordingCache.get(callId);
+    if (shouldUseCachedRecording(cached)) {
+      setRecordingUrl(cached.url);
+      setDownloadUrl(cached.downloadUrl);
+      setDurationMs(cached.durationMs ?? (existingDurationMs ? parseFloat(existingDurationMs) : null));
+    } else if (cached) {
+      clearCachedRecording(callId);
     }
   }, [callId, existingRecordingUrl, existingDurationMs]);
 
@@ -189,6 +226,7 @@ export function useCallRecording(callId: string, existingRecordingUrl?: string |
       url,
       downloadUrl: dlUrl || null,
       durationMs: null,
+      cachedAt: Date.now(),
     };
     recordingCache.set(callId, cached);
     setRecordingUrl(url);
@@ -225,7 +263,7 @@ export function useCallRecording(callId: string, existingRecordingUrl?: string |
           setLoading(false);
         }
         // 'processing' → keep polling
-      } catch (err) {
+      } catch {
         stopPolling();
         setError('Network error while checking recording status');
         setErrorType('unknown');
@@ -244,12 +282,30 @@ export function useCallRecording(callId: string, existingRecordingUrl?: string |
 
   const fetchRecording = useCallback(async (): Promise<string | null> => {
     // Check cache first
+    const freshCached = getFreshCachedRecording(callId);
+    if (freshCached) {
+      setRecordingUrl(freshCached.url);
+      setDownloadUrl(freshCached.downloadUrl);
+      setDurationMs(freshCached.durationMs);
+      return freshCached.url;
+    }
+
     const cached = recordingCache.get(callId);
     if (cached) {
-      setRecordingUrl(cached.url);
-      setDownloadUrl(cached.downloadUrl);
-      setDurationMs(cached.durationMs);
-      return cached.url;
+      clearCachedRecording(callId);
+      setRecordingUrl(null);
+      setDownloadUrl(null);
+      showRecordingToast(
+        `recording-expired:${callId}`,
+        'Recording link expired',
+        'Fetching a fresh secure link for this recording now.',
+      );
+    } else if (existingRecordingUrl) {
+      showRecordingToast(
+        `recording-refresh:${callId}`,
+        'Refreshing recording link',
+        'Secure recording links expire after a while. Fetching a fresh one now.',
+      );
     }
 
     setLoading(true);
@@ -294,10 +350,14 @@ export function useCallRecording(callId: string, existingRecordingUrl?: string |
       setLoading(false);
       return null;
     }
-  }, [callId, handleReady, startPolling]);
+  }, [callId, existingRecordingUrl, handleReady, startPolling]);
 
   const play = useCallback(async () => {
-    let url = recordingUrl;
+    const freshCached = getFreshCachedRecording(callId);
+    let url = freshCached?.url ?? recordingUrl;
+    if (!freshCached && url) {
+      url = await fetchRecording();
+    }
     if (!url) {
       url = await fetchRecording();
     }
@@ -346,9 +406,13 @@ export function useCallRecording(callId: string, existingRecordingUrl?: string |
     }
   }, [isPlaying, pause, play]);
 
+  const freshCached = getFreshCachedRecording(callId);
+  const activeRecordingUrl = freshCached ? recordingUrl : null;
+  const activeDownloadUrl = freshCached ? downloadUrl : null;
+
   return {
-    recordingUrl,
-    downloadUrl,
+    recordingUrl: activeRecordingUrl,
+    downloadUrl: activeDownloadUrl,
     durationMs,
     loading,
     error,

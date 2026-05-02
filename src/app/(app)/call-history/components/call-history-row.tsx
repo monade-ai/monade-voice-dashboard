@@ -78,6 +78,7 @@ export const CallHistoryRow = React.memo(({
     togglePlay,
     downloadUrl,
     recordingUrl,
+    fetchRecording,
   } = useCallRecording(
     transcript.call_id,
     analytics?.recording_url,
@@ -288,11 +289,11 @@ export const CallHistoryRow = React.memo(({
                 </motion.button>
               </motion.div>
 
-              {(downloadUrl || recordingUrl) && (
+              {hasSipCallId && (
                 <button
-                  onClick={(e) => {
+                  onClick={async (e) => {
                     e.stopPropagation();
-                    const url = downloadUrl || recordingUrl;
+                    const url = downloadUrl || recordingUrl || await fetchRecording();
                     if (!url) return;
                     const a = document.createElement('a');
                     a.href = url;

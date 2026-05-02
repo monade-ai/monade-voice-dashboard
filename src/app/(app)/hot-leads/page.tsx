@@ -102,6 +102,7 @@ const DealRow = React.memo(({ lead, onClick, bucketIndex }: {
     togglePlay,
     downloadUrl,
     recordingUrl,
+    fetchRecording,
   } = useCallRecording(
     lead.call_id,
     lead.recording_url,
@@ -201,11 +202,11 @@ const DealRow = React.memo(({ lead, onClick, bucketIndex }: {
               )}
             </motion.button>
 
-            {(downloadUrl || recordingUrl) && (
+            {hasRecording && (
               <button
-                onClick={(e) => {
+                onClick={async (e) => {
                   e.stopPropagation();
-                  const url = downloadUrl || recordingUrl;
+                  const url = downloadUrl || recordingUrl || await fetchRecording();
                   if (!url) return;
                   const a = document.createElement('a');
                   a.href = url;
