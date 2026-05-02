@@ -41,8 +41,26 @@ export interface BillingData {
   cost_per_minute?: number;
   recording_enabled?: boolean;
   recording_surcharge_total?: number;
-  call_direction?: string;
-  settlement_status?: string;
+  call_direction?: 'inbound' | 'outbound' | 'unknown' | string;
+  settlement_status?: 'ok' | 'failed' | string;
+}
+
+export interface ProviderCallStatus {
+  status: 'answered' | 'no_answer' | 'busy' | 'failed' | 'cancelled' | string;
+  hangup_cause?: string | null;
+  duration?: number | null;
+  end_time?: string | null;
+  direction: 'inbound' | 'outbound' | string;
+  source: 'vobiz' | 'skipped' | string;
+  fetched_at: string;
+}
+
+export interface RecordingMetadata {
+  duration_ms?: number | null;
+  from_number?: string | null;
+  to_number?: string | null;
+  recording_available_after_ms?: number | null;
+  fetched_at?: string;
 }
 
 export interface CallAnalytics {
@@ -69,6 +87,7 @@ export interface CallAnalytics {
   analysis_timestamp?: string;
   analysis_model?: string;
   transcript_url?: string;
+  enhanced_transcript_url?: string | null;
   phone_number?: string;
   campaign_id?: string;
   created_at?: string;
@@ -81,6 +100,9 @@ export interface CallAnalytics {
   call_ended_at?: string;
   duration_seconds?: number;
   billing_data?: BillingData | null;
+  // Provider/CDR ground truth (filled async by sweeper, may stay null)
+  provider_call_status?: ProviderCallStatus | null;
+  recording_metadata?: RecordingMetadata | null;
   analytics_history?: Array<Record<string, unknown>>;
 }
 

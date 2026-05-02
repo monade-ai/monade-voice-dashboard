@@ -10,14 +10,19 @@ import {
   Pause,
   Loader2,
   Download,
+  PhoneIncoming,
+  PhoneOutgoing,
+  PhoneMissed,
+  AlertTriangle,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 import { LeadIcon } from '@/components/ui/lead-icon';
 import { cn } from '@/lib/utils';
-import { CallAnalytics, BillingData } from '@/app/hooks/use-analytics';
+import { CallAnalytics } from '@/app/hooks/use-analytics';
 import { Transcript } from '@/app/hooks/use-transcripts';
 import { useCallRecording } from '@/app/hooks/use-call-recording';
+import { deriveCallOutcome } from '@/lib/utils/call-outcome';
 
 interface CallHistoryRowProps {
   transcript: Transcript;
@@ -43,6 +48,20 @@ const formatDuration = (seconds?: number) => {
 
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 };
+
+// Resolve direction with billing → provider fallback (per backend guide).
+// Returns null when neither source has spoken yet.
+const resolveDirection = (analytics?: CallAnalytics): 'inbound' | 'outbound' | 'unknown' | null => {
+  const fromBilling = analytics?.billing_data?.call_direction;
+  if (fromBilling === 'inbound' || fromBilling === 'outbound') return fromBilling;
+  if (fromBilling === 'unknown') return 'unknown';
+
+  const fromProvider = analytics?.provider_call_status?.direction;
+  if (fromProvider === 'inbound' || fromProvider === 'outbound') return fromProvider;
+
+  return null;
+};
+
 
 export const CallHistoryRow = React.memo(({
   transcript,
@@ -74,6 +93,9 @@ export const CallHistoryRow = React.memo(({
     ? analytics.key_discoveries.duration_seconds
     : (analytics?.duration_seconds ?? undefined);
   const billing = analytics?.billing_data;
+  const direction = resolveDirection(analytics);
+  const outcomeChip = deriveCallOutcome(analytics?.provider_call_status);
+  const settlementFailed = billing?.settlement_status === 'failed';
 
   const dotColor = useMemo(() => {
     const colors: Record<string, string> = {
@@ -99,9 +121,26 @@ export const CallHistoryRow = React.memo(({
         <div className="flex items-center gap-3">
           <LeadIcon seed={transcript.call_id} size={28} />
           <div className="flex flex-col">
-            <span className="text-sm font-semibold text-foreground tracking-tight selection:bg-primary selection:text-black">
-              {transcript.phone_number}
-            </span>
+            <div className="flex items-center gap-2">
+              {direction === 'inbound' && (
+                <span title="Inbound call" className="inline-flex items-center text-green-500/90">
+                  <PhoneIncoming size={11} strokeWidth={2.4} />
+                </span>
+              )}
+              {direction === 'outbound' && (
+                <span title="Outbound call" className="inline-flex items-center text-blue-500/90">
+                  <PhoneOutgoing size={11} strokeWidth={2.4} />
+                </span>
+              )}
+              {direction === 'unknown' && (
+                <span title="Direction unknown" className="inline-flex items-center text-muted-foreground/40">
+                  <PhoneMissed size={11} strokeWidth={2.4} />
+                </span>
+              )}
+              <span className="text-sm font-semibold text-foreground tracking-tight selection:bg-primary selection:text-black">
+                {transcript.phone_number}
+              </span>
+            </div>
             <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-mono">
               ID: {transcript.call_id.substring(0, 8)}
             </span>
@@ -126,6 +165,26 @@ export const CallHistoryRow = React.memo(({
               </span>
             </div>
           )}
+          {outcomeChip ? (
+            <div
+              className="flex items-center gap-1.5 mt-0.5"
+              title={outcomeChip.reason}
+            >
+              <span className={cn('w-1 h-1 rounded-full', outcomeChip.dot)} />
+              <span className={cn('text-[9px] font-bold uppercase tracking-wider', outcomeChip.tone)}>
+                {outcomeChip.label}
+              </span>
+              {outcomeChip.outcome === 'failed' && outcomeChip.reason && (
+                <span className="text-[8px] text-muted-foreground/60 italic truncate max-w-[140px]">
+                  {outcomeChip.reason}
+                </span>
+              )}
+            </div>
+          ) : isEngaged ? (
+            <span className="text-[8px] text-muted-foreground/30 uppercase tracking-wider mt-0.5">
+              Pending status
+            </span>
+          ) : null}
           {billing && typeof billing.credits_used === 'number' ? (
             <div className="flex items-center gap-1.5 mt-0.5">
               <span className="text-[9px] font-bold text-orange-500 uppercase tracking-wider">
@@ -134,6 +193,15 @@ export const CallHistoryRow = React.memo(({
               {billing.recording_enabled && (
                 <span className="text-[8px] text-muted-foreground/60 uppercase tracking-wider">
                   +rec
+                </span>
+              )}
+              {settlementFailed && (
+                <span
+                  className="inline-flex items-center gap-0.5 text-[8px] font-bold text-red-500 uppercase tracking-wider"
+                  title="Billing settlement failed — wallet may be out of sync"
+                >
+                  <AlertTriangle size={9} />
+                  Settle
                 </span>
               )}
             </div>

@@ -10,6 +10,8 @@ import {
   Zap,
   Clock,
   FolderOpen,
+  PhoneIncoming,
+  PhoneOutgoing,
 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -34,6 +36,7 @@ export interface CallHistoryFilterState {
   timeRange: string;
   durationRange: string;
   campaigns: string[];
+  direction: 'all' | 'inbound' | 'outbound';
 }
 
 interface CallHistoryFilterBarProps {
@@ -107,16 +110,25 @@ export function CallHistoryFilterBar({
       timeRange: 'all',
       durationRange: 'all',
       campaigns: [],
+      direction: 'all',
     });
   };
 
-  const activeCount = 
-    filters.verdicts.length + 
-    filters.qualities.length + 
-    (filters.hasConversation ? 1 : 0) + 
+  const activeCount =
+    filters.verdicts.length +
+    filters.qualities.length +
+    (filters.hasConversation ? 1 : 0) +
     (filters.timeRange !== 'all' ? 1 : 0) +
     (filters.durationRange !== 'all' ? 1 : 0) +
+    (filters.direction !== 'all' ? 1 : 0) +
     filters.campaigns.length;
+
+  const cycleDirection = () => {
+    const next: CallHistoryFilterState['direction'] = (
+      filters.direction === 'all' ? 'inbound' : filters.direction === 'inbound' ? 'outbound' : 'all'
+    );
+    onFilterChange({ ...filters, direction: next });
+  };
 
   return (
     <div className="flex flex-col gap-3 w-full">
@@ -286,6 +298,29 @@ export function CallHistoryFilterBar({
         )}
 
         <div className="w-[1px] h-4 bg-border/20 mx-1" />
+
+        {/* Direction Filter (cycles All → Inbound → Outbound → All) */}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={cycleDirection}
+          className={cn(
+            'h-7 gap-1.5 hover:bg-white/[0.05] rounded-full text-[10px] font-bold uppercase tracking-wider px-3 transition-all',
+            filters.direction === 'inbound' ? 'text-green-500 hover:text-green-500 hover:bg-green-500/5' :
+              filters.direction === 'outbound' ? 'text-blue-500 hover:text-blue-500 hover:bg-blue-500/5' :
+                'text-foreground/80',
+          )}
+          title="Toggle inbound / outbound / all"
+        >
+          {filters.direction === 'inbound' ? (
+            <PhoneIncoming className="w-3 h-3 transition-colors" />
+          ) : filters.direction === 'outbound' ? (
+            <PhoneOutgoing className="w-3 h-3 transition-colors" />
+          ) : (
+            <PhoneIncoming className="w-3 h-3 transition-colors" />
+          )}
+          {filters.direction === 'all' ? 'Direction' : filters.direction === 'inbound' ? 'Inbound' : 'Outbound'}
+        </Button>
 
         {/* Connected Filter */}
         <Button

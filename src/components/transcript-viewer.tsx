@@ -30,6 +30,7 @@ import {
 import { MONADE_API_BASE } from '@/config';
 import { fetchJson } from '@/lib/http';
 import { cn } from '@/lib/utils';
+import { deriveCallOutcome } from '@/lib/utils/call-outcome';
 
 // --- Types ---
 
@@ -722,10 +723,19 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
               </PaperCardContent>
             </PaperCard>
 
-            {/* Billing Breakdown — only for newer entries with billing_data */}
+            {/* Billing Breakdown — only for newer entries with billing_data.
+                NOTE: keep timing/duration sourced from the original `duration_seconds` only.
+                Don't fall back to provider_call_status.duration — it can be misleading or empty. */}
             {analytics?.billing_data ? (
               <div className="space-y-4 pt-4 border-t border-border/20">
-                <h3 className="text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground">Billing</h3>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground">Billing</h3>
+                  {analytics.billing_data.settlement_status === 'failed' && (
+                    <Badge variant="outline" className="text-[9px] uppercase tracking-[0.2em] border-red-500/40 bg-red-500/10 text-red-500">
+                      Settlement Failed
+                    </Badge>
+                  )}
+                </div>
                 <div className="space-y-2">
                   <div className="flex justify-between text-xs">
                     <span className="text-muted-foreground">Credits Used</span>
@@ -782,6 +792,70 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
                 <p className="text-[10px] text-muted-foreground/50 italic uppercase tracking-widest">
                   Billing data unavailable for this entry
                 </p>
+              </div>
+            ) : null}
+
+            {/* Call Outcome — derived from Vobiz provider_call_status.
+                See src/lib/utils/call-outcome.ts for the mapping. */}
+            {(() => {
+              const outcome = deriveCallOutcome(analytics?.provider_call_status);
+
+              if (outcome) {
+                return (
+                  <div className="space-y-4 pt-4 border-t border-border/20">
+                    <h3 className="text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground">Call Outcome</h3>
+                    <div className="flex items-center gap-3">
+                      <span className={cn('w-2 h-2 rounded-full', outcome.dot)} />
+                      <span className={cn('text-sm font-bold', outcome.tone)}>{outcome.label}</span>
+                    </div>
+                    {outcome.outcome === 'failed' && outcome.reason && (
+                      <p className="text-xs text-muted-foreground italic leading-relaxed">
+                        {outcome.reason}
+                      </p>
+                    )}
+                  </div>
+                );
+              }
+
+              if (!analyticsLoading && analytics) {
+                return (
+                  <div className="pt-4 border-t border-border/20">
+                    <p className="text-[10px] text-muted-foreground/50 italic uppercase tracking-widest">
+                      Call status not yet available
+                    </p>
+                  </div>
+                );
+              }
+
+              return null;
+            })()}
+
+            {/* Recording Metadata — only if backend has fetched it */}
+            {analytics?.recording_metadata ? (
+              <div className="space-y-4 pt-4 border-t border-border/20">
+                <h3 className="text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground">Recording</h3>
+                <div className="space-y-2">
+                  {analytics.recording_metadata.from_number && (
+                    <div className="flex justify-between text-xs">
+                      <span className="text-muted-foreground">From</span>
+                      <span className="font-mono text-[10px] text-foreground">{analytics.recording_metadata.from_number}</span>
+                    </div>
+                  )}
+                  {analytics.recording_metadata.to_number && (
+                    <div className="flex justify-between text-xs">
+                      <span className="text-muted-foreground">To</span>
+                      <span className="font-mono text-[10px] text-foreground">{analytics.recording_metadata.to_number}</span>
+                    </div>
+                  )}
+                  {analytics.recording_metadata.duration_ms != null && (
+                    <div className="flex justify-between text-xs">
+                      <span className="text-muted-foreground">Duration</span>
+                      <span className="font-medium text-foreground">
+                        {(analytics.recording_metadata.duration_ms / 1000).toFixed(1)}s
+                      </span>
+                    </div>
+                  )}
+                </div>
               </div>
             ) : null}
 

@@ -36,6 +36,7 @@ export default function CallHistoryPage() {
     timeRange: 'all',
     durationRange: 'all',
     campaigns: [],
+    direction: 'all',
   });
   const callsPerPage = 10;
 
@@ -136,6 +137,14 @@ export default function CallHistoryPage() {
       if (filters.campaigns.length > 0) {
         const campaignId = t.analytics?.campaign_id;
         if (!campaignId || !filters.campaigns.includes(campaignId)) return false;
+      }
+
+      // 6b. Direction (billing → provider fallback per backend guide)
+      if (filters.direction !== 'all') {
+        const dir = (t.analytics?.billing_data?.call_direction
+          || t.analytics?.provider_call_status?.direction
+          || '').toLowerCase();
+        if (dir !== filters.direction) return false;
       }
 
       // 7. Time Range
