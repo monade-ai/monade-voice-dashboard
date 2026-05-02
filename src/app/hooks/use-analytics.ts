@@ -230,50 +230,40 @@ export function useUserAnalytics() {
       try {
         const data = await fetchJson<any>(`${MONADE_API_BASE}/api/analytics?user_uid=${userUid}`);
 
+        // Merge the inner analytics object with top-level call metadata.
+        // IMPORTANT: keep this allowlist in sync with the backend doc
+        // (docs/FRONTEND_CALL_DIRECTION_AND_BILLING_FIELDS.md).
+        // Anything NOT listed here gets dropped — that's how billing_data /
+        // provider_call_status / recording_metadata silently disappeared before.
+        const mergeRecord = (item: any): CallAnalytics => ({
+          ...item.analytics,
+          id: item.id,
+          call_id: item.call_id,
+          user_uid: item.user_uid,
+          phone_number: item.phone_number,
+          transcript_url: item.transcript_url,
+          enhanced_transcript_url: item.enhanced_transcript_url,
+          campaign_id: item.campaign_id,
+          created_at: item.created_at,
+          updated_at: item.updated_at,
+          sip_call_id: item.sip_call_id,
+          recording_url: item.recording_url,
+          recording_duration_ms: item.recording_duration_ms,
+          // Billing audit + CDR fields (per backend doc)
+          call_started_at: item.call_started_at,
+          call_ended_at: item.call_ended_at,
+          duration_seconds: item.duration_seconds,
+          billing_data: item.billing_data,
+          provider_call_status: item.provider_call_status,
+          recording_metadata: item.recording_metadata,
+        });
+
         let analyticsArray: CallAnalytics[] = [];
         if (Array.isArray(data)) {
-          analyticsArray = data.map(item => {
-            if (item.analytics) {
-              return {
-                ...item.analytics,
-                id: item.id,
-                call_id: item.call_id,
-                user_uid: item.user_uid,
-                phone_number: item.phone_number,
-                transcript_url: item.transcript_url,
-                campaign_id: item.campaign_id,
-                created_at: item.created_at,
-                updated_at: item.updated_at,
-                sip_call_id: item.sip_call_id,
-                recording_url: item.recording_url,
-                recording_duration_ms: item.recording_duration_ms,
-              };
-            }
-
-            return item;
-          });
+          analyticsArray = data.map(item => (item.analytics ? mergeRecord(item) : item));
         } else if (data.analytics) {
           analyticsArray = Array.isArray(data.analytics)
-            ? data.analytics.map((item: any) => {
-              if (item.analytics) {
-                return {
-                  ...item.analytics,
-                  id: item.id,
-                  call_id: item.call_id,
-                  user_uid: item.user_uid,
-                  phone_number: item.phone_number,
-                  transcript_url: item.transcript_url,
-                  campaign_id: item.campaign_id,
-                  created_at: item.created_at,
-                  updated_at: item.updated_at,
-                  sip_call_id: item.sip_call_id,
-                  recording_url: item.recording_url,
-                  recording_duration_ms: item.recording_duration_ms,
-                };
-              }
-
-              return item;
-            })
+            ? data.analytics.map((item: any) => (item.analytics ? mergeRecord(item) : item))
             : [data.analytics];
         }
 
