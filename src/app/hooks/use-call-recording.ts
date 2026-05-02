@@ -54,7 +54,15 @@ function notifyListeners() {
 }
 
 function shouldUseCachedRecording(cached?: CachedRecording) {
-  return Boolean(cached && (Date.now() - cached.cachedAt) < SIGNED_URL_TTL_MS);
+  return Boolean(
+    cached
+    && !isLegacyProviderRecordingUrl(cached.url)
+    && (Date.now() - cached.cachedAt) < SIGNED_URL_TTL_MS,
+  );
+}
+
+function isLegacyProviderRecordingUrl(url?: string | null) {
+  return Boolean(url && url.includes('media.vobiz.ai'));
 }
 
 function getFreshCachedRecording(callId: string) {
@@ -171,8 +179,15 @@ export function useCallRecording(callId: string, existingRecordingUrl?: string |
   // streamable URL. Playback/download should only use signed URLs returned by
   // the prepare -> status flow.
   useEffect(() => {
+    setRecordingUrl(null);
+    setDownloadUrl(null);
+    setError(null);
+    setErrorType(null);
+
     if (existingDurationMs) {
       setDurationMs(parseFloat(existingDurationMs));
+    } else {
+      setDurationMs(null);
     }
 
     const cached = recordingCache.get(callId);
@@ -222,6 +237,12 @@ export function useCallRecording(callId: string, existingRecordingUrl?: string |
 
   /** Handle a "ready" response — cache it and update state */
   const handleReady = useCallback((url: string, dlUrl?: string) => {
+    if (isLegacyProviderRecordingUrl(url)) {
+      setError('Recording link was invalid. Please try again.');
+      setErrorType('unknown');
+      return;
+    }
+
     const cached: CachedRecording = {
       url,
       downloadUrl: dlUrl || null,
@@ -253,6 +274,14 @@ export function useCallRecording(callId: string, existingRecordingUrl?: string |
         );
 
         if (data.status === 'ready' && data.url) {
+          if (isLegacyProviderRecordingUrl(data.url)) {
+            stopPolling();
+            setError('Recording link was invalid. Please try again.');
+            setErrorType('unknown');
+            setLoading(false);
+            return;
+          }
+
           stopPolling();
           handleReady(data.url, data.download_url);
           setLoading(false);
@@ -320,6 +349,13 @@ export function useCallRecording(callId: string, existingRecordingUrl?: string |
       );
 
       if (data.status === 'ready' && data.url) {
+        if (isLegacyProviderRecordingUrl(data.url)) {
+          setError('Recording link was invalid. Please try again.');
+          setErrorType('unknown');
+          setLoading(false);
+          return null;
+        }
+
         // Cache hit — URL available immediately
         handleReady(data.url, data.download_url);
         setLoading(false);
@@ -354,13 +390,7 @@ export function useCallRecording(callId: string, existingRecordingUrl?: string |
 
   const play = useCallback(async () => {
     const freshCached = getFreshCachedRecording(callId);
-    let url = freshCached?.url ?? recordingUrl;
-    if (!freshCached && url) {
-      url = await fetchRecording();
-    }
-    if (!url) {
-      url = await fetchRecording();
-    }
+    const url = freshCached?.url ?? await fetchRecording();
     if (!url) return;
 
     const audio = getOrCreateAudio();
@@ -383,7 +413,7 @@ export function useCallRecording(callId: string, existingRecordingUrl?: string |
     globalActiveCallId = callId;
     notifyListeners();
     audio.play().catch(console.error);
-  }, [callId, recordingUrl, fetchRecording]);
+  }, [callId, fetchRecording]);
 
   const pause = useCallback(() => {
     if (globalActiveCallId === callId && globalAudio) {
