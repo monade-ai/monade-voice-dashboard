@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import dynamic from 'next/dynamic';
+import { motion } from 'framer-motion';
 import {
   Search,
   ArrowUpRight,
@@ -11,9 +12,13 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  Play,
+  Pause,
+  Download,
 } from 'lucide-react';
 
 import { useUserAnalytics, CallAnalytics } from '@/app/hooks/use-analytics';
+import { useCallRecording } from '@/app/hooks/use-call-recording';
 import { QualificationBucket, usePostProcessingTemplates } from '@/app/hooks/use-post-processing-templates';
 import { DashboardHeader } from '@/components/dashboard-header';
 import { Input } from '@/components/ui/input';
@@ -86,13 +91,30 @@ const DealRow = React.memo(({ lead, onClick, bucketIndex }: {
   const price = formatCurrency(lead.key_discoveries?.price_quoted as string);
   const confidenceColor = confidence >= 80 ? 'text-green-500' : confidence >= 50 ? 'text-yellow-500' : 'text-red-500';
 
+  // Recording playback — same pattern as Call History row.
+  // Hook is called unconditionally; UI shown only when a recording is reachable.
+  const hasRecording = !!(lead.sip_call_id || lead.recording_url);
+  const {
+    loading: recordingLoading,
+    isPlaying,
+    formattedCurrentTime,
+    progress,
+    togglePlay,
+    downloadUrl,
+    recordingUrl,
+  } = useCallRecording(
+    lead.call_id,
+    lead.recording_url,
+    lead.recording_duration_ms,
+  );
+
   return (
-    <div 
+    <div
       onClick={onClick}
       className="group flex items-center justify-between p-5 border-b border-border/10 hover:bg-muted/30 transition-all cursor-pointer relative overflow-hidden"
     >
       <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-primary scale-y-0 group-hover:scale-y-100 transition-transform origin-center" />
-            
+
       {/* 1. Lead Identity (30%) */}
       <div className="flex items-center gap-5 w-[30%]">
         <div className="shrink-0">
@@ -125,13 +147,82 @@ const DealRow = React.memo(({ lead, onClick, bucketIndex }: {
       </div>
 
       {/* 4. Value & Action (20%) */}
-      <div className="w-[20%] flex items-center justify-end gap-8">
+      <div className="w-[20%] flex items-center justify-end gap-3">
         {price && (
           <div className="flex flex-col items-end">
             <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/60">Value</span>
             <span className="text-base font-mono font-bold text-foreground">{price}</span>
           </div>
         )}
+
+        {hasRecording && (
+          <div className="flex items-center gap-2">
+            <motion.button
+              layout
+              onClick={(e) => { e.stopPropagation(); togglePlay(); }}
+              disabled={recordingLoading}
+              className={cn(
+                'h-8 flex items-center bg-foreground text-background font-bold tracking-widest overflow-hidden transition-all duration-500 rounded-full disabled:opacity-60',
+                isPlaying ? 'px-3 gap-3 w-44' : 'px-3 gap-2 w-auto',
+              )}
+              title={recordingLoading ? 'Preparing recording…' : isPlaying ? 'Pause' : 'Play recording'}
+            >
+              <div className="flex items-center gap-2 flex-shrink-0">
+                {recordingLoading ? (
+                  <Loader2 size={12} className="animate-spin" />
+                ) : isPlaying ? (
+                  <Pause size={12} fill="currentColor" />
+                ) : (
+                  <Play size={12} fill="currentColor" />
+                )}
+                {!isPlaying && !recordingLoading && (
+                  <span className="text-[9px] uppercase">Play</span>
+                )}
+                {recordingLoading && (
+                  <span className="text-[9px] uppercase">Preparing</span>
+                )}
+              </div>
+
+              {isPlaying && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="flex-1 flex items-center gap-2"
+                >
+                  <div className="flex-1 h-1 bg-background/20 rounded-full relative overflow-hidden">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${progress}%` }}
+                      className="absolute inset-y-0 left-0 bg-background"
+                    />
+                  </div>
+                  <span className="text-[8px] font-mono tabular-nums opacity-60">{formattedCurrentTime}</span>
+                </motion.div>
+              )}
+            </motion.button>
+
+            {(downloadUrl || recordingUrl) && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const url = downloadUrl || recordingUrl;
+                  if (!url) return;
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `recording-${lead.call_id}.mp3`;
+                  a.target = '_blank';
+                  a.rel = 'noopener noreferrer';
+                  a.click();
+                }}
+                className="h-8 w-8 flex items-center justify-center rounded-full border border-border/30 text-muted-foreground hover:text-foreground hover:border-border/60 transition-all"
+                title="Download recording"
+              >
+                <Download size={12} />
+              </button>
+            )}
+          </div>
+        )}
+
         <div className="w-10 h-10 rounded-full bg-foreground text-background flex items-center justify-center group-hover:bg-primary group-hover:text-black transition-all duration-300 shadow-sm">
           <ArrowUpRight size={18} />
         </div>

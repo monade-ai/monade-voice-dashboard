@@ -43,7 +43,6 @@ import {
   CampaignExportEnrichment,
 } from '@/lib/utils/campaign-client-export';
 import { fetchJson } from '@/lib/http';
-import { MONADE_API_BASE } from '@/config';
 import {
   Campaign,
   CampaignStatus,
@@ -352,7 +351,6 @@ const buildCampaignCallLogRows = (
         contact_updated_at_utc: toUtcIso(contact.updated_at),
         transcript_call_id: '',
         transcript_url: '',
-        enhanced_transcript_url: '',
         transcript_created_at_utc: '',
         analysis_verdict: '',
         analysis_summary: '',
@@ -1094,7 +1092,6 @@ export default function CampaignDetailPage() {
           : null;
         row.transcript_call_id = selected.call_id ?? '';
         row.transcript_url = selected.transcript_url ?? '';
-        row.enhanced_transcript_url = selected.enhanced_transcript_url ?? '';
         row.transcript_created_at_utc = toUtcIso(selected.created_at);
         row.analysis_verdict = typeof analytics?.verdict === 'string' ? analytics.verdict : '';
         row.analysis_summary = typeof analytics?.summary === 'string' ? analytics.summary : '';
@@ -1113,76 +1110,13 @@ export default function CampaignDetailPage() {
         message: `Matched analytics records for ${analyticsRecords.length} campaign calls.`,
       });
 
-      // Resolve transcript URL for each row using priority order:
-      //   P1: row.enhanced_transcript_url (already on the analytics record)
-      //   P2: GET ${MONADE_API_BASE}/api/analytics/{sip_call_id}/enhanced-transcript → enhanced_transcript_url
-      //   P3: row.transcript_url (original GCS transcript)
-      // resolvedTranscriptUrls maps row.contact_id+attempt_number → fetchable URL.
-      const rowKey = (row: CampaignCallAttemptExportRow) => `${row.contact_id}::${row.attempt_number}`;
-      const resolvedTranscriptUrls = new Map<string, string>();
-
-      const rowsNeedingP2 = rows.filter(
-        (row) => !row.enhanced_transcript_url && row.sip_call_id && !resolvedTranscriptUrls.has(rowKey(row)),
+      const transcriptUrls = Array.from(
+        new Set(
+          rows
+            .map((row) => row.transcript_url)
+            .filter((url): url is string => typeof url === 'string' && url.length > 0),
+        ),
       );
-
-      if (rowsNeedingP2.length > 0) {
-        setDownloadProgress({
-          phase: 'transcripts',
-          done: 0,
-          total: rowsNeedingP2.length,
-          message: `Resolving enhanced transcripts (0/${rowsNeedingP2.length})...`,
-        });
-
-        // Cache by sip_call_id so duplicate sip_call_ids only hit the endpoint once.
-        const enhancedBySipCallId = new Map<string, string>();
-        const p2Queue = [...rowsNeedingP2];
-        let p2Completed = 0;
-
-        const p2WorkerCount = Math.min(4, p2Queue.length);
-        const p2Workers = Array.from({ length: p2WorkerCount }, async () => {
-          while (p2Queue.length > 0) {
-            const row = p2Queue.shift();
-            if (!row) break;
-            const sipCallId = row.sip_call_id;
-
-            if (!enhancedBySipCallId.has(sipCallId)) {
-              try {
-                const data = await fetchJson<{ status?: string; enhanced_transcript_url?: string }>(
-                  `${MONADE_API_BASE}/api/analytics/${encodeURIComponent(sipCallId)}/enhanced-transcript`,
-                  { retry: { retries: 0 } },
-                );
-                const enhancedUrl = data?.status === 'ready' && typeof data.enhanced_transcript_url === 'string'
-                  ? data.enhanced_transcript_url
-                  : '';
-                enhancedBySipCallId.set(sipCallId, enhancedUrl);
-              } catch (error) {
-                console.warn('[Campaign Export] Enhanced transcript lookup failed for sip_call_id', sipCallId, error);
-                enhancedBySipCallId.set(sipCallId, '');
-              }
-            }
-
-            const enhancedUrl = enhancedBySipCallId.get(sipCallId) ?? '';
-            if (enhancedUrl) row.enhanced_transcript_url = enhancedUrl;
-            p2Completed += 1;
-            setDownloadProgress({
-              phase: 'transcripts',
-              done: p2Completed,
-              total: rowsNeedingP2.length,
-              message: `Resolving enhanced transcripts (${p2Completed}/${rowsNeedingP2.length})...`,
-            });
-          }
-        });
-
-        await Promise.all(p2Workers);
-      }
-
-      // After P1 + P2, decide the final fetchable URL per row.
-      rows.forEach((row) => {
-        const url = row.enhanced_transcript_url || row.transcript_url || '';
-        if (url) resolvedTranscriptUrls.set(rowKey(row), url);
-      });
-
-      const transcriptUrls = Array.from(new Set(resolvedTranscriptUrls.values()));
 
       if (transcriptUrls.length > 0) {
         setDownloadProgress({
@@ -1239,9 +1173,8 @@ export default function CampaignDetailPage() {
         await Promise.all(workers);
 
         rows.forEach((row) => {
-          const url = resolvedTranscriptUrls.get(rowKey(row));
-          if (!url) return;
-          const transcriptEntry = transcriptCache.get(url);
+          if (!row.transcript_url) return;
+          const transcriptEntry = transcriptCache.get(row.transcript_url);
           if (!transcriptEntry) return;
 
           row.transcript_text = transcriptEntry.transcript;
