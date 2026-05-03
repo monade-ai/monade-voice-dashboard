@@ -59,6 +59,11 @@ describe('campaign-client-export', () => {
     expect(mapAttemptTag(makeAttempt({ analysis_verdict: 'likely_to_book' }))).toBe('Qualified');
     expect(mapAttemptTag(makeAttempt({ analysis_verdict: 'not_interested' }))).toBe('Not Interested');
     expect(mapAttemptTag(makeAttempt({
+      analytics_json: { call_connected: false, call_quality: 'voicemail' },
+      transcript_text: 'Voicemail prompt',
+      transcript_url: 'https://storage.googleapis.com/test',
+    }))).toBe('Did not pick-up');
+    expect(mapAttemptTag(makeAttempt({
       attempt_number: '0',
       attempt_status: 'not_started',
       analysis_verdict: '',
@@ -129,5 +134,71 @@ describe('campaign-client-export', () => {
     expect(result.rows[0]['Attempt_2_Analytics_key_discoveries.customer_language']).toBe('english');
     expect(result.totalCalls).toBe(7);
     expect(result.availableRecordings).toBe(1);
+  });
+
+  test('buildClientCampaignExport skips duplicate or empty follow-up attempt slots', () => {
+    const duplicateAttempt = makeAttempt({
+      contact_id: 'contact_dupe',
+      contact_name: 'Duplicate Lead',
+      transcript_call_id: '',
+      provider_call_id: '',
+      analysis_verdict: 'call_disconnected',
+      transcript_text: '',
+      transcript_url: '',
+      transcript_message_count: '',
+      duration_seconds: '',
+      analytics_json: null,
+    });
+    const realAttempt = makeAttempt({
+      contact_id: 'contact_dupe',
+      contact_name: 'Duplicate Lead',
+      transcript_call_id: 'call_real_1',
+      provider_call_id: 'provider_real_1',
+      analysis_verdict: 'call_disconnected',
+    });
+
+    const result = buildClientCampaignExport([realAttempt, duplicateAttempt]);
+
+    expect(result.rows).toHaveLength(1);
+    expect(result.rows[0].Attempt_1_Call_ID).toBe('call_real_1');
+    expect(result.rows[0].Attempt_1_Tag).toBe('Uncertain');
+    expect(result.rows[0].Attempt_2_Call_ID).toBeUndefined();
+    expect(result.rows[0].Attempt_2_Tag).toBeUndefined();
+    expect(result.rows[0].Attempt_2_Call_Connected).toBeUndefined();
+    expect(result.rows[0].All_Call_IDs).toBe('call_real_1');
+    expect(result.totalCalls).toBe(1);
+  });
+
+  test('unanswered calls do not populate uncertain enrichment or analytics verdict fields', () => {
+    const result = buildClientCampaignExport([
+      makeAttempt({
+        contact_id: 'contact_unanswered',
+        contact_name: 'Unanswered Lead',
+        transcript_call_id: 'call_vm_1',
+        provider_call_id: 'provider_vm_1',
+        transcript_text: 'Voicemail greeting',
+        transcript_url: 'https://storage.googleapis.com/vm.jsonl',
+        analytics_json: {
+          call_connected: false,
+          call_quality: 'voicemail',
+          verdict: 'call_disconnected',
+        },
+      }),
+    ], {
+      call_vm_1: {
+        uncertain_tag: 'Voicemail',
+        uncertain_reason: 'Call reached voicemail or a recorded prompt.',
+        uncertain_feedback_for_agent: 'Should not appear',
+      },
+    });
+
+    expect(result.rows).toHaveLength(1);
+    expect(result.rows[0].Attempt_1_Tag).toBe('Did not pick-up');
+    expect(result.rows[0].Attempt_1_Call_Connected).toBe('false');
+    expect(result.rows[0].Uncertain_Tag).toBe('');
+    expect(result.rows[0].Uncertain_Reason).toBe('');
+    expect(result.rows[0]['Uncertain_Feedback for agent']).toBe('');
+    expect(result.rows[0]['Attempt_1_Analytics_verdict']).toBeUndefined();
+    expect(result.rows[0].Qualified_confidence).toBe('');
   });
 });

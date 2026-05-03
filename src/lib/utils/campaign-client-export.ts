@@ -7,6 +7,7 @@ export type ClientAttemptTag = 'Qualified' | 'Not Interested' | 'Did not pick-up
 export interface CampaignAnalyticsExportRecord {
   call_id?: string;
   transcript_url?: string;
+  enhanced_transcript_url?: string | null;
   phone_number?: string;
   campaign_id?: string | null;
   created_at?: string;
@@ -122,6 +123,10 @@ function getAttemptCallId(row: CampaignCallAttemptExportRow): string {
   return row.transcript_call_id || row.provider_call_id || '';
 }
 
+function hasDistinctAttemptCallId(row: CampaignCallAttemptExportRow): boolean {
+  return getAttemptCallId(row).trim().length > 0;
+}
+
 export function extractClientLeadId(metadata: Record<string, unknown> | null | undefined): string {
   if (!metadata) return '';
 
@@ -168,12 +173,17 @@ export function mapAttemptTag(row: Pick<CampaignCallAttemptExportRow,
   const verdict = String(row.analysis_verdict || '').trim().toLowerCase();
   const status = String(row.attempt_status || '').trim().toLowerCase();
   const callQuality = String(row.analytics_json?.call_quality ?? '').trim().toLowerCase();
+  const explicitConnected = row.analytics_json?.call_connected;
   const hasTranscript = Boolean(
     row.transcript_text
     || row.transcript_url
     || (Number(row.transcript_message_count) > 0),
   );
   const hasDuration = Number(row.duration_seconds) > 0;
+
+  if (explicitConnected === false || explicitConnected === 0 || explicitConnected === 'false') {
+    return 'Did not pick-up';
+  }
 
   if (verdict === 'interested' || verdict === 'likely_to_book') return 'Qualified';
   if (verdict === 'not_interested') return 'Not Interested';
@@ -223,6 +233,15 @@ export function deriveCallConnected(
   return '';
 }
 
+function isConnectedAttempt(
+  row: Pick<CampaignCallAttemptExportRow,
+    'attempt_status' | 'transcript_text' | 'transcript_url' | 'transcript_message_count' | 'duration_seconds' | 'attempt_message' | 'analytics_json' | 'analysis_verdict' | 'attempt_number'
+  >,
+  mappedTag?: ClientAttemptTag,
+): boolean {
+  return deriveCallConnected(row, mappedTag).toLowerCase() === 'true';
+}
+
 export function buildCampaignEnrichmentRequests(
   rows: CampaignCallAttemptExportRow[],
 ): CampaignExportEnrichmentRequest[] {
@@ -234,7 +253,7 @@ export function buildCampaignEnrichmentRequests(
     if (tag !== 'Not Interested' && tag !== 'Uncertain') continue;
 
     const callConnected = deriveCallConnected(row, tag);
-    if (callConnected.toLowerCase() !== 'true') continue;
+    if (!isConnectedAttempt(row, tag)) continue;
 
     const callId = getAttemptCallId(row);
     if (!callId || seen.has(callId)) continue;
@@ -288,32 +307,48 @@ export function buildClientCampaignExport(
 
       return String(a.attempt_timestamp_utc).localeCompare(String(b.attempt_timestamp_utc));
     });
-    const sortedAttempts = allSortedAttempts.slice(0, MAX_EXPORT_ATTEMPTS);
+    const uniqueAttemptsByCallId: CampaignCallAttemptExportRow[] = [];
+    const seenAttemptCallIds = new Set<string>();
 
-    const lead = sortedAttempts[0];
-    const callIds = allSortedAttempts
+    allSortedAttempts.forEach((attempt) => {
+      const callId = getAttemptCallId(attempt).trim();
+      if (!callId || seenAttemptCallIds.has(callId)) return;
+      seenAttemptCallIds.add(callId);
+      uniqueAttemptsByCallId.push(attempt);
+    });
+
+    const sortedAttempts = uniqueAttemptsByCallId.slice(0, MAX_EXPORT_ATTEMPTS);
+
+    const lead = sortedAttempts[0] ?? allSortedAttempts[0];
+    if (!lead) continue;
+
+    const callIds = uniqueAttemptsByCallId
       .map(getAttemptCallId)
       .filter(Boolean);
     const uniqueCallIds = Array.from(new Set(callIds));
-    const tagsByCallId = new Map<string, ClientAttemptTag>();
-
-    allSortedAttempts.forEach((attempt) => {
-      const callId = getAttemptCallId(attempt);
-      const tag = mapAttemptTag(attempt);
-      if (callId) tagsByCallId.set(callId, tag);
-      if (callId) totalCalls += 1;
-      if (attempt.recording_url) availableRecordings += 1;
-    });
+    totalCalls += uniqueCallIds.length;
+    availableRecordings += uniqueAttemptsByCallId.filter((attempt) => hasDistinctAttemptCallId(attempt) && Boolean(attempt.recording_url)).length;
 
     const primaryTranscriptAttempt = sortedAttempts.find((attempt) => mapAttemptTag(attempt) === 'Qualified' && attempt.transcript_text)
       ?? sortedAttempts.find((attempt) => attempt.transcript_text)
-      ?? sortedAttempts[0];
+      ?? sortedAttempts[0]
+      ?? lead;
     const primaryRecordingAttempt = sortedAttempts.find((attempt) => mapAttemptTag(attempt) === 'Qualified' && attempt.recording_url)
       ?? sortedAttempts.find((attempt) => attempt.recording_url)
-      ?? sortedAttempts[0];
-    const firstQualifiedAttempt = sortedAttempts.find((attempt) => mapAttemptTag(attempt) === 'Qualified');
-    const firstNotInterestedAttempt = sortedAttempts.find((attempt) => mapAttemptTag(attempt) === 'Not Interested');
-    const firstUncertainAttempt = sortedAttempts.find((attempt) => mapAttemptTag(attempt) === 'Uncertain');
+      ?? sortedAttempts[0]
+      ?? lead;
+    const firstQualifiedAttempt = sortedAttempts.find((attempt) => {
+      const tag = mapAttemptTag(attempt);
+      return tag === 'Qualified' && isConnectedAttempt(attempt, tag);
+    });
+    const firstNotInterestedAttempt = sortedAttempts.find((attempt) => {
+      const tag = mapAttemptTag(attempt);
+      return tag === 'Not Interested' && isConnectedAttempt(attempt, tag);
+    });
+    const firstUncertainAttempt = sortedAttempts.find((attempt) => {
+      const tag = mapAttemptTag(attempt);
+      return tag === 'Uncertain' && isConnectedAttempt(attempt, tag);
+    });
     const notInterestedEnrichment = firstNotInterestedAttempt
       ? enrichmentsByCallId[getAttemptCallId(firstNotInterestedAttempt)]
       : undefined;
@@ -338,13 +373,15 @@ export function buildClientCampaignExport(
     };
 
     sortedAttempts.forEach((attempt, index) => {
+      if (!hasDistinctAttemptCallId(attempt)) return;
+
       const attemptNumber = index + 1;
-      const tag = tagsByCallId.get(getAttemptCallId(attempt)) ?? mapAttemptTag(attempt);
+      const tag = mapAttemptTag(attempt);
       output[`Attempt_${attemptNumber}_Call_ID`] = getAttemptCallId(attempt);
       output[`Attempt_${attemptNumber}_Tag`] = tag;
       output[`Attempt_${attemptNumber}_Call_Connected`] = deriveCallConnected(attempt, tag);
 
-      if (tag === 'Qualified' && attempt.analytics_json) {
+      if (tag === 'Qualified' && attempt.analytics_json && isConnectedAttempt(attempt, tag)) {
         output[`Attempt_${attemptNumber}_Analytics_JSON`] = JSON.stringify(attempt.analytics_json);
         dynamicAnalyticsFields.add(`Attempt_${attemptNumber}_Analytics_JSON`);
 

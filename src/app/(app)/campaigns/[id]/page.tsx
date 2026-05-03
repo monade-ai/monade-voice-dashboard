@@ -313,6 +313,37 @@ const extractCampaignAnalyticsRecords = (payload: unknown): CampaignAnalyticsExp
   });
 };
 
+const parseAnalyticsExportPayload = (value: unknown): Record<string, unknown> | null => {
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
+  }
+
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return parsed as Record<string, unknown>;
+      }
+    } catch {
+      return null;
+    }
+  }
+
+  return null;
+};
+
+const resolveTranscriptExportUrl = (record: CampaignAnalyticsExportRecord): string => {
+  if (typeof record.enhanced_transcript_url === 'string' && record.enhanced_transcript_url.trim()) {
+    return record.enhanced_transcript_url;
+  }
+
+  if (typeof record.transcript_url === 'string' && record.transcript_url.trim()) {
+    return record.transcript_url;
+  }
+
+  return '';
+};
+
 const buildCampaignCallLogRows = (
   campaignId: string,
   contacts: CampaignContact[],
@@ -1087,11 +1118,9 @@ export default function CampaignDetailPage() {
         usedAnalyticsIndices.set(phoneKey, used);
 
         const selected = candidates[selectedIndex];
-        const analytics = selected.analytics && typeof selected.analytics === 'object'
-          ? selected.analytics
-          : null;
+        const analytics = parseAnalyticsExportPayload(selected.analytics);
         row.transcript_call_id = selected.call_id ?? '';
-        row.transcript_url = selected.transcript_url ?? '';
+        row.transcript_url = resolveTranscriptExportUrl(selected);
         row.transcript_created_at_utc = toUtcIso(selected.created_at);
         row.analysis_verdict = typeof analytics?.verdict === 'string' ? analytics.verdict : '';
         row.analysis_summary = typeof analytics?.summary === 'string' ? analytics.summary : '';
