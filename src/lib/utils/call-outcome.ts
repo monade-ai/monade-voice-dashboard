@@ -17,7 +17,7 @@
 
 import type { ProviderCallStatus } from '@/app/hooks/use-analytics';
 
-export type CallOutcome = 'picked_up' | 'not_picked_up' | 'busy' | 'failed';
+export type CallOutcome = 'picked_up' | 'not_picked_up' | 'busy' | 'failed' | 'voicemail' | 'unavailable';
 
 // User-facing translations of Vobiz hangup_cause codes. Non-technical copy on purpose.
 export const FAILURE_REASONS: Record<string, string> = {
@@ -67,6 +67,16 @@ const FAILED: Omit<OutcomeChip, 'outcome' | 'reason'> = {
   tone: 'text-red-500',
   dot: 'bg-red-500/80',
 };
+const VOICEMAIL: Omit<OutcomeChip, 'outcome' | 'reason'> = {
+  label: 'Voicemail',
+  tone: 'text-blue-500',
+  dot: 'bg-blue-500/80',
+};
+const UNAVAILABLE: Omit<OutcomeChip, 'outcome' | 'reason'> = {
+  label: 'Not Available',
+  tone: 'text-muted-foreground/60',
+  dot: 'bg-muted-foreground/30',
+};
 
 export function deriveCallOutcome(status: ProviderCallStatus | null | undefined): OutcomeChip | null {
   if (!status) return null;
@@ -89,4 +99,39 @@ export function deriveCallOutcome(status: ProviderCallStatus | null | undefined)
     ...FAILED,
     reason: FAILURE_REASONS[cause] ?? 'Call failed',
   };
+}
+
+interface AnalyticsStatusFallback {
+  provider_call_status?: ProviderCallStatus | null;
+  call_status?: string | null;
+  voicemail?: boolean | null;
+}
+
+export function resolveCallOutcome(
+  analytics: AnalyticsStatusFallback | string | null | undefined,
+): OutcomeChip {
+  let parsedAnalytics: AnalyticsStatusFallback | null = null;
+
+  if (typeof analytics === 'string') {
+    try {
+      parsedAnalytics = JSON.parse(analytics) as AnalyticsStatusFallback;
+    } catch {
+      parsedAnalytics = null;
+    }
+  } else if (analytics && typeof analytics === 'object') {
+    parsedAnalytics = analytics;
+  }
+
+  const providerOutcome = deriveCallOutcome(parsedAnalytics?.provider_call_status);
+  if (providerOutcome) return providerOutcome;
+
+  if (parsedAnalytics?.call_status === 'not_picked_up') {
+    return { outcome: 'not_picked_up', label: 'Not Answered', tone: 'text-muted-foreground', dot: 'bg-muted-foreground/40' };
+  }
+
+  if (parsedAnalytics?.call_status === 'picked_up' && parsedAnalytics?.voicemail === true) {
+    return { outcome: 'voicemail', ...VOICEMAIL };
+  }
+
+  return { outcome: 'unavailable', ...UNAVAILABLE };
 }

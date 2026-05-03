@@ -102,6 +102,8 @@ export interface CallAnalytics {
   billing_data?: BillingData | null;
   // Provider/CDR ground truth (filled async by sweeper, may stay null)
   provider_call_status?: ProviderCallStatus | null;
+  call_status?: 'picked_up' | 'not_picked_up' | string | null;
+  voicemail?: boolean | null;
   recording_metadata?: RecordingMetadata | null;
   analytics_history?: Array<Record<string, unknown>>;
 }

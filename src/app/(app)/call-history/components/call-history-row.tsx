@@ -22,7 +22,7 @@ import { cn } from '@/lib/utils';
 import { CallAnalytics } from '@/app/hooks/use-analytics';
 import { Transcript } from '@/app/hooks/use-transcripts';
 import { useCallRecording } from '@/app/hooks/use-call-recording';
-import { deriveCallOutcome } from '@/lib/utils/call-outcome';
+import { resolveCallOutcome } from '@/lib/utils/call-outcome';
 
 interface CallHistoryRowProps {
   transcript: Transcript;
@@ -95,7 +95,7 @@ export const CallHistoryRow = React.memo(({
     : (analytics?.duration_seconds ?? undefined);
   const billing = analytics?.billing_data;
   const direction = resolveDirection(analytics);
-  const outcomeChip = deriveCallOutcome(analytics?.provider_call_status);
+  const outcomeChip = resolveCallOutcome(analytics);
   const settlementFailed = billing?.settlement_status === 'failed';
 
   const dotColor = useMemo(() => {
@@ -166,26 +166,20 @@ export const CallHistoryRow = React.memo(({
               </span>
             </div>
           )}
-          {outcomeChip ? (
-            <div
-              className="flex items-center gap-1.5 mt-0.5"
-              title={outcomeChip.reason}
-            >
-              <span className={cn('w-1 h-1 rounded-full', outcomeChip.dot)} />
-              <span className={cn('text-[9px] font-bold uppercase tracking-wider', outcomeChip.tone)}>
-                {outcomeChip.label}
-              </span>
-              {outcomeChip.outcome === 'failed' && outcomeChip.reason && (
-                <span className="text-[8px] text-muted-foreground/60 italic truncate max-w-[140px]">
-                  {outcomeChip.reason}
-                </span>
-              )}
-            </div>
-          ) : isEngaged ? (
-            <span className="text-[8px] text-muted-foreground/30 uppercase tracking-wider mt-0.5">
-              Pending status
+          <div
+            className="flex items-center gap-1.5 mt-0.5"
+            title={outcomeChip.reason}
+          >
+            <span className={cn('w-1 h-1 rounded-full', outcomeChip.dot)} />
+            <span className={cn('text-[9px] font-bold uppercase tracking-wider', outcomeChip.tone)}>
+              {outcomeChip.label}
             </span>
-          ) : null}
+            {outcomeChip.outcome === 'failed' && outcomeChip.reason && (
+              <span className="text-[8px] text-muted-foreground/60 italic truncate max-w-[140px]">
+                {outcomeChip.reason}
+              </span>
+            )}
+          </div>
           {billing && typeof billing.credits_used === 'number' ? (
             <div className="flex items-center gap-1.5 mt-0.5">
               <span className="text-[9px] font-bold text-orange-500 uppercase tracking-wider">

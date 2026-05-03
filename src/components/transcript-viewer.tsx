@@ -30,7 +30,7 @@ import {
 import { MONADE_API_BASE } from '@/config';
 import { fetchJson } from '@/lib/http';
 import { cn } from '@/lib/utils';
-import { deriveCallOutcome } from '@/lib/utils/call-outcome';
+import { resolveCallOutcome } from '@/lib/utils/call-outcome';
 
 // --- Types ---
 
@@ -798,36 +798,24 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
             {/* Call Outcome — derived from Vobiz provider_call_status.
                 See src/lib/utils/call-outcome.ts for the mapping. */}
             {(() => {
-              const outcome = deriveCallOutcome(analytics?.provider_call_status);
+              if (analyticsLoading && !analytics) return null;
 
-              if (outcome) {
-                return (
-                  <div className="space-y-4 pt-4 border-t border-border/20">
-                    <h3 className="text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground">Call Outcome</h3>
-                    <div className="flex items-center gap-3">
-                      <span className={cn('w-2 h-2 rounded-full', outcome.dot)} />
-                      <span className={cn('text-sm font-bold', outcome.tone)}>{outcome.label}</span>
-                    </div>
-                    {outcome.outcome === 'failed' && outcome.reason && (
-                      <p className="text-xs text-muted-foreground italic leading-relaxed">
-                        {outcome.reason}
-                      </p>
-                    )}
+              const outcome = resolveCallOutcome(analytics);
+
+              return (
+                <div className="space-y-4 pt-4 border-t border-border/20">
+                  <h3 className="text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground">Call Outcome</h3>
+                  <div className="flex items-center gap-3">
+                    <span className={cn('w-2 h-2 rounded-full', outcome.dot)} />
+                    <span className={cn('text-sm font-bold', outcome.tone)}>{outcome.label}</span>
                   </div>
-                );
-              }
-
-              if (!analyticsLoading && analytics) {
-                return (
-                  <div className="pt-4 border-t border-border/20">
-                    <p className="text-[10px] text-muted-foreground/50 italic uppercase tracking-widest">
-                      Call status not yet available
+                  {outcome.outcome === 'failed' && outcome.reason && (
+                    <p className="text-xs text-muted-foreground italic leading-relaxed">
+                      {outcome.reason}
                     </p>
-                  </div>
-                );
-              }
-
-              return null;
+                  )}
+                </div>
+              );
             })()}
 
             {/* Recording Metadata — only if backend has fetched it */}
