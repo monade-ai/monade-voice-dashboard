@@ -13,6 +13,10 @@ import {
   Trash2,
   Lock,
   ChevronRight,
+  BookOpen,
+  Copy,
+  Check,
+  ExternalLink,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -318,6 +322,23 @@ function QualificationStudioScreen({ selectedTemplateId }: { selectedTemplateId:
   const [isSystemDefault, setIsSystemDefault] = useState(false);
   const [loadedTemplateName, setLoadedTemplateName] = useState<string | null>(null);
   const [savedSnapshot, setSavedSnapshot] = useState<string>(JSON.stringify(serializeForm(createBlankForm())));
+  const [guideCopyState, setGuideCopyState] = useState<'idle' | 'copying' | 'copied'>('idle');
+
+  const handleCopyGuide = async () => {
+    try {
+      setGuideCopyState('copying');
+      const response = await fetch('/llms.txt', { cache: 'no-store' });
+      if (!response.ok) throw new Error('Could not load the authoring guide.');
+      const text = await response.text();
+      await navigator.clipboard.writeText(text);
+      setGuideCopyState('copied');
+      toast.success('Authoring guide copied — paste it into any AI assistant');
+      setTimeout(() => setGuideCopyState('idle'), 2500);
+    } catch (error) {
+      setGuideCopyState('idle');
+      toast.error(error instanceof Error ? error.message : 'Could not copy the guide');
+    }
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -517,6 +538,79 @@ function QualificationStudioScreen({ selectedTemplateId }: { selectedTemplateId:
                     Open Library
                   </Button>
                 )}
+              </PaperCardContent>
+            </PaperCard>
+
+            <PaperCard className="border-border/30 bg-card/80">
+              <PaperCardContent className="p-6 space-y-5">
+                <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-5">
+                  <div className="flex items-start gap-3">
+                    <div className="h-10 w-10 rounded-md border border-border/20 bg-muted/30 flex items-center justify-center shrink-0">
+                      <BookOpen size={16} className="text-foreground/70" />
+                    </div>
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-bold uppercase tracking-[0.24em] text-muted-foreground/60">Authoring Guide</span>
+                      <h3 className="text-lg font-medium tracking-tight text-foreground">Write a template that classifies cleanly</h3>
+                      <p className="text-sm text-muted-foreground leading-relaxed max-w-2xl">
+                        Templates are rendered into an LLM prompt — wording matters. Copy the full guide below and paste it into ChatGPT, Claude, or any AI to draft buckets for your domain, then refine here.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex flex-row gap-2 shrink-0">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleCopyGuide}
+                      disabled={guideCopyState === 'copying'}
+                      className="h-9 px-3 text-[10px] font-bold uppercase tracking-[0.2em] border-border/40"
+                    >
+                      {guideCopyState === 'copied' ? (
+                        <Check size={14} className="mr-2 text-green-600" />
+                      ) : guideCopyState === 'copying' ? (
+                        <Loader2 size={14} className="mr-2 animate-spin" />
+                      ) : (
+                        <Copy size={14} className="mr-2" />
+                      )}
+                      {guideCopyState === 'copied' ? 'Copied' : 'Copy llms.txt'}
+                    </Button>
+                    <a
+                      href="/llms.txt"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="h-9 px-3 text-[10px] font-bold uppercase tracking-[0.2em] border border-border/40 rounded-md flex items-center justify-center text-foreground hover:bg-muted/30 transition-colors whitespace-nowrap"
+                    >
+                      <ExternalLink size={14} className="mr-2" />
+                      View Guide
+                    </a>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="rounded-md border border-border/20 bg-muted/[0.03] p-3 space-y-1">
+                    <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60">Cover four roles</span>
+                    <p className="text-xs text-foreground/90 leading-relaxed">
+                      Every template needs at least one bucket each for <span className="font-semibold">positive</span>, <span className="font-semibold">negative</span>, <span className="font-semibold">ambiguous</span>, and <span className="font-semibold">no-contact</span>. Names are yours; roles are universal.
+                    </p>
+                  </div>
+                  <div className="rounded-md border border-border/20 bg-muted/[0.03] p-3 space-y-1">
+                    <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60">Definition · Inclusion · Exclusions</span>
+                    <p className="text-xs text-foreground/90 leading-relaxed">
+                      Each bucket description should state what the bucket means, what MUST be true to assign it, and what disqualifies a call.
+                    </p>
+                  </div>
+                  <div className="rounded-md border border-border/20 bg-muted/[0.03] p-3 space-y-1">
+                    <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60">No prescriptive routing</span>
+                    <p className="text-xs text-foreground/90 leading-relaxed">
+                      Avoid &ldquo;should land in&rdquo; or &ldquo;goes to&rdquo; inside descriptions — those are <em>definitions</em>, not if-then rules. Put conditional logic in Analyzer Guidance.
+                    </p>
+                  </div>
+                  <div className="rounded-md border border-border/20 bg-muted/[0.03] p-3 space-y-1">
+                    <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60">One transcript, one bucket</span>
+                    <p className="text-xs text-foreground/90 leading-relaxed">
+                      If two buckets could match the same call, tighten exclusions until only one wins. Keep total count between 4 and 6.
+                    </p>
+                  </div>
+                </div>
               </PaperCardContent>
             </PaperCard>
 

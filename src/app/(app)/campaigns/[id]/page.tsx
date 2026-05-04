@@ -57,7 +57,7 @@ import {
   getCampaignProgress,
 } from '@/types/campaign.types';
 import { cn } from '@/lib/utils';
-import { parseApiTimestamp } from '@/lib/utils/date';
+import { formatInTimeZone, getNextOccurrenceUtcIso, parseApiTimestamp } from '@/lib/utils/date';
 import { useAssistants } from '@/app/hooks/use-assistants-context';
 import { useLibrary } from '@/app/hooks/use-knowledge-base';
 
@@ -873,6 +873,9 @@ export default function CampaignDetailPage() {
         daily_end_time: draft.dailyEndTime,
         timezone: draft.timezone,
         description: draft.description.trim(),
+        scheduled_start_at: campaign.status === 'pending'
+          ? getNextOccurrenceUtcIso(draft.dailyStartTime, draft.timezone)
+          : campaign.scheduled_start_at ?? null,
       });
 
       if (pausedForUpdate) {
@@ -1810,6 +1813,10 @@ export default function CampaignDetailPage() {
                     )}
                     <ConfigItem label="Timezone" value={campaign.timezone} />
                     <ConfigItem label="Call Window" value={`${campaign.daily_start_time} - ${campaign.daily_end_time}`} />
+                    <ConfigItem
+                      label="Schedule"
+                      value={campaign.scheduled_start_at ? formatInTimeZone(campaign.scheduled_start_at, campaign.timezone) : 'Start immediately'}
+                    />
                     <ConfigItem label="Description" value={campaign.description || '—'} />
                   </>
                 )}

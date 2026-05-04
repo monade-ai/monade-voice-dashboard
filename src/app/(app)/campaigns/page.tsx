@@ -45,7 +45,7 @@ import {
   getCampaignProgress,
 } from '@/types/campaign.types';
 import { cn } from '@/lib/utils';
-import { parseApiDate, parseApiTimestamp } from '@/lib/utils/date';
+import { formatInTimeZone, parseApiDate, parseApiTimestamp } from '@/lib/utils/date';
 
 import { CampaignsGuide } from './components/campaigns-guide';
 
@@ -107,6 +107,7 @@ const CampaignRow = ({
   const canStop = canStopCampaign(campaign.status);
   const canResume = campaign.status === 'paused';
   const createdAt = parseApiDate(campaign.created_at);
+  const statusDisplay = campaign.status === 'pending' && campaign.scheduled_start_at ? 'Scheduled' : campaign.status;
   const startDisabled = canStart && (
     campaign.total_contacts <= 0
     || !campaign.assistant_id
@@ -123,12 +124,16 @@ const CampaignRow = ({
             {campaign.name}
           </span>
           <Badge variant="outline" className={cn('text-[9px] font-bold uppercase tracking-widest px-1.5 py-0 h-5', getStatusColor(campaign.status))}>
-            {campaign.status}
+            {statusDisplay}
           </Badge>
         </div>
         <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
           <Clock size={10} />
-          <span>Created {createdAt ? createdAt.toLocaleDateString() : '—'}</span>
+          <span>
+            {campaign.status === 'pending' && campaign.scheduled_start_at
+              ? `Scheduled ${formatInTimeZone(campaign.scheduled_start_at, campaign.timezone)}`
+              : `Created ${createdAt ? createdAt.toLocaleDateString() : '—'}`}
+          </span>
         </div>
       </div>
 

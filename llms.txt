@@ -1,0 +1,161 @@
+# Post-Processing Template Authoring Guide
+
+> Instructions for AI assistants and operators creating post-processing templates that classify voice-AI call transcripts. This guide is domain-neutral — it applies whether the use case is edtech lead qualification, real-estate sales, customer support, healthcare intake, or anything else.
+
+A post-processing template defines how completed calls get classified into outcome buckets and what structured data points should be extracted from each call. The template is rendered into an LLM prompt that runs against every call transcript, so its wording directly determines classification quality.
+
+---
+
+## Core concept
+
+**Buckets are roles, not names.** Operators in different industries call the same conversational outcome by different names — but the underlying *role* the bucket plays is universal. Every template, regardless of domain, must cover the same four conversational outcome shapes.
+
+Bucket vocabulary is operator-chosen. The role is what the system reasons about.
+
+---
+
+## The four required bucket roles
+
+Every template must include at least one bucket per role. Names are operator-chosen.
+
+| Role | What it captures | Example names |
+|------|------------------|---------------|
+| **POSITIVE** | Customer engaged, intent confirmed, outcome favorable | `qualified`, `interested`, `hot_lead`, `resolved`, `booked` |
+| **NEGATIVE** | Customer engaged, declined explicitly | `not_interested`, `dnc`, `unresolved_user_declined`, `lost` |
+| **AMBIGUOUS** | Customer engaged but outcome unclear — incomplete conversation, language barrier, system error, or genuinely unclear intent | `uncertain`, `needs_followup`, `unclear`, `escalate`, `pending` |
+| **NO-CONTACT** | No human conversation occurred at all (rang unanswered, voicemail with no human voice) | `did_not_pick_up`, `no_answer`, `abandoned` |
+
+Optional additional buckets (e.g. `callback`, `wrong_number`) are allowed, but the four core roles must each have exactly one home in the template.
+
+If the schema supports a `role` field, declare it explicitly:
+
+```json
+{
+  "key": "interested",
+  "label": "Interested",
+  "role": "positive",
+  "description": "...",
+  "confidence_range": [50, 100]
+}
+```
+
+If not, the bucket name should make its role obvious to a reader.
+
+---
+
+## Bucket description format
+
+Every `description` field must follow a strict three-part structure. Treat the description like prompt code, not marketing copy — it is rendered verbatim into the LLM prompt and the LLM follows what's written.
+
+1. **Definition** — one sentence: what conversational outcome does this bucket represent?
+2. **Inclusion criteria** — what MUST be true in the transcript for this verdict to apply.
+3. **Exclusions** — what disqualifies a call from this bucket and where it should go instead.
+
+### Well-formed examples
+
+**Real-estate domain:**
+```
+Customer expressed genuine interest in a property listing.
+MUST be true: customer asked at least one specific question about a property,
+OR agreed to a site visit, OR shared budget/location preferences.
+EXCLUDES: calls where customer only said 'tell me more' without specifics —
+those go to needs_followup.
+EXCLUDES: explicit declines, even polite ones.
+```
+
+**Customer support domain:**
+```
+Customer's issue was answered or fixed during the call.
+MUST be true: agent provided an answer/action AND customer acknowledged
+understanding (even briefly).
+EXCLUDES: calls where the agent said 'I'll get back to you' without
+resolution — those go to pending.
+EXCLUDES: calls where customer disconnected before acknowledgment.
+```
+
+The shape is identical across domains. The vocabulary inside is operator-chosen.
+
+---
+
+## Hard rules
+
+These apply to every template, every domain. Each one prevents a specific class of misclassification.
+
+1. **No prescriptive routing in bucket descriptions.** Bucket descriptions are *definitions*, not *if-then rules*. Never write phrases like "should land in", "goes to", "falls under", "this is X". Conditional routing logic belongs in `custom_instructions`, not in a bucket description.
+
+2. **Don't reference `call_quality` values inside bucket descriptions.** `call_quality` (`completed`, `abrupt_end`, `no_response`, `voicemail`) is a separate axis describing how the call ended technically. It is not a verdict. Mixing the two is the most common cause of misclassification.
+
+3. **One transcript should fit exactly one bucket.** If two buckets could both reasonably fit the same call, the boundary is broken. Tighten one description's exclusions until only one bucket can win.
+
+4. **Keep bucket count between 4 and 6.** More buckets means more boundary disputes. Push fine-grained distinctions into a `data_point` sub-tag rather than into a new bucket.
+
+5. **Every template must have an AMBIGUOUS-role bucket.** Without a pressure-release valve, real-world messy calls (STT errors, language barriers, partial conversations) get force-fit into substantive buckets and pollute downstream metrics.
+
+6. **Confidence ranges shouldn't overlap unless fully nested.** A 60-confidence call shouldn't have two valid bucket homes.
+
+7. **Data points should declare their parent bucket.** Use a field like `applies_to_buckets: ["interested", "needs_followup"]` on each data point. This is more reliable than prose ("Only populate this field if...") which the LLM may ignore.
+
+8. **NO-CONTACT buckets are exclusively for transcripts with zero user voice.** A `no_answer` / `did_not_pick_up` bucket must require the transcript to contain no user turns at all. Any call where the customer said even one word ("hello", "haan") goes to AMBIGUOUS instead.
+
+9. **`custom_instructions` must reference observable transcript content.** "Classify as POSITIVE if the lead is high-value" is broken. "Classify as POSITIVE if customer stated their requirement AND a constraint (budget, timeline, location)" works. The constraint can be domain-specific; the rule (refer to what's in the transcript) is universal.
+
+10. **Confidence scores must fall inside the bucket's stated range.** If `interested` is `[50, 100]` and a custom instruction says "give 30 confidence to 'maybe' responses", you've broken your own range. Either widen the range, change the score, or move the case to a different bucket.
+
+---
+
+## Edge cases every template must handle
+
+These conversational shapes occur in every domain. Every template should explicitly route each of them, either via bucket descriptions or `custom_instructions`.
+
+1. **Single-word pickups.** Customer says one word ("hello", "yes", "haan", "kaun") and disconnects. → **AMBIGUOUS** with sub-tag *Disconnected with Minimal Conversation*. Never POSITIVE, even if the word was "yes" — STT regularly mishears background noise as consent.
+
+2. **Agent never finished its pitch.** Customer picked up, agent got 1–2 sentences in, customer disconnected before any real exchange. → **AMBIGUOUS** with sub-tag *Disconnected on Hearing Call Reason*. Not NEGATIVE — the customer expressed no opinion.
+
+3. **Wrong number / not-the-right-person.** Customer picked up, said "wrong number" or "not me" and hung up. → **AMBIGUOUS** with sub-tag *Wrong Recipient*. Not NEGATIVE — they didn't decline your offer, they aren't your audience.
+
+4. **STT garbage looking like consent.** A single user "yes" or "haan" must never upgrade a call to POSITIVE without supporting context. State this explicitly in `custom_instructions`.
+
+5. **Multi-language calls.** Customer switches languages mid-call. Don't keyword-match in descriptions — rely on the LLM's semantic understanding, or list both forms (e.g., "interested" / "इच्छुक") in data point descriptions.
+
+6. **IVR / voicemail without trigger phrases.** Some voicemails play music or use uncommon phrases that the rule-based detector misses. Add a `custom_instruction`: *"if agent has 3+ turns and user has zero turns, classify as AMBIGUOUS with sub-tag 'Voicemail' regardless of explicit voicemail phrases."*
+
+7. **Agent-side failure.** Agent crashes mid-call, transcript ends mid-agent-sentence. → **AMBIGUOUS** with sub-tag *Agent Side Failure*. Not NEGATIVE just because the customer "didn't engage at the end."
+
+8. **Soft commitments.** Phrases like "call me later" or "I'll think about it" without a specific timeframe → **AMBIGUOUS**. With a specific timeframe → **POSITIVE** at reduced confidence (40–60). Build this into `custom_instructions` for every template.
+
+9. **Politeness ≠ engagement.** Customer says "thanks, sounds interesting" but never asks a question, gives no detail, doesn't commit. → **AMBIGUOUS**, not POSITIVE. The "polite-but-no-substance" shape exists in every domain.
+
+10. **Confidence drift on model upgrades.** Different LLM versions calibrate scores differently. Downstream alerts should tier on `bucket assignment + confidence range`, not on raw confidence thresholds (e.g. avoid `>= 80`).
+
+---
+
+## Common mistakes to flag in operator drafts
+
+When reviewing a template draft, flag any of the following and ask the operator to revise:
+
+| Mistake | Why it's broken |
+|---------|-----------------|
+| Description contains "should land in", "goes to", "falls under" | Prescriptive routing — bucket descriptions are definitions, not rules |
+| Description references `call_quality` values (`no_response`, `voicemail`, `abrupt_end`) | Confuses verdict axis with technical-ending axis |
+| Two buckets share keywords or could match the same transcript | Ambiguous boundary — LLM will misroute |
+| Template has only POSITIVE + NEGATIVE buckets | Missing AMBIGUOUS — messy real-world calls will pollute metrics |
+| Bucket description says "if the user says 'yes', classify as X" | Single-word user input is unreliable due to STT errors |
+| `confidence_range` values overlap without one being fully nested | Same call can land in two buckets at random |
+| `custom_instructions` reference unobservable signals (lead value, customer mood, business priority) | LLM cannot verify these from the transcript alone |
+| Custom instruction's confidence score falls outside the parent bucket's range | Internal contradiction — pick one |
+| NO-CONTACT bucket allows partial pickups | Breaks the "zero human voice" invariant |
+| 8+ buckets in the template | Boundary disputes proliferate; fold rare cases into AMBIGUOUS sub-tags |
+
+---
+
+## Quick checklist before saving a template
+
+- [ ] Exactly one POSITIVE, NEGATIVE, AMBIGUOUS, NO-CONTACT bucket present
+- [ ] Each bucket description has Definition + Inclusion + Exclusions
+- [ ] No bucket description contains prescriptive routing language
+- [ ] No bucket description references `call_quality` values
+- [ ] Confidence ranges don't overlap (or are fully nested)
+- [ ] Total bucket count is 4–6
+- [ ] All ten edge cases above are routed somewhere
+- [ ] Every data point has a clear parent bucket
+- [ ] `custom_instructions` only reference observable transcript content

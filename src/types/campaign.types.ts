@@ -41,6 +41,7 @@ export interface Campaign {
   daily_start_time: string; // "HH:MM"
   daily_end_time: string; // "HH:MM"
   timezone: string;
+  scheduled_start_at?: string | null;
   total_contacts: number;
   successful_calls: number;
   failed_calls: number;
@@ -65,6 +66,7 @@ export interface CreateCampaignRequest {
   daily_end_time?: string; // default: "17:00"
   timezone?: string; // default: "Asia/Kolkata"
   max_retries?: number; // default: 3
+  scheduled_start_at?: string | null;
 }
 
 export interface UpdateCampaignRequest {
@@ -78,6 +80,7 @@ export interface UpdateCampaignRequest {
   daily_end_time?: string;
   timezone?: string;
   max_retries?: number;
+  scheduled_start_at?: string | null;
 }
 
 // ============================================
@@ -365,7 +368,7 @@ export interface CampaignProgressState {
  * Keeps lifecycle state and completion % aligned even when backend counters lag.
  */
 export function getCampaignProgress(
-  campaign: Pick<Campaign, 'status' | 'total_contacts' | 'successful_calls' | 'failed_calls'>,
+  campaign: Pick<Campaign, 'status' | 'total_contacts' | 'successful_calls' | 'failed_calls' | 'scheduled_start_at'>,
   stats?: Partial<Pick<CampaignMonitoringStats, 'pending_contacts' | 'in_progress_contacts' | 'completed_contacts' | 'failed_contacts'>>,
 ): CampaignProgressState {
   const total = Math.max(0, campaign.total_contacts || 0);
@@ -390,7 +393,7 @@ export function getCampaignProgress(
   }
 
   const statusLabel: Record<CampaignStatus, string> = {
-    pending: 'Ready',
+    pending: campaign.scheduled_start_at ? 'Scheduled' : 'Ready',
     active: inProgress > 0 ? 'Dialing' : (pending > 0 ? 'Queued' : 'Running'),
     paused: 'Paused',
     stopped: 'Stopped',

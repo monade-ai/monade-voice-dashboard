@@ -33,7 +33,7 @@ import {
   canStopCampaign,
   getCampaignProgress,
 } from '@/types/campaign.types';
-import { parseApiDate } from '@/lib/utils/date';
+import { formatInTimeZone, parseApiDate } from '@/lib/utils/date';
 
 interface CampaignCardProps {
   campaign: Campaign;
@@ -66,6 +66,7 @@ export function CampaignCard({
   const progress = getCampaignProgress(campaign);
   const createdAt = parseApiDate(campaign.created_at);
   const startedAt = parseApiDate(campaign.started_at);
+  const scheduledLabel = campaign.status === 'pending' && campaign.scheduled_start_at ? 'Scheduled' : campaign.status;
 
   const handleViewDetails = () => {
     router.push(`/campaigns/${campaign.id}`);
@@ -87,7 +88,7 @@ export function CampaignCard({
                 variant="secondary"
                 className={`${statusStyle.bg} ${statusStyle.text} ${statusStyle.pulse ? 'animate-pulse' : ''}`}
               >
-                {campaign.status}
+                {scheduledLabel}
               </Badge>
             </div>
             {campaign.description && (
@@ -179,6 +180,11 @@ export function CampaignCard({
           {startedAt && (
             <span>
               Started {formatDistanceToNow(startedAt, { addSuffix: true })}
+            </span>
+          )}
+          {!startedAt && campaign.status === 'pending' && campaign.scheduled_start_at && (
+            <span>
+              Scheduled {formatInTimeZone(campaign.scheduled_start_at, campaign.timezone)}
             </span>
           )}
         </div>
