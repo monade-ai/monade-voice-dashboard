@@ -104,8 +104,13 @@ const GEMINI_VOICE_OPTIONS = [
   { value: 'Charon', label: 'Charon', tone: 'Deep and authoritative.' },
   { value: 'Fenrir', label: 'Fenrir', tone: 'Warm and approachable.' },
   { value: 'Aoede', label: 'Aoede', tone: 'Breezy and energetic.' },
+  { value: 'Leda', label: 'Leda', tone: 'Soft and measured.' },
+  { value: 'Orus', label: 'Orus', tone: 'Crisp and articulate.' },
   { value: 'Zephyr', label: 'Zephyr', tone: 'Bright.' },
 ] as const;
+
+const MAX_VOICE_ID_LENGTH = 64;
+const isKnownVoiceId = (value: string | null) => !value || GEMINI_VOICE_OPTIONS.some((voice) => voice.value === value);
 
 export default function AssistantStudio() {
   const {
@@ -134,6 +139,7 @@ export default function AssistantStudio() {
   const [isSyncingTools, setIsSyncingTools] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
   const [savedVoiceValue, setSavedVoiceValue] = useState<string | null>(null);
+  const [customVoiceMode, setCustomVoiceMode] = useState(false);
   const currentAssistantRef = useRef<Assistant | null>(null);
 
   const isDraft = currentAssistant?.id.startsWith('local-');
@@ -182,6 +188,10 @@ export default function AssistantStudio() {
   useEffect(() => {
     setSavedVoiceValue(currentAssistant?.voice || null);
   }, [currentAssistant?.id, currentAssistant?.voice]);
+
+  useEffect(() => {
+    setCustomVoiceMode(!isKnownVoiceId(currentAssistant?.voice || null));
+  }, [currentAssistant?.id]);
 
   useEffect(() => {
     if (!currentAssistant?.id || isDraft) return;
@@ -1195,6 +1205,113 @@ export default function AssistantStudio() {
                 >
                   Samples Soon
                 </Button>
+              </PaperCardContent>
+            </PaperCard>
+
+            {/* Advanced Voice Tuning — always visible, including drafts */}
+            <PaperCard className="border-border/40 bg-background">
+              <PaperCardHeader className="p-6 pb-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Settings2 size={14} className="text-muted-foreground" />
+                    <h4 className="text-[10px] font-bold uppercase tracking-[0.2em] text-foreground">Advanced</h4>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          type="button"
+                          className="inline-flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+                          aria-label="About Advanced Voice Tuning"
+                        >
+                          <Info size={12} />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-[280px] text-[11px] leading-relaxed">
+                        Pick from the supported Gemini voices, or paste any new Google voice ID (up to 64 chars) — the backend forwards it as-is. Default falls back to <strong>Kore</strong>.
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[8px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60">Custom ID</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const next = !customVoiceMode;
+                        setCustomVoiceMode(next);
+                        if (!next && !isKnownVoiceId(currentAssistant.voice || null)) {
+                          handleUpdate('voice', null);
+                        }
+                      }}
+                      className={cn(
+                        'relative inline-flex h-5 w-9 shrink-0 items-center rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50',
+                        customVoiceMode ? 'bg-green-500 border-green-500' : 'bg-muted border-border/70',
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          'inline-block h-3.5 w-3.5 transform rounded-full shadow-sm transition-transform',
+                          customVoiceMode ? 'bg-background translate-x-5' : 'bg-muted-foreground/70 translate-x-0.5',
+                        )}
+                      />
+                    </button>
+                  </div>
+                </div>
+              </PaperCardHeader>
+              <PaperCardContent className="p-6 pt-3 space-y-4">
+                {!customVoiceMode ? (
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 px-1">Voice</label>
+                    <Select
+                      value={selectedVoiceValue && isKnownVoiceId(selectedVoiceValue) ? selectedVoiceValue : '__default__'}
+                      onValueChange={(value) => handleUpdate('voice', value === '__default__' ? null : value)}
+                    >
+                      <SelectTrigger className="w-full h-10 border-border/40 bg-muted/20 text-left">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__default__">Default (Kore)</SelectItem>
+                        {GEMINI_VOICE_OPTIONS.map((voice) => (
+                          <SelectItem key={voice.value} value={voice.value}>
+                            <div className="flex flex-col">
+                              <span className="font-medium">{voice.label}</span>
+                              <span className="text-[10px] text-muted-foreground">{voice.tone}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-[10px] text-muted-foreground/60 px-1 italic leading-relaxed">
+                      Default leaves <code className="font-mono">voice</code> unset so the agent falls back to Kore. Flip <span className="font-semibold">Custom ID</span> to use a Gemini voice that isn&apos;t in this list yet.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 px-1">Custom Voice ID</label>
+                    <Input
+                      value={currentAssistant.voice || ''}
+                      maxLength={MAX_VOICE_ID_LENGTH}
+                      onChange={(e) => {
+                        const next = e.target.value.slice(0, MAX_VOICE_ID_LENGTH);
+                        handleUpdate('voice', next ? next : null);
+                      }}
+                      placeholder="e.g. NewVoice2025"
+                      className="h-10 bg-muted/20 border-border/40 font-mono text-sm focus:border-primary transition-all rounded-md px-3"
+                    />
+                    <div className="flex items-center justify-between px-1">
+                      <p className="text-[10px] text-muted-foreground/60 italic leading-relaxed">
+                        Sent verbatim to Gemini Live. Clear to fall back to Kore.
+                      </p>
+                      <span className="text-[9px] font-mono text-muted-foreground/60 ml-3 shrink-0">
+                        {(currentAssistant.voice || '').length}/{MAX_VOICE_ID_LENGTH}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {hasUnsavedVoiceChange && (
+                  <p className="text-[9px] uppercase tracking-widest text-primary px-1">
+                    {isDraft ? 'Publish to apply voice.' : 'Save assistant to apply voice.'}
+                  </p>
+                )}
               </PaperCardContent>
             </PaperCard>
 

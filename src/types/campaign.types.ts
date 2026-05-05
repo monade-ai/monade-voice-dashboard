@@ -38,7 +38,7 @@ export interface Campaign {
   assistant_id: string;
   max_concurrent: number;
   calls_per_second: number;
-  daily_start_time: string; // "HH:MM"
+  daily_start_time: string | null; // "HH:MM" or null when using one-time scheduled start
   daily_end_time: string; // "HH:MM"
   timezone: string;
   scheduled_start_at?: string | null;
@@ -62,7 +62,7 @@ export interface CreateCampaignRequest {
   assistant_id: string;
   max_concurrent?: number; // default: 5
   calls_per_second?: number; // default: 1
-  daily_start_time?: string; // default: "10:00"
+  daily_start_time?: string | null; // null when using one-time scheduled start
   daily_end_time?: string; // default: "17:00"
   timezone?: string; // default: "Asia/Kolkata"
   max_retries?: number; // default: 3
@@ -76,7 +76,7 @@ export interface UpdateCampaignRequest {
   assistant_id?: string;
   max_concurrent?: number;
   calls_per_second?: number;
-  daily_start_time?: string;
+  daily_start_time?: string | null;
   daily_end_time?: string;
   timezone?: string;
   max_retries?: number;

@@ -556,6 +556,12 @@ const ConfigItem = ({ label, value }: { label: string; value: string | number })
   </div>
 );
 
+const formatCallWindow = (campaign: Campaign): string => (
+  campaign.daily_start_time
+    ? `${campaign.daily_start_time} - ${campaign.daily_end_time}`
+    : `Until ${campaign.daily_end_time}`
+);
+
 const toCampaignEditDraft = (campaign: Campaign): CampaignParamsEditDraft => ({
   assistantId: campaign.assistant_id ?? '',
   dailyStartTime: campaign.daily_start_time ?? CAMPAIGN_API_CONFIG.DEFAULTS.DAILY_START_TIME,
@@ -869,7 +875,7 @@ export default function CampaignDetailPage() {
 
       await updateCampaign(campaign.id, {
         assistant_id: draft.assistantId,
-        daily_start_time: draft.dailyStartTime,
+        daily_start_time: null,
         daily_end_time: draft.dailyEndTime,
         timezone: draft.timezone,
         description: draft.description.trim(),
@@ -1812,7 +1818,7 @@ export default function CampaignDetailPage() {
                       </div>
                     )}
                     <ConfigItem label="Timezone" value={campaign.timezone} />
-                    <ConfigItem label="Call Window" value={`${campaign.daily_start_time} - ${campaign.daily_end_time}`} />
+                    <ConfigItem label="Call Window" value={formatCallWindow(campaign)} />
                     <ConfigItem
                       label="Schedule"
                       value={campaign.scheduled_start_at ? formatInTimeZone(campaign.scheduled_start_at, campaign.timezone) : 'Start immediately'}

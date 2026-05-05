@@ -32,6 +32,7 @@ import {
 } from '@/types/campaign.types';
 import { saveCampaignConfig } from '@/lib/utils/campaign-storage';
 import { cn } from '@/lib/utils';
+import { getNextOccurrenceUtcIso } from '@/lib/utils/date';
 
 const { DEFAULTS, LIMITS } = CAMPAIGN_API_CONFIG;
 
@@ -143,10 +144,11 @@ export function CreateCampaignModal({
         assistant_id: formData.assistantId,
         max_concurrent: formData.maxConcurrent,
         calls_per_second: formData.callsPerSecond,
-        daily_start_time: formData.dailyStartTime,
+        daily_start_time: null,
         daily_end_time: formData.dailyEndTime,
         timezone: formData.timezone,
         max_retries: formData.maxRetries,
+        scheduled_start_at: getNextOccurrenceUtcIso(formData.dailyStartTime, formData.timezone),
       });
 
       toast.success('Operation Initialized');

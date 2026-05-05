@@ -67,6 +67,9 @@ export function CampaignCard({
   const createdAt = parseApiDate(campaign.created_at);
   const startedAt = parseApiDate(campaign.started_at);
   const scheduledLabel = campaign.status === 'pending' && campaign.scheduled_start_at ? 'Scheduled' : campaign.status;
+  const callWindowLabel = campaign.daily_start_time
+    ? `${campaign.daily_start_time} - ${campaign.daily_end_time}`
+    : `Until ${campaign.daily_end_time}`;
 
   const handleViewDetails = () => {
     router.push(`/campaigns/${campaign.id}`);
@@ -164,7 +167,7 @@ export function CampaignCard({
           <div className="flex items-center gap-1">
             <Clock className="h-4 w-4" />
             <span>
-              {campaign.daily_start_time} - {campaign.daily_end_time}
+              {callWindowLabel}
             </span>
           </div>
         </div>
