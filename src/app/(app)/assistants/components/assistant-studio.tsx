@@ -112,6 +112,45 @@ const GEMINI_VOICE_OPTIONS = [
 const MAX_VOICE_ID_LENGTH = 64;
 const isKnownVoiceId = (value: string | null) => !value || GEMINI_VOICE_OPTIONS.some((voice) => voice.value === value);
 
+type VadSensitivity = 'HIGH' | 'LOW' | null;
+type VadConfig = {
+  start_of_speech_sensitivity: VadSensitivity;
+  end_of_speech_sensitivity: VadSensitivity;
+  prefix_padding_ms: number | null;
+  silence_duration_ms: number | null;
+};
+
+const DEFAULT_VAD: VadConfig = {
+  start_of_speech_sensitivity: null,
+  end_of_speech_sensitivity: null,
+  prefix_padding_ms: null,
+  silence_duration_ms: null,
+};
+
+const VAD_PREFIX_PADDING_MAX = 2000;
+const VAD_SILENCE_DURATION_MAX = 5000;
+
+const readVad = (toolsConfig: any): VadConfig => {
+  const raw = toolsConfig?.vad || {};
+  const sanitizeSensitivity = (v: unknown): VadSensitivity => (
+    v === 'HIGH' || v === 'LOW' ? v : null
+  );
+  const sanitizeMs = (v: unknown, max: number): number | null => {
+    if (v === null || v === undefined || v === '') return null;
+    const n = Number(v);
+    if (!Number.isFinite(n)) return null;
+
+    return Math.min(max, Math.max(0, Math.round(n)));
+  };
+
+  return {
+    start_of_speech_sensitivity: sanitizeSensitivity(raw.start_of_speech_sensitivity),
+    end_of_speech_sensitivity: sanitizeSensitivity(raw.end_of_speech_sensitivity),
+    prefix_padding_ms: sanitizeMs(raw.prefix_padding_ms, VAD_PREFIX_PADDING_MAX),
+    silence_duration_ms: sanitizeMs(raw.silence_duration_ms, VAD_SILENCE_DURATION_MAX),
+  };
+};
+
 export default function AssistantStudio() {
   const {
     currentAssistant,
@@ -144,6 +183,7 @@ export default function AssistantStudio() {
 
   const isDraft = currentAssistant?.id.startsWith('local-');
   const backgroundAudio = readBackgroundAudio(currentAssistant?.toolsConfig);
+  const vad = readVad(currentAssistant?.toolsConfig);
   const selectedVoiceValue = currentAssistant?.voice || null;
   const selectedVoiceMeta = GEMINI_VOICE_OPTIONS.find((voice) => voice.value === selectedVoiceValue)
     || GEMINI_VOICE_OPTIONS.find((voice) => voice.value === 'Kore');
@@ -386,6 +426,25 @@ export default function AssistantStudio() {
     setBackgroundVolumeInput(String(nextVolume));
     if (isInboundBound) return;
     void saveBackgroundAudio({ ambient_volume: nextVolume });
+  };
+
+  const updateVad = (updates: Partial<VadConfig>) => {
+    if (!currentAssistant) return;
+    const nextVad: VadConfig = { ...vad, ...updates };
+    const nextToolsConfig = {
+      ...(currentAssistant.toolsConfig || {}),
+      vad: nextVad,
+    };
+    handleUpdate('toolsConfig' as keyof Assistant, nextToolsConfig);
+  };
+
+  const parseMsInput = (raw: string, max: number): number | null => {
+    const trimmed = raw.trim();
+    if (trimmed === '') return null;
+    const n = Number(trimmed);
+    if (!Number.isFinite(n)) return null;
+
+    return Math.min(max, Math.max(0, Math.round(n)));
   };
 
   // Outbound trunk options
@@ -1208,19 +1267,20 @@ export default function AssistantStudio() {
               </PaperCardContent>
             </PaperCard>
 
-            {/* Advanced Voice Tuning — always visible, including drafts */}
-            <PaperCard className="border-border/40 bg-background">
+            {/* Voice Lab — always visible, including drafts. Lives directly under the Voice card. */}
+            <PaperCard className="border-primary/30 bg-primary/[0.02]">
               <PaperCardHeader className="p-6 pb-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Settings2 size={14} className="text-muted-foreground" />
-                    <h4 className="text-[10px] font-bold uppercase tracking-[0.2em] text-foreground">Advanced</h4>
+                    <Settings2 size={14} className="text-primary" />
+                    <h4 className="text-[10px] font-bold uppercase tracking-[0.2em] text-foreground">Voice Lab</h4>
+                    <Badge variant="secondary" className="text-[8px] bg-primary/10 text-primary border-primary/20 uppercase">Beta</Badge>
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <button
                           type="button"
                           className="inline-flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
-                          aria-label="About Advanced Voice Tuning"
+                          aria-label="About Voice Lab"
                         >
                           <Info size={12} />
                         </button>
@@ -1312,6 +1372,112 @@ export default function AssistantStudio() {
                     {isDraft ? 'Publish to apply voice.' : 'Save assistant to apply voice.'}
                   </p>
                 )}
+
+                {/* Speech Detection (VAD) tweaks */}
+                <div className="border-t border-border/30 pt-4 space-y-4">
+                  <div className="space-y-1">
+                    <h5 className="text-[10px] font-bold uppercase tracking-[0.22em] text-foreground">Speech Detection</h5>
+                    <p className="text-[10px] text-muted-foreground/70 leading-relaxed">
+                      Tunes how the agent decides the caller is speaking or done. Defaults work well — only nudge if you see misfires.
+                    </p>
+                  </div>
+
+                  {/* Start of Speech */}
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 px-1">
+                      Start of Speech Sensitivity
+                    </label>
+                    <Select
+                      value={vad.start_of_speech_sensitivity || '__default__'}
+                      onValueChange={(value) => updateVad({
+                        start_of_speech_sensitivity: value === '__default__' ? null : (value as VadSensitivity),
+                      })}
+                    >
+                      <SelectTrigger className="w-full h-10 border-border/40 bg-muted/20 text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__default__">Default</SelectItem>
+                        <SelectItem value="HIGH">High — reacts quickly</SelectItem>
+                        <SelectItem value="LOW">Low — needs clearer speech</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-[10px] text-muted-foreground/60 px-1 italic leading-relaxed">
+                      How eagerly to register the caller has started speaking. <span className="font-semibold">High</span> jumps in fast (interrupts the agent quicker); <span className="font-semibold">Low</span> ignores small noises and breaths.
+                    </p>
+                  </div>
+
+                  {/* End of Speech */}
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 px-1">
+                      End of Speech Sensitivity
+                    </label>
+                    <Select
+                      value={vad.end_of_speech_sensitivity || '__default__'}
+                      onValueChange={(value) => updateVad({
+                        end_of_speech_sensitivity: value === '__default__' ? null : (value as VadSensitivity),
+                      })}
+                    >
+                      <SelectTrigger className="w-full h-10 border-border/40 bg-muted/20 text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__default__">Default</SelectItem>
+                        <SelectItem value="HIGH">High — replies faster</SelectItem>
+                        <SelectItem value="LOW">Low — waits for longer pauses</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-[10px] text-muted-foreground/60 px-1 italic leading-relaxed">
+                      How quickly to decide the caller is done speaking. <span className="font-semibold">High</span> replies sooner; <span className="font-semibold">Low</span> is more patient — better for slow speakers or callers who pause mid-sentence.
+                    </p>
+                  </div>
+
+                  {/* Prefix Padding */}
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 px-1">
+                      Prefix Padding
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        min={0}
+                        max={VAD_PREFIX_PADDING_MAX}
+                        step={10}
+                        value={vad.prefix_padding_ms ?? ''}
+                        onChange={(e) => updateVad({ prefix_padding_ms: parseMsInput(e.target.value, VAD_PREFIX_PADDING_MAX) })}
+                        placeholder="Default"
+                        className="h-9 bg-muted/20 border-border/40 font-mono text-sm focus:border-primary transition-all rounded-md px-3"
+                      />
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70 shrink-0">ms</span>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground/60 px-1 italic leading-relaxed">
+                      Audio captured <em>before</em> speech is detected, in milliseconds. Helps avoid clipping the caller&apos;s first syllable. Leave blank for the Gemini default.
+                    </p>
+                  </div>
+
+                  {/* Silence Duration */}
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 px-1">
+                      Silence Duration
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        min={0}
+                        max={VAD_SILENCE_DURATION_MAX}
+                        step={10}
+                        value={vad.silence_duration_ms ?? ''}
+                        onChange={(e) => updateVad({ silence_duration_ms: parseMsInput(e.target.value, VAD_SILENCE_DURATION_MAX) })}
+                        placeholder="Default"
+                        className="h-9 bg-muted/20 border-border/40 font-mono text-sm focus:border-primary transition-all rounded-md px-3"
+                      />
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70 shrink-0">ms</span>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground/60 px-1 italic leading-relaxed">
+                      How many milliseconds of silence count as the caller having stopped, in milliseconds. Higher = more patient agent; lower = faster turn-taking but risks cutting the caller off.
+                    </p>
+                  </div>
+                </div>
               </PaperCardContent>
             </PaperCard>
 
