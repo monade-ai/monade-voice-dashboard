@@ -50,6 +50,13 @@ const extractCallProvider = (assistant: { tags?: string[]; callProvider?: string
   return trunkTag ? trunkTag.replace('trunk:', '') : (assistant.callProvider || '');
 };
 
+const isNonEmptyObject = (value: unknown): value is Record<string, unknown> => (
+  !!value
+  && typeof value === 'object'
+  && !Array.isArray(value)
+  && Object.keys(value).length > 0
+);
+
 // Define the structure for creating an assistant (maps to POST body)
 // Explicitly define fields matching API requirements
 type CreateAssistantData = {
@@ -415,7 +422,18 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
       const existingAssistant = assistants.find(a => a.id === id);
       const editingAssistant = currentAssistant?.id === id ? currentAssistant : existingAssistant;
       const responseTags = updatedAssistantResponse.tags ?? editingAssistant?.tags ?? [];
-      const responseKnowledgeBase = updatedAssistantResponse.knowledgeBase ?? editingAssistant?.knowledgeBase ?? null;
+      const responseKnowledgeBase = knowledgeBaseId !== undefined
+        ? knowledgeBaseId
+        : (updatedAssistantResponse.knowledgeBase ?? editingAssistant?.knowledgeBase ?? null);
+      const responseToolsConfig = updatedAssistantResponse.toolsConfig ?? updatedAssistantResponse.tools_config;
+      const requestedToolsConfig = updatedData.toolsConfig;
+      const toolsConfig = isNonEmptyObject(responseToolsConfig) || isNonEmptyObject(requestedToolsConfig) || isNonEmptyObject(editingAssistant?.toolsConfig)
+        ? {
+          ...(isNonEmptyObject(editingAssistant?.toolsConfig) ? editingAssistant.toolsConfig : {}),
+          ...(isNonEmptyObject(requestedToolsConfig) ? requestedToolsConfig : {}),
+          ...(isNonEmptyObject(responseToolsConfig) ? responseToolsConfig : {}),
+        }
+        : responseToolsConfig ?? requestedToolsConfig ?? editingAssistant?.toolsConfig ?? null;
       const processedAssistant: Assistant = {
         ...editingAssistant,
         ...updatedAssistantResponse,
@@ -427,6 +445,7 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
           ? new Date(updatedAssistantResponse.createdAt)
           : (editingAssistant?.createdAt || new Date()),
         knowledgeBase: responseKnowledgeBase,
+        toolsConfig,
         tags: responseTags,
       };
 

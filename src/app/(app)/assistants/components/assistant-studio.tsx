@@ -110,25 +110,25 @@ const GEMINI_VOICE_OPTIONS = [
 ] as const;
 
 type VadSensitivity = 'HIGH' | 'LOW' | null;
-type VadConfig = {
+type RealtimeInputConfig = {
   start_of_speech_sensitivity: VadSensitivity;
   end_of_speech_sensitivity: VadSensitivity;
   prefix_padding_ms: number | null;
   silence_duration_ms: number | null;
 };
 
-const DEFAULT_VAD: VadConfig = {
-  start_of_speech_sensitivity: null,
-  end_of_speech_sensitivity: null,
-  prefix_padding_ms: null,
-  silence_duration_ms: null,
-};
+const DEFAULT_REALTIME_INPUT = {
+  start_of_speech_sensitivity: 'HIGH',
+  end_of_speech_sensitivity: 'HIGH',
+  prefix_padding_ms: 20,
+  silence_duration_ms: 100,
+} as const;
 
-const VAD_PREFIX_PADDING_MAX = 2000;
+const VAD_PREFIX_PADDING_MAX = 5000;
 const VAD_SILENCE_DURATION_MAX = 5000;
 
-const readVad = (toolsConfig: any): VadConfig => {
-  const raw = toolsConfig?.vad || {};
+const readRealtimeInput = (toolsConfig: any): RealtimeInputConfig => {
+  const raw = toolsConfig?.realtime_input || toolsConfig?.vad || {};
   const sanitizeSensitivity = (v: unknown): VadSensitivity => (
     v === 'HIGH' || v === 'LOW' ? v : null
   );
@@ -147,6 +147,13 @@ const readVad = (toolsConfig: any): VadConfig => {
     silence_duration_ms: sanitizeMs(raw.silence_duration_ms, VAD_SILENCE_DURATION_MAX),
   };
 };
+
+const buildRealtimeInputPayload = (config: RealtimeInputConfig) => ({
+  start_of_speech_sensitivity: config.start_of_speech_sensitivity ?? DEFAULT_REALTIME_INPUT.start_of_speech_sensitivity,
+  end_of_speech_sensitivity: config.end_of_speech_sensitivity ?? DEFAULT_REALTIME_INPUT.end_of_speech_sensitivity,
+  prefix_padding_ms: config.prefix_padding_ms ?? DEFAULT_REALTIME_INPUT.prefix_padding_ms,
+  silence_duration_ms: config.silence_duration_ms ?? DEFAULT_REALTIME_INPUT.silence_duration_ms,
+});
 
 export default function AssistantStudio() {
   const {
@@ -179,7 +186,7 @@ export default function AssistantStudio() {
 
   const isDraft = currentAssistant?.id.startsWith('local-');
   const backgroundAudio = readBackgroundAudio(currentAssistant?.toolsConfig);
-  const vad = readVad(currentAssistant?.toolsConfig);
+  const realtimeInput = readRealtimeInput(currentAssistant?.toolsConfig);
   const selectedVoiceValue = currentAssistant?.voice || null;
   const selectedVoiceMeta = GEMINI_VOICE_OPTIONS.find((voice) => voice.value === selectedVoiceValue)
     || GEMINI_VOICE_OPTIONS.find((voice) => voice.value === 'Kore');
@@ -261,10 +268,29 @@ export default function AssistantStudio() {
     setSaveStatus('idle');
     try {
       const { id, createdAt: _createdAt, knowledgeBase, dispatch_rule_id: _dispatchRuleId, ...updates } = currentAssistant;
-      await saveAssistantUpdates(id, {
+      const savedAssistant = await saveAssistantUpdates(id, {
         ...updates,
         knowledgeBaseId: knowledgeBase,
       });
+      const nextRealtimeInput = readRealtimeInput(currentAssistant.toolsConfig);
+      const hasRealtimeInputConfig = !!currentAssistant.toolsConfig?.realtime_input || !!currentAssistant.toolsConfig?.vad;
+      if (hasRealtimeInputConfig) {
+        const data = await fetchJson<any>(`${MONADE_API_BASE}/api/assistants/${encodeURIComponent(id)}/realtime-input`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(buildRealtimeInputPayload(nextRealtimeInput)),
+          retry: { retries: 0 },
+        });
+        const latestAssistant = currentAssistantRef.current;
+        if (latestAssistant?.id === id) {
+          updateAssistantLocally(id, {
+            toolsConfig: data?.toolsConfig ?? {
+              ...(savedAssistant?.toolsConfig || latestAssistant.toolsConfig || {}),
+              realtime_input: buildRealtimeInputPayload(nextRealtimeInput),
+            },
+          });
+        }
+      }
       setSavedVoiceValue(currentAssistant.voice || null);
       setIsDirty(false);
       setSaveStatus('saved');
@@ -420,12 +446,12 @@ export default function AssistantStudio() {
     void saveBackgroundAudio({ ambient_volume: nextVolume });
   };
 
-  const updateVad = (updates: Partial<VadConfig>) => {
+  const updateVad = (updates: Partial<RealtimeInputConfig>) => {
     if (!currentAssistant) return;
-    const nextVad: VadConfig = { ...vad, ...updates };
+    const nextRealtimeInput: RealtimeInputConfig = { ...realtimeInput, ...updates };
     const nextToolsConfig = {
       ...(currentAssistant.toolsConfig || {}),
-      vad: nextVad,
+      realtime_input: nextRealtimeInput,
     };
     handleUpdate('toolsConfig' as keyof Assistant, nextToolsConfig);
   };
@@ -1298,7 +1324,7 @@ export default function AssistantStudio() {
                       Start of Speech Sensitivity
                     </label>
                     <Select
-                      value={vad.start_of_speech_sensitivity || '__default__'}
+                      value={realtimeInput.start_of_speech_sensitivity || '__default__'}
                       onValueChange={(value) => updateVad({
                         start_of_speech_sensitivity: value === '__default__' ? null : (value as VadSensitivity),
                       })}
@@ -1323,7 +1349,7 @@ export default function AssistantStudio() {
                       End of Speech Sensitivity
                     </label>
                     <Select
-                      value={vad.end_of_speech_sensitivity || '__default__'}
+                      value={realtimeInput.end_of_speech_sensitivity || '__default__'}
                       onValueChange={(value) => updateVad({
                         end_of_speech_sensitivity: value === '__default__' ? null : (value as VadSensitivity),
                       })}
@@ -1353,7 +1379,7 @@ export default function AssistantStudio() {
                         min={0}
                         max={VAD_PREFIX_PADDING_MAX}
                         step={10}
-                        value={vad.prefix_padding_ms ?? ''}
+                        value={realtimeInput.prefix_padding_ms ?? ''}
                         onChange={(e) => updateVad({ prefix_padding_ms: parseMsInput(e.target.value, VAD_PREFIX_PADDING_MAX) })}
                         placeholder="Default"
                         className="h-9 bg-muted/20 border-border/40 font-mono text-sm focus:border-primary transition-all rounded-md px-3"
@@ -1376,7 +1402,7 @@ export default function AssistantStudio() {
                         min={0}
                         max={VAD_SILENCE_DURATION_MAX}
                         step={10}
-                        value={vad.silence_duration_ms ?? ''}
+                        value={realtimeInput.silence_duration_ms ?? ''}
                         onChange={(e) => updateVad({ silence_duration_ms: parseMsInput(e.target.value, VAD_SILENCE_DURATION_MAX) })}
                         placeholder="Default"
                         className="h-9 bg-muted/20 border-border/40 font-mono text-sm focus:border-primary transition-all rounded-md px-3"
@@ -1399,7 +1425,7 @@ export default function AssistantStudio() {
               <div className="space-y-4">
                 {[
                   { label: 'Direction', value: isInbound ? 'Inbound' : 'Outbound' },
-                  { label: 'Model', value: currentAssistant.model || 'GPT-4 Omni' },
+                  { label: 'Model', value: currentAssistant.model || 'Muvel' },
                   { label: 'Accent', value: currentAssistant.speakingAccent || 'Default' },
                   { label: 'Knowledge', value: libraryItems.find(kb => kb.id === currentAssistant.knowledgeBase)?.filename || 'None' },
                 ].map((spec) => (

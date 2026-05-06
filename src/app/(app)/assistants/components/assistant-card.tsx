@@ -76,7 +76,7 @@ export function AssistantCard({ assistant, onSelect }: AssistantCardProps) {
                 <Cpu size={14} className="text-primary/60" />
                 <span className="text-[10px] font-bold uppercase tracking-widest">Model</span>
               </div>
-              <span className="text-sm font-semibold text-foreground truncate">{assistant.model || 'GPT-4 Omni'}</span>
+              <span className="text-sm font-semibold text-foreground truncate">{assistant.model || 'Muvel'}</span>
             </div>
             <div className="flex flex-col gap-1.5">
               <div className="flex items-center gap-2 text-muted-foreground">
