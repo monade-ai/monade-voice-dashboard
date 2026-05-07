@@ -34,6 +34,13 @@ const makeAttempt = (overrides: Partial<CampaignCallAttemptExportRow> = {}): Cam
   analysis_verdict: 'call_disconnected',
   analysis_summary: 'Summary',
   analysis_confidence_score: '50',
+  call_status: '',
+  voicemail: '',
+  uncertain_tag: '',
+  uncertain_reason: '',
+  uncertain_agent_feedback: '',
+  not_interested_tag: '',
+  not_interested_reason: '',
   transcript_message_count: '3',
   transcript_text: 'Agent: hello\nUser: hi',
   metadata_json: JSON.stringify({ client_lead_id: 'CLIENT-1', name: 'Lead One' }),
@@ -54,7 +61,45 @@ describe('campaign-client-export', () => {
     expect(extractClientLeadId({ name: 'No ID' })).toBe('');
   });
 
-  test('mapAttemptTag applies deterministic taxonomy', () => {
+  test('mapAttemptTag is driven by call_status when present', () => {
+    expect(mapAttemptTag(makeAttempt({
+      call_status: 'not_picked_up',
+      analysis_verdict: '',
+    }))).toBe('Did not pick-up');
+
+    expect(mapAttemptTag(makeAttempt({
+      call_status: 'picked_up',
+      voicemail: 'true',
+      analysis_verdict: '',
+    }))).toBe('Did not pick-up');
+
+    expect(mapAttemptTag(makeAttempt({
+      call_status: 'picked_up',
+      analysis_verdict: 'qualified',
+    }))).toBe('Qualified');
+
+    expect(mapAttemptTag(makeAttempt({
+      call_status: 'picked_up',
+      analysis_verdict: 'interested',
+    }))).toBe('Qualified');
+
+    expect(mapAttemptTag(makeAttempt({
+      call_status: 'picked_up',
+      analysis_verdict: 'not_interested',
+    }))).toBe('Not Interested');
+
+    expect(mapAttemptTag(makeAttempt({
+      call_status: 'picked_up',
+      analysis_verdict: 'uncertain',
+    }))).toBe('Uncertain');
+
+    expect(mapAttemptTag(makeAttempt({
+      call_status: 'picked_up',
+      analysis_verdict: '',
+    }))).toBe('Uncertain');
+  });
+
+  test('mapAttemptTag falls back to legacy heuristic when call_status absent', () => {
     expect(mapAttemptTag(makeAttempt({ analysis_verdict: 'interested' }))).toBe('Qualified');
     expect(mapAttemptTag(makeAttempt({ analysis_verdict: 'likely_to_book' }))).toBe('Qualified');
     expect(mapAttemptTag(makeAttempt({ analysis_verdict: 'not_interested' }))).toBe('Not Interested');
@@ -75,7 +120,17 @@ describe('campaign-client-export', () => {
     expect(mapAttemptTag(makeAttempt({ analysis_verdict: 'call_disconnected' }))).toBe('Uncertain');
   });
 
-  test('deriveCallConnected prefers analytics.call_connected and infers conservatively', () => {
+  test('deriveCallConnected prefers call_status, then analytics.call_connected', () => {
+    expect(deriveCallConnected(makeAttempt({
+      call_status: 'not_picked_up',
+    }))).toBe('false');
+    expect(deriveCallConnected(makeAttempt({
+      call_status: 'picked_up',
+      voicemail: 'true',
+    }))).toBe('false');
+    expect(deriveCallConnected(makeAttempt({
+      call_status: 'picked_up',
+    }))).toBe('true');
     expect(deriveCallConnected(makeAttempt({
       analytics_json: { call_connected: false },
     }))).toBe('false');
@@ -111,9 +166,14 @@ describe('campaign-client-export', () => {
       attempt_number: String(index + 1),
       provider_call_id: `provider_${index + 1}`,
       transcript_call_id: `call_${index + 1}`,
+      // The 2nd attempt is a real qualified conversation; the rest are call_disconnected.
+      // For the qualified attempt we must populate call_status='picked_up' so the
+      // call_status-driven gate (Rule 3) lets analytics flow through.
+      call_status: index === 1 ? 'picked_up' : '',
       analysis_verdict: index === 1 ? 'interested' : 'call_disconnected',
       analysis_confidence_score: index === 1 ? '87' : '50',
       analytics_json: index === 1 ? {
+        call_status: 'picked_up',
         verdict: 'interested',
         confidence_score: 87,
         key_discoveries: { customer_language: 'english' },
@@ -169,28 +229,31 @@ describe('campaign-client-export', () => {
     expect(result.totalCalls).toBe(1);
   });
 
-  test('unanswered calls do not populate uncertain enrichment or analytics verdict fields', () => {
+  test('not_picked_up attempts never invent uncertain enrichment or leak analytics', () => {
+    // The bug from the field report: DB has call_status='not_picked_up', verdict=null,
+    // uncertain_tag=null, voicemail=false. Export must echo nulls, never fabricate "Voicemail".
     const result = buildClientCampaignExport([
       makeAttempt({
         contact_id: 'contact_unanswered',
         contact_name: 'Unanswered Lead',
         transcript_call_id: 'call_vm_1',
         provider_call_id: 'provider_vm_1',
+        call_status: 'not_picked_up',
+        voicemail: 'false',
+        analysis_verdict: '',
+        uncertain_tag: '',
+        uncertain_reason: '',
+        uncertain_agent_feedback: '',
         transcript_text: 'Voicemail greeting',
         transcript_url: 'https://storage.googleapis.com/vm.jsonl',
         analytics_json: {
-          call_connected: false,
-          call_quality: 'voicemail',
-          verdict: 'call_disconnected',
+          call_status: 'not_picked_up',
+          verdict: null,
+          voicemail: false,
+          uncertain_tag: null,
         },
       }),
-    ], {
-      call_vm_1: {
-        uncertain_tag: 'Voicemail',
-        uncertain_reason: 'Call reached voicemail or a recorded prompt.',
-        uncertain_feedback_for_agent: 'Should not appear',
-      },
-    });
+    ]);
 
     expect(result.rows).toHaveLength(1);
     expect(result.rows[0].Attempt_1_Tag).toBe('Did not pick-up');
@@ -198,7 +261,53 @@ describe('campaign-client-export', () => {
     expect(result.rows[0].Uncertain_Tag).toBe('');
     expect(result.rows[0].Uncertain_Reason).toBe('');
     expect(result.rows[0]['Uncertain_Feedback for agent']).toBe('');
-    expect(result.rows[0]['Attempt_1_Analytics_verdict']).toBeUndefined();
+    expect(result.rows[0]['Not Interested_Tag']).toBe('');
+    expect(result.rows[0]['Not Interested_Reason']).toBe('');
     expect(result.rows[0].Qualified_confidence).toBe('');
+    expect(result.rows[0]['Attempt_1_Analytics_verdict']).toBeUndefined();
+  });
+
+  test('uncertain DB fields are passed through to CSV unchanged', () => {
+    // When the DB *does* have uncertain_tag populated, the export must echo it verbatim
+    // (no regex inference, no overrides).
+    const result = buildClientCampaignExport([
+      makeAttempt({
+        contact_id: 'contact_real_uncertain',
+        call_status: 'picked_up',
+        voicemail: 'false',
+        analysis_verdict: 'uncertain',
+        uncertain_tag: 'Language barrier',
+        uncertain_reason: 'Customer responded in a language the agent did not handle.',
+        uncertain_agent_feedback: 'Offer multilingual support next time.',
+      }),
+    ]);
+
+    expect(result.rows[0].Attempt_1_Tag).toBe('Uncertain');
+    expect(result.rows[0].Attempt_1_Call_Connected).toBe('true');
+    expect(result.rows[0].Uncertain_Tag).toBe('Language barrier');
+    expect(result.rows[0].Uncertain_Reason).toBe('Customer responded in a language the agent did not handle.');
+    expect(result.rows[0]['Uncertain_Feedback for agent']).toBe('Offer multilingual support next time.');
+  });
+
+  test('qualified verdict populates only Qualified columns, never Uncertain', () => {
+    // The "Interested tagged as Uncertain" bug: DB verdict='qualified' must map to
+    // Qualified_confidence and leave Uncertain_* / Not Interested_* blank.
+    const result = buildClientCampaignExport([
+      makeAttempt({
+        contact_id: 'contact_qualified',
+        call_status: 'picked_up',
+        voicemail: 'false',
+        analysis_verdict: 'qualified',
+        analysis_confidence_score: '92',
+        uncertain_tag: '',
+        uncertain_reason: '',
+      }),
+    ]);
+
+    expect(result.rows[0].Attempt_1_Tag).toBe('Qualified');
+    expect(result.rows[0].Qualified_confidence).toBe('92');
+    expect(result.rows[0].Uncertain_Tag).toBe('');
+    expect(result.rows[0].Uncertain_Reason).toBe('');
+    expect(result.rows[0]['Not Interested_Tag']).toBe('');
   });
 });

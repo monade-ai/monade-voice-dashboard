@@ -36,11 +36,9 @@ import { useCampaignApi } from '@/app/hooks/use-campaign-api';
 import { campaignApi } from '@/lib/services/campaign-api.service';
 import { downloadCSV, generateCSV, loadCSVPreview } from '@/lib/utils/csv-preview';
 import {
-  buildCampaignEnrichmentRequests,
   buildClientCampaignExport,
   CampaignAnalyticsExportRecord,
   CampaignCallAttemptExportRow,
-  CampaignExportEnrichment,
 } from '@/lib/utils/campaign-client-export';
 import { fetchJson } from '@/lib/http';
 import {
@@ -95,7 +93,7 @@ interface ActivityEvent {
 type CampaignCallLogRow = CampaignCallAttemptExportRow;
 
 interface CsvDownloadProgress {
-  phase: 'contacts' | 'analytics' | 'transcripts' | 'enrichment' | 'csv';
+  phase: 'contacts' | 'analytics' | 'transcripts' | 'csv';
   done: number;
   total: number;
   message: string;
@@ -386,6 +384,13 @@ const buildCampaignCallLogRows = (
         analysis_verdict: '',
         analysis_summary: '',
         analysis_confidence_score: '',
+        call_status: '',
+        voicemail: '',
+        uncertain_tag: '',
+        uncertain_reason: '',
+        uncertain_agent_feedback: '',
+        not_interested_tag: '',
+        not_interested_reason: '',
         transcript_message_count: '',
         transcript_text: '',
         metadata_json: metadataJson,
@@ -1136,6 +1141,15 @@ export default function CampaignDetailPage() {
         row.analysis_confidence_score = typeof analytics?.confidence_score === 'number'
           ? String(analytics.confidence_score)
           : '';
+        // Direct passthrough of DB analytics fields used by the CSV export. Null/missing → ''.
+        // The export layer must never invent values for these — see campaign-client-export.ts.
+        row.call_status = typeof analytics?.call_status === 'string' ? analytics.call_status : '';
+        row.voicemail = typeof analytics?.voicemail === 'boolean' ? String(analytics.voicemail) : '';
+        row.uncertain_tag = typeof analytics?.uncertain_tag === 'string' ? analytics.uncertain_tag : '';
+        row.uncertain_reason = typeof analytics?.uncertain_reason === 'string' ? analytics.uncertain_reason : '';
+        row.uncertain_agent_feedback = typeof analytics?.uncertain_agent_feedback === 'string' ? analytics.uncertain_agent_feedback : '';
+        row.not_interested_tag = typeof analytics?.not_interested_tag === 'string' ? analytics.not_interested_tag : '';
+        row.not_interested_reason = typeof analytics?.not_interested_reason === 'string' ? analytics.not_interested_reason : '';
         row.sip_call_id = selected.sip_call_id ?? '';
         row.recording_url = selected.recording_url ?? '';
         row.analytics_json = analytics;
@@ -1220,35 +1234,6 @@ export default function CampaignDetailPage() {
         });
       }
 
-      const enrichmentRequests = buildCampaignEnrichmentRequests(rows);
-      let enrichmentsByCallId: Record<string, CampaignExportEnrichment> = {};
-
-      if (enrichmentRequests.length > 0) {
-        setDownloadProgress({
-          phase: 'enrichment',
-          done: 0,
-          total: enrichmentRequests.length,
-          message: `Extracting reasons and feedback (${enrichmentRequests.length} calls)...`,
-        });
-
-        try {
-          const enrichmentResponse = await fetchJson<{ enrichments?: Record<string, CampaignExportEnrichment> }>(
-            '/api/campaign-export/enrich',
-            {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({ calls: enrichmentRequests }),
-              retry: { retries: 0 },
-            },
-          );
-          enrichmentsByCallId = enrichmentResponse.enrichments ?? {};
-        } catch (enrichmentError) {
-          console.warn('Failed to enrich campaign export calls:', enrichmentError);
-        }
-      }
-
       setDownloadProgress({
         phase: 'csv',
         done: 1,
@@ -1256,7 +1241,7 @@ export default function CampaignDetailPage() {
         message: 'Generating client campaign CSV file...',
       });
 
-      const exportResult = buildClientCampaignExport(rows, enrichmentsByCallId);
+      const exportResult = buildClientCampaignExport(rows);
       if (exportResult.totalCalls > 0) {
         setRecordingStatus((current) => ({
           user_uid: campaign.user_uid,

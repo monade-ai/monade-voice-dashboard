@@ -44,6 +44,14 @@ export interface CampaignCallAttemptExportRow {
   analysis_verdict: string;
   analysis_summary: string;
   analysis_confidence_score: string;
+  // Analytics fields read straight off the DB analytics blob — never fabricated.
+  call_status: string;
+  voicemail: string;
+  uncertain_tag: string;
+  uncertain_reason: string;
+  uncertain_agent_feedback: string;
+  not_interested_tag: string;
+  not_interested_reason: string;
   transcript_message_count: string;
   transcript_text: string;
   metadata_json: string;
@@ -57,23 +65,6 @@ export interface ClientCampaignExportResult {
   fields: string[];
   totalCalls: number;
   availableRecordings: number;
-}
-
-export interface CampaignExportEnrichment {
-  not_interested_reason?: string;
-  not_interested_tag?: string;
-  uncertain_reason?: string;
-  uncertain_tag?: string;
-  uncertain_feedback_for_agent?: string;
-}
-
-export interface CampaignExportEnrichmentRequest {
-  call_id: string;
-  mapped_tag: Extract<ClientAttemptTag, 'Not Interested' | 'Uncertain'>;
-  transcript_text: string;
-  analysis_summary: string;
-  call_connected: string;
-  analytics: Record<string, unknown>;
 }
 
 const CLIENT_LEAD_ID_ALIASES = new Set([
@@ -93,6 +84,23 @@ const NORMALIZED_NO_PICKUP_STATUSES = new Set([
   'not_started',
   'not started',
 ]);
+
+// Canonical analytics.call_status vocabulary — see src/app/hooks/use-analytics.ts.
+// 'picked_up' = call connected (the team's "completed" in the bug report).
+const CALL_STATUS_PICKED_UP = 'picked_up';
+const CALL_STATUS_NOT_PICKED_UP = 'not_picked_up';
+
+function normalizeCallStatus(value: string | null | undefined): string {
+  return String(value ?? '').trim().toLowerCase();
+}
+
+function isVoicemailRow(callStatus: string, voicemailFlag: string): boolean {
+  return callStatus === CALL_STATUS_PICKED_UP && voicemailFlag.trim().toLowerCase() === 'true';
+}
+
+function isCompletedConversation(callStatus: string, voicemailFlag: string): boolean {
+  return callStatus === CALL_STATUS_PICKED_UP && !isVoicemailRow(callStatus, voicemailFlag);
+}
 
 function normalizeKey(key: string): string {
   return key.trim().replace(/[\s_.-]+/g, ' ').toLowerCase();
@@ -167,10 +175,38 @@ export function flattenAnalyticsObject(
   return flattened;
 }
 
-export function mapAttemptTag(row: Pick<CampaignCallAttemptExportRow,
-  'analysis_verdict' | 'attempt_status' | 'transcript_text' | 'transcript_url' | 'transcript_message_count' | 'duration_seconds' | 'attempt_number' | 'analytics_json'
->): ClientAttemptTag {
+type AttemptTagInput = Pick<CampaignCallAttemptExportRow,
+  'analysis_verdict' | 'attempt_status' | 'transcript_text' | 'transcript_url'
+  | 'transcript_message_count' | 'duration_seconds' | 'attempt_number' | 'analytics_json'
+> & Partial<Pick<CampaignCallAttemptExportRow, 'call_status' | 'voicemail'>>;
+
+// Tagging rules (Rule 2 from the export bug spec):
+//   call_status = 'not_picked_up'           → 'Did not pick-up'
+//   call_status = 'picked_up' & voicemail   → 'Did not pick-up' (Voicemail surfaces in Attempt_N_Tag as 'Voicemail' downstream;
+//                                              we don't have a 'Voicemail' tag in ClientAttemptTag, but it isn't a connected
+//                                              conversation — treat as not picked up so verdict columns stay blank)
+//   call_status = 'picked_up' (true convo)  → derive from verdict
+//   call_status missing                     → conservative legacy heuristic (transcript/status driven), never invents 'Uncertain'
+export function mapAttemptTag(row: AttemptTagInput): ClientAttemptTag {
   const verdict = String(row.analysis_verdict || '').trim().toLowerCase();
+  const callStatus = normalizeCallStatus(row.call_status ?? row.analytics_json?.call_status as string | undefined);
+  const voicemailFlag = String(
+    row.voicemail ?? (row.analytics_json?.voicemail as boolean | string | undefined) ?? '',
+  );
+
+  if (callStatus === CALL_STATUS_NOT_PICKED_UP) return 'Did not pick-up';
+  if (isVoicemailRow(callStatus, voicemailFlag)) return 'Did not pick-up';
+
+  if (callStatus === CALL_STATUS_PICKED_UP) {
+    if (verdict === 'qualified' || verdict === 'interested' || verdict === 'likely_to_book') return 'Qualified';
+    if (verdict === 'not_interested') return 'Not Interested';
+    if (verdict === 'uncertain' || verdict === 'callback' || verdict === 'call_disconnected') return 'Uncertain';
+    // Connected call with no/unknown verdict — surface as Uncertain so the row isn't silently dropped.
+    return 'Uncertain';
+  }
+
+  // Fallback path: analytics.call_status absent (older records). Use the prior heuristic
+  // but never override an explicit not-connected signal.
   const status = String(row.attempt_status || '').trim().toLowerCase();
   const callQuality = String(row.analytics_json?.call_quality ?? '').trim().toLowerCase();
   const explicitConnected = row.analytics_json?.call_connected;
@@ -185,7 +221,7 @@ export function mapAttemptTag(row: Pick<CampaignCallAttemptExportRow,
     return 'Did not pick-up';
   }
 
-  if (verdict === 'interested' || verdict === 'likely_to_book') return 'Qualified';
+  if (verdict === 'qualified' || verdict === 'interested' || verdict === 'likely_to_book') return 'Qualified';
   if (verdict === 'not_interested') return 'Not Interested';
 
   if (
@@ -207,12 +243,30 @@ export function mapAttemptTag(row: Pick<CampaignCallAttemptExportRow,
   return hasTranscript || hasDuration ? 'Uncertain' : 'Did not pick-up';
 }
 
+type CallConnectedInput = Pick<CampaignCallAttemptExportRow,
+  'attempt_status' | 'transcript_text' | 'transcript_url' | 'transcript_message_count'
+  | 'duration_seconds' | 'attempt_message' | 'analytics_json'
+> & Partial<Pick<CampaignCallAttemptExportRow, 'call_status' | 'voicemail'>>;
+
+// Call_Connected derivation (Rule 2):
+//   not_picked_up        → 'false'
+//   picked_up + voicemail → 'false'
+//   picked_up (real conv) → 'true'
+//   call_status missing  → fall back to explicit analytics.call_connected, then heuristic.
 export function deriveCallConnected(
-  row: Pick<CampaignCallAttemptExportRow,
-    'attempt_status' | 'transcript_text' | 'transcript_url' | 'transcript_message_count' | 'duration_seconds' | 'attempt_message' | 'analytics_json'
-  >,
+  row: CallConnectedInput,
   mappedTag?: ClientAttemptTag,
 ): string {
+  const callStatus = normalizeCallStatus(row.call_status ?? row.analytics_json?.call_status as string | undefined);
+  const voicemailFlag = String(
+    row.voicemail ?? (row.analytics_json?.voicemail as boolean | string | undefined) ?? '',
+  );
+
+  if (callStatus === CALL_STATUS_NOT_PICKED_UP) return 'false';
+  if (isVoicemailRow(callStatus, voicemailFlag)) return 'false';
+  if (callStatus === CALL_STATUS_PICKED_UP) return 'true';
+
+  // Legacy fallback for rows that pre-date call_status.
   const explicit = row.analytics_json?.call_connected;
   if (typeof explicit === 'boolean') return explicit ? 'true' : 'false';
   if (typeof explicit === 'number') return explicit > 0 ? 'true' : 'false';
@@ -234,47 +288,14 @@ export function deriveCallConnected(
 }
 
 function isConnectedAttempt(
-  row: Pick<CampaignCallAttemptExportRow,
-    'attempt_status' | 'transcript_text' | 'transcript_url' | 'transcript_message_count' | 'duration_seconds' | 'attempt_message' | 'analytics_json' | 'analysis_verdict' | 'attempt_number'
-  >,
+  row: CallConnectedInput & Pick<CampaignCallAttemptExportRow, 'analysis_verdict' | 'attempt_number'>,
   mappedTag?: ClientAttemptTag,
 ): boolean {
   return deriveCallConnected(row, mappedTag).toLowerCase() === 'true';
 }
 
-export function buildCampaignEnrichmentRequests(
-  rows: CampaignCallAttemptExportRow[],
-): CampaignExportEnrichmentRequest[] {
-  const seen = new Set<string>();
-  const requests: CampaignExportEnrichmentRequest[] = [];
-
-  for (const row of rows) {
-    const tag = mapAttemptTag(row);
-    if (tag !== 'Not Interested' && tag !== 'Uncertain') continue;
-
-    const callConnected = deriveCallConnected(row, tag);
-    if (!isConnectedAttempt(row, tag)) continue;
-
-    const callId = getAttemptCallId(row);
-    if (!callId || seen.has(callId)) continue;
-    seen.add(callId);
-
-    requests.push({
-      call_id: callId,
-      mapped_tag: tag,
-      transcript_text: row.transcript_text,
-      analysis_summary: row.analysis_summary,
-      call_connected: callConnected,
-      analytics: row.analytics_json ?? {},
-    });
-  }
-
-  return requests;
-}
-
 export function buildClientCampaignExport(
   attemptRows: CampaignCallAttemptExportRow[],
-  enrichmentsByCallId: Record<string, CampaignExportEnrichment> = {},
 ): ClientCampaignExportResult {
   const grouped = new Map<string, CampaignCallAttemptExportRow[]>();
 
@@ -349,12 +370,16 @@ export function buildClientCampaignExport(
       const tag = mapAttemptTag(attempt);
       return tag === 'Uncertain' && isConnectedAttempt(attempt, tag);
     });
-    const notInterestedEnrichment = firstNotInterestedAttempt
-      ? enrichmentsByCallId[getAttemptCallId(firstNotInterestedAttempt)]
-      : undefined;
-    const uncertainEnrichment = firstUncertainAttempt
-      ? enrichmentsByCallId[getAttemptCallId(firstUncertainAttempt)]
-      : undefined;
+
+    // Verdict-driven enrichment columns (Rule 1 + Rule 4): values come straight from the DB
+    // analytics fields. Mutually exclusive — a row may only populate one of the three groups.
+    // Null/blank in DB → null/blank in CSV. No fallbacks, no regex inference.
+    const qualifiedColumn = firstQualifiedAttempt?.analysis_confidence_score ?? '';
+    const notInterestedTag = firstNotInterestedAttempt?.not_interested_tag ?? '';
+    const notInterestedReason = firstNotInterestedAttempt?.not_interested_reason ?? '';
+    const uncertainTag = firstUncertainAttempt?.uncertain_tag ?? '';
+    const uncertainReason = firstUncertainAttempt?.uncertain_reason ?? '';
+    const uncertainFeedback = firstUncertainAttempt?.uncertain_agent_feedback ?? '';
 
     const output: Record<string, string> = {
       'Unique Lead ID (yours)': lead.contact_id,
@@ -362,14 +387,14 @@ export function buildClientCampaignExport(
       'Lead Name': lead.contact_name,
       'Phone Number': lead.phone_number,
       All_Call_IDs: uniqueCallIds.join('|'),
-      Qualified_confidence: firstQualifiedAttempt?.analysis_confidence_score ?? '',
+      Qualified_confidence: qualifiedColumn,
       Transcript: primaryTranscriptAttempt?.transcript_text ?? '',
       'Call Recording Link': primaryRecordingAttempt?.recording_url || '',
-      'Not Interested_Reason': notInterestedEnrichment?.not_interested_reason ?? '',
-      'Not Interested_Tag': notInterestedEnrichment?.not_interested_tag ?? '',
-      Uncertain_Reason: uncertainEnrichment?.uncertain_reason ?? '',
-      Uncertain_Tag: uncertainEnrichment?.uncertain_tag ?? '',
-      'Uncertain_Feedback for agent': uncertainEnrichment?.uncertain_feedback_for_agent ?? '',
+      'Not Interested_Reason': notInterestedReason,
+      'Not Interested_Tag': notInterestedTag,
+      Uncertain_Reason: uncertainReason,
+      Uncertain_Tag: uncertainTag,
+      'Uncertain_Feedback for agent': uncertainFeedback,
     };
 
     sortedAttempts.forEach((attempt, index) => {
@@ -381,7 +406,15 @@ export function buildClientCampaignExport(
       output[`Attempt_${attemptNumber}_Tag`] = tag;
       output[`Attempt_${attemptNumber}_Call_Connected`] = deriveCallConnected(attempt, tag);
 
-      if (tag === 'Qualified' && attempt.analytics_json && isConnectedAttempt(attempt, tag)) {
+      // Rule 3: gate Attempt_N_Analytics_* columns behind a real connected conversation.
+      // Voicemail and not_picked_up rows must not leak analytics fields.
+      const callStatus = normalizeCallStatus(attempt.call_status ?? attempt.analytics_json?.call_status as string | undefined);
+      const voicemailFlag = String(
+        attempt.voicemail ?? (attempt.analytics_json?.voicemail as boolean | string | undefined) ?? '',
+      );
+      const isCompleted = isCompletedConversation(callStatus, voicemailFlag);
+
+      if (tag === 'Qualified' && attempt.analytics_json && isConnectedAttempt(attempt, tag) && isCompleted) {
         output[`Attempt_${attemptNumber}_Analytics_JSON`] = JSON.stringify(attempt.analytics_json);
         dynamicAnalyticsFields.add(`Attempt_${attemptNumber}_Analytics_JSON`);
 
