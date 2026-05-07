@@ -99,14 +99,14 @@ const readRebakedDispatchRuleId = (response: any) => (
 );
 
 const GEMINI_VOICE_OPTIONS = [
-  { value: 'Kore', label: 'Kore', tone: 'Neutral and professional.' },
-  { value: 'Puck', label: 'Puck', tone: 'Conversational and friendly.' },
-  { value: 'Charon', label: 'Charon', tone: 'Deep and authoritative.' },
-  { value: 'Fenrir', label: 'Fenrir', tone: 'Warm and approachable.' },
-  { value: 'Aoede', label: 'Aoede', tone: 'Breezy and energetic.' },
-  { value: 'Leda', label: 'Leda', tone: 'Soft and measured.' },
-  { value: 'Orus', label: 'Orus', tone: 'Crisp and articulate.' },
-  { value: 'Zephyr', label: 'Zephyr', tone: 'Bright.' },
+  { value: 'Kore', label: 'Anjali', tone: 'Neutral and professional.' },
+  { value: 'Aoede', label: 'Riya', tone: 'Breezy and energetic.' },
+  { value: 'Leda', label: 'Meera', tone: 'Soft and measured.' },
+  { value: 'Zephyr', label: 'Diya', tone: 'Bright.' },
+  { value: 'Puck', label: 'Rohan', tone: 'Conversational and friendly.' },
+  { value: 'Charon', label: 'Vikram', tone: 'Deep and authoritative.' },
+  { value: 'Fenrir', label: 'Aarav', tone: 'Warm and approachable.' },
+  { value: 'Orus', label: 'Arjun', tone: 'Crisp and articulate.' },
 ] as const;
 
 type VadSensitivity = 'HIGH' | 'LOW' | null;
@@ -1256,7 +1256,7 @@ export default function AssistantStudio() {
                       <SelectValue placeholder="Select voice" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="__default__">Default (Kore)</SelectItem>
+                      <SelectItem value="__default__">Default (Anjali)</SelectItem>
                       {GEMINI_VOICE_OPTIONS.map((voice) => (
                         <SelectItem key={voice.value} value={voice.value}>
                           {voice.label}
@@ -1266,7 +1266,7 @@ export default function AssistantStudio() {
                   </Select>
 
                   <div className="p-4 rounded-md bg-muted/30 border border-border/20">
-                    <span className="text-sm font-bold text-foreground block">{selectedVoiceMeta?.label || 'Kore'}</span>
+                    <span className="text-sm font-bold text-foreground block">{selectedVoiceMeta?.label || 'Anjali'}</span>
                     <span className="text-[10px] text-muted-foreground mt-1 block">{selectedVoiceMeta?.tone || 'Neutral and professional.'}</span>
                     {hasUnsavedVoiceChange && (
                       <span className="text-[9px] uppercase tracking-widest text-primary mt-3 block">
