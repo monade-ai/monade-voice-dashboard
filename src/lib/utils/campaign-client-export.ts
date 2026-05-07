@@ -358,28 +358,35 @@ export function buildClientCampaignExport(
       ?? sortedAttempts.find((attempt) => attempt.recording_url)
       ?? sortedAttempts[0]
       ?? lead;
-    const firstQualifiedAttempt = sortedAttempts.find((attempt) => {
-      const tag = mapAttemptTag(attempt);
-      return tag === 'Qualified' && isConnectedAttempt(attempt, tag);
+    // Summary-column rule: find the LAST attempt where Call_Connected = TRUE.
+    // Its verdict alone decides which of the three column groups gets populated;
+    // the other two stay blank. Enforces mutual exclusivity (a lead can never
+    // appear in both Qualified and Uncertain summary columns).
+    const lastConnectedAttempt = [...sortedAttempts].reverse().find((attempt) => {
+      return isConnectedAttempt(attempt, mapAttemptTag(attempt));
     });
-    const firstNotInterestedAttempt = sortedAttempts.find((attempt) => {
-      const tag = mapAttemptTag(attempt);
-      return tag === 'Not Interested' && isConnectedAttempt(attempt, tag);
-    });
-    const firstUncertainAttempt = sortedAttempts.find((attempt) => {
-      const tag = mapAttemptTag(attempt);
-      return tag === 'Uncertain' && isConnectedAttempt(attempt, tag);
-    });
+    const lastConnectedTag = lastConnectedAttempt ? mapAttemptTag(lastConnectedAttempt) : null;
 
-    // Verdict-driven enrichment columns (Rule 1 + Rule 4): values come straight from the DB
-    // analytics fields. Mutually exclusive — a row may only populate one of the three groups.
-    // Null/blank in DB → null/blank in CSV. No fallbacks, no regex inference.
-    const qualifiedColumn = firstQualifiedAttempt?.analysis_confidence_score ?? '';
-    const notInterestedTag = firstNotInterestedAttempt?.not_interested_tag ?? '';
-    const notInterestedReason = firstNotInterestedAttempt?.not_interested_reason ?? '';
-    const uncertainTag = firstUncertainAttempt?.uncertain_tag ?? '';
-    const uncertainReason = firstUncertainAttempt?.uncertain_reason ?? '';
-    const uncertainFeedback = firstUncertainAttempt?.uncertain_agent_feedback ?? '';
+    // Values come straight from the DB analytics fields. Null/blank in DB → blank in CSV.
+    // No fallbacks, no regex inference.
+    const qualifiedColumn = lastConnectedTag === 'Qualified'
+      ? (lastConnectedAttempt?.analysis_confidence_score ?? '')
+      : '';
+    const notInterestedTag = lastConnectedTag === 'Not Interested'
+      ? (lastConnectedAttempt?.not_interested_tag ?? '')
+      : '';
+    const notInterestedReason = lastConnectedTag === 'Not Interested'
+      ? (lastConnectedAttempt?.not_interested_reason ?? '')
+      : '';
+    const uncertainTag = lastConnectedTag === 'Uncertain'
+      ? (lastConnectedAttempt?.uncertain_tag ?? '')
+      : '';
+    const uncertainReason = lastConnectedTag === 'Uncertain'
+      ? (lastConnectedAttempt?.uncertain_reason ?? '')
+      : '';
+    const uncertainFeedback = lastConnectedTag === 'Uncertain'
+      ? (lastConnectedAttempt?.uncertain_agent_feedback ?? '')
+      : '';
 
     const output: Record<string, string> = {
       'Unique Lead ID (yours)': lead.contact_id,

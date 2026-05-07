@@ -162,23 +162,24 @@ describe('campaign-client-export', () => {
   });
 
   test('buildClientCampaignExport pivots to one row and caps attempts at six', () => {
+    // Attempts 1-5 are uncertain (call_disconnected, connected). Attempt 6 is the qualified
+    // conversation — and it is the LAST connected attempt, so its verdict drives the
+    // summary columns (Qualified_confidence) per the last-connected rule.
+    // (Attempt 7 exists but gets capped by MAX_EXPORT_ATTEMPTS=6.)
     const attempts = Array.from({ length: 7 }, (_, index) => makeAttempt({
       attempt_number: String(index + 1),
       provider_call_id: `provider_${index + 1}`,
       transcript_call_id: `call_${index + 1}`,
-      // The 2nd attempt is a real qualified conversation; the rest are call_disconnected.
-      // For the qualified attempt we must populate call_status='picked_up' so the
-      // call_status-driven gate (Rule 3) lets analytics flow through.
-      call_status: index === 1 ? 'picked_up' : '',
-      analysis_verdict: index === 1 ? 'interested' : 'call_disconnected',
-      analysis_confidence_score: index === 1 ? '87' : '50',
-      analytics_json: index === 1 ? {
+      call_status: index === 5 ? 'picked_up' : '',
+      analysis_verdict: index === 5 ? 'interested' : 'call_disconnected',
+      analysis_confidence_score: index === 5 ? '87' : '50',
+      analytics_json: index === 5 ? {
         call_status: 'picked_up',
         verdict: 'interested',
         confidence_score: 87,
         key_discoveries: { customer_language: 'english' },
       } : { verdict: 'call_disconnected', call_connected: true },
-      recording_url: index === 1 ? 'https://recording.example/call.mp3' : '',
+      recording_url: index === 5 ? 'https://recording.example/call.mp3' : '',
     }));
 
     const result = buildClientCampaignExport(attempts);
@@ -186,14 +187,104 @@ describe('campaign-client-export', () => {
     expect(result.rows).toHaveLength(1);
     expect(result.rows[0].All_Call_IDs).toBe('call_1|call_2|call_3|call_4|call_5|call_6|call_7');
     expect(result.rows[0].Attempt_6_Call_ID).toBe('call_6');
-    expect(result.rows[0].Attempt_6_Tag).toBe('Uncertain');
+    expect(result.rows[0].Attempt_6_Tag).toBe('Qualified');
     expect(result.rows[0].Attempt_7_Call_ID).toBeUndefined();
     expect(result.rows[0].Qualified_confidence).toBe('87');
     expect(result.rows[0]['Call Recording Link']).toBe('https://recording.example/call.mp3');
-    expect(result.fields).toContain('Attempt_2_Analytics_key_discoveries.customer_language');
-    expect(result.rows[0]['Attempt_2_Analytics_key_discoveries.customer_language']).toBe('english');
+    expect(result.fields).toContain('Attempt_6_Analytics_key_discoveries.customer_language');
+    expect(result.rows[0]['Attempt_6_Analytics_key_discoveries.customer_language']).toBe('english');
     expect(result.totalCalls).toBe(7);
     expect(result.availableRecordings).toBe(1);
+  });
+
+  test('summary columns come from the last connected attempt only (mutual exclusivity)', () => {
+    // The team's example: Attempt 1 Qualified TRUE, Attempt 2 Uncertain TRUE, Attempt 3 not picked up.
+    // Last connected = Attempt 2 (Uncertain). Only Uncertain_* columns get populated;
+    // Qualified_confidence and Not Interested_* MUST stay blank even though Attempt 1 was Qualified.
+    const result = buildClientCampaignExport([
+      makeAttempt({
+        contact_id: 'lead_mixed',
+        attempt_number: '1',
+        provider_call_id: 'provider_q',
+        transcript_call_id: 'AJ_qualifiedAttempt_1',
+        call_status: 'picked_up',
+        voicemail: 'false',
+        analysis_verdict: 'qualified',
+        analysis_confidence_score: '88',
+      }),
+      makeAttempt({
+        contact_id: 'lead_mixed',
+        attempt_number: '2',
+        provider_call_id: 'provider_u',
+        transcript_call_id: 'AJ_aHsphstuVBBT',
+        call_status: 'picked_up',
+        voicemail: 'false',
+        analysis_verdict: 'uncertain',
+        uncertain_tag: 'Asked to call later',
+        uncertain_reason: 'Customer was driving and asked us to call back tomorrow.',
+        uncertain_agent_feedback: 'Confirm a callback slot before ending.',
+      }),
+      makeAttempt({
+        contact_id: 'lead_mixed',
+        attempt_number: '3',
+        provider_call_id: 'provider_np',
+        transcript_call_id: 'AJ_notPicked_3',
+        call_status: 'not_picked_up',
+        voicemail: 'false',
+        analysis_verdict: '',
+      }),
+    ]);
+
+    expect(result.rows).toHaveLength(1);
+
+    // Per-attempt columns reflect each attempt's own state.
+    expect(result.rows[0].Attempt_1_Tag).toBe('Qualified');
+    expect(result.rows[0].Attempt_1_Call_Connected).toBe('true');
+    expect(result.rows[0].Attempt_2_Tag).toBe('Uncertain');
+    expect(result.rows[0].Attempt_2_Call_Connected).toBe('true');
+    expect(result.rows[0].Attempt_3_Tag).toBe('Did not pick-up');
+    expect(result.rows[0].Attempt_3_Call_Connected).toBe('false');
+
+    // Summary columns come from Attempt 2 (last connected) ONLY.
+    expect(result.rows[0].Uncertain_Tag).toBe('Asked to call later');
+    expect(result.rows[0].Uncertain_Reason).toBe('Customer was driving and asked us to call back tomorrow.');
+    expect(result.rows[0]['Uncertain_Feedback for agent']).toBe('Confirm a callback slot before ending.');
+
+    // Qualified and Not Interested groups MUST stay blank — even though Attempt 1 was Qualified.
+    expect(result.rows[0].Qualified_confidence).toBe('');
+    expect(result.rows[0]['Not Interested_Tag']).toBe('');
+    expect(result.rows[0]['Not Interested_Reason']).toBe('');
+  });
+
+  test('summary columns stay blank when no attempt was connected', () => {
+    // All attempts not_picked_up → no last-connected attempt → every summary column blank.
+    const result = buildClientCampaignExport([
+      makeAttempt({
+        contact_id: 'lead_unanswered',
+        attempt_number: '1',
+        provider_call_id: 'provider_np_1',
+        transcript_call_id: 'call_np_1',
+        call_status: 'not_picked_up',
+        analysis_verdict: '',
+        uncertain_tag: '',
+      }),
+      makeAttempt({
+        contact_id: 'lead_unanswered',
+        attempt_number: '2',
+        provider_call_id: 'provider_np_2',
+        transcript_call_id: 'call_np_2',
+        call_status: 'not_picked_up',
+        analysis_verdict: '',
+        uncertain_tag: '',
+      }),
+    ]);
+
+    expect(result.rows[0].Qualified_confidence).toBe('');
+    expect(result.rows[0]['Not Interested_Tag']).toBe('');
+    expect(result.rows[0]['Not Interested_Reason']).toBe('');
+    expect(result.rows[0].Uncertain_Tag).toBe('');
+    expect(result.rows[0].Uncertain_Reason).toBe('');
+    expect(result.rows[0]['Uncertain_Feedback for agent']).toBe('');
   });
 
   test('buildClientCampaignExport skips duplicate or empty follow-up attempt slots', () => {
