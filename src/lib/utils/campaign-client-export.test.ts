@@ -380,6 +380,73 @@ describe('campaign-client-export', () => {
     expect(result.rows[0]['Uncertain_Feedback for agent']).toBe('Offer multilingual support next time.');
   });
 
+  test('connected Uncertain attempts emit Attempt_N_Analytics_JSON + flattened key_discoveries (Bishal regression)', () => {
+    // Reproduces the Bishal/AJ_oMg96scfUpke bug: a connected Uncertain attempt was producing
+    // blank Attempt_1_Analytics_JSON and blank Uncertain_* summary columns, even though the
+    // DB had verdict='uncertain', call_status='picked_up', and key_discoveries.uncertain_tag set.
+    // Two things the export now must do:
+    //   1. Write Attempt_N_Analytics_JSON + flatten for ANY connected+completed attempt
+    //      (not gated on tag === 'Qualified').
+    //   2. Echo the ingested uncertain_* fields (sourced from key_discoveries during ingest)
+    //      into the summary columns when the last connected attempt is Uncertain.
+    const result = buildClientCampaignExport([
+      makeAttempt({
+        contact_id: 'bishal_69fc94dfd65f6c3a32bf6525',
+        contact_name: 'Bishal',
+        provider_call_id: 'AJ_oMg96scfUpke',
+        transcript_call_id: 'AJ_oMg96scfUpke',
+        call_status: 'picked_up',
+        voicemail: 'false',
+        analysis_verdict: 'uncertain',
+        analysis_confidence_score: '60',
+        // These reflect the ingestion having read from analytics.key_discoveries.* in page.tsx.
+        uncertain_tag: 'Disconnected Mid-Conversation',
+        uncertain_reason: 'The call was disrupted by hold music and connection issues.',
+        uncertain_agent_feedback: 'Acknowledge the hold music issue and attempt to reconnect.',
+        analytics_json: {
+          verdict: 'uncertain',
+          call_status: 'picked_up',
+          voicemail: false,
+          confidence_score: 60,
+          summary: 'Agent attempted to qualify the caller; hold music disrupted the call.',
+          key_discoveries: {
+            uncertain_tag: 'Disconnected Mid-Conversation',
+            uncertain_reason: 'The call was disrupted by hold music and connection issues.',
+            uncertain_agent_feedback: 'Acknowledge the hold music issue and attempt to reconnect.',
+            qualified_confidence_score: null,
+            not_interested_tag: null,
+            not_interested_reason: null,
+          },
+        },
+      }),
+    ]);
+
+    expect(result.rows).toHaveLength(1);
+    expect(result.rows[0].Attempt_1_Tag).toBe('Uncertain');
+    expect(result.rows[0].Attempt_1_Call_Connected).toBe('true');
+
+    // Bug B fix: Attempt_1_Analytics_JSON now present for Uncertain (previously blank).
+    expect(result.rows[0].Attempt_1_Analytics_JSON).toBeDefined();
+    expect(JSON.parse(result.rows[0].Attempt_1_Analytics_JSON)).toMatchObject({
+      verdict: 'uncertain',
+      call_status: 'picked_up',
+    });
+
+    // Flattened key_discoveries columns must be present.
+    expect(result.fields).toContain('Attempt_1_Analytics_key_discoveries.uncertain_tag');
+    expect(result.rows[0]['Attempt_1_Analytics_key_discoveries.uncertain_tag']).toBe('Disconnected Mid-Conversation');
+    expect(result.rows[0]['Attempt_1_Analytics_key_discoveries.uncertain_reason']).toBe('The call was disrupted by hold music and connection issues.');
+
+    // Summary columns reflect the last connected attempt (this one).
+    expect(result.rows[0].Uncertain_Tag).toBe('Disconnected Mid-Conversation');
+    expect(result.rows[0].Uncertain_Reason).toBe('The call was disrupted by hold music and connection issues.');
+    expect(result.rows[0]['Uncertain_Feedback for agent']).toBe('Acknowledge the hold music issue and attempt to reconnect.');
+
+    // Other column groups stay blank.
+    expect(result.rows[0].Qualified_confidence).toBe('');
+    expect(result.rows[0]['Not Interested_Tag']).toBe('');
+  });
+
   test('qualified verdict populates only Qualified columns, never Uncertain', () => {
     // The "Interested tagged as Uncertain" bug: DB verdict='qualified' must map to
     // Qualified_confidence and leave Uncertain_* / Not Interested_* blank.

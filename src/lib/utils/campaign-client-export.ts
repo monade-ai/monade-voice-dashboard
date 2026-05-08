@@ -413,15 +413,18 @@ export function buildClientCampaignExport(
       output[`Attempt_${attemptNumber}_Tag`] = tag;
       output[`Attempt_${attemptNumber}_Call_Connected`] = deriveCallConnected(attempt, tag);
 
-      // Rule 3: gate Attempt_N_Analytics_* columns behind a real connected conversation.
-      // Voicemail and not_picked_up rows must not leak analytics fields.
+      // Rule 3: gate Attempt_N_Analytics_* columns behind a real connected conversation
+      // (call_status='picked_up' AND not voicemail). Voicemail and not_picked_up rows must
+      // not leak analytics fields. The verdict (Qualified/Uncertain/Not Interested) does NOT
+      // gate this — every connected, completed attempt gets its analytics blob written so
+      // the client can see why a call was tagged the way it was.
       const callStatus = normalizeCallStatus(attempt.call_status ?? attempt.analytics_json?.call_status as string | undefined);
       const voicemailFlag = String(
         attempt.voicemail ?? (attempt.analytics_json?.voicemail as boolean | string | undefined) ?? '',
       );
       const isCompleted = isCompletedConversation(callStatus, voicemailFlag);
 
-      if (tag === 'Qualified' && attempt.analytics_json && isConnectedAttempt(attempt, tag) && isCompleted) {
+      if (attempt.analytics_json && isCompleted) {
         output[`Attempt_${attemptNumber}_Analytics_JSON`] = JSON.stringify(attempt.analytics_json);
         dynamicAnalyticsFields.add(`Attempt_${attemptNumber}_Analytics_JSON`);
 

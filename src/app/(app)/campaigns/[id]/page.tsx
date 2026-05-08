@@ -1143,17 +1143,35 @@ export default function CampaignDetailPage() {
           : '';
         // Direct passthrough of DB analytics fields used by the CSV export. Null/missing → ''.
         // The export layer must never invent values for these — see campaign-client-export.ts.
+        // call_status / voicemail live at the top level; the verdict-detail fields live under
+        // analytics.key_discoveries (see prod schema for reference).
         row.call_status = typeof analytics?.call_status === 'string' ? analytics.call_status : '';
         row.voicemail = typeof analytics?.voicemail === 'boolean' ? String(analytics.voicemail) : '';
-        row.uncertain_tag = typeof analytics?.uncertain_tag === 'string' ? analytics.uncertain_tag : '';
-        row.uncertain_reason = typeof analytics?.uncertain_reason === 'string' ? analytics.uncertain_reason : '';
-        row.uncertain_agent_feedback = typeof analytics?.uncertain_agent_feedback === 'string' ? analytics.uncertain_agent_feedback : '';
-        row.not_interested_tag = typeof analytics?.not_interested_tag === 'string' ? analytics.not_interested_tag : '';
-        row.not_interested_reason = typeof analytics?.not_interested_reason === 'string' ? analytics.not_interested_reason : '';
+        const keyDiscoveries = (analytics?.key_discoveries && typeof analytics.key_discoveries === 'object' && !Array.isArray(analytics.key_discoveries))
+          ? analytics.key_discoveries as Record<string, unknown>
+          : null;
+        row.uncertain_tag = typeof keyDiscoveries?.uncertain_tag === 'string' ? keyDiscoveries.uncertain_tag : '';
+        row.uncertain_reason = typeof keyDiscoveries?.uncertain_reason === 'string' ? keyDiscoveries.uncertain_reason : '';
+        row.uncertain_agent_feedback = typeof keyDiscoveries?.uncertain_agent_feedback === 'string' ? keyDiscoveries.uncertain_agent_feedback : '';
+        row.not_interested_tag = typeof keyDiscoveries?.not_interested_tag === 'string' ? keyDiscoveries.not_interested_tag : '';
+        row.not_interested_reason = typeof keyDiscoveries?.not_interested_reason === 'string' ? keyDiscoveries.not_interested_reason : '';
         row.sip_call_id = selected.sip_call_id ?? '';
         row.recording_url = selected.recording_url ?? '';
         row.analytics_json = analytics;
       });
+
+      // Surface fetch/match failures: any attempt that resolved to a real call (provider_call_id
+       // exists) but didn't get analytics attached is suspect. Don't write blank silently.
+      const unmatchedConnectedRows = rows.filter((row) => {
+        return Boolean(row.provider_call_id) && !row.analytics_json && !row.transcript_call_id;
+      });
+      if (unmatchedConnectedRows.length > 0) {
+        const sample = unmatchedConnectedRows.slice(0, 10).map((row) => row.provider_call_id);
+        console.warn(
+          `[CampaignExport] ${unmatchedConnectedRows.length} attempt(s) had a provider_call_id but no analytics record matched. Sample call IDs:`,
+          sample,
+        );
+      }
 
       setDownloadProgress({
         phase: 'analytics',
