@@ -19,7 +19,11 @@ import {
   AlertCircle,
   BarChart3,
   Brain,
+  ChevronLeft,
+  ChevronRight,
   CheckCircle2,
+  CircleDollarSign,
+  Eye,
   Loader2,
   Phone,
   RefreshCw,
@@ -60,13 +64,15 @@ import {
 type AnalyticsAction = 'reanalyze' | 'enhance';
 type Segment = 'all' | 'hot' | 'qualified' | 'connected' | 'not_connected';
 
-const COLORS = ['#2563eb', '#16a34a', '#f59e0b', '#dc2626', '#7c3aed', '#0891b2', '#db2777', '#475569'];
+const COLORS = ['#0f766e', '#2563eb', '#65a30d', '#ca8a04', '#b91c1c', '#475569', '#7c3aed', '#0891b2'];
 const BLOCKED_STATUSES = new Set(['active', 'pending']);
 const POSITIVE_VERDICTS = ['interested', 'likely_to_book', 'qualified', 'success', 'callback', 'booked', 'hot'];
+const CALL_RECORDS_PAGE_SIZE = 12;
 
 const humanize = (value: string) => value.replace(/[_-]+/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
 const num = (value: unknown, fallback = 0) => (typeof value === 'number' && Number.isFinite(value) ? value : fallback);
 const compact = (value: unknown, digits = 0) => num(value).toLocaleString(undefined, { maximumFractionDigits: digits });
+const credits = (value: unknown) => `${compact(value, 2)} cr`;
 const pct = (value: unknown) => {
   const n = num(value);
   if (n > 0 && n <= 1) return `${Math.round(n * 100)}%`;
@@ -181,9 +187,19 @@ const enhanceErrors = (response: CampaignEnhanceTranscriptsResponse | null) => {
   return [...direct, ...fromResults];
 };
 
-function MiniStat({ label, value, subtext }: { label: string; value: string; subtext?: string }) {
+function MiniStat({
+  label,
+  value,
+  subtext,
+  accent = 'border-border/40',
+}: {
+  label: string;
+  value: string;
+  subtext?: string;
+  accent?: string;
+}) {
   return (
-    <PaperCard className="bg-muted/5 border-border/40">
+    <PaperCard className={cn('bg-muted/5', accent)}>
       <PaperCardContent className="p-4">
         <p className="text-[9px] uppercase tracking-widest text-muted-foreground font-bold">{label}</p>
         <p className="mt-2 text-2xl font-mono font-bold tracking-tight text-foreground">{value}</p>
@@ -201,6 +217,16 @@ function ChartPanel({ title, children, className }: { title: string; children: R
       </PaperCardHeader>
       <PaperCardContent className="p-5 pt-2 h-[260px]">{children}</PaperCardContent>
     </PaperCard>
+  );
+}
+
+function WorkflowStep({ label, title, detail }: { label: string; title: string; detail: string }) {
+  return (
+    <div className="rounded-md border border-border/30 bg-background p-3">
+      <p className="text-[9px] uppercase tracking-widest font-bold text-muted-foreground">{label}</p>
+      <p className="mt-1 text-sm font-semibold text-foreground">{title}</p>
+      <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">{detail}</p>
+    </div>
   );
 }
 
@@ -258,6 +284,8 @@ export default function CampaignAnalyticsPage() {
   const [runningAction, setRunningAction] = useState(false);
   const [search, setSearch] = useState('');
   const [segment, setSegment] = useState<Segment>('all');
+  const [recordsOpen, setRecordsOpen] = useState(false);
+  const [recordsPage, setRecordsPage] = useState(1);
   const [reanalyzeResult, setReanalyzeResult] = useState<CampaignReanalyzeResponse | null>(null);
   const [enhanceResult, setEnhanceResult] = useState<CampaignEnhanceTranscriptsResponse | null>(null);
 
@@ -319,7 +347,7 @@ export default function CampaignAnalyticsPage() {
   const diagrams = analytics?.diagrams ?? {};
   const entries = useMemo(() => analytics?.call_entries?.entries ?? [], [analytics]);
   const blocked = selectedCampaign ? BLOCKED_STATUSES.has(selectedCampaign.status) : true;
-  const hotLeads = entries.filter(hotLead);
+  const hotLeads = useMemo(() => entries.filter(hotLead), [entries]);
   const filteredEntries = useMemo(() => {
     const q = search.trim().toLowerCase();
 
@@ -334,6 +362,13 @@ export default function CampaignAnalyticsPage() {
         .some((value) => String(value ?? '').toLowerCase().includes(q));
     });
   }, [entries, search, segment]);
+  const totalRecordPages = Math.max(1, Math.ceil(filteredEntries.length / CALL_RECORDS_PAGE_SIZE));
+  const effectiveRecordsPage = Math.min(recordsPage, totalRecordPages);
+  const paginatedEntries = useMemo(() => {
+    const start = (effectiveRecordsPage - 1) * CALL_RECORDS_PAGE_SIZE;
+
+    return filteredEntries.slice(start, start + CALL_RECORDS_PAGE_SIZE);
+  }, [effectiveRecordsPage, filteredEntries]);
 
   const openAction = (nextAction: AnalyticsAction) => {
     if (!selectedCampaign) return;
@@ -380,14 +415,10 @@ export default function CampaignAnalyticsPage() {
   };
 
   const cards = [
-    { label: 'Calls', value: compact(overview.total_call_attempts ?? analytics?.total_calls), subtext: `${compact(overview.attempted_contacts)} attempted contacts` },
-    { label: 'Contacts', value: compact(overview.total_contacts), subtext: `${compact(overview.connected_contacts)} connected` },
-    { label: 'Pickup Rate', value: pct(overview.pickup_rate), subtext: 'Connected / attempted' },
-    { label: 'Qualification', value: pct(overview.qualification_rate), subtext: `${hotLeads.length} hot leads in table` },
-    { label: 'Avg Duration', value: duration(overview.avg_call_duration_seconds), subtext: 'Talk time per call' },
-    { label: 'Confidence', value: pct(overview.avg_confidence_score), subtext: 'Average model score' },
-    { label: 'Enhanced', value: pct(overview.enhanced_transcript_coverage), subtext: 'Transcript coverage' },
-    { label: 'Credits', value: compact(overview.total_credits_used, 2), subtext: `${compact(overview.credits_per_connected_call, 2)} / connected` },
+    { label: 'Calls', value: compact(overview.total_call_attempts ?? analytics?.total_calls), subtext: `${compact(overview.attempted_contacts)} attempted contacts`, accent: 'border-slate-500/20' },
+    { label: 'Pickup Rate', value: pct(overview.pickup_rate), subtext: `${compact(overview.connected_contacts)} connected`, accent: 'border-teal-600/25' },
+    { label: 'Qualification', value: pct(overview.qualification_rate), subtext: `${hotLeads.length} hot leads`, accent: 'border-emerald-600/25' },
+    { label: 'Credits Used', value: credits(overview.total_credits_used), subtext: `${credits(overview.credits_per_connected_call)} / connected`, accent: 'border-amber-600/25' },
   ];
   const chartData = {
     funnel: distribution(diagrams.connectivity_funnel),
@@ -422,7 +453,11 @@ export default function CampaignAnalyticsPage() {
           <div className="flex flex-col gap-3 lg:min-w-[420px]">
             <select
               value={selectedCampaignId}
-              onChange={(event) => setSelectedCampaignId(event.target.value)}
+              onChange={(event) => {
+                setSelectedCampaignId(event.target.value);
+                setRecordsPage(1);
+                setRecordsOpen(false);
+              }}
               className="h-10 w-full rounded-md border border-border/40 bg-background px-3 text-sm"
               disabled={loadingCampaigns}
             >
@@ -468,6 +503,54 @@ export default function CampaignAnalyticsPage() {
           </PaperCard>
         ) : (
           <>
+            <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_1fr] gap-6">
+              <PaperCard className="border-border/40 bg-muted/5">
+                <PaperCardHeader className="p-5 pb-2">
+                  <PaperCardTitle className="text-[10px] uppercase tracking-[0.2em]">Operator Flow</PaperCardTitle>
+                </PaperCardHeader>
+                <PaperCardContent className="p-5 pt-2 grid gap-3 md:grid-cols-3">
+                  <WorkflowStep
+                    label="Step 1"
+                    title="Analyze"
+                    detail="Read-only refresh of campaign overview, charts, billing, and lead segments."
+                  />
+                  <WorkflowStep
+                    label="Step 2"
+                    title="Optional reanalysis"
+                    detail="Pick a template and update stored analytics for existing calls."
+                  />
+                  <WorkflowStep
+                    label="Step 3"
+                    title="Optional enhancement"
+                    detail="Heavier transcript enhancement pass using recordings and Gemini."
+                  />
+                </PaperCardContent>
+              </PaperCard>
+
+              <PaperCard className="border-amber-600/25 bg-amber-500/[0.03]">
+                <PaperCardHeader className="p-5 pb-2">
+                  <div className="flex items-center gap-2">
+                    <CircleDollarSign size={16} className="text-amber-600" />
+                    <PaperCardTitle className="text-[10px] uppercase tracking-[0.2em]">Billing Credits</PaperCardTitle>
+                  </div>
+                </PaperCardHeader>
+                <PaperCardContent className="p-5 pt-2 grid grid-cols-3 gap-4">
+                  <div>
+                    <p className="text-[9px] uppercase tracking-widest text-muted-foreground font-bold">Total</p>
+                    <p className="mt-2 text-2xl font-mono font-bold">{credits(overview.total_credits_used)}</p>
+                  </div>
+                  <div>
+                    <p className="text-[9px] uppercase tracking-widest text-muted-foreground font-bold">Connected</p>
+                    <p className="mt-2 text-2xl font-mono font-bold">{credits(overview.credits_per_connected_call)}</p>
+                  </div>
+                  <div>
+                    <p className="text-[9px] uppercase tracking-widest text-muted-foreground font-bold">Qualified</p>
+                    <p className="mt-2 text-2xl font-mono font-bold">{credits(overview.credits_per_qualified_lead)}</p>
+                  </div>
+                </PaperCardContent>
+              </PaperCard>
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {cards.map((card) => <MiniStat key={card.label} {...card} />)}
             </div>
@@ -491,6 +574,20 @@ export default function CampaignAnalyticsPage() {
                     <p className="mt-1 text-3xl font-mono font-bold">{hotLeads.length}</p>
                     <p className="mt-1 text-[11px] text-muted-foreground">Positive verdicts with usable confidence from this campaign.</p>
                   </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="rounded-md bg-muted/20 p-3">
+                      <p className="text-[9px] uppercase tracking-widest text-muted-foreground font-bold">Avg Duration</p>
+                      <p className="mt-1 text-sm font-mono font-bold">{duration(overview.avg_call_duration_seconds)}</p>
+                    </div>
+                    <div className="rounded-md bg-muted/20 p-3">
+                      <p className="text-[9px] uppercase tracking-widest text-muted-foreground font-bold">Confidence</p>
+                      <p className="mt-1 text-sm font-mono font-bold">{pct(overview.avg_confidence_score)}</p>
+                    </div>
+                    <div className="rounded-md bg-muted/20 p-3">
+                      <p className="text-[9px] uppercase tracking-widest text-muted-foreground font-bold">Enhanced</p>
+                      <p className="mt-1 text-sm font-mono font-bold">{pct(overview.enhanced_transcript_coverage)}</p>
+                    </div>
+                  </div>
                 </PaperCardContent>
               </PaperCard>
             </div>
@@ -511,9 +608,9 @@ export default function CampaignAnalyticsPage() {
                       <XAxis dataKey="date" tickLine={false} axisLine={false} fontSize={11} />
                       <YAxis tickLine={false} axisLine={false} fontSize={11} />
                       <Tooltip />
-                      <Area type="monotone" dataKey="calls" stroke="#2563eb" fill="#2563eb" fillOpacity={0.12} />
-                      <Area type="monotone" dataKey="connected" stroke="#16a34a" fill="#16a34a" fillOpacity={0.12} />
-                      <Area type="monotone" dataKey="qualified" stroke="#f59e0b" fill="#f59e0b" fillOpacity={0.12} />
+                      <Area type="monotone" dataKey="calls" stroke="#475569" fill="#475569" fillOpacity={0.10} />
+                      <Area type="monotone" dataKey="connected" stroke="#0f766e" fill="#0f766e" fillOpacity={0.12} />
+                      <Area type="monotone" dataKey="qualified" stroke="#65a30d" fill="#65a30d" fillOpacity={0.12} />
                     </AreaChart>
                   </ResponsiveContainer>
                 )}
@@ -529,9 +626,9 @@ export default function CampaignAnalyticsPage() {
                       <XAxis dataKey="hour" tickLine={false} axisLine={false} fontSize={11} />
                       <YAxis tickLine={false} axisLine={false} fontSize={11} />
                       <Tooltip />
-                      <Bar dataKey="calls" fill="#2563eb" radius={[4, 4, 0, 0]} />
-                      <Bar dataKey="connected" fill="#16a34a" radius={[4, 4, 0, 0]} />
-                      <Bar dataKey="qualified" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="calls" fill="#475569" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="connected" fill="#0f766e" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="qualified" fill="#65a30d" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 )}
@@ -544,8 +641,8 @@ export default function CampaignAnalyticsPage() {
                       <XAxis dataKey="name" tickLine={false} axisLine={false} fontSize={11} />
                       <YAxis tickLine={false} axisLine={false} fontSize={11} />
                       <Tooltip />
-                      <Bar dataKey="calls" fill="#2563eb" radius={[4, 4, 0, 0]} />
-                      <Bar dataKey="qualified" fill="#16a34a" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="calls" fill="#475569" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="qualified" fill="#0f766e" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 )}
@@ -585,24 +682,65 @@ export default function CampaignAnalyticsPage() {
 
             <PaperCard className="bg-muted/5 border-border/40">
               <PaperCardHeader className="p-5 pb-3">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <PaperCardTitle className="text-[10px] uppercase tracking-[0.2em]">Lead Segment</PaperCardTitle>
+                    <p className="mt-1 text-xs text-muted-foreground">A short preview of qualified or high-intent leads from this campaign.</p>
+                  </div>
+                  <Badge variant="outline" className="text-[9px] uppercase tracking-widest border-emerald-600/25 text-emerald-600">
+                    {hotLeads.length} hot
+                  </Badge>
+                </div>
+              </PaperCardHeader>
+              <PaperCardContent className="px-5 pb-5">
+                {hotLeads.length === 0 ? (
+                  <div className="rounded-md border border-dashed border-border/40 p-8 text-center">
+                    <Target className="mx-auto mb-3 text-muted-foreground" size={18} />
+                    <p className="text-sm font-medium">No hot leads detected in this campaign.</p>
+                    <p className="mt-1 text-xs text-muted-foreground">You can still inspect all call records when needed.</p>
+                  </div>
+                ) : (
+                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                    {hotLeads.slice(0, 6).map((lead, index) => (
+                      <div key={lead.call_id || index} className="rounded-md border border-border/30 bg-background p-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="font-mono text-sm font-semibold">{lead.phone_number || '--'}</p>
+                            <p className="mt-1 text-[11px] text-muted-foreground">{dateTime(callTime(lead))}</p>
+                          </div>
+                          <Badge variant="outline" className="text-[9px] uppercase tracking-widest border-emerald-600/25">
+                            {lead.confidence_score ?? '--'}%
+                          </Badge>
+                        </div>
+                        <p className="mt-3 text-xs font-medium">{humanize(String(lead.verdict || 'Qualified'))}</p>
+                        <p className="mt-1 text-[11px] text-muted-foreground">
+                          {lead.template_name || lead.use_case || lead.call_quality || 'Review call details for next action.'}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </PaperCardContent>
+            </PaperCard>
+
+            <PaperCard className="bg-muted/5 border-border/40">
+              <PaperCardHeader className="p-5 pb-3">
                 <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                   <div>
                     <PaperCardTitle className="text-[10px] uppercase tracking-[0.2em]">Call Entries</PaperCardTitle>
-                    <p className="mt-1 text-xs text-muted-foreground">Shown when analytics is requested with include_calls=true.</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Kept collapsed by default. Open this only when you need row-level investigation.
+                    </p>
                   </div>
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                      <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search calls..." className="h-9 pl-9 text-xs" />
-                    </div>
-                    <select value={segment} onChange={(event) => setSegment(event.target.value as Segment)} className="h-9 rounded-md border border-border/40 bg-background px-3 text-xs">
-                      <option value="all">All calls</option>
-                      <option value="hot">Hot leads</option>
-                      <option value="qualified">Qualified</option>
-                      <option value="connected">Connected</option>
-                      <option value="not_connected">Not connected</option>
-                    </select>
-                  </div>
+                  <Button
+                    variant={recordsOpen ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setRecordsOpen((open) => !open)}
+                    className="h-9 gap-2 text-[10px] uppercase tracking-widest"
+                  >
+                    <Eye size={14} />
+                    {recordsOpen ? 'Hide Records' : `Show Records (${entries.length})`}
+                  </Button>
                 </div>
               </PaperCardHeader>
               <PaperCardContent className="px-5 pb-5">
@@ -612,45 +750,127 @@ export default function CampaignAnalyticsPage() {
                     <p className="text-sm font-medium">No call entries returned.</p>
                     <p className="mt-1 text-xs text-muted-foreground">The headline analytics can still render without call_entries.</p>
                   </div>
+                ) : !recordsOpen ? (
+                  <div className="grid gap-4 md:grid-cols-4">
+                    <div className="rounded-md border border-border/30 bg-background p-4">
+                      <p className="text-[9px] uppercase tracking-widest font-bold text-muted-foreground">Returned</p>
+                      <p className="mt-2 text-2xl font-mono font-bold">{entries.length}</p>
+                    </div>
+                    <div className="rounded-md border border-border/30 bg-background p-4">
+                      <p className="text-[9px] uppercase tracking-widest font-bold text-muted-foreground">Connected</p>
+                      <p className="mt-2 text-2xl font-mono font-bold">{entries.filter(connected).length}</p>
+                    </div>
+                    <div className="rounded-md border border-border/30 bg-background p-4">
+                      <p className="text-[9px] uppercase tracking-widest font-bold text-muted-foreground">Qualified</p>
+                      <p className="mt-2 text-2xl font-mono font-bold">{entries.filter((entry) => POSITIVE_VERDICTS.some((token) => String(entry.verdict ?? '').toLowerCase().includes(token))).length}</p>
+                    </div>
+                    <div className="rounded-md border border-border/30 bg-background p-4">
+                      <p className="text-[9px] uppercase tracking-widest font-bold text-muted-foreground">Hot Leads</p>
+                      <p className="mt-2 text-2xl font-mono font-bold">{hotLeads.length}</p>
+                    </div>
+                  </div>
                 ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full min-w-[980px] text-left">
-                      <thead>
-                        <tr className="border-b border-border/30">
-                          {['Lead', 'Call Time', 'Status', 'Verdict', 'Confidence', 'Quality', 'Duration', 'Template', 'Credits'].map((heading) => (
-                            <th key={heading} className="py-2 pr-3 text-[10px] uppercase tracking-widest text-muted-foreground">{heading}</th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {filteredEntries.slice(0, 200).map((entry, index) => (
-                          <tr key={entry.call_id || index} className="border-b border-border/10 hover:bg-muted/10">
-                            <td className="py-3 pr-3">
-                              <div className="flex flex-col gap-1">
-                                <span className="text-xs font-mono font-semibold">{entry.phone_number || '--'}</span>
-                                <span className="text-[10px] text-muted-foreground font-mono">{entry.call_id || '--'}</span>
-                              </div>
-                            </td>
-                            <td className="py-3 pr-3 text-xs text-muted-foreground whitespace-nowrap">{dateTime(callTime(entry))}</td>
-                            <td className="py-3 pr-3">
-                              <Badge variant="outline" className="text-[9px] uppercase tracking-widest">{entry.provider_status || (connected(entry) ? 'connected' : 'unknown')}</Badge>
-                            </td>
-                            <td className="py-3 pr-3">
-                              <div className="flex items-center gap-2">
-                                {hotLead(entry) ? <Target size={13} className="text-green-600" /> : null}
-                                <span className="text-xs font-medium">{humanize(String(entry.verdict || 'unknown'))}</span>
-                              </div>
-                            </td>
-                            <td className="py-3 pr-3 text-xs font-mono">{entry.confidence_score ?? '--'}%</td>
-                            <td className="py-3 pr-3 text-xs">{humanize(String(entry.call_quality || '--'))}</td>
-                            <td className="py-3 pr-3 text-xs font-mono">{duration(entry.duration_seconds)}</td>
-                            <td className="py-3 pr-3 text-xs text-muted-foreground">{entry.template_name || entry.use_case || '--'}</td>
-                            <td className="py-3 pr-3 text-xs font-mono">{entry.billing_data?.credits_used ?? '--'}</td>
+                  <div className="space-y-4">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                        <div className="relative">
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                          <Input
+                            value={search}
+                            onChange={(event) => {
+                              setSearch(event.target.value);
+                              setRecordsPage(1);
+                            }}
+                            placeholder="Search calls..."
+                            className="h-9 pl-9 text-xs"
+                          />
+                        </div>
+                        <select
+                          value={segment}
+                          onChange={(event) => {
+                            setSegment(event.target.value as Segment);
+                            setRecordsPage(1);
+                          }}
+                          className="h-9 rounded-md border border-border/40 bg-background px-3 text-xs"
+                        >
+                          <option value="all">All calls</option>
+                          <option value="hot">Hot leads</option>
+                          <option value="qualified">Qualified</option>
+                          <option value="connected">Connected</option>
+                          <option value="not_connected">Not connected</option>
+                        </select>
+                      </div>
+                      <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                        {filteredEntries.length} matching records
+                      </p>
+                    </div>
+
+                    <div className="overflow-x-auto rounded-md border border-border/20">
+                      <table className="w-full min-w-[980px] text-left">
+                        <thead className="bg-muted/10">
+                          <tr className="border-b border-border/30">
+                            {['Lead', 'Call Time', 'Status', 'Verdict', 'Confidence', 'Quality', 'Duration', 'Template', 'Credits'].map((heading) => (
+                              <th key={heading} className="py-2 pr-3 text-[10px] uppercase tracking-widest text-muted-foreground">{heading}</th>
+                            ))}
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                    {filteredEntries.length > 200 && <p className="mt-3 text-[11px] text-muted-foreground">Showing first 200 of {filteredEntries.length} matching calls.</p>}
+                        </thead>
+                        <tbody>
+                          {paginatedEntries.map((entry, index) => (
+                            <tr key={entry.call_id || index} className="border-b border-border/10 hover:bg-muted/10">
+                              <td className="py-3 pr-3 pl-3">
+                                <div className="flex flex-col gap-1">
+                                  <span className="text-xs font-mono font-semibold">{entry.phone_number || '--'}</span>
+                                  <span className="text-[10px] text-muted-foreground font-mono">{entry.call_id || '--'}</span>
+                                </div>
+                              </td>
+                              <td className="py-3 pr-3 text-xs text-muted-foreground whitespace-nowrap">{dateTime(callTime(entry))}</td>
+                              <td className="py-3 pr-3">
+                                <Badge variant="outline" className="text-[9px] uppercase tracking-widest">{entry.provider_status || (connected(entry) ? 'connected' : 'unknown')}</Badge>
+                              </td>
+                              <td className="py-3 pr-3">
+                                <div className="flex items-center gap-2">
+                                  {hotLead(entry) ? <Target size={13} className="text-emerald-600" /> : null}
+                                  <span className="text-xs font-medium">{humanize(String(entry.verdict || 'unknown'))}</span>
+                                </div>
+                              </td>
+                              <td className="py-3 pr-3 text-xs font-mono">{entry.confidence_score ?? '--'}%</td>
+                              <td className="py-3 pr-3 text-xs">{humanize(String(entry.call_quality || '--'))}</td>
+                              <td className="py-3 pr-3 text-xs font-mono">{duration(entry.duration_seconds)}</td>
+                              <td className="py-3 pr-3 text-xs text-muted-foreground">{entry.template_name || entry.use_case || '--'}</td>
+                              <td className="py-3 pr-3 text-xs font-mono">{entry.billing_data?.credits_used ?? '--'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                        Page {effectiveRecordsPage} of {totalRecordPages}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setRecordsPage((page) => Math.max(1, page - 1))}
+                          disabled={effectiveRecordsPage === 1}
+                          className="h-8 w-8 p-0"
+                          aria-label="Previous call records page"
+                        >
+                          <ChevronLeft size={14} />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setRecordsPage((page) => Math.min(totalRecordPages, page + 1))}
+                          disabled={effectiveRecordsPage === totalRecordPages}
+                          className="h-8 w-8 p-0"
+                          aria-label="Next call records page"
+                        >
+                          <ChevronRight size={14} />
+                        </Button>
+                      </div>
+                    </div>
                   </div>
                 )}
               </PaperCardContent>
