@@ -1,5 +1,7 @@
 'use client';
 
+export { default } from './campaign-analytics-page';
+
 import React, { useState } from 'react';
 import { History, Download, Trash2, PieChart, Phone, CheckCircle2, XCircle, Clock, ChevronDown, ChevronUp } from 'lucide-react';
 
@@ -15,7 +17,7 @@ import {
 } from '@/components/ui/table';
 import { useCampaignHistory, CampaignRecord } from '@/app/hooks/use-campaign-history';
 
-export default function CampaignHistoryPage() {
+export function LegacyCampaignHistoryPage() {
   const { campaigns, loading, deleteCampaign, getConnectivityRate } = useCampaignHistory();
   const [expandedId, setExpandedId] = useState<string | null>(null);
 

@@ -23,7 +23,6 @@ import { QualificationBucket, usePostProcessingTemplates } from '@/app/hooks/use
 import { DashboardHeader } from '@/components/dashboard-header';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { LeadIcon } from '@/components/ui/lead-icon';
 import { cn } from '@/lib/utils';
 import { PaperCard, PaperCardContent } from '@/components/ui/paper-card';
@@ -79,6 +78,37 @@ const formatCurrency = (val: string | undefined) => {
   return val.includes('$') || val.includes('₹') ? val : `₹${val}`;
 };
 
+const getLeadDate = (lead: CallAnalytics) => new Date(lead.call_started_at || lead.created_at || 0);
+const formatLeadDate = (lead: CallAnalytics) => (
+  lead.call_started_at || lead.created_at ? getLeadDate(lead).toLocaleDateString() : '—'
+);
+
+const startOfLocalDay = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+const isSameLocalDay = (a: Date, b: Date) => (
+  a.getFullYear() === b.getFullYear()
+  && a.getMonth() === b.getMonth()
+  && a.getDate() === b.getDate()
+);
+
+const escapeCSV = (value: unknown): string => {
+  if (value === null || value === undefined) return '';
+  const text = Array.isArray(value) ? value.join('; ') : String(value);
+  if (/[",\n\r]/.test(text)) return `"${text.replace(/"/g, '""')}"`;
+
+  return text;
+};
+
+const downloadTextFile = (content: string, filename: string) => {
+  const blob = new Blob([content], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename.endsWith('.csv') ? filename : `${filename}.csv`;
+  link.click();
+  URL.revokeObjectURL(url);
+};
+
 // --- Component: DealRow (Memoized for Performance) ---
 
 const DealRow = React.memo(({ lead, onClick, bucketIndex }: {
@@ -124,7 +154,7 @@ const DealRow = React.memo(({ lead, onClick, bucketIndex }: {
         <div className="flex flex-col">
           <span className="text-sm font-bold text-foreground tracking-tight">{lead.phone_number}</span>
           <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest">
-            {new Date(lead.created_at || Date.now()).toLocaleDateString()}
+            {formatLeadDate(lead)}
           </span>
         </div>
       </div>
@@ -143,7 +173,7 @@ const DealRow = React.memo(({ lead, onClick, bucketIndex }: {
       {/* 3. Intelligence Snippet (25%) */}
       <div className="w-[25%] pr-6 border-l border-border/10 pl-6">
         <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed italic">
-                    "{lead.summary}"
+                    &quot;{lead.summary}&quot;
         </p>
       </div>
 
@@ -243,7 +273,7 @@ export default function HotLeadsPage() {
 
   // Filter States
   const [intentFilter, setIntentFilter] = useState<string>('all');
-  const [dateFilter, setDateFilter] = useState<'today' | '7d' | '30d' | 'all'>('all');
+  const [dateFilter, setDateFilter] = useState<'today' | 'yesterday' | '7d' | '30d' | 'all'>('all');
   const [confidenceFilter, setConfidenceFilter] = useState<'all' | 'high'>('all');
 
   // Pagination State
@@ -298,24 +328,32 @@ export default function HotLeadsPage() {
       if (confidenceFilter === 'high' && (a.confidence_score || 0) < 80) return false;
 
       // Date
-      const leadDate = new Date(a.created_at || Date.now());
+      const leadDate = getLeadDate(a);
       const now = new Date();
-      const diffDays = (now.getTime() - leadDate.getTime()) / (1000 * 3600 * 24);
-      if (dateFilter === 'today' && diffDays > 1) return false;
-      if (dateFilter === '7d' && diffDays > 7) return false;
-      if (dateFilter === '30d' && diffDays > 30) return false;
+      const today = startOfLocalDay(now);
+      const yesterday = new Date(today);
+      yesterday.setDate(today.getDate() - 1);
+      const sevenDaysAgo = new Date(today);
+      sevenDaysAgo.setDate(today.getDate() - 6);
+      const thirtyDaysAgo = new Date(today);
+      thirtyDaysAgo.setDate(today.getDate() - 29);
+      if (dateFilter === 'today' && !isSameLocalDay(leadDate, now)) return false;
+      if (dateFilter === 'yesterday' && !isSameLocalDay(leadDate, yesterday)) return false;
+      if (dateFilter === '7d' && leadDate < sevenDaysAgo) return false;
+      if (dateFilter === '30d' && leadDate < thirtyDaysAgo) return false;
 
       return true;
-    }).sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
+    }).sort((a, b) => getLeadDate(b).getTime() - getLeadDate(a).getTime());
   }, [allAnalytics, search, intentFilter, dateFilter, confidenceFilter, isNegativeKey]);
 
   // Pagination Logic
-  const totalPages = Math.ceil(hotLeads.length / itemsPerPage);
+  const totalPages = Math.max(1, Math.ceil(hotLeads.length / itemsPerPage));
+  const effectiveCurrentPage = Math.min(currentPage, totalPages);
   const paginatedLeads = useMemo(() => {
-    const start = (currentPage - 1) * itemsPerPage;
+    const start = (effectiveCurrentPage - 1) * itemsPerPage;
 
     return hotLeads.slice(start, start + itemsPerPage);
-  }, [hotLeads, currentPage]);
+  }, [hotLeads, effectiveCurrentPage]);
 
   // Stats Logic — dynamic per-bucket count for the active template's positive buckets
   const bucketStats = useMemo(() => {
@@ -334,8 +372,55 @@ export default function HotLeadsPage() {
     setSelectedLead(lead);
   }, []);
 
-  // Reset pagination on filter change
-  useEffect(() => { setCurrentPage(1); }, [search, intentFilter, dateFilter, confidenceFilter]);
+  const handleExportCSV = useCallback(() => {
+    if (hotLeads.length === 0) return;
+    const fields = [
+      'phone_number',
+      'call_id',
+      'campaign_id',
+      'call_time',
+      'verdict',
+      'confidence_score',
+      'call_quality',
+      'duration_seconds',
+      'price_quoted',
+      'customer_name',
+      'customer_location',
+      'next_steps',
+      'summary',
+      'transcript_url',
+      'enhanced_transcript_url',
+      'recording_url',
+    ];
+    const rows = hotLeads.map((lead) => {
+      const discoveries = lead.key_discoveries || {};
+      const durationSeconds = typeof discoveries.duration_seconds === 'number'
+        ? discoveries.duration_seconds
+        : lead.duration_seconds;
+
+      return [
+        lead.phone_number,
+        lead.call_id,
+        lead.campaign_id,
+        getLeadDate(lead).toISOString(),
+        lead.verdict,
+        lead.confidence_score,
+        lead.call_quality,
+        durationSeconds,
+        discoveries.price_quoted,
+        discoveries.customer_name,
+        discoveries.customer_location,
+        discoveries.next_steps,
+        lead.summary,
+        lead.transcript_url,
+        lead.enhanced_transcript_url,
+        lead.recording_url,
+      ].map(escapeCSV).join(',');
+    });
+
+    const stamp = new Date().toISOString().slice(0, 10);
+    downloadTextFile(`\uFEFF${fields.join(',')}\n${rows.join('\n')}`, `hot-leads-${stamp}.csv`);
+  }, [hotLeads]);
 
   return (
     <div className="min-h-screen bg-background flex flex-col font-sans">
@@ -365,17 +450,28 @@ export default function HotLeadsPage() {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" className="h-10 px-4 gap-2 border-border text-[10px] font-bold uppercase tracking-widest hover:bg-primary hover:text-black transition-all min-w-[120px] justify-between">
-                  <div className="flex items-center gap-2"><CalendarDays size={14} /> {dateFilter === 'all' ? 'All Time' : dateFilter === 'today' ? 'Today' : dateFilter === '7d' ? 'Last 7 Days' : 'Last 30 Days'}</div>
+                  <div className="flex items-center gap-2"><CalendarDays size={14} /> {dateFilter === 'all' ? 'All Time' : dateFilter === 'today' ? 'Today' : dateFilter === 'yesterday' ? 'Yesterday' : dateFilter === '7d' ? 'Last 7 Days' : 'Last 30 Days'}</div>
                   <ChevronDown size={12} />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onClick={() => setDateFilter('today')}>Today</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setDateFilter('yesterday')}>Yesterday</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setDateFilter('7d')}>Last 7 Days</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setDateFilter('30d')}>Last 30 Days</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setDateFilter('all')}>All Time</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+
+            <Button
+              variant="outline"
+              onClick={handleExportCSV}
+              disabled={hotLeads.length === 0}
+              className="h-10 px-4 gap-2 border-border text-[10px] font-bold uppercase tracking-widest hover:bg-primary hover:text-black transition-all"
+            >
+              <Download size={14} />
+              Export CSV
+            </Button>
           </div>
         </div>
 
@@ -505,19 +601,19 @@ export default function HotLeadsPage() {
             {hotLeads.length > 0 && (
               <div className="p-4 border-t border-border/10 flex items-center justify-between bg-muted/5 mt-auto">
                 <span className="text-[9px] font-bold font-mono text-muted-foreground uppercase tracking-widest">
-                            Page {currentPage} of {totalPages} ({hotLeads.length} Total)
+                            Page {effectiveCurrentPage} of {totalPages} ({hotLeads.length} Total)
                 </span>
                 <div className="flex items-center gap-4">
                   <button 
-                    onClick={() => handlePageChange(currentPage - 1)} 
-                    disabled={currentPage === 1} 
+                    onClick={() => handlePageChange(effectiveCurrentPage - 1)} 
+                    disabled={effectiveCurrentPage === 1} 
                     className="p-1.5 text-muted-foreground hover:text-primary disabled:opacity-10 transition-colors"
                   >
                     <ChevronLeft size={18} />
                   </button>
                   <button 
-                    onClick={() => handlePageChange(currentPage + 1)} 
-                    disabled={currentPage === totalPages} 
+                    onClick={() => handlePageChange(effectiveCurrentPage + 1)} 
+                    disabled={effectiveCurrentPage === totalPages} 
                     className="p-1.5 text-muted-foreground hover:text-primary disabled:opacity-10 transition-colors"
                   >
                     <ChevronRight size={18} />

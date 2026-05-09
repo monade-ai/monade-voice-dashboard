@@ -156,11 +156,82 @@ export interface SystemConfig {
 // ============================================
 
 export interface CampaignAnalytics {
-  campaign_id: string;
-  total_calls: number;
-  successful_calls: number;
-  failed_calls: number;
-  success_rate: number;
+  campaign_id?: string;
+  summary?: {
+    generated_at?: string;
+    [key: string]: unknown;
+  };
+  overview?: Record<string, number | string | null | undefined>;
+  diagrams?: Record<string, unknown>;
+  insights?: unknown;
+  call_entries?: {
+    entries?: CampaignAnalyticsCallEntry[];
+    total?: number;
+    [key: string]: unknown;
+  };
+  total_calls?: number;
+  successful_calls?: number;
+  failed_calls?: number;
+  success_rate?: number;
+  [key: string]: unknown;
+}
+
+export interface CampaignAnalyticsCallEntry {
+  call_id?: string;
+  phone_number?: string;
+  provider_status?: string | null;
+  verdict?: string | null;
+  confidence_score?: number | null;
+  call_quality?: string | null;
+  duration_seconds?: number | null;
+  template_name?: string | null;
+  use_case?: string | null;
+  connected?: boolean | null;
+  call_started_at?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  enhanced_transcript_url?: string | null;
+  billing_data?: {
+    credits_used?: number | null;
+    [key: string]: unknown;
+  } | null;
+  [key: string]: unknown;
+}
+
+export interface CampaignReanalyzeResponse {
+  campaign_id?: string;
+  template_id?: string;
+  commit?: boolean;
+  total_calls?: number;
+  processed_calls?: number;
+  failed_calls?: number;
+  results?: Array<{
+    call_id?: string;
+    error?: string;
+    analysis?: unknown;
+    [key: string]: unknown;
+  }>;
+  [key: string]: unknown;
+}
+
+export interface CampaignEnhanceTranscriptsResponse {
+  campaign_id?: string;
+  calls_kicked_off?: number;
+  kicked_off?: number;
+  calls_failed?: number;
+  failed_calls?: number;
+  errors?: Array<{
+    call_id?: string;
+    error?: string;
+    [key: string]: unknown;
+  }>;
+  results?: Array<{
+    call_id?: string;
+    status?: string;
+    error?: string;
+    [key: string]: unknown;
+  }>;
+  [key: string]: unknown;
 }
 
 export interface VerdictDistribution {

@@ -3,7 +3,7 @@
  * Centralized API client for the Campaign Service
  */
 
-import { fetchJson, ApiError } from '@/lib/http';
+import { fetchJson, ApiError, FetchJsonOptions } from '@/lib/http';
 import {
   Campaign,
   CreateCampaignRequest,
@@ -15,10 +15,12 @@ import {
   CreditStatus,
   SystemConfig,
   CampaignAnalytics,
+  CampaignEnhanceTranscriptsResponse,
   UserAnalyticsStats,
   CampaignAnalyticsDetail,
   CampaignRecordingStatus,
   CampaignContact,
+  CampaignReanalyzeResponse,
   CAMPAIGN_API_CONFIG,
 } from '@/types/campaign.types';
 
@@ -30,7 +32,7 @@ const { BASE_URL, DB_SERVICES_URL } = CAMPAIGN_API_CONFIG;
 
 async function fetchCampaignApi<T>(
   endpoint: string,
-  options?: RequestInit,
+  options?: FetchJsonOptions,
 ): Promise<T> {
   const url = `${BASE_URL}${endpoint}`;
 
@@ -50,7 +52,7 @@ async function fetchCampaignApi<T>(
 
 async function fetchDbServicesApi<T>(
   endpoint: string,
-  options?: RequestInit,
+  options?: FetchJsonOptions,
 ): Promise<T> {
   const url = `${DB_SERVICES_URL}${endpoint}`;
 
@@ -311,9 +313,51 @@ export async function getSystemConfig(): Promise<SystemConfig> {
 export async function getCampaignAnalytics(
   campaignId: string,
   userUid: string,
+  options: { includeCalls?: boolean; callLimit?: number; callOffset?: number } = {},
 ): Promise<CampaignAnalytics> {
-  return fetchCampaignApi<CampaignAnalytics>(
-    `/campaigns/${campaignId}/analytics?user_uid=${encodeURIComponent(userUid)}`,
+  void userUid;
+  const params = new URLSearchParams();
+  if (options.includeCalls) params.set('include_calls', 'true');
+  if (options.callLimit !== undefined) params.set('call_limit', String(options.callLimit));
+  if (options.callOffset !== undefined) params.set('call_offset', String(options.callOffset));
+  const query = params.toString();
+
+  return fetchDbServicesApi<CampaignAnalytics>(
+    `/campaigns/${encodeURIComponent(campaignId)}/analytics${query ? `?${query}` : ''}`,
+  );
+}
+
+export async function reanalyzeCampaign(
+  campaignId: string,
+  userUid: string,
+  body: { template_id: string; commit: boolean; concurrency: number },
+): Promise<CampaignReanalyzeResponse> {
+  void userUid;
+
+  return fetchDbServicesApi<CampaignReanalyzeResponse>(
+    `/campaigns/${encodeURIComponent(campaignId)}/reanalyze`,
+    {
+      method: 'POST',
+      body: JSON.stringify(body),
+      retry: { retries: 0 },
+    },
+  );
+}
+
+export async function enhanceCampaignTranscripts(
+  campaignId: string,
+  userUid: string,
+  body: { concurrency: number },
+): Promise<CampaignEnhanceTranscriptsResponse> {
+  void userUid;
+
+  return fetchDbServicesApi<CampaignEnhanceTranscriptsResponse>(
+    `/campaigns/${encodeURIComponent(campaignId)}/enhance-transcripts`,
+    {
+      method: 'POST',
+      body: JSON.stringify(body),
+      retry: { retries: 0 },
+    },
   );
 }
 
@@ -400,6 +444,8 @@ export const campaignApi = {
 
   // Analytics
   getAnalytics: getCampaignAnalytics,
+  reanalyze: reanalyzeCampaign,
+  enhanceTranscripts: enhanceCampaignTranscripts,
   getUserStats: getUserAnalyticsStats,
   getDetailedAnalytics: getCampaignAnalyticsDetail,
   getUserDetailedAnalytics: getUserAnalyticsDetail,
