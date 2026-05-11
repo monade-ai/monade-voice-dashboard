@@ -101,6 +101,15 @@ Recommended backend sequence:
 3. If `commit=true` reanalysis finished, call `GET /api/campaigns/:campaign_id/analytics` again to refresh the stored campaign summary.
 4. If the user chose enhanced transcripts, call `POST /api/campaigns/:campaign_id/enhance-transcripts` with `{ "concurrency": 3 }`.
 
+For longer-running operator flows, pass `async_job: true` and poll:
+
+```http
+GET /api/campaigns/:campaign_id/jobs/:job_id
+POST /api/campaigns/:campaign_id/jobs/:job_id/cancel
+```
+
+This is lightweight Redis-backed job tracking with a 24h TTL. It is still not a full durable queue, but polling works across campaign-service pods.
+
 For template experiments before commit:
 
 1. Call `POST /api/campaigns/:campaign_id/reanalyze` with `commit=false`.

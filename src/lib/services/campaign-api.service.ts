@@ -15,6 +15,7 @@ import {
   CreditStatus,
   SystemConfig,
   CampaignAnalytics,
+  CampaignAnalyticsJobStatus,
   CampaignEnhanceTranscriptsResponse,
   UserAnalyticsStats,
   CampaignAnalyticsDetail,
@@ -330,7 +331,8 @@ export async function getCampaignAnalytics(
 export async function reanalyzeCampaign(
   campaignId: string,
   userUid: string,
-  body: { template_id: string; commit: boolean; concurrency: number },
+  body: { template_id: string; commit: boolean; concurrency: number; async_job?: boolean },
+  options: Pick<FetchJsonOptions, 'signal'> = {},
 ): Promise<CampaignReanalyzeResponse> {
   void userUid;
 
@@ -340,6 +342,7 @@ export async function reanalyzeCampaign(
       method: 'POST',
       body: JSON.stringify(body),
       retry: { retries: 0 },
+      signal: options.signal,
     },
   );
 }
@@ -347,7 +350,8 @@ export async function reanalyzeCampaign(
 export async function enhanceCampaignTranscripts(
   campaignId: string,
   userUid: string,
-  body: { concurrency: number },
+  body: { concurrency: number; async_job?: boolean },
+  options: Pick<FetchJsonOptions, 'signal'> = {},
 ): Promise<CampaignEnhanceTranscriptsResponse> {
   void userUid;
 
@@ -356,6 +360,35 @@ export async function enhanceCampaignTranscripts(
     {
       method: 'POST',
       body: JSON.stringify(body),
+      retry: { retries: 0 },
+      signal: options.signal,
+    },
+  );
+}
+
+export async function getCampaignAnalyticsJob(
+  campaignId: string,
+  userUid: string,
+  jobId: string,
+): Promise<CampaignAnalyticsJobStatus> {
+  void userUid;
+
+  return fetchCampaignApi<CampaignAnalyticsJobStatus>(
+    `/campaigns/${encodeURIComponent(campaignId)}/jobs/${encodeURIComponent(jobId)}`,
+  );
+}
+
+export async function cancelCampaignAnalyticsJob(
+  campaignId: string,
+  userUid: string,
+  jobId: string,
+): Promise<CampaignAnalyticsJobStatus> {
+  void userUid;
+
+  return fetchCampaignApi<CampaignAnalyticsJobStatus>(
+    `/campaigns/${encodeURIComponent(campaignId)}/jobs/${encodeURIComponent(jobId)}/cancel`,
+    {
+      method: 'POST',
       retry: { retries: 0 },
     },
   );
@@ -446,6 +479,8 @@ export const campaignApi = {
   getAnalytics: getCampaignAnalytics,
   reanalyze: reanalyzeCampaign,
   enhanceTranscripts: enhanceCampaignTranscripts,
+  getAnalyticsJob: getCampaignAnalyticsJob,
+  cancelAnalyticsJob: cancelCampaignAnalyticsJob,
   getUserStats: getUserAnalyticsStats,
   getDetailedAnalytics: getCampaignAnalyticsDetail,
   getUserDetailedAnalytics: getUserAnalyticsDetail,

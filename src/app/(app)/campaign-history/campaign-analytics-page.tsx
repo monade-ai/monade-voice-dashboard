@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Area,
   AreaChart,
@@ -57,22 +57,79 @@ import {
   Campaign,
   CampaignAnalytics,
   CampaignAnalyticsCallEntry,
+  CampaignAnalyticsJobStatus,
   CampaignEnhanceTranscriptsResponse,
   CampaignReanalyzeResponse,
 } from '@/types/campaign.types';
 
 type AnalyticsAction = 'reanalyze' | 'enhance' | 'enhance_only';
 type Segment = 'all' | 'hot' | 'qualified' | 'connected' | 'not_connected';
+type WorkflowStatus = 'idle' | 'running' | 'cancel_requested' | 'success' | 'failed' | 'cancelled';
+type WorkflowPhase = 'reanalyze' | 'enhance';
+
+interface WorkflowState {
+  status: WorkflowStatus;
+  action: AnalyticsAction | null;
+  phase?: WorkflowPhase;
+  jobId?: string;
+  step: string;
+  detail: string;
+  startedAt: number | null;
+  updatedAt: number | null;
+  total?: number;
+  processed?: number;
+  succeeded?: number;
+  completed?: number;
+  failed?: number;
+  skipped?: number;
+  progressPercent?: number | null;
+  etaSeconds?: number | null;
+  cancelable?: boolean;
+}
 
 const COLORS = ['#0f766e', '#2563eb', '#65a30d', '#ca8a04', '#b91c1c', '#475569', '#7c3aed', '#0891b2'];
 const BLOCKED_STATUSES = new Set(['active', 'pending']);
+const TERMINAL_JOB_STATUSES = new Set(['succeeded', 'success', 'completed', 'complete', 'failed', 'error', 'cancelled', 'canceled']);
+const CANCELLED_JOB_STATUSES = new Set(['cancelled', 'canceled']);
+const FAILED_JOB_STATUSES = new Set(['failed', 'error']);
 const POSITIVE_VERDICTS = ['interested', 'likely_to_book', 'qualified', 'success', 'callback', 'booked', 'hot'];
 const CALL_RECORDS_PAGE_SIZE = 12;
+const JOB_POLL_INTERVAL_MS = 2000;
+const ENHANCE_TRANSCRIPT_CONCURRENCY = 4;
 
 const humanize = (value: string) => value.replace(/[_-]+/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
 const num = (value: unknown, fallback = 0) => (typeof value === 'number' && Number.isFinite(value) ? value : fallback);
 const compact = (value: unknown, digits = 0) => num(value).toLocaleString(undefined, { maximumFractionDigits: digits });
 const credits = (value: unknown) => `${compact(value, 2)} cr`;
+const secondsElapsed = (startedAt: number | null, now: number) => {
+  if (!startedAt) return '0s';
+  const seconds = Math.max(0, Math.floor((now - startedAt) / 1000));
+  const minutes = Math.floor(seconds / 60);
+  const remainder = seconds % 60;
+
+  return minutes > 0 ? `${minutes}m ${remainder}s` : `${remainder}s`;
+};
+const etaLabel = (seconds: number | null | undefined) => {
+  if (typeof seconds !== 'number' || !Number.isFinite(seconds) || seconds <= 0) return 'ETA pending';
+  const minutes = Math.floor(seconds / 60);
+  const remainder = Math.round(seconds % 60);
+
+  return minutes > 0 ? `~${minutes}m ${remainder}s left` : `~${remainder}s left`;
+};
+const actionLabel = (action: AnalyticsAction | null) => {
+  if (action === 'reanalyze') return 'Reanalyze';
+  if (action === 'enhance') return 'Reanalyze + Enhance';
+  if (action === 'enhance_only') return 'Enhance Only';
+
+  return 'Workflow';
+};
+const phaseLabel = (phase?: WorkflowPhase) => {
+  if (phase === 'reanalyze') return 'Reanalysis';
+  if (phase === 'enhance') return 'Transcript enhancement';
+
+  return 'Workflow';
+};
+const sleep = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
 const pct = (value: unknown) => {
   const n = num(value);
   if (n > 0 && n <= 1) return `${Math.round(n * 100)}%`;
@@ -186,6 +243,52 @@ const enhanceErrors = (response: CampaignEnhanceTranscriptsResponse | null) => {
 
   return [...direct, ...fromResults];
 };
+const jobStatus = (job: CampaignAnalyticsJobStatus | null | undefined) => String(job?.status ?? '').toLowerCase();
+const jobProcessed = (job: CampaignAnalyticsJobStatus | null | undefined) => num(job?.processed_calls ?? job?.completed_calls ?? job?.calls_kicked_off);
+const jobFailed = (job: CampaignAnalyticsJobStatus | null | undefined) => num(job?.failed_calls ?? job?.calls_failed);
+const jobTotal = (job: CampaignAnalyticsJobStatus | null | undefined) => num(job?.total_calls);
+const jobProgressPercent = (job: CampaignAnalyticsJobStatus | null | undefined) => {
+  const explicit = job?.progress_percent ?? job?.progress;
+  if (typeof explicit === 'number' && Number.isFinite(explicit)) {
+    return explicit > 0 && explicit <= 1 ? Math.round(explicit * 100) : Math.round(explicit);
+  }
+  const total = jobTotal(job);
+  if (total > 0) return Math.round((jobProcessed(job) / total) * 100);
+
+  return null;
+};
+const jobToWorkflow = (
+  action: AnalyticsAction,
+  phase: WorkflowPhase,
+  job: CampaignAnalyticsJobStatus,
+  startedAt: number | null,
+): WorkflowState => {
+  const status = jobStatus(job);
+  const failed = jobFailed(job);
+  const isCancelled = CANCELLED_JOB_STATUSES.has(status);
+  const isFailed = FAILED_JOB_STATUSES.has(status);
+  const isTerminal = TERMINAL_JOB_STATUSES.has(status);
+
+  return {
+    status: isCancelled ? 'cancelled' : isFailed ? 'failed' : isTerminal ? 'success' : status === 'cancel_requested' ? 'cancel_requested' : 'running',
+    action,
+    phase,
+    jobId: job.job_id,
+    step: String(job.current_step ?? job.step ?? phaseLabel(phase)),
+    detail: String(job.message ?? `${phaseLabel(phase)} ${status || 'is running'}.`),
+    startedAt,
+    updatedAt: Date.now(),
+    total: jobTotal(job),
+    processed: jobProcessed(job),
+    succeeded: num(job.succeeded_calls),
+    completed: jobProcessed(job),
+    failed,
+    skipped: num(job.skipped_calls),
+    progressPercent: jobProgressPercent(job),
+    etaSeconds: typeof job.eta_seconds === 'number' ? job.eta_seconds : null,
+    cancelable: job.cancelable !== false && !isTerminal,
+  };
+};
 
 function MiniStat({
   label,
@@ -282,6 +385,17 @@ export default function CampaignAnalyticsPage() {
   const [action, setAction] = useState<AnalyticsAction | null>(null);
   const [templateId, setTemplateId] = useState('');
   const [runningAction, setRunningAction] = useState(false);
+  const [workflow, setWorkflow] = useState<WorkflowState>({
+    status: 'idle',
+    action: null,
+    step: 'Idle',
+    detail: 'No analytics workflow is running.',
+    startedAt: null,
+    updatedAt: null,
+  });
+  const [clockNow, setClockNow] = useState(Date.now());
+  const activeJobRef = useRef<{ campaignId: string; jobId: string } | null>(null);
+  const cancelRequestedRef = useRef(false);
   const [search, setSearch] = useState('');
   const [segment, setSegment] = useState<Segment>('all');
   const [recordsOpen, setRecordsOpen] = useState(false);
@@ -343,6 +457,13 @@ export default function CampaignAnalyticsPage() {
     setTemplateId(activeTemplateId || templates[0]?.id || '');
   }, [activeTemplateId, templates]);
 
+  useEffect(() => {
+    if (!runningAction) return undefined;
+    const interval = window.setInterval(() => setClockNow(Date.now()), 1000);
+
+    return () => window.clearInterval(interval);
+  }, [runningAction]);
+
   const overview = analytics?.overview ?? {};
   const diagrams = analytics?.diagrams ?? {};
   const entries = useMemo(() => analytics?.call_entries?.entries ?? [], [analytics]);
@@ -364,6 +485,8 @@ export default function CampaignAnalyticsPage() {
   }, [entries, search, segment]);
   const totalRecordPages = Math.max(1, Math.ceil(filteredEntries.length / CALL_RECORDS_PAGE_SIZE));
   const effectiveRecordsPage = Math.min(recordsPage, totalRecordPages);
+  const workflowProgress = workflow.progressPercent ?? (workflow.total ? Math.round((num(workflow.processed) / workflow.total) * 100) : null);
+  const workflowProgressWidth = `${Math.min(100, Math.max(0, workflowProgress ?? (runningAction ? 18 : 0)))}%`;
   const paginatedEntries = useMemo(() => {
     const start = (effectiveRecordsPage - 1) * CALL_RECORDS_PAGE_SIZE;
 
@@ -382,6 +505,104 @@ export default function CampaignAnalyticsPage() {
     setEnhanceResult(null);
   };
 
+  const pollJobUntilTerminal = useCallback(async (
+    campaignId: string,
+    jobId: string,
+    currentAction: AnalyticsAction,
+    phase: WorkflowPhase,
+    startedAt: number,
+  ) => {
+    activeJobRef.current = { campaignId, jobId };
+
+    while (true) {
+      const job = await campaignApi.getAnalyticsJob(campaignId, userUid!, jobId);
+      const nextWorkflow = jobToWorkflow(currentAction, phase, job, startedAt);
+      setWorkflow(nextWorkflow);
+
+      const status = jobStatus(job);
+      if (TERMINAL_JOB_STATUSES.has(status)) {
+        activeJobRef.current = null;
+        if (CANCELLED_JOB_STATUSES.has(status)) {
+          throw new Error(`${phaseLabel(phase)} was cancelled.`);
+        }
+        if (FAILED_JOB_STATUSES.has(status)) {
+          throw new Error(String(job.message ?? `${phaseLabel(phase)} failed.`));
+        }
+
+        return job;
+      }
+
+      await sleep(JOB_POLL_INTERVAL_MS);
+    }
+  }, [userUid]);
+
+  const startJob = async (
+    campaignId: string,
+    currentAction: AnalyticsAction,
+    phase: WorkflowPhase,
+    jobId: string | undefined,
+    fallback: CampaignReanalyzeResponse | CampaignEnhanceTranscriptsResponse,
+    startedAt: number,
+  ) => {
+    if (!jobId) {
+      const fallbackRecord = fallback as Record<string, unknown>;
+      setWorkflow((current) => ({
+        ...current,
+        status: 'success',
+        phase,
+        step: `${phaseLabel(phase)} finished`,
+        detail: String(fallback.message ?? 'Backend returned a synchronous summary.'),
+        completed: num(fallbackRecord.processed_calls ?? fallbackRecord.calls_kicked_off ?? fallbackRecord.kicked_off ?? fallbackRecord.total_calls),
+        failed: num(fallbackRecord.failed_calls ?? fallbackRecord.calls_failed),
+        updatedAt: Date.now(),
+      }));
+
+      return fallback as CampaignAnalyticsJobStatus;
+    }
+
+    setWorkflow((current) => ({
+      ...current,
+      phase,
+      jobId,
+      step: `${phaseLabel(phase)} queued`,
+      detail: `Job ${jobId} accepted. Polling backend progress every ${JOB_POLL_INTERVAL_MS / 1000}s.`,
+      updatedAt: Date.now(),
+    }));
+
+    return pollJobUntilTerminal(campaignId, jobId, currentAction, phase, startedAt);
+  };
+
+  const cancelWorkflow = async () => {
+    if (!userUid || !activeJobRef.current) return;
+    cancelRequestedRef.current = true;
+    const { campaignId, jobId } = activeJobRef.current;
+    setWorkflow((current) => ({
+      ...current,
+      status: 'cancel_requested',
+      step: 'Cancel requested',
+      detail: 'Asking the backend to stop this job. In-flight calls may finish before it settles.',
+      cancelable: false,
+      updatedAt: Date.now(),
+    }));
+
+    try {
+      const job = await campaignApi.cancelAnalyticsJob(campaignId, userUid, jobId);
+      setWorkflow((current) => ({
+        ...jobToWorkflow(current.action ?? 'reanalyze', current.phase ?? 'reanalyze', job, current.startedAt),
+        action: current.action,
+        phase: current.phase,
+        status: jobStatus(job) === 'cancel_requested'
+          ? 'cancel_requested'
+          : jobToWorkflow(current.action ?? 'reanalyze', current.phase ?? 'reanalyze', job, current.startedAt).status,
+        detail: String(job.message ?? 'Cancel request sent. Waiting for the backend to finish settling the job.'),
+        cancelable: false,
+      }));
+      toast.info('Cancel request sent');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Could not cancel job');
+    }
+  };
+
   const runAction = async () => {
     if (!selectedCampaign || !userUid || !action) return;
     if (action !== 'enhance_only' && !templateId) {
@@ -390,31 +611,106 @@ export default function CampaignAnalyticsPage() {
       return;
     }
 
+    const startedAt = Date.now();
+    cancelRequestedRef.current = false;
     setRunningAction(true);
+    setClockNow(Date.now());
+    setWorkflow({
+      status: 'running',
+      action,
+      step: action === 'enhance_only' ? 'Starting transcript enhancement' : 'Starting reanalysis',
+      detail: 'Starting a backend analytics job with real progress tracking.',
+      startedAt,
+      updatedAt: startedAt,
+    });
     try {
       if (action === 'enhance_only') {
-        const enhanced = await campaignApi.enhanceTranscripts(selectedCampaign.id, userUid, { concurrency: 2 });
+        setWorkflow((current) => ({
+          ...current,
+          step: 'Enhancing transcripts',
+          detail: 'Backfilling enhanced transcripts. Returned counts will appear when the backend responds.',
+          updatedAt: Date.now(),
+        }));
+        const enhanced = await campaignApi.enhanceTranscripts(
+          selectedCampaign.id,
+          userUid,
+          { concurrency: ENHANCE_TRANSCRIPT_CONCURRENCY, async_job: true },
+        );
         setEnhanceResult(enhanced);
+        const finalJob = await startJob(selectedCampaign.id, action, 'enhance', enhanced.job_id, enhanced, startedAt);
+        setEnhanceResult({ ...enhanced, ...finalJob });
+        await loadAnalytics(selectedCampaign.id, true);
       } else {
-        const reanalyze = await campaignApi.reanalyze(selectedCampaign.id, userUid, {
-          template_id: templateId,
-          commit: true,
-          concurrency: 5,
-        });
+        setWorkflow((current) => ({
+          ...current,
+          step: 'Reanalyzing call entries',
+          detail: 'Updating stored analytics for existing campaign calls. Returned counts will appear when the backend responds.',
+          updatedAt: Date.now(),
+        }));
+        const reanalyze = await campaignApi.reanalyze(
+          selectedCampaign.id,
+          userUid,
+          {
+            template_id: templateId,
+            commit: true,
+            concurrency: 5,
+            async_job: true,
+          },
+        );
         setReanalyzeResult(reanalyze);
+        const finalReanalysis = await startJob(selectedCampaign.id, action, 'reanalyze', reanalyze.job_id, reanalyze, startedAt);
+        setReanalyzeResult({ ...reanalyze, ...finalReanalysis });
         await loadAnalytics(selectedCampaign.id, true);
 
         if (action === 'enhance') {
-          const enhanced = await campaignApi.enhanceTranscripts(selectedCampaign.id, userUid, { concurrency: 2 });
+          setWorkflow((current) => ({
+            ...current,
+            step: 'Enhancing transcripts',
+            detail: 'Reanalysis is done. Now backfilling enhanced transcripts from recordings.',
+            updatedAt: Date.now(),
+          }));
+          const enhanced = await campaignApi.enhanceTranscripts(
+            selectedCampaign.id,
+            userUid,
+            { concurrency: ENHANCE_TRANSCRIPT_CONCURRENCY, async_job: true },
+          );
           setEnhanceResult(enhanced);
+          const finalEnhancement = await startJob(selectedCampaign.id, action, 'enhance', enhanced.job_id, enhanced, startedAt);
+          setEnhanceResult({ ...enhanced, ...finalEnhancement });
+          await loadAnalytics(selectedCampaign.id, true);
+        } else {
+          setWorkflow((current) => ({
+            ...current,
+            status: 'success',
+            updatedAt: Date.now(),
+          }));
         }
       }
 
       toast.success('Campaign analytics workflow completed');
       setAction(null);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Campaign analytics workflow failed');
+      if (cancelRequestedRef.current) {
+        setWorkflow((current) => ({
+          ...current,
+          status: 'cancelled',
+          step: 'Workflow cancelled',
+          detail: error instanceof Error ? error.message : 'The backend cancelled this workflow.',
+          updatedAt: Date.now(),
+        }));
+        toast.info('Workflow cancelled');
+      } else {
+        setWorkflow((current) => ({
+          ...current,
+          status: 'failed',
+          step: 'Workflow failed',
+          detail: error instanceof Error ? error.message : 'Campaign analytics workflow failed.',
+          updatedAt: Date.now(),
+        }));
+        toast.error(error instanceof Error ? error.message : 'Campaign analytics workflow failed');
+      }
     } finally {
+      activeJobRef.current = null;
       setRunningAction(false);
     }
   };
@@ -497,7 +793,7 @@ export default function CampaignAnalyticsPage() {
             <div className="grid gap-2 rounded-md border border-border/30 bg-muted/10 p-3 text-[11px] leading-relaxed text-muted-foreground">
               <p><span className="font-semibold text-foreground">Analyze:</span> refreshes this dashboard only. No stored call analytics are changed.</p>
               <p><span className="font-semibold text-foreground">Reanalyze:</span> asks for a template, then updates stored analytics for existing campaign calls.</p>
-              <p><span className="font-semibold text-foreground">Enhance Only:</span> backfills enhanced transcripts from recordings. It does not reprocess qualification analytics.</p>
+              <p><span className="font-semibold text-foreground">Enhance Only:</span> backfills enhanced transcripts from recordings at concurrency {ENHANCE_TRANSCRIPT_CONCURRENCY}. It does not reprocess qualification analytics.</p>
               <p><span className="font-semibold text-foreground">Reanalyze + Enhance:</span> updates analytics first, then starts enhanced transcript backfill.</p>
             </div>
             {selectedCampaign && blocked && <p className="text-[11px] text-muted-foreground">Analytics actions are unavailable while this campaign is {selectedCampaign.status}.</p>}
@@ -518,6 +814,87 @@ export default function CampaignAnalyticsPage() {
           </PaperCard>
         ) : (
           <>
+            {workflow.status !== 'idle' && (
+              <PaperCard className={cn(
+                'border-border/40 bg-muted/5',
+                workflow.status === 'failed' && 'border-destructive/25 bg-destructive/5',
+                workflow.status === 'cancelled' && 'border-amber-600/25 bg-amber-500/[0.03]',
+                workflow.status === 'success' && 'border-emerald-600/25 bg-emerald-500/[0.03]',
+              )}>
+                <PaperCardContent className="p-5">
+                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant="outline" className="text-[9px] uppercase tracking-widest">
+                          {actionLabel(workflow.action)}
+                        </Badge>
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            'text-[9px] uppercase tracking-widest',
+                            workflow.status === 'running' && 'border-primary/25 text-primary',
+                            workflow.status === 'cancel_requested' && 'border-amber-600/25 text-amber-700',
+                            workflow.status === 'success' && 'border-emerald-600/25 text-emerald-700',
+                            workflow.status === 'failed' && 'border-destructive/25 text-destructive',
+                          )}
+                        >
+                          {humanize(workflow.status)}
+                        </Badge>
+                        {workflow.jobId && <span className="text-[10px] font-mono text-muted-foreground">job {workflow.jobId}</span>}
+                      </div>
+                      <h2 className="mt-3 text-lg font-semibold tracking-tight">{workflow.step}</h2>
+                      <p className="mt-1 text-sm text-muted-foreground">{workflow.detail}</p>
+
+                      <div className="mt-4 h-2 overflow-hidden rounded-full bg-muted">
+                        <div
+                          className={cn(
+                            'h-full rounded-full transition-all duration-500',
+                            workflow.status === 'failed' ? 'bg-destructive' : workflow.status === 'success' ? 'bg-emerald-600' : 'bg-primary',
+                            workflowProgress === null && runningAction && 'animate-pulse',
+                          )}
+                          style={{ width: workflowProgressWidth }}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:min-w-[520px]">
+                      <div className="rounded-md border border-border/30 bg-background p-3">
+                        <p className="text-[9px] uppercase tracking-widest font-bold text-muted-foreground">Progress</p>
+                        <p className="mt-1 text-sm font-mono font-bold">
+                          {workflowProgress === null ? '--' : `${workflowProgress}%`}
+                        </p>
+                        <p className="text-[10px] text-muted-foreground">
+                          {compact(workflow.processed)} / {workflow.total ? compact(workflow.total) : '--'}
+                        </p>
+                      </div>
+                      <div className="rounded-md border border-border/30 bg-background p-3">
+                        <p className="text-[9px] uppercase tracking-widest font-bold text-muted-foreground">Failed</p>
+                        <p className="mt-1 text-sm font-mono font-bold">{compact(workflow.failed)}</p>
+                        <p className="text-[10px] text-muted-foreground">{compact(workflow.skipped)} skipped</p>
+                      </div>
+                      <div className="rounded-md border border-border/30 bg-background p-3">
+                        <p className="text-[9px] uppercase tracking-widest font-bold text-muted-foreground">Elapsed</p>
+                        <p className="mt-1 text-sm font-mono font-bold">{secondsElapsed(workflow.startedAt, clockNow)}</p>
+                        <p className="text-[10px] text-muted-foreground">{etaLabel(workflow.etaSeconds)}</p>
+                      </div>
+                      <div className="rounded-md border border-border/30 bg-background p-3">
+                        <p className="text-[9px] uppercase tracking-widest font-bold text-muted-foreground">Control</p>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={cancelWorkflow}
+                          disabled={!runningAction || !workflow.jobId || workflow.cancelable === false || workflow.status === 'cancel_requested'}
+                          className="mt-2 h-8 w-full text-[10px] uppercase tracking-widest"
+                        >
+                          {workflow.status === 'cancel_requested' ? 'Stopping' : 'Cancel'}
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </PaperCardContent>
+              </PaperCard>
+            )}
+
             <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_1fr] gap-6">
               <PaperCard className="border-border/40 bg-muted/5">
                 <PaperCardHeader className="p-5 pb-2">
@@ -945,8 +1322,8 @@ export default function CampaignAnalyticsPage() {
                     <p className="text-sm font-medium">Enhanced transcript backfill</p>
                     <p className="mt-1 text-xs text-muted-foreground">
                       {action === 'enhance_only'
-                        ? 'This starts transcript enhancement at concurrency 2 and reports kicked-off, failed, and per-call errors.'
-                        : 'After reanalysis, this starts transcript enhancement at concurrency 2 and reports kicked-off, failed, and per-call errors.'}
+                        ? `This starts transcript enhancement at concurrency ${ENHANCE_TRANSCRIPT_CONCURRENCY} and reports kicked-off, failed, and per-call errors.`
+                        : `After reanalysis, this starts transcript enhancement at concurrency ${ENHANCE_TRANSCRIPT_CONCURRENCY} and reports kicked-off, failed, and per-call errors.`}
                     </p>
                   </div>
                 </div>
@@ -954,10 +1331,10 @@ export default function CampaignAnalyticsPage() {
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" disabled={runningAction} onClick={() => setAction(null)}>Cancel</Button>
+            <Button variant="outline" disabled={runningAction} onClick={() => setAction(null)}>Close</Button>
             <Button disabled={runningAction} onClick={runAction} className="gap-2">
               {runningAction ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
-              Run workflow
+              {runningAction ? 'Running job' : 'Run workflow'}
             </Button>
           </DialogFooter>
         </DialogContent>

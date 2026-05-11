@@ -200,6 +200,10 @@ export interface CampaignAnalyticsCallEntry {
 
 export interface CampaignReanalyzeResponse {
   campaign_id?: string;
+  job_id?: string;
+  status?: string;
+  job_type?: string;
+  message?: string;
   template_id?: string;
   commit?: boolean;
   total_calls?: number;
@@ -216,6 +220,10 @@ export interface CampaignReanalyzeResponse {
 
 export interface CampaignEnhanceTranscriptsResponse {
   campaign_id?: string;
+  job_id?: string;
+  status?: string;
+  job_type?: string;
+  message?: string;
   calls_kicked_off?: number;
   kicked_off?: number;
   calls_failed?: number;
@@ -229,6 +237,44 @@ export interface CampaignEnhanceTranscriptsResponse {
     call_id?: string;
     status?: string;
     error?: string;
+    [key: string]: unknown;
+  }>;
+  [key: string]: unknown;
+}
+
+export interface CampaignAnalyticsJobStatus {
+  campaign_id?: string;
+  job_id?: string;
+  status?: string;
+  job_type?: string;
+  current_step?: string;
+  step?: string;
+  message?: string;
+  total_calls?: number;
+  processed_calls?: number;
+  completed_calls?: number;
+  succeeded_calls?: number;
+  calls_kicked_off?: number;
+  failed_calls?: number;
+  calls_failed?: number;
+  skipped_calls?: number;
+  progress_percent?: number;
+  progress?: number;
+  eta_seconds?: number | null;
+  cancelable?: boolean;
+  started_at?: string | null;
+  updated_at?: string | null;
+  completed_at?: string | null;
+  errors?: Array<{
+    call_id?: string;
+    error?: string;
+    [key: string]: unknown;
+  }>;
+  results?: Array<{
+    call_id?: string;
+    status?: string;
+    error?: string;
+    analysis?: unknown;
     [key: string]: unknown;
   }>;
   [key: string]: unknown;
