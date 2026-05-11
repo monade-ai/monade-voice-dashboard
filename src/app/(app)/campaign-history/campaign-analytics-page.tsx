@@ -61,7 +61,7 @@ import {
   CampaignReanalyzeResponse,
 } from '@/types/campaign.types';
 
-type AnalyticsAction = 'reanalyze' | 'enhance';
+type AnalyticsAction = 'reanalyze' | 'enhance' | 'enhance_only';
 type Segment = 'all' | 'hot' | 'qualified' | 'connected' | 'not_connected';
 
 const COLORS = ['#0f766e', '#2563eb', '#65a30d', '#ca8a04', '#b91c1c', '#475569', '#7c3aed', '#0891b2'];
@@ -384,7 +384,7 @@ export default function CampaignAnalyticsPage() {
 
   const runAction = async () => {
     if (!selectedCampaign || !userUid || !action) return;
-    if (!templateId) {
+    if (action !== 'enhance_only' && !templateId) {
       toast.error('Select a post-processing template first.');
 
       return;
@@ -392,17 +392,22 @@ export default function CampaignAnalyticsPage() {
 
     setRunningAction(true);
     try {
-      const reanalyze = await campaignApi.reanalyze(selectedCampaign.id, userUid, {
-        template_id: templateId,
-        commit: true,
-        concurrency: 5,
-      });
-      setReanalyzeResult(reanalyze);
-      await loadAnalytics(selectedCampaign.id, true);
-
-      if (action === 'enhance') {
+      if (action === 'enhance_only') {
         const enhanced = await campaignApi.enhanceTranscripts(selectedCampaign.id, userUid, { concurrency: 2 });
         setEnhanceResult(enhanced);
+      } else {
+        const reanalyze = await campaignApi.reanalyze(selectedCampaign.id, userUid, {
+          template_id: templateId,
+          commit: true,
+          concurrency: 5,
+        });
+        setReanalyzeResult(reanalyze);
+        await loadAnalytics(selectedCampaign.id, true);
+
+        if (action === 'enhance') {
+          const enhanced = await campaignApi.enhanceTranscripts(selectedCampaign.id, userUid, { concurrency: 2 });
+          setEnhanceResult(enhanced);
+        }
       }
 
       toast.success('Campaign analytics workflow completed');
@@ -480,10 +485,20 @@ export default function CampaignAnalyticsPage() {
                 <Brain size={14} />
                 Reanalyze
               </Button>
+              <Button variant="outline" size="sm" onClick={() => openAction('enhance_only')} disabled={blocked} className="h-9 gap-2 text-[10px] uppercase tracking-widest">
+                <Zap size={14} />
+                Enhance Only
+              </Button>
               <Button size="sm" onClick={() => openAction('enhance')} disabled={blocked} className="h-9 gap-2 text-[10px] uppercase tracking-widest">
                 <Sparkles size={14} />
                 Reanalyze + Enhance
               </Button>
+            </div>
+            <div className="grid gap-2 rounded-md border border-border/30 bg-muted/10 p-3 text-[11px] leading-relaxed text-muted-foreground">
+              <p><span className="font-semibold text-foreground">Analyze:</span> refreshes this dashboard only. No stored call analytics are changed.</p>
+              <p><span className="font-semibold text-foreground">Reanalyze:</span> asks for a template, then updates stored analytics for existing campaign calls.</p>
+              <p><span className="font-semibold text-foreground">Enhance Only:</span> backfills enhanced transcripts from recordings. It does not reprocess qualification analytics.</p>
+              <p><span className="font-semibold text-foreground">Reanalyze + Enhance:</span> updates analytics first, then starts enhanced transcript backfill.</p>
             </div>
             {selectedCampaign && blocked && <p className="text-[11px] text-muted-foreground">Analytics actions are unavailable while this campaign is {selectedCampaign.status}.</p>}
           </div>
@@ -882,9 +897,17 @@ export default function CampaignAnalyticsPage() {
       <Dialog open={Boolean(action)} onOpenChange={(open) => !open && !runningAction && setAction(null)}>
         <DialogContent className="max-w-xl">
           <DialogHeader>
-            <DialogTitle>{action === 'enhance' ? 'Re-analyze and enhance transcripts' : 'Re-analyze campaign entries'}</DialogTitle>
+            <DialogTitle>
+              {action === 'enhance_only'
+                ? 'Enhance transcripts only'
+                : action === 'enhance'
+                  ? 'Re-analyze and enhance transcripts'
+                  : 'Re-analyze campaign entries'}
+            </DialogTitle>
             <DialogDescription>
-              Reanalysis updates stored analytics for existing calls while preserving original call dates. Transcript enhancement is heavier and uses recordings with Gemini.
+              {action === 'enhance_only'
+                ? 'Starts enhanced transcript generation for campaign calls that still need it. Stored analytics are not reprocessed.'
+                : 'Reanalysis updates stored analytics for existing calls while preserving original call dates. Transcript enhancement is heavier and uses recordings with Gemini.'}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -892,30 +915,38 @@ export default function CampaignAnalyticsPage() {
               <div className="flex items-start gap-3">
                 <AlertCircle size={18} className="text-yellow-600 mt-0.5" />
                 <div>
-                  <p className="text-sm font-medium">Optional mutating workflow</p>
+                  <p className="text-sm font-medium">
+                    {action === 'enhance_only' ? 'Recording-backed transcript workflow' : 'Optional mutating workflow'}
+                  </p>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    The backend will commit analytics changes for processed calls. Existing call dates stay unchanged.
+                    {action === 'enhance_only'
+                      ? 'This does not change qualification analytics. It asks the backend to backfill enhanced transcripts and reports per-call failures.'
+                      : 'The backend will commit analytics changes for processed calls. Existing call dates stay unchanged.'}
                   </p>
                 </div>
               </div>
             </div>
-            <div className="space-y-2">
-              <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">Post-processing template</label>
-              <select value={templateId} onChange={(event) => setTemplateId(event.target.value)} className="h-10 w-full rounded-md border border-border/40 bg-background px-3 text-sm">
-                <option value="">Select template</option>
-                {templates.map((template) => (
-                  <option key={template.id} value={template.id}>{template.name}{template.id === activeTemplateId ? ' · active' : ''}</option>
-                ))}
-              </select>
-            </div>
-            {action === 'enhance' && (
+            {action !== 'enhance_only' && (
+              <div className="space-y-2">
+                <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">Post-processing template</label>
+                <select value={templateId} onChange={(event) => setTemplateId(event.target.value)} className="h-10 w-full rounded-md border border-border/40 bg-background px-3 text-sm">
+                  <option value="">Select template</option>
+                  {templates.map((template) => (
+                    <option key={template.id} value={template.id}>{template.name}{template.id === activeTemplateId ? ' · active' : ''}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+            {(action === 'enhance' || action === 'enhance_only') && (
               <div className="rounded-md border border-primary/20 bg-primary/5 p-4">
                 <div className="flex items-start gap-3">
                   <Zap size={18} className="text-primary mt-0.5" />
                   <div>
                     <p className="text-sm font-medium">Enhanced transcript backfill</p>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      After reanalysis, this starts transcript enhancement at concurrency 2 and reports kicked-off, failed, and per-call errors.
+                      {action === 'enhance_only'
+                        ? 'This starts transcript enhancement at concurrency 2 and reports kicked-off, failed, and per-call errors.'
+                        : 'After reanalysis, this starts transcript enhancement at concurrency 2 and reports kicked-off, failed, and per-call errors.'}
                     </p>
                   </div>
                 </div>
