@@ -4,22 +4,20 @@ import React, { useState, useEffect, useMemo } from 'react';
 import {
   ChevronLeft,
   ChevronRight,
-  ArrowUpRight,
   Phone,
-  Download,
 } from 'lucide-react';
 
 import { DashboardHeader } from '@/components/dashboard-header';
 import { TranscriptViewer } from '@/components/transcript-viewer';
 import { PaperCard, PaperCardContent, PaperCardHeader, PaperCardTitle } from '@/components/ui/paper-card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
 import { useTranscripts, Transcript } from '@/app/hooks/use-transcripts';
 import { useUserAnalytics, CallAnalytics } from '@/app/hooks/use-analytics';
 
 import { CallHistoryFilterBar, CallHistoryFilterState } from './components/call-history-filter-bar';
 import { CallHistoryRow } from './components/call-history-row';
+import { ExportCsvDialog } from './components/export-csv-dialog';
 
 interface MergedTranscript extends Transcript {
   analytics?: CallAnalytics;
@@ -236,11 +234,7 @@ export default function CallHistoryPage() {
               </p>
             </div>
             <div className="flex gap-3">
-              <Button variant="outline" size="sm" className="gap-2 h-9 text-[10px] font-bold uppercase tracking-widest border-border hover:bg-[#facc15] hover:border-[#facc15] hover:text-black transition-all">
-                <Download className="w-3 h-3" />
-                Export Archive
-                <ArrowUpRight className="w-3 h-3" />
-              </Button>
+              <ExportCsvDialog calls={mergedTranscripts} />
             </div>
           </div>
 
