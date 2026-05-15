@@ -101,6 +101,60 @@ export function deriveCallOutcome(status: ProviderCallStatus | null | undefined)
   };
 }
 
+export type CallDirection = 'inbound' | 'outbound' | 'unknown';
+
+interface DirectionSource {
+  billing_data?: { call_direction?: string | null } | null;
+  provider_call_status?: { direction?: string | null } | null;
+}
+
+/**
+ * Canonical call-direction resolver — see docs/FRONTEND_CALL_DIRECTION_AND_BILLING_FIELDS.md.
+ *
+ * Policy:
+ *  - `billing_data.call_direction` is set when the call starts (instant, always present on
+ *     settled calls).
+ *  - `provider_call_status.direction` is the carrier CDR ground truth, filled in later by the
+ *     sweeper.
+ *  - If the two DISAGREE, trust the provider (carrier's view wins).
+ *  - If billing is missing/unknown, fall back to provider.
+ *  - If neither is present → 'unknown'.
+ *
+ * The common bug this fixes: code that reads only `billing_data.call_direction` mislabels every
+ * call where billing direction is empty but the provider CDR knows the answer (and silently
+ * shows "unknown"/blank for inbound calls).
+ */
+export function resolveCallDirection(
+  analytics: DirectionSource | string | null | undefined,
+): CallDirection {
+  let parsed: DirectionSource | null = null;
+
+  if (typeof analytics === 'string') {
+    try {
+      parsed = JSON.parse(analytics) as DirectionSource;
+    } catch {
+      parsed = null;
+    }
+  } else if (analytics && typeof analytics === 'object') {
+    parsed = analytics;
+  }
+
+  const normalize = (value: string | null | undefined): CallDirection | null => {
+    const v = String(value ?? '').trim().toLowerCase();
+    if (v === 'inbound' || v === 'outbound') return v;
+
+    return null;
+  };
+
+  const billing = normalize(parsed?.billing_data?.call_direction);
+  const provider = normalize(parsed?.provider_call_status?.direction);
+
+  // Conflict policy: carrier CDR wins.
+  if (billing && provider && billing !== provider) return provider;
+
+  return billing ?? provider ?? 'unknown';
+}
+
 interface AnalyticsStatusFallback {
   provider_call_status?: ProviderCallStatus | null;
   call_status?: string | null;

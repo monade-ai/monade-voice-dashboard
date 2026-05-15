@@ -14,6 +14,8 @@ export interface CampaignAnalyticsExportRecord {
   sip_call_id?: string | null;
   recording_url?: string | null;
   analytics?: Record<string, unknown> | null;
+  billing_data?: { call_direction?: string | null } | null;
+  provider_call_status?: { direction?: string | null } | null;
 }
 
 export interface CampaignCallAttemptExportRow {
@@ -46,6 +48,7 @@ export interface CampaignCallAttemptExportRow {
   analysis_confidence_score: string;
   // Analytics fields read straight off the DB analytics blob — never fabricated.
   call_status: string;
+  call_direction: string;
   voicemail: string;
   uncertain_tag: string;
   uncertain_reason: string;
@@ -393,6 +396,7 @@ export function buildClientCampaignExport(
       'Unique Lead ID (client\'s)': extractClientLeadIdFromMetadataJson(lead.metadata_json),
       'Lead Name': lead.contact_name,
       'Phone Number': lead.phone_number,
+      Call_Direction: (lastConnectedAttempt ?? lead).call_direction || '',
       All_Call_IDs: uniqueCallIds.join('|'),
       Qualified_confidence: qualifiedColumn,
       Transcript: primaryTranscriptAttempt?.transcript_text ?? '',
@@ -445,6 +449,7 @@ export function buildClientCampaignExport(
     'Unique Lead ID (client\'s)',
     'Lead Name',
     'Phone Number',
+    'Call_Direction',
     'All_Call_IDs',
     'Qualified_confidence',
     'Transcript',

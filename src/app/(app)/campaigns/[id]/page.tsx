@@ -58,6 +58,7 @@ import { cn } from '@/lib/utils';
 import { formatInTimeZone, getNextOccurrenceUtcIso, parseApiTimestamp } from '@/lib/utils/date';
 import { useAssistants } from '@/app/hooks/use-assistants-context';
 import { useLibrary } from '@/app/hooks/use-knowledge-base';
+import { resolveCallDirection } from '@/lib/utils/call-outcome';
 
 import { CSVUpload } from '../components/csv-upload';
 
@@ -385,6 +386,7 @@ const buildCampaignCallLogRows = (
         analysis_summary: '',
         analysis_confidence_score: '',
         call_status: '',
+        call_direction: '',
         voicemail: '',
         uncertain_tag: '',
         uncertain_reason: '',
@@ -1146,6 +1148,14 @@ export default function CampaignDetailPage() {
         // call_status / voicemail live at the top level; the verdict-detail fields live under
         // analytics.key_discoveries (see prod schema for reference).
         row.call_status = typeof analytics?.call_status === 'string' ? analytics.call_status : '';
+        // Direction: billing → provider fallback + conflict policy. Resolved from the
+        // selected record (billing_data / provider_call_status live on the record, not the
+        // inner analytics blob). 'unknown' is written as '' so the column reads clean.
+        const resolvedDirection = resolveCallDirection({
+          billing_data: selected.billing_data,
+          provider_call_status: selected.provider_call_status,
+        });
+        row.call_direction = resolvedDirection === 'unknown' ? '' : resolvedDirection;
         row.voicemail = typeof analytics?.voicemail === 'boolean' ? String(analytics.voicemail) : '';
         const keyDiscoveries = (analytics?.key_discoveries && typeof analytics.key_discoveries === 'object' && !Array.isArray(analytics.key_discoveries))
           ? analytics.key_discoveries as Record<string, unknown>

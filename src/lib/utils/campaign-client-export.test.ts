@@ -35,6 +35,7 @@ const makeAttempt = (overrides: Partial<CampaignCallAttemptExportRow> = {}): Cam
   analysis_summary: 'Summary',
   analysis_confidence_score: '50',
   call_status: '',
+  call_direction: '',
   voicemail: '',
   uncertain_tag: '',
   uncertain_reason: '',

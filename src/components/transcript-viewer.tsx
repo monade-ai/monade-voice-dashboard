@@ -30,7 +30,7 @@ import {
 import { MONADE_API_BASE } from '@/config';
 import { fetchJson } from '@/lib/http';
 import { cn } from '@/lib/utils';
-import { resolveCallOutcome } from '@/lib/utils/call-outcome';
+import { resolveCallOutcome, resolveCallDirection } from '@/lib/utils/call-outcome';
 
 // --- Types ---
 
@@ -760,12 +760,20 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
                         : ''}
                     </span>
                   </div>
-                  {analytics.billing_data.call_direction && (
-                    <div className="flex justify-between text-xs">
-                      <span className="text-muted-foreground">Direction</span>
-                      <span className="font-medium text-foreground capitalize">{analytics.billing_data.call_direction}</span>
-                    </div>
-                  )}
+                  {(() => {
+                    // Use the shared resolver: billing → provider fallback + conflict policy.
+                    // Reading billing_data.call_direction alone hid direction for inbound
+                    // calls whose billing field was empty but whose CDR knew the answer.
+                    const direction = resolveCallDirection(analytics);
+                    if (direction === 'unknown') return null;
+
+                    return (
+                      <div className="flex justify-between text-xs">
+                        <span className="text-muted-foreground">Direction</span>
+                        <span className="font-medium text-foreground capitalize">{direction}</span>
+                      </div>
+                    );
+                  })()}
                   {analytics.duration_seconds != null && (
                     <div className="flex justify-between text-xs">
                       <span className="text-muted-foreground">Duration</span>

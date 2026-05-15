@@ -17,6 +17,8 @@ import {
   Download,
 } from 'lucide-react';
 
+import { toast } from 'sonner';
+
 import { useUserAnalytics, CallAnalytics } from '@/app/hooks/use-analytics';
 import { useCallRecording } from '@/app/hooks/use-call-recording';
 import { QualificationBucket, usePostProcessingTemplates } from '@/app/hooks/use-post-processing-templates';
@@ -25,6 +27,8 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { LeadIcon } from '@/components/ui/lead-icon';
 import { cn } from '@/lib/utils';
+import { fetchJson } from '@/lib/http';
+import { resolveCallDirection } from '@/lib/utils/call-outcome';
 import { PaperCard, PaperCardContent } from '@/components/ui/paper-card';
 import {
   DropdownMenu,
@@ -275,6 +279,12 @@ export default function HotLeadsPage() {
   const [intentFilter, setIntentFilter] = useState<string>('all');
   const [dateFilter, setDateFilter] = useState<'today' | 'yesterday' | '7d' | '30d' | 'all'>('all');
   const [confidenceFilter, setConfidenceFilter] = useState<'all' | 'high'>('all');
+  // Custom datetime range (datetime-local strings, local time). Empty = unbounded on that side.
+  const [fromDateTime, setFromDateTime] = useState<string>('');
+  const [toDateTime, setToDateTime] = useState<string>('');
+
+  // Export progress
+  const [exporting, setExporting] = useState(false);
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
@@ -342,9 +352,20 @@ export default function HotLeadsPage() {
       if (dateFilter === '7d' && leadDate < sevenDaysAgo) return false;
       if (dateFilter === '30d' && leadDate < thirtyDaysAgo) return false;
 
+      // Custom datetime range (applied on top of the preset, when set).
+      // datetime-local has no timezone → parsed as local time, which matches leadDate.
+      if (fromDateTime) {
+        const from = new Date(fromDateTime);
+        if (!Number.isNaN(from.getTime()) && leadDate < from) return false;
+      }
+      if (toDateTime) {
+        const to = new Date(toDateTime);
+        if (!Number.isNaN(to.getTime()) && leadDate > to) return false;
+      }
+
       return true;
     }).sort((a, b) => getLeadDate(b).getTime() - getLeadDate(a).getTime());
-  }, [allAnalytics, search, intentFilter, dateFilter, confidenceFilter, isNegativeKey]);
+  }, [allAnalytics, search, intentFilter, dateFilter, confidenceFilter, isNegativeKey, fromDateTime, toDateTime]);
 
   // Pagination Logic
   const totalPages = Math.max(1, Math.ceil(hotLeads.length / itemsPerPage));
@@ -372,55 +393,105 @@ export default function HotLeadsPage() {
     setSelectedLead(lead);
   }, []);
 
-  const handleExportCSV = useCallback(() => {
-    if (hotLeads.length === 0) return;
-    const fields = [
-      'phone_number',
-      'call_id',
-      'campaign_id',
-      'call_time',
-      'verdict',
-      'confidence_score',
-      'call_quality',
-      'duration_seconds',
-      'price_quoted',
-      'customer_name',
-      'customer_location',
-      'next_steps',
-      'summary',
-      'transcript_url',
-      'enhanced_transcript_url',
-      'recording_url',
-    ];
-    const rows = hotLeads.map((lead) => {
-      const discoveries = lead.key_discoveries || {};
-      const durationSeconds = typeof discoveries.duration_seconds === 'number'
-        ? discoveries.duration_seconds
-        : lead.duration_seconds;
+  const handleExportCSV = useCallback(async () => {
+    if (hotLeads.length === 0 || exporting) return;
+    setExporting(true);
 
-      return [
-        lead.phone_number,
-        lead.call_id,
-        lead.campaign_id,
-        getLeadDate(lead).toISOString(),
-        lead.verdict,
-        lead.confidence_score,
-        lead.call_quality,
-        durationSeconds,
-        discoveries.price_quoted,
-        discoveries.customer_name,
-        discoveries.customer_location,
-        discoveries.next_steps,
-        lead.summary,
-        lead.transcript_url,
-        lead.enhanced_transcript_url,
-        lead.recording_url,
-      ].map(escapeCSV).join(',');
-    });
+    try {
+      // Fetch transcript text per lead, preferring the enhanced transcript when present.
+      // Bounded concurrency so a large Deal Room doesn't fire hundreds of requests at once.
+      const transcriptByCallId = new Map<string, string>();
+      const jobs = hotLeads
+        .map((lead) => ({
+          callId: lead.call_id,
+          url: lead.enhanced_transcript_url || lead.transcript_url || '',
+        }))
+        .filter((job) => job.callId && job.url);
 
-    const stamp = new Date().toISOString().slice(0, 10);
-    downloadTextFile(`\uFEFF${fields.join(',')}\n${rows.join('\n')}`, `hot-leads-${stamp}.csv`);
-  }, [hotLeads]);
+      const queue = [...jobs];
+      const worker = async () => {
+        while (queue.length > 0) {
+          const job = queue.shift();
+          if (!job) break;
+          try {
+            const res = await fetchJson<{ transcript?: string }>(
+              '/api/transcript-content',
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url: job.url }),
+                retry: { retries: 0 },
+              },
+            );
+            if (res?.transcript) transcriptByCallId.set(job.callId, res.transcript);
+          } catch (err) {
+            // Surface, don't swallow \u2014 a blank transcript cell should be explainable.
+            console.warn(`[HotLeadsExport] transcript fetch failed for ${job.callId}:`, err);
+          }
+        }
+      };
+      await Promise.all(Array.from({ length: Math.min(4, queue.length) }, worker));
+
+      const fields = [
+        'phone_number',
+        'call_id',
+        'campaign_id',
+        'call_time',
+        'call_direction',
+        'verdict',
+        'confidence_score',
+        'call_quality',
+        'duration_seconds',
+        'price_quoted',
+        'customer_name',
+        'customer_location',
+        'next_steps',
+        'summary',
+        'transcript',
+        'transcript_url',
+        'enhanced_transcript_url',
+        'recording_url',
+      ];
+      const rows = hotLeads.map((lead) => {
+        const discoveries = lead.key_discoveries || {};
+        const durationSeconds = typeof discoveries.duration_seconds === 'number'
+          ? discoveries.duration_seconds
+          : lead.duration_seconds;
+        const direction = resolveCallDirection(lead);
+
+        return [
+          lead.phone_number,
+          lead.call_id,
+          lead.campaign_id,
+          getLeadDate(lead).toISOString(),
+          direction === 'unknown' ? '' : direction,
+          lead.verdict,
+          lead.confidence_score,
+          lead.call_quality,
+          durationSeconds,
+          discoveries.price_quoted,
+          discoveries.customer_name,
+          discoveries.customer_location,
+          discoveries.next_steps,
+          lead.summary,
+          transcriptByCallId.get(lead.call_id) ?? '',
+          lead.transcript_url,
+          lead.enhanced_transcript_url,
+          lead.recording_url,
+        ].map(escapeCSV).join(',');
+      });
+
+      const stamp = new Date().toISOString().slice(0, 10);
+      // \uFEFF = UTF-8 BOM so Excel renders non-ASCII (\u20B9, names) correctly.
+      downloadTextFile(`\uFEFF${fields.join(',')}\n${rows.join('\n')}`, `hot-leads-${stamp}.csv`);
+      toast.success(`Exported ${rows.length} hot leads.`);
+    } catch (err) {
+      console.error('[HotLeadsExport] Failed:', err);
+      toast.error('Failed to export hot leads.');
+    } finally {
+      setExporting(false);
+    }
+  }, [hotLeads, exporting]);
 
   return (
     <div className="min-h-screen bg-background flex flex-col font-sans">
@@ -463,14 +534,43 @@ export default function HotLeadsPage() {
               </DropdownMenuContent>
             </DropdownMenu>
 
+            {/* Precise datetime range — narrows the (potentially huge) list before export. */}
+            <div className="flex items-center gap-2">
+              <input
+                type="datetime-local"
+                value={fromDateTime}
+                max={toDateTime || undefined}
+                onChange={(e) => setFromDateTime(e.target.value)}
+                aria-label="From date and time"
+                className="h-10 px-2 bg-muted/10 border border-border/40 rounded-md text-[11px] text-foreground focus:ring-primary"
+              />
+              <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">to</span>
+              <input
+                type="datetime-local"
+                value={toDateTime}
+                min={fromDateTime || undefined}
+                onChange={(e) => setToDateTime(e.target.value)}
+                aria-label="To date and time"
+                className="h-10 px-2 bg-muted/10 border border-border/40 rounded-md text-[11px] text-foreground focus:ring-primary"
+              />
+              {(fromDateTime || toDateTime) && (
+                <button
+                  onClick={() => { setFromDateTime(''); setToDateTime(''); }}
+                  className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 hover:text-foreground transition-colors px-2"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+
             <Button
               variant="outline"
               onClick={handleExportCSV}
-              disabled={hotLeads.length === 0}
+              disabled={hotLeads.length === 0 || exporting}
               className="h-10 px-4 gap-2 border-border text-[10px] font-bold uppercase tracking-widest hover:bg-primary hover:text-black transition-all"
             >
-              <Download size={14} />
-              Export CSV
+              {exporting ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+              {exporting ? 'Exporting…' : 'Export CSV'}
             </Button>
           </div>
         </div>
