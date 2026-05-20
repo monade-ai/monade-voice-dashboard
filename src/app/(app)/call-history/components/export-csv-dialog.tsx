@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
-import { Download, FileDown, Filter, X } from 'lucide-react';
+import React, { useMemo, useRef, useState } from 'react';
+import { Download, FileDown, Filter, Loader2, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { cn } from '@/lib/utils';
@@ -18,6 +18,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import { fetchJson } from '@/lib/http';
 import type { Transcript } from '@/app/hooks/use-transcripts';
 import type { CallAnalytics } from '@/app/hooks/use-analytics';
 
@@ -34,7 +35,21 @@ interface ExportCsvDialogProps {
   trigger?: React.ReactNode;
 }
 
-const CSV_COLUMNS: { key: string; label: string; get: (c: ExportableCall) => unknown }[] = [
+// The two transcript URLs live on either the Transcript record or its analytics.
+// Mirror the "Conversation Log" viewer: prefer the enhanced transcript when present.
+function transcriptUrlOf(c: ExportableCall): string {
+  return c.analytics?.transcript_url || c.transcript_url || '';
+}
+
+function enhancedTranscriptUrlOf(c: ExportableCall): string {
+  return c.analytics?.enhanced_transcript_url || '';
+}
+
+const CSV_COLUMNS: {
+  key: string;
+  label: string;
+  get: (c: ExportableCall, transcripts: Map<string, string>) => unknown;
+}[] = [
   { key: 'call_id', label: 'Call ID', get: (c) => c.call_id },
   { key: 'phone_number', label: 'Phone Number', get: (c) => c.phone_number },
   {
@@ -89,6 +104,10 @@ const CSV_COLUMNS: { key: string; label: string; get: (c: ExportableCall) => unk
   { key: 'assistant_id', label: 'Assistant ID', get: (c) => c.analytics?.billing_data?.assistant_id ?? '' },
   { key: 'recording_url', label: 'Recording URL', get: (c) => c.analytics?.recording_url ?? '' },
   { key: 'sip_call_id', label: 'SIP Call ID', get: (c) => c.analytics?.sip_call_id ?? '' },
+  // Transcript: fetched text (enhanced preferred), then the raw URLs — same as Hot Leads export.
+  { key: 'transcript', label: 'Transcript', get: (c, transcripts) => transcripts.get(c.call_id) ?? '' },
+  { key: 'transcript_url', label: 'Transcript URL', get: (c) => transcriptUrlOf(c) },
+  { key: 'enhanced_transcript_url', label: 'Enhanced Transcript URL', get: (c) => enhancedTranscriptUrlOf(c) },
 ];
 
 function escapeCsv(value: unknown): string {
@@ -143,6 +162,8 @@ export function ExportCsvDialog({ calls, trigger }: ExportCsvDialogProps) {
   const [direction, setDirection] = useState<DirectionFilter>('all');
   const [verdict, setVerdict] = useState<VerdictFilter>('all');
   const [connectedOnly, setConnectedOnly] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
 
   const applyPreset = (p: RangePreset) => {
     setPreset(p);
@@ -201,36 +222,99 @@ export function ExportCsvDialog({ calls, trigger }: ExportCsvDialogProps) {
     });
   }, [calls, fromDate, toDate, direction, verdict, connectedOnly]);
 
-  const handleDownload = () => {
-    if (filteredCalls.length === 0) {
-      toast.error('No records match the selected filters.');
+  const handleDownload = async () => {
+    if (filteredCalls.length === 0 || exporting) {
+      if (filteredCalls.length === 0) toast.error('No records match the selected filters.');
 
       return;
     }
+    setExporting(true);
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const { signal } = controller;
 
-    const header = CSV_COLUMNS.map(c => escapeCsv(c.label)).join(',');
-    const rows = filteredCalls.map(call =>
-      CSV_COLUMNS.map(col => escapeCsv(col.get(call))).join(','),
-    );
-    // Prepend BOM so Excel detects UTF-8 correctly.
-    const csv = '﻿' + [header, ...rows].join('\r\n');
+    try {
+      // Fetch transcript text only for the calls being exported, preferring the enhanced
+      // transcript. Bounded concurrency so a large range doesn't fire hundreds of requests.
+      const transcriptByCallId = new Map<string, string>();
+      const jobs = filteredCalls
+        .map((c) => ({
+          callId: c.call_id,
+          url: enhancedTranscriptUrlOf(c) || transcriptUrlOf(c),
+        }))
+        .filter((job) => job.callId && job.url);
 
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-    const rangeTag = fromDate || toDate
-      ? `_${fromDate || 'start'}_to_${toDate || 'end'}`
-      : '';
-    a.href = url;
-    a.download = `call-archive${rangeTag}_${stamp}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+      const queue = [...jobs];
+      const worker = async () => {
+        while (queue.length > 0) {
+          if (signal.aborted) return; // stop pulling new work the moment we're cancelled
+          const job = queue.shift();
+          if (!job) break;
+          try {
+            const res = await fetchJson<{ transcript?: string }>(
+              '/api/transcript-content',
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url: job.url }),
+                retry: { retries: 0 },
+                signal,
+              },
+            );
+            if (res?.transcript) transcriptByCallId.set(job.callId, res.transcript);
+          } catch (err) {
+            if (signal.aborted) return; // aborted fetches throw — exit quietly
+            // Surface, don't swallow — a blank transcript cell should be explainable.
+            console.warn(`[CallArchiveExport] transcript fetch failed for ${job.callId}:`, err);
+          }
+        }
+      };
+      await Promise.all(Array.from({ length: Math.min(4, queue.length) }, worker));
 
-    toast.success(`Exported ${filteredCalls.length.toLocaleString()} record${filteredCalls.length === 1 ? '' : 's'} to CSV.`);
-    setOpen(false);
+      if (signal.aborted) {
+        toast.info('Export cancelled.');
+
+        return;
+      }
+
+      const header = CSV_COLUMNS.map(c => escapeCsv(c.label)).join(',');
+      const rows = filteredCalls.map(call =>
+        CSV_COLUMNS.map(col => escapeCsv(col.get(call, transcriptByCallId))).join(','),
+      );
+      // ﻿ = UTF-8 BOM so Excel detects UTF-8 (₹, names, non-ASCII) correctly.
+      const csv = '﻿' + [header, ...rows].join('\r\n');
+
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+      const rangeTag = fromDate || toDate
+        ? `_${fromDate || 'start'}_to_${toDate || 'end'}`
+        : '';
+      a.href = url;
+      a.download = `call-archive${rangeTag}_${stamp}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast.success(`Exported ${rows.length.toLocaleString()} record${rows.length === 1 ? '' : 's'} to CSV.`);
+      setOpen(false);
+    } catch (err) {
+      if (signal.aborted) {
+        toast.info('Export cancelled.');
+      } else {
+        console.error('[CallArchiveExport] Failed:', err);
+        toast.error('Failed to export call archive.');
+      }
+    } finally {
+      abortRef.current = null;
+      setExporting(false);
+    }
+  };
+
+  const handleCancelExport = () => {
+    abortRef.current?.abort();
   };
 
   const resetFilters = () => {
@@ -252,7 +336,14 @@ export function ExportCsvDialog({ calls, trigger }: ExportCsvDialogProps) {
   ];
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        // Don't let the dialog close mid-export — that would orphan the in-flight fetches.
+        if (!next && exporting) return;
+        setOpen(next);
+      }}
+    >
       <DialogTrigger asChild>
         {trigger ?? (
           <Button
@@ -272,8 +363,8 @@ export function ExportCsvDialog({ calls, trigger }: ExportCsvDialogProps) {
             Export Call Archive to CSV
           </DialogTitle>
           <DialogDescription>
-            Choose a time range and optional filters. Transcripts are excluded; everything else
-            (call IDs, phone numbers, verdicts, analytics, billing) is included.
+            Choose a time range and optional filters. Each row includes call IDs, phone numbers,
+            verdicts, analytics, billing and the full transcript (enhanced when available).
           </DialogDescription>
         </DialogHeader>
 
@@ -406,6 +497,7 @@ export function ExportCsvDialog({ calls, trigger }: ExportCsvDialogProps) {
               variant="ghost"
               size="sm"
               onClick={resetFilters}
+              disabled={exporting}
               className="h-7 text-[10px] font-bold uppercase tracking-widest text-muted-foreground hover:text-foreground"
             >
               <X className="w-3 h-3 mr-1" />
@@ -416,19 +508,43 @@ export function ExportCsvDialog({ calls, trigger }: ExportCsvDialogProps) {
 
         <DialogFooter>
           <DialogClose asChild>
-            <Button variant="outline" size="sm" className="text-[10px] font-bold uppercase tracking-widest">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={exporting}
+              className="text-[10px] font-bold uppercase tracking-widest"
+            >
               Cancel
             </Button>
           </DialogClose>
-          <Button
-            onClick={handleDownload}
-            disabled={filteredCalls.length === 0}
-            size="sm"
-            className="gap-2 text-[10px] font-bold uppercase tracking-widest bg-foreground text-background hover:bg-foreground/90"
-          >
-            <Download className="w-3 h-3" />
-            Download CSV
-          </Button>
+          {exporting ? (
+            // While exporting: show progress + an inline cross to abort the in-flight job.
+            <div className="flex items-stretch rounded-md overflow-hidden bg-foreground text-background">
+              <div className="flex items-center gap-2 pl-3 pr-2 text-[10px] font-bold uppercase tracking-widest">
+                <Loader2 className="w-3 h-3 animate-spin" />
+                Fetching transcripts…
+              </div>
+              <button
+                type="button"
+                onClick={handleCancelExport}
+                aria-label="Cancel export"
+                title="Cancel export"
+                className="flex items-center justify-center px-2 border-l border-background/30 hover:bg-red-500 hover:text-white transition-colors"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ) : (
+            <Button
+              onClick={handleDownload}
+              disabled={filteredCalls.length === 0}
+              size="sm"
+              className="gap-2 text-[10px] font-bold uppercase tracking-widest bg-foreground text-background hover:bg-foreground/90"
+            >
+              <Download className="w-3 h-3" />
+              Download CSV
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
