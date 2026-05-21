@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Loader2, MessageCircle } from 'lucide-react';
+import { AlertTriangle, Loader2, MessageCircle } from 'lucide-react';
 
 import {
   Dialog,
@@ -92,7 +92,7 @@ export function ConnectChannelDialog({ open, onOpenChange, onConnect, saving }: 
             <Input
               value={form.label}
               onChange={setField('label')}
-              placeholder="College Vidya WhatsApp"
+              placeholder="Primary WhatsApp Channel"
             />
           </div>
 
@@ -114,7 +114,7 @@ export function ConnectChannelDialog({ open, onOpenChange, onConnect, saving }: 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <FieldLabel required>Sender phone number</FieldLabel>
-              <Input value={form.phone_number} onChange={setField('phone_number')} placeholder="+918065480578" />
+              <Input value={form.phone_number} onChange={setField('phone_number')} placeholder="+15551234567" />
             </div>
             <div className="space-y-1.5">
               <FieldLabel>Display name</FieldLabel>
@@ -131,9 +131,12 @@ export function ConnectChannelDialog({ open, onOpenChange, onConnect, saving }: 
               onChange={setField('access_token')}
               placeholder="EAAG..."
             />
-            <p className="text-[10px] text-muted-foreground">
-              Stored securely server-side and never displayed again.
-            </p>
+            <div className="flex items-start gap-2 rounded-md border border-amber-500/25 bg-amber-500/10 px-3 py-2">
+              <AlertTriangle size={14} className="text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+              <p className="text-[10px] leading-relaxed text-amber-700 dark:text-amber-300">
+                This token is used only for the connection step. We do not store or display the access token after submission.
+              </p>
+            </div>
           </div>
 
           <DialogFooter className="pt-2">
