@@ -25,6 +25,8 @@ import {
   Zap,
   Sparkles,
   Target,
+  MessageCircle,
+  Workflow,
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 
@@ -188,6 +190,20 @@ export function Sidebar() {
           icon={<Sparkles />}
           label="Template Library"
           isActive={pathname.startsWith('/template-library')}
+        />
+
+        <CategoryLabel>Messaging</CategoryLabel>
+        <NavItem
+          href="/whatsapp"
+          icon={<MessageCircle />}
+          label="WhatsApp"
+          isActive={pathname === '/whatsapp'}
+        />
+        <NavItem
+          href="/whatsapp-flows"
+          icon={<Workflow />}
+          label="WhatsApp Flows"
+          isActive={pathname === '/whatsapp-flows'}
         />
 
         <CategoryLabel>Archive</CategoryLabel>
