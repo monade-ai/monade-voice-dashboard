@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { Loader2, Save, Workflow, X } from 'lucide-react';
+import { AlertTriangle, Loader2, Save, Workflow, X } from 'lucide-react';
 
 import { DashboardHeader } from '@/components/dashboard-header';
 import { Button } from '@/components/ui/button';
@@ -28,6 +28,7 @@ import {
 } from '@/app/hooks/use-post-processing-templates';
 import { useVobizWhatsapp, type WhatsappTemplate } from '@/app/hooks/use-vobiz-whatsapp';
 import { useWhatsappFlows } from '@/app/hooks/use-whatsapp-flows';
+import { areOutcomeKeysSynced, INVALID_OUTCOME_KEYS_MESSAGE } from '@/lib/post-processing-outcomes';
 import { cn } from '@/lib/utils';
 
 import { TemplateStatusBadge } from '../whatsapp/components/status-badges';
@@ -68,6 +69,7 @@ export default function WhatsAppFlowsPage() {
   const [loadingFlow, setLoadingFlow] = useState(false);
   const [loadingBuckets, setLoadingBuckets] = useState(false);
   const [loadingWaTemplates, setLoadingWaTemplates] = useState(false);
+  const [storedOutcomeKeys, setStoredOutcomeKeys] = useState<string[] | null>(null);
 
   const publishedAssistants = useMemo(
     () => assistants.filter((assistant) => !assistant.id.startsWith('local-')),
@@ -96,6 +98,7 @@ export default function WhatsAppFlowsPage() {
     setWaTemplates([]);
     setConnectionId('');
     setEnabled(false);
+    setStoredOutcomeKeys(null);
   };
 
   const handleConnectionChange = (value: string) => {
@@ -117,11 +120,13 @@ export default function WhatsAppFlowsPage() {
       .then((result) => {
         if (!isMounted) return;
         setBuckets(result?.content?.qualification_buckets ?? []);
+        setStoredOutcomeKeys(result?.outcome_keys ?? null);
       })
       .catch((error) => {
         if (!isMounted) return;
         console.error('[WhatsAppFlowsPage] fetchTemplate error:', error);
         setBuckets([]);
+        setStoredOutcomeKeys(null);
       })
       .finally(() => {
         if (isMounted) {
@@ -213,6 +218,11 @@ export default function WhatsAppFlowsPage() {
     () => waTemplates.filter((template) => (template.status || '').toUpperCase() === 'APPROVED'),
     [waTemplates],
   );
+  const outcomeKeyState = useMemo(
+    () => areOutcomeKeysSynced(storedOutcomeKeys, buckets),
+    [storedOutcomeKeys, buckets],
+  );
+  const hasInvalidOutcomeKeys = Boolean(templateId) && buckets.length > 0 && !outcomeKeyState.valid;
 
   const channelOptions = useMemo(() => {
     return channels.map((channel) => ({
@@ -241,7 +251,7 @@ export default function WhatsAppFlowsPage() {
   };
 
   const handleSave = async () => {
-    if (!assistantId || !templateId || !connectionId) return;
+    if (!assistantId || !templateId || !connectionId || hasInvalidOutcomeKeys) return;
 
     try {
       await saveFlow(assistantId, {
@@ -256,7 +266,7 @@ export default function WhatsAppFlowsPage() {
   };
 
   const readyToEdit = assistantId && templateId;
-  const canSave = Boolean(assistantId && templateId && connectionId);
+  const canSave = Boolean(assistantId && templateId && connectionId && !hasInvalidOutcomeKeys);
 
   return (
     <div className="min-h-screen bg-background flex flex-col font-sans">
@@ -405,6 +415,23 @@ export default function WhatsAppFlowsPage() {
               </div>
             ) : (
               <>
+                {hasInvalidOutcomeKeys && (
+                  <div className="mx-6 mt-6 flex items-start gap-3 rounded-md border border-amber-500/25 bg-amber-500/10 px-4 py-3">
+                    <AlertTriangle size={16} className="text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium text-amber-700 dark:text-amber-300">
+                        {INVALID_OUTCOME_KEYS_MESSAGE}
+                      </p>
+                      <p className="text-[11px] text-amber-700/90 dark:text-amber-300/90">
+                        Saved snapshot: {outcomeKeyState.snapshotKeys.join(', ') || 'none'}
+                      </p>
+                      <p className="text-[11px] text-amber-700/90 dark:text-amber-300/90">
+                        Current buckets: {outcomeKeyState.bucketKeys.join(', ') || 'none'}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 <Table>
                   <TableHeader>
                     <TableRow className="hover:bg-transparent border-border/30">

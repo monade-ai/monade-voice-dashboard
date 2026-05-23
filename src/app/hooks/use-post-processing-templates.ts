@@ -40,6 +40,7 @@ export interface PostProcessingTemplateSummary {
   name: string;
   description?: string | null;
   url?: string | null;
+  outcome_keys?: string[] | null;
   is_system_default?: boolean;
   created_at?: string;
   updated_at?: string;
@@ -54,6 +55,7 @@ export interface ResolvedPostProcessingTemplate {
   name: string;
   description?: string | null;
   url?: string | null;
+  outcome_keys?: string[] | null;
   is_system_default?: boolean;
   resolved_via?: 'user_active' | 'system_default';
   content: PostProcessingTemplateContent;
@@ -90,6 +92,9 @@ const normalizeTemplateResponse = (template: any): PostProcessingTemplate => ({
   name: template.name,
   description: template.description ?? null,
   url: template.url ?? null,
+  outcome_keys: Array.isArray(template.outcome_keys ?? template.outcomeKeys)
+    ? (template.outcome_keys ?? template.outcomeKeys)
+    : null,
   is_system_default: Boolean(template.is_system_default ?? template.isSystemDefault),
   created_at: template.created_at ?? template.createdAt,
   updated_at: template.updated_at ?? template.updatedAt,
@@ -108,6 +113,9 @@ const normalizeResolvedTemplateResponse = (response: any): ResolvedPostProcessin
   name: response?.name ?? 'Default Monade Rules',
   description: response?.description ?? null,
   url: response?.url ?? null,
+  outcome_keys: Array.isArray(response?.outcome_keys ?? response?.outcomeKeys)
+    ? (response?.outcome_keys ?? response?.outcomeKeys)
+    : null,
   is_system_default: Boolean(response?.is_system_default ?? response?.isSystemDefault),
   resolved_via: response?.resolved_via ?? response?.resolvedVia ?? 'system_default',
   content: response?.content ?? {

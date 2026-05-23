@@ -19,19 +19,21 @@ import {
 
 import { useUserAnalytics, CallAnalytics } from '@/app/hooks/use-analytics';
 import { useCallRecording } from '@/app/hooks/use-call-recording';
-import { QualificationBucket, usePostProcessingTemplates } from '@/app/hooks/use-post-processing-templates';
+import { PostProcessingTemplate, QualificationBucket, usePostProcessingTemplates } from '@/app/hooks/use-post-processing-templates';
 import { DashboardHeader } from '@/components/dashboard-header';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { LeadIcon } from '@/components/ui/lead-icon';
 import { cn } from '@/lib/utils';
 import { PaperCard, PaperCardContent } from '@/components/ui/paper-card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { humanizeOutcomeKey } from '@/lib/post-processing-outcomes';
 
 import { HotLeadsGuide } from './components/hot-leads-guide';
 import { HotLeadsExportDialog } from './components/hot-leads-export-dialog';
@@ -56,8 +58,6 @@ const NEUTRAL_CONFIG = {
   label: 'Unknown', color: 'text-muted-foreground', bg: 'bg-muted', border: 'border-border', accent: 'text-muted-foreground',
 };
 
-const humanizeKey = (key: string) => key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-
 const resolveVerdictConfig = (
   verdict: string | undefined,
   bucketIndex: Map<string, { bucket: QualificationBucket; index: number }>,
@@ -67,10 +67,10 @@ const resolveVerdictConfig = (
   if (match) {
     const palette = BUCKET_PALETTE[match.index % BUCKET_PALETTE.length];
 
-    return { label: match.bucket.label || humanizeKey(match.bucket.key), ...palette };
+    return { label: match.bucket.label || humanizeOutcomeKey(match.bucket.key), ...palette };
   }
 
-  return { ...NEUTRAL_CONFIG, label: humanizeKey(verdict) };
+  return { ...NEUTRAL_CONFIG, label: humanizeOutcomeKey(verdict) };
 };
 
 const formatCurrency = (val: string | undefined) => {
@@ -250,14 +250,16 @@ DealRow.displayName = 'DealRow';
 
 export default function HotLeadsPage() {
   const { analytics: allAnalytics, loading, fetchAll } = useUserAnalytics();
-  const { resolvedTemplate } = usePostProcessingTemplates();
+  const { templates, fetchTemplate } = usePostProcessingTemplates();
   const [search, setSearch] = useState('');
   const [selectedLead, setSelectedLead] = useState<CallAnalytics | null>(null);
 
   // Filter States
   const [intentFilter, setIntentFilter] = useState<string>('all');
+  const [templateFilter, setTemplateFilter] = useState<string>('all');
   const [dateFilter, setDateFilter] = useState<'today' | 'yesterday' | '7d' | '30d' | 'all'>('all');
   const [confidenceFilter, setConfidenceFilter] = useState<'all' | 'high'>('all');
+  const [templateDetails, setTemplateDetails] = useState<Record<string, PostProcessingTemplate>>({});
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
@@ -265,19 +267,66 @@ export default function HotLeadsPage() {
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
-  // Build bucket lookup from active template
-  const buckets = useMemo<QualificationBucket[]>(
-    () => resolvedTemplate?.content?.qualification_buckets || [],
-    [resolvedTemplate],
-  );
-  const bucketIndex = useMemo(() => {
-    const map = new Map<string, { bucket: QualificationBucket; index: number }>();
-    buckets.forEach((bucket, index) => {
-      if (bucket.key) map.set(bucket.key.toLowerCase(), { bucket, index });
+  useEffect(() => {
+    let isMounted = true;
+    const templateIds = Array.from(new Set(
+      allAnalytics
+        .map((lead) => lead.post_processing_template_id)
+        .filter((templateId): templateId is string => Boolean(templateId)),
+    ));
+
+    if (templateIds.length === 0) {
+      Promise.resolve().then(() => {
+        if (isMounted) {
+          setTemplateDetails({});
+        }
+      });
+
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    Promise.all(templateIds.map(async (templateId) => {
+      try {
+        const template = await fetchTemplate(templateId);
+
+        return template ? [templateId, template] as const : null;
+      } catch {
+        return null;
+      }
+    })).then((entries) => {
+      if (!isMounted) return;
+
+      const nextTemplateDetails: Record<string, PostProcessingTemplate> = {};
+      entries.forEach((entry) => {
+        if (entry) {
+          nextTemplateDetails[entry[0]] = entry[1];
+        }
+      });
+      setTemplateDetails(nextTemplateDetails);
     });
 
-    return map;
-  }, [buckets]);
+    return () => {
+      isMounted = false;
+    };
+  }, [allAnalytics, fetchTemplate]);
+
+  const bucketIndexByTemplateId = useMemo(() => {
+    const indexMap = new Map<string, Map<string, { bucket: QualificationBucket; index: number }>>();
+
+    Object.entries(templateDetails).forEach(([templateId, template]) => {
+      const bucketIndex = new Map<string, { bucket: QualificationBucket; index: number }>();
+      (template.content?.qualification_buckets || []).forEach((bucket, index) => {
+        if (bucket.key) {
+          bucketIndex.set(bucket.key.toLowerCase(), { bucket, index });
+        }
+      });
+      indexMap.set(templateId, bucketIndex);
+    });
+
+    return indexMap;
+  }, [templateDetails]);
 
   // Heuristic: hide buckets that look explicitly negative from the "hot leads" curation
   const isNegativeKey = useCallback((key: string) => {
@@ -288,13 +337,7 @@ export default function HotLeadsPage() {
       || k.includes('disconnect') || k.includes('declined') || k.includes('reject');
   }, []);
 
-  const positiveBuckets = useMemo(
-    () => buckets.filter((bucket) => !isNegativeKey(bucket.key || '')),
-    [buckets, isNegativeKey],
-  );
-
-  // Memoized Filter Logic (Heavy Calculation)
-  const hotLeads = useMemo(() => {
+  const baseHotLeads = useMemo(() => {
     return allAnalytics.filter(a => {
       if ((a.confidence_score || 0) < 50) return false;
       const v = (a.verdict || '').toLowerCase();
@@ -303,9 +346,8 @@ export default function HotLeadsPage() {
 
       // Search
       if (search && !a.phone_number?.includes(search) && !a.summary?.toLowerCase().includes(search.toLowerCase())) return false;
-
-      // Intent (exact bucket key match)
-      if (intentFilter !== 'all' && v !== intentFilter.toLowerCase()) return false;
+      if (templateFilter === 'legacy' && a.post_processing_template_id) return false;
+      if (templateFilter !== 'all' && templateFilter !== 'legacy' && a.post_processing_template_id !== templateFilter) return false;
 
       // Confidence
       if (confidenceFilter === 'high' && (a.confidence_score || 0) < 80) return false;
@@ -327,7 +369,39 @@ export default function HotLeadsPage() {
 
       return true;
     }).sort((a, b) => getLeadDate(b).getTime() - getLeadDate(a).getTime());
-  }, [allAnalytics, search, intentFilter, dateFilter, confidenceFilter, isNegativeKey]);
+  }, [allAnalytics, search, templateFilter, dateFilter, confidenceFilter, isNegativeKey]);
+
+  const verdictOptions = useMemo(() => {
+    const seen = new Set<string>();
+
+    return baseHotLeads.reduce<Array<{ key: string; label: string }>>((accumulator, lead) => {
+      const verdict = (lead.verdict || '').toLowerCase();
+      if (!verdict || seen.has(verdict)) return accumulator;
+      seen.add(verdict);
+
+      const bucketIndex = lead.post_processing_template_id
+        ? bucketIndexByTemplateId.get(lead.post_processing_template_id)
+        : undefined;
+      const label = bucketIndex?.get(verdict)?.bucket.label || humanizeOutcomeKey(verdict);
+      accumulator.push({ key: verdict, label });
+
+      return accumulator;
+    }, []);
+  }, [baseHotLeads, bucketIndexByTemplateId]);
+  const effectiveIntentFilter = useMemo(() => {
+    if (intentFilter === 'all') return 'all';
+
+    return verdictOptions.some((option) => option.key === intentFilter) ? intentFilter : 'all';
+  }, [intentFilter, verdictOptions]);
+
+  const hotLeads = useMemo(() => {
+    return baseHotLeads.filter((lead) => {
+      const verdict = (lead.verdict || '').toLowerCase();
+      if (effectiveIntentFilter !== 'all' && verdict !== effectiveIntentFilter.toLowerCase()) return false;
+
+      return true;
+    });
+  }, [baseHotLeads, effectiveIntentFilter]);
 
   // Pagination Logic
   const totalPages = Math.max(1, Math.ceil(hotLeads.length / itemsPerPage));
@@ -340,11 +414,27 @@ export default function HotLeadsPage() {
 
   // Stats Logic — dynamic per-bucket count for the active template's positive buckets
   const bucketStats = useMemo(() => {
-    return positiveBuckets.map((bucket) => ({
-      bucket,
-      count: hotLeads.filter((l) => (l.verdict || '').toLowerCase() === bucket.key.toLowerCase()).length,
+    return verdictOptions.map((option) => ({
+      key: option.key,
+      label: option.label,
+      count: hotLeads.filter((l) => (l.verdict || '').toLowerCase() === option.key).length,
     }));
-  }, [hotLeads, positiveBuckets]);
+  }, [hotLeads, verdictOptions]);
+
+  const templateOptions = useMemo(() => {
+    const ids = Array.from(new Set(
+      allAnalytics
+        .map((lead) => lead.post_processing_template_id)
+        .filter((templateId): templateId is string => Boolean(templateId)),
+    ));
+
+    return ids.map((templateId) => ({
+      id: templateId,
+      label: templateDetails[templateId]?.name
+        || templates.find((template) => template.id === templateId)?.name
+        || 'Saved Template',
+    }));
+  }, [allAnalytics, templateDetails, templates]);
 
   // Handlers (Stabilized)
   const handlePageChange = useCallback((newPage: number) => {
@@ -396,6 +486,19 @@ export default function HotLeadsPage() {
               </DropdownMenuContent>
             </DropdownMenu>
 
+            <Select value={templateFilter} onValueChange={setTemplateFilter}>
+              <SelectTrigger className="h-10 w-52 bg-muted/10 border-border/40 text-xs">
+                <SelectValue placeholder="All templates" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All templates</SelectItem>
+                <SelectItem value="legacy">Legacy / No template</SelectItem>
+                {templateOptions.map((option) => (
+                  <SelectItem key={option.id} value={option.id}>{option.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
             <HotLeadsExportDialog leads={hotLeads} />
           </div>
         </div>
@@ -409,21 +512,21 @@ export default function HotLeadsPage() {
               onClick={() => setIntentFilter('all')}
               className={cn(
                 'px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all border',
-                intentFilter === 'all' ? 'bg-foreground text-background border-foreground' : 'bg-transparent text-muted-foreground border-transparent hover:bg-muted/50',
+                effectiveIntentFilter === 'all' ? 'bg-foreground text-background border-foreground' : 'bg-transparent text-muted-foreground border-transparent hover:bg-muted/50',
               )}
             >
               All
             </button>
-            {positiveBuckets.map((bucket) => (
+            {verdictOptions.map((bucket) => (
               <button
                 key={bucket.key}
                 onClick={() => setIntentFilter(bucket.key)}
                 className={cn(
                   'px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all border whitespace-nowrap',
-                  intentFilter === bucket.key ? 'bg-foreground text-background border-foreground' : 'bg-transparent text-muted-foreground border-transparent hover:bg-muted/50',
+                  effectiveIntentFilter === bucket.key ? 'bg-foreground text-background border-foreground' : 'bg-transparent text-muted-foreground border-transparent hover:bg-muted/50',
                 )}
               >
-                {bucket.label || humanizeKey(bucket.key)}
+                {bucket.label}
               </button>
             ))}
           </div>
@@ -446,19 +549,19 @@ export default function HotLeadsPage() {
             'grid grid-cols-1 gap-6',
             bucketStats.length === 1 ? 'md:grid-cols-1' : bucketStats.length === 2 ? 'md:grid-cols-2' : 'md:grid-cols-3',
           )}>
-            {bucketStats.slice(0, 6).map(({ bucket, count }, index) => {
+            {bucketStats.slice(0, 6).map(({ key, label, count }, index) => {
               const palette = BUCKET_PALETTE[index % BUCKET_PALETTE.length];
 
               return (
                 <PaperCard
-                  key={bucket.key}
+                  key={key}
                   variant="default"
                   className={cn('border', palette.border, palette.bg.replace('/10', '/[0.02]'))}
                 >
                   <PaperCardContent className="p-6 flex items-center justify-between">
                     <div className="space-y-1">
                       <span className={cn('text-[9px] font-bold uppercase tracking-widest', palette.accent)}>
-                        {bucket.label || humanizeKey(bucket.key)}
+                        {label}
                       </span>
                       <div className="flex items-center gap-2">
                         <span className="text-3xl font-bold font-mono text-foreground">{count}</span>
@@ -515,7 +618,9 @@ export default function HotLeadsPage() {
                   <DealRow
                     key={lead.call_id}
                     lead={lead}
-                    bucketIndex={bucketIndex}
+                    bucketIndex={lead.post_processing_template_id
+                      ? (bucketIndexByTemplateId.get(lead.post_processing_template_id) ?? new Map())
+                      : new Map()}
                     onClick={() => handleSelectLead(lead)}
                   />
                 ))}

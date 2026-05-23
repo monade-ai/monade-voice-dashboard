@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
+  AlertTriangle,
   ArrowLeft,
   Plus,
   Loader2,
@@ -42,6 +43,7 @@ import {
   TemplateFieldType,
   usePostProcessingTemplates,
 } from '@/app/hooks/use-post-processing-templates';
+import { areOutcomeKeysSynced, INVALID_OUTCOME_KEYS_MESSAGE } from '@/lib/post-processing-outcomes';
 
 type StudioBucket = QualificationBucket & { rowId: string };
 type StudioDataPoint = DataPointDefinition & { rowId: string };
@@ -323,6 +325,7 @@ function QualificationStudioScreen({ selectedTemplateId }: { selectedTemplateId:
   const [loadedTemplateName, setLoadedTemplateName] = useState<string | null>(null);
   const [savedSnapshot, setSavedSnapshot] = useState<string>(JSON.stringify(serializeForm(createBlankForm())));
   const [guideCopyState, setGuideCopyState] = useState<'idle' | 'copying' | 'copied'>('idle');
+  const [storedOutcomeKeys, setStoredOutcomeKeys] = useState<string[] | null>(null);
 
   const handleCopyGuide = async () => {
     try {
@@ -365,6 +368,7 @@ function QualificationStudioScreen({ selectedTemplateId }: { selectedTemplateId:
         setSavedSnapshot(JSON.stringify(serializeForm(nextForm)));
         setIsSystemDefault(Boolean(template.is_system_default));
         setLoadedTemplateName(template.name);
+        setStoredOutcomeKeys(template.outcome_keys ?? null);
       })
       .catch((error) => {
         toast.error(error instanceof Error ? error.message : 'Could not load template');
@@ -381,6 +385,12 @@ function QualificationStudioScreen({ selectedTemplateId }: { selectedTemplateId:
   const serializedCurrentForm = useMemo(() => JSON.stringify(serializeForm(form)), [form]);
   const isDirty = serializedCurrentForm !== savedSnapshot;
   const isLiveTemplate = Boolean(selectedTemplateId && activeTemplateId === selectedTemplateId);
+  const currentSerializedPayload = useMemo(() => serializeForm(form), [form]);
+  const outcomeKeyState = useMemo(
+    () => areOutcomeKeysSynced(storedOutcomeKeys, currentSerializedPayload.qualification_buckets),
+    [currentSerializedPayload.qualification_buckets, storedOutcomeKeys],
+  );
+  const needsOutcomeKeyBackfill = Boolean(selectedTemplateId) && !outcomeKeyState.valid;
 
   const applyValidation = () => {
     const nextValidation = validateForm(form);
@@ -398,19 +408,29 @@ function QualificationStudioScreen({ selectedTemplateId }: { selectedTemplateId:
     }
 
     try {
-      const payload = serializeForm(form);
+      const payload = currentSerializedPayload;
       let templateId = selectedTemplateId;
+      let savedTemplate;
 
       if (selectedTemplateId) {
-        await updateTemplate(selectedTemplateId, payload);
+        savedTemplate = await updateTemplate(selectedTemplateId, payload);
         templateId = selectedTemplateId;
-        toast.success('Template updated');
       } else {
-        const created = await createTemplate(payload);
-        templateId = created.id;
-        toast.success('Template created');
-        router.replace(`/qualification-studio?templateId=${encodeURIComponent(created.id)}`);
+        savedTemplate = await createTemplate(payload);
+        templateId = savedTemplate.id;
+        router.replace(`/qualification-studio?templateId=${encodeURIComponent(savedTemplate.id)}`);
       }
+
+      setStoredOutcomeKeys(savedTemplate.outcome_keys ?? null);
+      const savedOutcomeKeyState = areOutcomeKeysSynced(savedTemplate.outcome_keys, payload.qualification_buckets);
+
+      if (!savedOutcomeKeyState.valid) {
+        toast.error('Outcome key snapshot is still out of sync after saving. Review the qualification bucket keys and try again.');
+
+        return;
+      }
+
+      toast.success(selectedTemplateId ? 'Template updated' : 'Template created');
 
       if (templateId && activateAfterSave) {
         await setActiveTemplate(templateId);
@@ -485,7 +505,7 @@ function QualificationStudioScreen({ selectedTemplateId }: { selectedTemplateId:
                 type="button"
                 variant="outline"
                 onClick={() => setActiveTemplate(selectedTemplateId).then(() => toast.success('Template is now live')).catch((error) => toast.error(error instanceof Error ? error.message : 'Could not update live ruleset'))}
-                disabled={saving}
+                disabled={saving || needsOutcomeKeyBackfill}
                 className="h-10 px-4 text-[10px] font-bold uppercase tracking-[0.2em] border-border/40"
               >
                 <Target size={14} className="mr-2" />
@@ -507,7 +527,7 @@ function QualificationStudioScreen({ selectedTemplateId }: { selectedTemplateId:
                 <Button
                   type="button"
                   onClick={() => handleSave(true)}
-                  disabled={saving || isLoadingTemplate}
+                  disabled={saving || isLoadingTemplate || (Boolean(selectedTemplateId) && needsOutcomeKeyBackfill)}
                   className="h-10 px-4 text-[10px] font-bold uppercase tracking-[0.2em]"
                 >
                   <Sparkles size={14} className="mr-2" />
@@ -532,12 +552,49 @@ function QualificationStudioScreen({ selectedTemplateId }: { selectedTemplateId:
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => router.push(`/template-library`)}
+                    onClick={() => router.push('/template-library')}
                     className="h-10 px-4 text-[10px] font-bold uppercase tracking-[0.2em] border-border/40"
                   >
                     Open Library
                   </Button>
                 )}
+              </PaperCardContent>
+            </PaperCard>
+
+            <PaperCard className={cn('border', needsOutcomeKeyBackfill ? 'border-amber-500/25 bg-amber-500/[0.05]' : 'border-green-500/20 bg-green-500/[0.03]')}>
+              <PaperCardContent className="p-6 space-y-4">
+                <div className="flex items-start gap-3">
+                  {needsOutcomeKeyBackfill ? (
+                    <AlertTriangle size={18} className="text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+                  ) : (
+                    <Check size={18} className="text-green-600 dark:text-green-400 mt-0.5 shrink-0" />
+                  )}
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-bold uppercase tracking-[0.24em] text-muted-foreground/70">Outcome Keys Snapshot</span>
+                    <p className="text-sm text-foreground">
+                      {selectedTemplateId
+                        ? needsOutcomeKeyBackfill
+                          ? INVALID_OUTCOME_KEYS_MESSAGE
+                          : 'Stored outcome keys match the current qualification bucket keys.'
+                        : 'Outcome keys will be generated automatically from these bucket keys on first save.'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 text-xs">
+                  <div className="rounded-md border border-border/20 bg-background/80 p-4 space-y-2">
+                    <span className="text-[9px] font-bold uppercase tracking-[0.18em] text-muted-foreground/60">Current Bucket Keys</span>
+                    <p className="text-foreground font-mono break-words">
+                      {outcomeKeyState.bucketKeys.join(', ') || 'None yet'}
+                    </p>
+                  </div>
+                  <div className="rounded-md border border-border/20 bg-background/80 p-4 space-y-2">
+                    <span className="text-[9px] font-bold uppercase tracking-[0.18em] text-muted-foreground/60">Stored Outcome Keys</span>
+                    <p className="text-foreground font-mono break-words">
+                      {outcomeKeyState.snapshotKeys.join(', ') || 'None yet'}
+                    </p>
+                  </div>
+                </div>
               </PaperCardContent>
             </PaperCard>
 
