@@ -25,6 +25,7 @@ import {
   Zap,
   Sparkles,
   Target,
+  Bot,
   MessageCircle,
   Workflow,
 } from 'lucide-react';
@@ -204,6 +205,12 @@ export function Sidebar() {
           icon={<Workflow />}
           label="WhatsApp Flows"
           isActive={pathname === '/whatsapp-flows'}
+        />
+        <NavItem
+          href="/whatsapp-bot"
+          icon={<Bot />}
+          label="WhatsApp Bot"
+          isActive={pathname === '/whatsapp-bot'}
         />
 
         <CategoryLabel>Archive</CategoryLabel>
