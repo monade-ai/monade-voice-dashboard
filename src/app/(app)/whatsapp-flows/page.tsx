@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, Loader2, Save, Workflow, X } from 'lucide-react';
+import { AlertTriangle, ChevronRight, Loader2, Save, Workflow, X } from 'lucide-react';
 
 import { DashboardHeader } from '@/components/dashboard-header';
 import { Button } from '@/components/ui/button';
@@ -56,7 +56,7 @@ export default function WhatsAppFlowsPage() {
   const { assistants } = useAssistants();
   const { templates, fetchTemplate } = usePostProcessingTemplates();
   const { channels, fetchTemplates } = useVobizWhatsapp();
-  const { fetchAssistantFlow, saveFlow, savingFlow } = useWhatsappFlows();
+  const { fetchAssistantFlow, fetchFlows, saveFlow, savingFlow } = useWhatsappFlows();
 
   const [direction, setDirection] = useState<DirectionFilter>('all');
   const [assistantId, setAssistantId] = useState('');
@@ -70,6 +70,8 @@ export default function WhatsAppFlowsPage() {
   const [loadingBuckets, setLoadingBuckets] = useState(false);
   const [loadingWaTemplates, setLoadingWaTemplates] = useState(false);
   const [storedOutcomeKeys, setStoredOutcomeKeys] = useState<string[] | null>(null);
+  const [existingFlows, setExistingFlows] = useState<ReturnType<typeof useWhatsappFlows> extends any ? any[] : never>([]);
+  const [loadingExistingFlows, setLoadingExistingFlows] = useState(false);
 
   const publishedAssistants = useMemo(
     () => assistants.filter((assistant) => !assistant.id.startsWith('local-')),
@@ -109,13 +111,48 @@ export default function WhatsAppFlowsPage() {
   useEffect(() => {
     let isMounted = true;
 
+    Promise.resolve().then(() => {
+      if (isMounted) {
+        setLoadingExistingFlows(true);
+      }
+    });
+    fetchFlows()
+      .then((flows) => {
+        if (isMounted) {
+          setExistingFlows(flows);
+        }
+      })
+      .catch((error) => {
+        if (isMounted) {
+          console.error('[WhatsAppFlowsPage] fetchFlows error:', error);
+          setExistingFlows([]);
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setLoadingExistingFlows(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [fetchFlows]);
+
+  useEffect(() => {
+    let isMounted = true;
+
     if (!templateId) {
       return () => {
         isMounted = false;
       };
     }
 
-    setLoadingBuckets(true);
+    Promise.resolve().then(() => {
+      if (isMounted) {
+        setLoadingBuckets(true);
+      }
+    });
     fetchTemplate(templateId)
       .then((result) => {
         if (!isMounted) return;
@@ -148,7 +185,11 @@ export default function WhatsAppFlowsPage() {
       };
     }
 
-    setLoadingFlow(true);
+    Promise.resolve().then(() => {
+      if (isMounted) {
+        setLoadingFlow(true);
+      }
+    });
     fetchAssistantFlow(assistantId, templateId)
       .then((flow) => {
         if (!isMounted) return;
@@ -191,7 +232,11 @@ export default function WhatsAppFlowsPage() {
       };
     }
 
-    setLoadingWaTemplates(true);
+    Promise.resolve().then(() => {
+      if (isMounted) {
+        setLoadingWaTemplates(true);
+      }
+    });
     fetchTemplates(connectionId)
       .then((result) => {
         if (isMounted) {
@@ -218,6 +263,17 @@ export default function WhatsAppFlowsPage() {
     () => waTemplates.filter((template) => (template.status || '').toUpperCase() === 'APPROVED'),
     [waTemplates],
   );
+  const visibleExistingFlows = useMemo(() => {
+    return existingFlows.filter((flow) => {
+      const flowDirection = flow.assistant?.call_direction;
+      if (direction === 'all') return true;
+      if (direction === 'outbound') {
+        return flowDirection === 'outbound' || flowDirection === 'both';
+      }
+
+      return flowDirection === 'inbound' || flowDirection === 'both';
+    });
+  }, [direction, existingFlows]);
   const outcomeKeyState = useMemo(
     () => areOutcomeKeysSynced(storedOutcomeKeys, buckets),
     [storedOutcomeKeys, buckets],
@@ -248,6 +304,17 @@ export default function WhatsAppFlowsPage() {
       ...current,
       [outcomeKey]: parsed,
     }));
+  };
+
+  const openExistingFlow = (assistantValue: string, templateValue: string) => {
+    setAssistantId(assistantValue);
+    setTemplateId(templateValue);
+    setBuckets([]);
+    setMappings({});
+    setWaTemplates([]);
+    setConnectionId('');
+    setEnabled(false);
+    setStoredOutcomeKeys(null);
   };
 
   const handleSave = async () => {
@@ -393,11 +460,57 @@ export default function WhatsAppFlowsPage() {
         <PaperCard variant="default" className="border-border/40">
           <PaperCardContent className="p-0">
             {!readyToEdit ? (
-              <div className="py-16 px-6 text-center space-y-3">
-                <h3 className="text-lg font-medium tracking-tight">Pick an assistant and a post-processing template to begin</h3>
-                <p className="text-sm text-muted-foreground max-w-md mx-auto">
-                  Once those are selected, we can load the outcome buckets and map each one to a WhatsApp template.
-                </p>
+              <div className="py-10 px-6 space-y-6">
+                <div className="text-center space-y-3">
+                  <h3 className="text-lg font-medium tracking-tight">Pick an assistant and a post-processing template to begin</h3>
+                  <p className="text-sm text-muted-foreground max-w-md mx-auto">
+                    Or jump into an existing saved flow below and continue editing its mappings.
+                  </p>
+                </div>
+
+                {loadingExistingFlows ? (
+                  <div className="py-10 flex flex-col items-center gap-3">
+                    <Loader2 className="animate-spin text-primary/50" />
+                    <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground">
+                      Loading saved flows...
+                    </span>
+                  </div>
+                ) : visibleExistingFlows.length > 0 ? (
+                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                    {visibleExistingFlows.map((flow) => (
+                      <button
+                        key={flow.id || `${flow.assistant_id}-${flow.post_processing_template_id}`}
+                        type="button"
+                        onClick={() => openExistingFlow(flow.assistant_id, flow.post_processing_template_id)}
+                        className="rounded-md border border-border/30 bg-muted/[0.03] p-4 text-left hover:bg-muted/40 transition-colors"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="space-y-1 min-w-0">
+                            <p className="text-sm font-medium truncate">
+                              {flow.assistant?.name || flow.assistant_id}
+                            </p>
+                            <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground truncate">
+                              {flow.post_processing_template?.name || flow.post_processing_template_id}
+                            </p>
+                          </div>
+                          <ChevronRight size={16} className="text-muted-foreground shrink-0" />
+                        </div>
+                        <div className="mt-4 space-y-1 text-[11px] text-muted-foreground">
+                          <p>
+                            Channel: {flow.whatsapp_channel_connection?.display_name || flow.whatsapp_channel_connection?.phone_number || flow.whatsapp_channel_connection_id}
+                          </p>
+                          <p>
+                            Mappings: {Object.keys(flow.mappings || {}).length}
+                          </p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="py-8 text-center text-sm text-muted-foreground">
+                    No saved WhatsApp flows yet for this direction filter.
+                  </div>
+                )}
               </div>
             ) : loadingFlow || loadingBuckets ? (
               <div className="py-20 flex flex-col items-center gap-3">

@@ -156,7 +156,7 @@ function PromptEditorDialog({
 
   return (
     <Dialog open={open} onOpenChange={(next) => { if (!saving) onOpenChange(next); }}>
-      <DialogContent className="max-w-2xl border-border/40 bg-background/95 backdrop-blur-xl">
+      <DialogContent className="max-w-2xl max-h-[90vh] border-border/40 bg-background/95 backdrop-blur-xl overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl font-medium tracking-tight">
             <FilePenLine size={18} className="text-primary" />
@@ -167,7 +167,7 @@ function PromptEditorDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="space-y-4 overflow-y-auto pr-1 flex-1 min-h-0">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Prompt Name</Label>
@@ -244,15 +244,16 @@ export default function WhatsappBotPage() {
   const [promptDialogOpen, setPromptDialogOpen] = useState(false);
   const [promptDraft, setPromptDraft] = useState<PromptDraft>(createPromptDraft());
   const [configErrors, setConfigErrors] = useState<string[]>([]);
+  const effectiveSelectedChannelId = selectedChannelId || channels[0]?.id || '';
 
   const selectedChannel = useMemo(
-    () => channels.find((channel) => channel.id === selectedChannelId) ?? null,
-    [channels, selectedChannelId],
+    () => channels.find((channel) => channel.id === effectiveSelectedChannelId) ?? null,
+    [channels, effectiveSelectedChannelId],
   );
 
   const selectedConfig = useMemo(
-    () => configs.find((config) => config.whatsapp_channel_connection_id === selectedChannelId) ?? null,
-    [configs, selectedChannelId],
+    () => configs.find((config) => config.whatsapp_channel_connection_id === effectiveSelectedChannelId) ?? null,
+    [configs, effectiveSelectedChannelId],
   );
 
   const selectedPrompt = useMemo(
@@ -270,36 +271,33 @@ export default function WhatsappBotPage() {
   }, [fetchConfigs, fetchPrompts]);
 
   useEffect(() => {
-    loadPageData().catch(() => undefined);
+    Promise.resolve().then(() => loadPageData().catch(() => undefined));
   }, [loadPageData]);
 
   useEffect(() => {
-    if (!selectedChannelId && channels.length > 0) {
-      setSelectedChannelId(channels[0].id);
-    }
-  }, [channels, selectedChannelId]);
+    if (!effectiveSelectedChannelId) return;
 
-  useEffect(() => {
-    if (!selectedChannelId) return;
-    setForm(buildFormFromConfig(selectedConfig ? {
-      ...selectedConfig,
-      whatsapp_channel_connection_id: selectedChannelId,
-    } : {
-      ...DEFAULT_WHATSAPP_BOT_CONFIG,
-      whatsapp_channel_connection_id: selectedChannelId,
-    }));
-    setConfigErrors([]);
-  }, [selectedChannelId, selectedConfig]);
+    Promise.resolve().then(() => {
+      setForm(buildFormFromConfig(selectedConfig ? {
+        ...selectedConfig,
+        whatsapp_channel_connection_id: effectiveSelectedChannelId,
+      } : {
+        ...DEFAULT_WHATSAPP_BOT_CONFIG,
+        whatsapp_channel_connection_id: effectiveSelectedChannelId,
+      }));
+      setConfigErrors([]);
+    });
+  }, [effectiveSelectedChannelId, selectedConfig]);
 
   const serializedCurrent = useMemo(() => JSON.stringify(serializeBotPayload(form)), [form]);
   const serializedSaved = useMemo(() => JSON.stringify(serializeBotPayload(buildFormFromConfig(selectedConfig ? {
     ...selectedConfig,
-    whatsapp_channel_connection_id: selectedChannelId,
+    whatsapp_channel_connection_id: effectiveSelectedChannelId,
   } : {
     ...DEFAULT_WHATSAPP_BOT_CONFIG,
-    whatsapp_channel_connection_id: selectedChannelId,
-  }))), [selectedChannelId, selectedConfig]);
-  const isDirty = selectedChannelId ? serializedCurrent !== serializedSaved : false;
+    whatsapp_channel_connection_id: effectiveSelectedChannelId,
+  }))), [effectiveSelectedChannelId, selectedConfig]);
+  const isDirty = effectiveSelectedChannelId ? serializedCurrent !== serializedSaved : false;
 
   const handlePromptDraftChange = (updates: Partial<PromptDraft>) => {
     setPromptDraft((current) => {
@@ -402,14 +400,14 @@ export default function WhatsappBotPage() {
   };
 
   const handleSave = async () => {
-    if (!selectedChannelId || !form.whatsapp_bot_prompt_id) return;
+    if (!effectiveSelectedChannelId || !form.whatsapp_bot_prompt_id) return;
     setConfigErrors([]);
 
     try {
-      const { config } = await saveConfig(selectedChannelId, serializeBotPayload(form));
+      const { config } = await saveConfig(effectiveSelectedChannelId, serializeBotPayload(form));
       if (config) {
         setConfigs((current) => {
-          const next = current.filter((item) => item.whatsapp_channel_connection_id !== selectedChannelId);
+          const next = current.filter((item) => item.whatsapp_channel_connection_id !== effectiveSelectedChannelId);
 
           return [...next, config];
         });
@@ -421,7 +419,7 @@ export default function WhatsappBotPage() {
   };
 
   const noChannels = !loadingChannels && channels.length === 0;
-  const canSave = Boolean(selectedChannelId && form.whatsapp_bot_prompt_id) && !savingConfig;
+  const canSave = Boolean(effectiveSelectedChannelId && form.whatsapp_bot_prompt_id) && !savingConfig;
 
   return (
     <div className="min-h-screen bg-background flex flex-col font-sans">
@@ -471,7 +469,7 @@ export default function WhatsappBotPage() {
             <div className="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)] items-start">
               <div className="space-y-2">
                 <PaperCardTitle>Connected Number</PaperCardTitle>
-                <Select value={selectedChannelId} onValueChange={setSelectedChannelId} disabled={noChannels}>
+                <Select value={effectiveSelectedChannelId} onValueChange={setSelectedChannelId} disabled={noChannels}>
                   <SelectTrigger className="h-11 bg-background/90 text-xs">
                     <SelectValue placeholder={noChannels ? 'Connect a WhatsApp channel first' : 'Select a WhatsApp channel'} />
                   </SelectTrigger>

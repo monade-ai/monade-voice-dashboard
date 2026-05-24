@@ -69,7 +69,7 @@ export function TemplatesTab({ whatsapp }: { whatsapp: WhatsappApi }) {
 
   const [selectedChannelId, setSelectedChannelId] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL');
-  const [templates, setTemplates] = useState<WhatsappTemplate[]>([]);
+  const [allTemplates, setAllTemplates] = useState<WhatsappTemplate[]>([]);
   const [flows, setFlows] = useState<WhatsappFlow[]>([]);
   const [loadingTemplates, setLoadingTemplates] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -83,16 +83,16 @@ export function TemplatesTab({ whatsapp }: { whatsapp: WhatsappApi }) {
     }
   }, [channels, selectedChannelId]);
 
-  const loadTemplates = useCallback(async (channelId: string, status: StatusFilter) => {
+  const loadTemplates = useCallback(async (channelId: string, _status: StatusFilter) => {
     if (!channelId) return;
     setLoadingTemplates(true);
     try {
-      const result = await fetchTemplates(channelId, status === 'ALL' ? undefined : status);
-      setTemplates(result);
+      const result = await fetchTemplates(channelId);
+      setAllTemplates(result);
     } catch (err) {
       console.error('[TemplatesTab] loadTemplates error:', err);
       toast.error(err instanceof Error ? err.message : 'Failed to load templates');
-      setTemplates([]);
+      setAllTemplates([]);
     } finally {
       setLoadingTemplates(false);
     }
@@ -138,12 +138,18 @@ export function TemplatesTab({ whatsapp }: { whatsapp: WhatsappApi }) {
 
   const usageByTemplate = useMemo(() => {
     const map = new Map<string, TemplateUsage[]>();
-    templates.forEach((template) => {
+    allTemplates.forEach((template) => {
       map.set(`${template.name}::${template.language}`, collectUsage(template, flows));
     });
 
     return map;
-  }, [templates, flows]);
+  }, [allTemplates, flows]);
+
+  const templates = useMemo(() => {
+    if (statusFilter === 'ALL') return allTemplates;
+
+    return allTemplates.filter((template) => (template.status || '').toUpperCase() === statusFilter);
+  }, [allTemplates, statusFilter]);
 
   const channelOptions = useMemo(
     () => channels.map((channel) => ({
