@@ -35,8 +35,15 @@ import { TemplateStatusBadge } from '../whatsapp/components/status-badges';
 
 type DirectionFilter = 'all' | 'outbound' | 'inbound';
 type MappingState = Record<string, { template_name: string; language: string }>;
+type FlowBucket = QualificationBucket & { system?: boolean };
 
 const HEAD_CLASS = 'text-[9px] font-bold uppercase tracking-[0.18em] text-muted-foreground/70';
+const DID_NOT_PICK_UP_BUCKET: FlowBucket = {
+  key: 'did_not_pick_up',
+  label: 'Call not picked up / No answer',
+  description: 'System bucket used for unanswered calls. Map it to any approved WhatsApp template you want to send.',
+  system: true,
+};
 
 const optionValueForTemplate = (templateName: string, language: string) => `${templateName}__${language}`;
 
@@ -277,6 +284,10 @@ export default function WhatsAppFlowsPage() {
   const outcomeKeyState = useMemo(
     () => areOutcomeKeysSynced(storedOutcomeKeys, buckets),
     [storedOutcomeKeys, buckets],
+  );
+  const flowBuckets = useMemo<FlowBucket[]>(
+    () => [...buckets, DID_NOT_PICK_UP_BUCKET],
+    [buckets],
   );
   const hasInvalidOutcomeKeys = Boolean(templateId) && buckets.length > 0 && !outcomeKeyState.valid;
 
@@ -519,7 +530,7 @@ export default function WhatsAppFlowsPage() {
                   Loading flow...
                 </span>
               </div>
-            ) : buckets.length === 0 ? (
+            ) : flowBuckets.length === 0 ? (
               <div className="py-16 px-6 text-center space-y-3">
                 <h3 className="text-lg font-medium tracking-tight">This template has no outcomes yet</h3>
                 <p className="text-sm text-muted-foreground max-w-md mx-auto">
@@ -557,7 +568,7 @@ export default function WhatsAppFlowsPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {buckets.map((bucket) => {
+                    {flowBuckets.map((bucket) => {
                       const mapping = mappings[bucket.key];
                       const currentValue = mapping
                         ? optionValueForTemplate(mapping.template_name, mapping.language)
@@ -579,7 +590,14 @@ export default function WhatsAppFlowsPage() {
                           <TableCell className="font-mono text-xs text-foreground">{bucket.key}</TableCell>
                           <TableCell>
                             <div>
-                              <p className="text-sm font-medium">{bucket.label}</p>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <p className="text-sm font-medium">{bucket.label}</p>
+                                {bucket.system ? (
+                                  <span className="rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.16em] text-primary">
+                                    System
+                                  </span>
+                                ) : null}
+                              </div>
                               {bucket.description ? (
                                 <p className="mt-1 text-[11px] text-muted-foreground max-w-[320px]">
                                   {bucket.description}

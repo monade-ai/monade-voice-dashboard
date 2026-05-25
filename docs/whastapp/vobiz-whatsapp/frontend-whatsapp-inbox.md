@@ -93,8 +93,22 @@ Sender values:
 
 - `user`: customer inbound message
 - `bot`: Monade WhatsApp bot reply
-- `template`: outbound template follow-up
 - `status`: delivery/read/reply status event
+
+Template follow-ups are returned as bot turns:
+
+```json
+{
+  "direction": "outbound",
+  "sender": "bot",
+  "message_type": "template",
+  "text": "Hey Shashwat, Sara here from College Vidya..."
+}
+```
+
+Render these in the same outbound bot-message lane as normal bot replies. Use `message_type: "template"` only if you want a small template/business-message visual treatment. The `text` field is the display preview; for older Redis rows the API may also include `template_text` with the original approved template body before variable substitution.
+
+`sender: "status"` rows are delivery/read events. The inbox UI can either hide them from the chat transcript and use them to decorate the related outbound message, or show them in a compact system style.
 
 ## Clear A Thread
 

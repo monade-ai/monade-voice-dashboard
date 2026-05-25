@@ -75,6 +75,9 @@ const messageTone = (message: WhatsappInboxMessage) => {
   if (message.sender === 'user') {
     return 'bg-muted text-foreground border-border/30 self-start';
   }
+  if (message.sender === 'template' || message.message_type === 'template') {
+    return 'bg-primary/10 text-foreground border-primary/20 self-end';
+  }
 
   return 'bg-foreground text-background border-foreground/20 self-end';
 };
@@ -145,7 +148,12 @@ export default function WhatsappInboxPage() {
   );
 
   const visibleMessages = useMemo(() => {
-    return messages.filter((message) => message.sender === 'user' || message.sender === 'bot');
+    return messages.filter((message) => (
+      message.sender === 'user'
+      || message.sender === 'bot'
+      || message.sender === 'template'
+      || message.message_type === 'template'
+    ));
   }, [messages]);
 
   const filteredThreads = useMemo(() => {
