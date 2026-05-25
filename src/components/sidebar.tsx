@@ -28,6 +28,7 @@ import {
   Bot,
   MessageCircle,
   Workflow,
+  Inbox,
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 
@@ -211,6 +212,12 @@ export function Sidebar() {
           icon={<Bot />}
           label="WhatsApp Bot"
           isActive={pathname === '/whatsapp-bot'}
+        />
+        <NavItem
+          href="/whatsapp-inbox"
+          icon={<Inbox />}
+          label="WhatsApp Inbox"
+          isActive={pathname === '/whatsapp-inbox'}
         />
 
         <CategoryLabel>Archive</CategoryLabel>
