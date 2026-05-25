@@ -75,12 +75,6 @@ const messageTone = (message: WhatsappInboxMessage) => {
   if (message.sender === 'user') {
     return 'bg-muted text-foreground border-border/30 self-start';
   }
-  if (message.sender === 'status') {
-    return 'bg-background text-muted-foreground border-border/20 self-center';
-  }
-  if (message.sender === 'template') {
-    return 'bg-primary/10 text-foreground border-primary/20 self-end';
-  }
 
   return 'bg-foreground text-background border-foreground/20 self-end';
 };
@@ -149,6 +143,10 @@ export default function WhatsappInboxPage() {
     () => threads.find((thread) => thread.thread_id === selectedThreadId) ?? null,
     [selectedThreadId, threads],
   );
+
+  const visibleMessages = useMemo(() => {
+    return messages.filter((message) => message.sender === 'user' || message.sender === 'bot');
+  }, [messages]);
 
   const filteredThreads = useMemo(() => {
     return threads.filter((thread) => {
@@ -321,9 +319,14 @@ export default function WhatsappInboxPage() {
             <>
           <PaperCard variant="default" className="border-border/40">
             <PaperCardHeader className="p-6 pb-4">
-              <div className="space-y-1">
+              <div className="flex items-start justify-between gap-4">
+                <div className="space-y-1">
                 <PaperCardTitle>Thread Rail</PaperCardTitle>
                 <h2 className="text-2xl font-medium tracking-tight">Unified Conversations</h2>
+                </div>
+                <div className="rounded-full border border-border/30 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                  {filteredThreads.length} number{filteredThreads.length === 1 ? '' : 's'}
+                </div>
               </div>
             </PaperCardHeader>
             <PaperCardContent className="p-0">
@@ -353,7 +356,7 @@ export default function WhatsappInboxPage() {
                         <div
                           key={thread.thread_id}
                           className={cn(
-                            'w-full rounded-md border p-4 transition-all',
+                            'w-full rounded-md border p-3 transition-all',
                             isActive ? 'border-primary/30 bg-primary/10' : 'border-border/20 hover:bg-muted/40',
                           )}
                         >
@@ -374,7 +377,7 @@ export default function WhatsappInboxPage() {
                               </span>
                             </div>
 
-                            <div className="mt-3 flex items-center gap-2 text-[11px] text-muted-foreground">
+                            <div className="mt-2 flex items-center gap-2 text-[10px] text-muted-foreground">
                               {thread.last_direction ? (
                                 <span className="rounded-full border border-border/20 px-2 py-0.5 uppercase tracking-[0.16em]">
                                   {thread.last_direction}
@@ -387,12 +390,12 @@ export default function WhatsappInboxPage() {
                               ) : null}
                             </div>
 
-                            <p className="mt-3 text-sm text-muted-foreground line-clamp-2 min-h-[40px]">
+                            <p className="mt-2 text-xs text-muted-foreground line-clamp-2 min-h-[32px]">
                               {thread.last_text || 'No preview available'}
                             </p>
                           </button>
 
-                          <div className="mt-4 flex items-center justify-between gap-3">
+                          <div className="mt-3 flex items-center justify-between gap-3">
                             <span className="text-[10px] font-mono text-muted-foreground truncate">
                               {thread.waba_id || 'No WABA'}
                             </span>
@@ -473,18 +476,18 @@ export default function WhatsappInboxPage() {
                   <Loader2 className="animate-spin text-primary/50" />
                   <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground">Loading messages...</span>
                 </div>
-              ) : messages.length === 0 ? (
+              ) : visibleMessages.length === 0 ? (
                 <div className="py-24 px-6 text-center space-y-3">
                   <MessageCircle className="mx-auto text-primary/50" size={28} />
-                  <h3 className="text-lg font-medium tracking-tight">No messages in this thread</h3>
+                  <h3 className="text-lg font-medium tracking-tight">No user or bot messages in this thread</h3>
                   <p className="text-sm text-muted-foreground max-w-sm mx-auto">
-                    This thread exists in the Redis index, but the message log is empty or has already been cleared.
+                    Status events are hidden here, so this thread currently has no visible conversation messages to show.
                   </p>
                 </div>
               ) : (
                 <ScrollArea className="h-[72vh]">
                   <div className="p-6 space-y-4">
-                    {messages.map((message) => (
+                    {visibleMessages.map((message) => (
                       <div
                         key={message.id}
                         className={cn(
