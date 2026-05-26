@@ -109,6 +109,44 @@ const GEMINI_VOICE_OPTIONS = [
   { value: 'Orus', label: 'Arjun', tone: 'Crisp and articulate.' },
 ] as const;
 
+const VOICE_MODEL_OPTIONS = [
+  { value: 'gemini-2.5-native-audio', label: 'Gemini 2.5 Native Audio', tone: 'Original native-audio model.' },
+  { value: 'gemini-3.1-live', label: 'Gemini 3.1 Live', tone: 'New live model with thinking levels.' },
+] as const;
+type VoiceModelId = typeof VOICE_MODEL_OPTIONS[number]['value'];
+
+type ThinkingLevel = 'minimal' | 'low' | 'medium' | 'high';
+const THINKING_LEVEL_OPTIONS: { value: ThinkingLevel; label: string; description: string }[] = [
+  { value: 'minimal', label: 'Minimal', description: 'No thinking — fastest, cheapest.' },
+  { value: 'low', label: 'Low', description: 'Light thinking — quick and economical.' },
+  { value: 'medium', label: 'Medium', description: 'Balanced thinking.' },
+  { value: 'high', label: 'High', description: 'Deep thinking — highest quality.' },
+];
+
+const isThinkingLevel = (v: unknown): v is ThinkingLevel => (
+  v === 'minimal' || v === 'low' || v === 'medium' || v === 'high'
+);
+
+const readThinkingLevel = (toolsConfig: any): ThinkingLevel => {
+  const raw = String(toolsConfig?.model_config?.thinking_level ?? '').toLowerCase();
+
+  return isThinkingLevel(raw) ? raw : 'minimal';
+};
+
+const inferVoiceModel = (toolsConfig: any): VoiceModelId => (
+  toolsConfig?.model_config && 'thinking_level' in toolsConfig.model_config
+    ? 'gemini-3.1-live'
+    : 'gemini-2.5-native-audio'
+);
+
+const budgetToLevel = (budget: number): ThinkingLevel => {
+  if (!Number.isFinite(budget) || budget <= 0) return 'minimal';
+  if (budget <= 1024) return 'low';
+  if (budget <= 8192) return 'medium';
+
+  return 'high';
+};
+
 type VadSensitivity = 'HIGH' | 'LOW' | null;
 type RealtimeInputConfig = {
   start_of_speech_sensitivity: VadSensitivity;
@@ -192,6 +230,9 @@ export default function AssistantStudio() {
     || GEMINI_VOICE_OPTIONS.find((voice) => voice.value === 'Kore');
   const hasUnsavedVoiceChange = (selectedVoiceValue || null) !== savedVoiceValue;
 
+  const [selectedVoiceModel, setSelectedVoiceModel] = useState<VoiceModelId>(() => inferVoiceModel(currentAssistant?.toolsConfig));
+  const thinkingLevel = readThinkingLevel(currentAssistant?.toolsConfig);
+
   const syncToolsFromBackend = useCallback(async (assistantId: string) => {
     try {
       setIsSyncingTools(true);
@@ -231,6 +272,10 @@ export default function AssistantStudio() {
   useEffect(() => {
     setSavedVoiceValue(currentAssistant?.voice || null);
   }, [currentAssistant?.id, currentAssistant?.voice]);
+
+  useEffect(() => {
+    setSelectedVoiceModel(inferVoiceModel(currentAssistant?.toolsConfig));
+  }, [currentAssistant?.id]);
 
   useEffect(() => {
     if (!currentAssistant?.id || isDraft) return;
@@ -452,6 +497,39 @@ export default function AssistantStudio() {
     const nextToolsConfig = {
       ...(currentAssistant.toolsConfig || {}),
       realtime_input: nextRealtimeInput,
+    };
+    handleUpdate('toolsConfig' as keyof Assistant, nextToolsConfig);
+  };
+
+  const updateVoiceModel = (next: VoiceModelId) => {
+    if (!currentAssistant) return;
+    setSelectedVoiceModel(next);
+    const existing = { ...(currentAssistant.toolsConfig?.model_config || {}) };
+    if (next === 'gemini-3.1-live') {
+      if ('thinking_budget' in existing) {
+        existing.thinking_level = budgetToLevel(Number(existing.thinking_budget));
+        delete existing.thinking_budget;
+      } else if (!isThinkingLevel(existing.thinking_level)) {
+        existing.thinking_level = 'minimal';
+      }
+    } else {
+      delete existing.thinking_level;
+    }
+    const nextToolsConfig = {
+      ...(currentAssistant.toolsConfig || {}),
+      model_config: existing,
+    };
+    handleUpdate('toolsConfig' as keyof Assistant, nextToolsConfig);
+  };
+
+  const updateThinkingLevel = (level: ThinkingLevel) => {
+    if (!currentAssistant) return;
+    const nextModelConfig = { ...(currentAssistant.toolsConfig?.model_config || {}) };
+    nextModelConfig.thinking_level = level;
+    delete nextModelConfig.thinking_budget;
+    const nextToolsConfig = {
+      ...(currentAssistant.toolsConfig || {}),
+      model_config: nextModelConfig,
     };
     handleUpdate('toolsConfig' as keyof Assistant, nextToolsConfig);
   };
@@ -1309,6 +1387,64 @@ export default function AssistantStudio() {
                 </div>
               </PaperCardHeader>
               <PaperCardContent className="p-6 pt-3 space-y-4">
+                {/* Model selector — frontend-only switch between Gemini 2.5 Native Audio and Gemini 3.1 Live */}
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 px-1">
+                    Model
+                  </label>
+                  <Select
+                    value={selectedVoiceModel}
+                    onValueChange={(value) => updateVoiceModel(value as VoiceModelId)}
+                  >
+                    <SelectTrigger className="w-full h-10 border-border/40 bg-muted/20 text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {VOICE_MODEL_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          <div className="flex flex-col">
+                            <span className="font-medium">{option.label}</span>
+                            <span className="text-[10px] text-muted-foreground">{option.tone}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-[10px] text-muted-foreground/60 px-1 italic leading-relaxed">
+                    Pick the underlying Gemini model. 3.1 Live exposes a thinking level instead of a thinking budget.
+                  </p>
+                </div>
+
+                {/* Thinking Level — 3.1 Live only */}
+                {selectedVoiceModel === 'gemini-3.1-live' && (
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 px-1">
+                      Thinking Level
+                    </label>
+                    <Select
+                      value={thinkingLevel}
+                      onValueChange={(value) => updateThinkingLevel(value as ThinkingLevel)}
+                    >
+                      <SelectTrigger className="w-full h-10 border-border/40 bg-muted/20 text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {THINKING_LEVEL_OPTIONS.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            <div className="flex flex-col">
+                              <span className="font-medium">{option.label}</span>
+                              <span className="text-[10px] text-muted-foreground">{option.description}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-[10px] text-muted-foreground/60 px-1 italic leading-relaxed">
+                      Replaces the legacy <em>thinking_budget</em> field. Sent on save as <span className="font-mono">model_config.thinking_level</span>.
+                    </p>
+                  </div>
+                )}
+
                 {/* Speech Detection (VAD) tweaks */}
                 <div className="space-y-4">
                   <div className="space-y-1">
