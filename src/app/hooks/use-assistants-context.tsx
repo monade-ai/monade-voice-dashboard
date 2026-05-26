@@ -83,6 +83,10 @@ type UpdateAssistantData = Partial<Omit<Assistant, 'id' | 'createdAt' | 'knowled
   knowledgeBaseId?: string | null; // Use ID or null for updating link
 };
 
+type SaveAssistantOptions = {
+  silentSuccess?: boolean;
+};
+
 
 interface AssistantsContextType {
   assistants: Assistant[];
@@ -93,7 +97,7 @@ interface AssistantsContextType {
   updateAssistantLocally: (id: string, updatedData: Partial<Assistant>) => void; // Updates state + localStorage for drafts
   deleteAssistant: (id: string) => Promise<boolean>; // Handles both drafts (local) and published (API)
   fetchAssistants: () => Promise<void>; // Fetches API assistants, merges with local drafts
-  saveAssistantUpdates: (id: string, updatedData: UpdateAssistantData) => Promise<Assistant | undefined>; // Saves published assistants
+  saveAssistantUpdates: (id: string, updatedData: UpdateAssistantData, options?: SaveAssistantOptions) => Promise<Assistant | undefined>; // Saves published assistants
 }
 
 // Create context with default values
@@ -362,7 +366,11 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
   };
 
   // Saves updates for an EXISTING PUBLISHED assistant to the backend
-  const saveAssistantUpdates = async (id: string, updatedData: UpdateAssistantData): Promise<Assistant | undefined> => {
+  const saveAssistantUpdates = async (
+    id: string,
+    updatedData: UpdateAssistantData,
+    options?: SaveAssistantOptions,
+  ): Promise<Assistant | undefined> => {
     if (id.startsWith('local-')) {
       console.error('Attempted to save updates for a draft assistant using saveAssistantUpdates. Use createAssistant (publish) instead.');
       toast({ title: 'Error', description: 'Cannot save changes for a draft. Publish it first.' });
@@ -450,7 +458,9 @@ export const AssistantsProvider = ({ children }: { children: ReactNode }) => {
       };
 
       console.log('[Assistants] PATCH Success, updated:', processedAssistant);
-      toast({ title: 'Success', description: 'Assistant updates saved.' });
+      if (!options?.silentSuccess) {
+        toast({ title: 'Success', description: 'Assistant updates saved.' });
+      }
 
       // Update local state with confirmed data
       setAssistants((prev) =>

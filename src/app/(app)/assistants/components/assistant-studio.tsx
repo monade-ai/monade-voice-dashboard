@@ -359,7 +359,7 @@ export default function AssistantStudio() {
       const savedAssistant = await saveAssistantUpdates(id, {
         ...updates,
         knowledgeBaseId: knowledgeBase,
-      });
+      }, { silentSuccess: true });
       const nextRealtimeInput = readRealtimeInput(currentAssistant.toolsConfig);
       const hasRealtimeInputConfig = !!currentAssistant.toolsConfig?.realtime_input || !!currentAssistant.toolsConfig?.vad;
       if (hasRealtimeInputConfig) {
@@ -385,6 +385,7 @@ export default function AssistantStudio() {
       setSavedVoiceValue(currentAssistant.voice || null);
       setIsDirty(false);
       setSaveStatus('saved');
+      toast.success('Assistant saved successfully.');
       setTimeout(() => setSaveStatus('idle'), 2000);
     } catch (_err) {
       setSaveStatus('error');
