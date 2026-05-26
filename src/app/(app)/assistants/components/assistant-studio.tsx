@@ -106,7 +106,7 @@ const GEMINI_VOICE_OPTIONS = [
   { value: 'Sulafat', label: 'Kavya', tone: 'Warm middle pitch.' },
   { value: 'Vindemiatrix', label: 'Naina', tone: 'Gentle middle pitch.' },
   { value: 'Despina', label: 'Ishita', tone: 'Smooth middle pitch.' },
-  { value: 'Pulcherrima', label: 'Suhani', tone: 'Forward middle pitch.' },
+  { value: 'Pulcherrima', label: 'Kunal', tone: 'Forward middle pitch.' },
   { value: 'Puck', label: 'Rohan', tone: 'Conversational and friendly.' },
   { value: 'Achird', label: 'Kabir', tone: 'Friendly middle tone.' },
   { value: 'Charon', label: 'Vikram', tone: 'Deep and authoritative.' },
