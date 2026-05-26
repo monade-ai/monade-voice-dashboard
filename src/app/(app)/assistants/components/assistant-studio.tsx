@@ -133,6 +133,18 @@ const readThinkingLevel = (toolsConfig: any): ThinkingLevel => {
   return isThinkingLevel(raw) ? raw : 'minimal';
 };
 
+const TEMPERATURE_DEFAULT = 0.7;
+const TEMPERATURE_MIN = 0;
+const TEMPERATURE_MAX = 2;
+
+const readTemperature = (toolsConfig: any): number => {
+  const raw = toolsConfig?.model_config?.temperature;
+  const n = typeof raw === 'number' ? raw : Number(raw);
+  if (!Number.isFinite(n)) return TEMPERATURE_DEFAULT;
+
+  return Math.min(TEMPERATURE_MAX, Math.max(TEMPERATURE_MIN, n));
+};
+
 const inferVoiceModel = (toolsConfig: any): VoiceModelId => {
   const hasThinkingLevel = !!toolsConfig?.model_config && 'thinking_level' in toolsConfig.model_config;
   const hasNoiseCancellation = !!toolsConfig?.noise_cancellation;
@@ -256,6 +268,12 @@ export default function AssistantStudio() {
   const selectedVoiceModel = inferVoiceModel(currentAssistant?.toolsConfig);
   const thinkingLevel = readThinkingLevel(currentAssistant?.toolsConfig);
   const noiseCancellationModel = readNoiseCancellation(currentAssistant?.toolsConfig);
+  const temperature = readTemperature(currentAssistant?.toolsConfig);
+  const [temperatureInput, setTemperatureInput] = useState<string>(String(temperature));
+
+  useEffect(() => {
+    setTemperatureInput(String(readTemperature(currentAssistant?.toolsConfig)));
+  }, [currentAssistant?.id]);
 
   const syncToolsFromBackend = useCallback(async (assistantId: string) => {
     try {
@@ -546,6 +564,23 @@ export default function AssistantStudio() {
     const nextModelConfig = { ...(currentAssistant.toolsConfig?.model_config || {}) };
     nextModelConfig.thinking_level = level;
     delete nextModelConfig.thinking_budget;
+    const nextToolsConfig = {
+      ...(currentAssistant.toolsConfig || {}),
+      model_config: nextModelConfig,
+    };
+    handleUpdate('toolsConfig' as keyof Assistant, nextToolsConfig);
+  };
+
+  const commitTemperature = (raw: string) => {
+    if (!currentAssistant) return;
+    const trimmed = raw.trim();
+    const n = trimmed === '' ? TEMPERATURE_DEFAULT : Number(trimmed);
+    const clamped = Number.isFinite(n)
+      ? Math.min(TEMPERATURE_MAX, Math.max(TEMPERATURE_MIN, n))
+      : TEMPERATURE_DEFAULT;
+    setTemperatureInput(String(clamped));
+    const nextModelConfig = { ...(currentAssistant.toolsConfig?.model_config || {}) };
+    nextModelConfig.temperature = clamped;
     const nextToolsConfig = {
       ...(currentAssistant.toolsConfig || {}),
       model_config: nextModelConfig,
@@ -1481,6 +1516,35 @@ export default function AssistantStudio() {
                     </Select>
                     <p className="text-[10px] text-muted-foreground/60 px-1 italic leading-relaxed">
                       Replaces the legacy <em>thinking_budget</em> field. Sent on save as <span className="font-mono">model_config.thinking_level</span>.
+                    </p>
+                  </div>
+                )}
+
+                {/* Temperature — 3.1 Live only */}
+                {selectedVoiceModel === 'gemini-3.1-live' && (
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 px-1">
+                      Temperature
+                    </label>
+                    <Input
+                      type="number"
+                      min={TEMPERATURE_MIN}
+                      max={TEMPERATURE_MAX}
+                      step={0.1}
+                      value={temperatureInput}
+                      onChange={(e) => setTemperatureInput(e.target.value)}
+                      onBlur={(e) => commitTemperature(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          commitTemperature((e.target as HTMLInputElement).value);
+                        }
+                      }}
+                      placeholder={String(TEMPERATURE_DEFAULT)}
+                      className="h-10 bg-muted/20 border-border/40 font-mono text-sm focus:border-primary transition-all rounded-md px-3"
+                    />
+                    <p className="text-[10px] text-muted-foreground/60 px-1 italic leading-relaxed">
+                      Float between {TEMPERATURE_MIN} and {TEMPERATURE_MAX}. Higher = more creative, lower = more deterministic. Sent on save as <span className="font-mono">model_config.temperature</span>.
                     </p>
                   </div>
                 )}

@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Phone, X, Plus } from 'lucide-react';
+import { Phone, X, Plus, History } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -34,6 +34,38 @@ const COUNTRY_CODES = [
   { code: '+81', label: 'Japan' },
   { code: '+86', label: 'China' },
 ];
+
+const RECENT_NUMBERS_KEY = 'monade.phone-dialog.recents';
+const RECENT_NUMBERS_MAX = 8;
+
+const loadRecentNumbers = (): string[] => {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = window.localStorage.getItem(RECENT_NUMBERS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+
+    return Array.isArray(parsed) ? parsed.filter((v): v is string => typeof v === 'string' && v.length > 0) : [];
+  } catch {
+    return [];
+  }
+};
+
+const saveRecentNumbers = (recents: string[]) => {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(RECENT_NUMBERS_KEY, JSON.stringify(recents));
+  } catch {
+    // localStorage may be unavailable (private mode, quota) — silently skip
+  }
+};
+
+const addRecentNumber = (current: string[], number: string): string[] => {
+  const cleaned = number.trim();
+  if (!cleaned) return current;
+
+  return [cleaned, ...current.filter((n) => n !== cleaned)].slice(0, RECENT_NUMBERS_MAX);
+};
 
 interface CalleeInfo {
   [key: string]: string;
@@ -72,6 +104,7 @@ export function NewPhoneDialog({
   const [newKey, setNewKey] = useState('');
   const [newValue, setNewValue] = useState('');
   const [selectedTrunk, setSelectedTrunk] = useState(callProvider || 'vobiz');
+  const [recentNumbers, setRecentNumbers] = useState<string[]>([]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -98,7 +131,22 @@ export function NewPhoneDialog({
     }
 
     setError('');
+    const nextRecents = addRecentNumber(recentNumbers, fullNumber);
+    setRecentNumbers(nextRecents);
+    saveRecentNumbers(nextRecents);
     onCall(fullNumber, calleeInfo, selectedTrunk);
+  };
+
+  const fillFromRecent = (number: string) => {
+    setPhoneNumber(number);
+    setCountryCode('');
+    setError('');
+  };
+
+  const removeRecent = (number: string) => {
+    const next = recentNumbers.filter((n) => n !== number);
+    setRecentNumbers(next);
+    saveRecentNumbers(next);
   };
 
   const addCalleeInfoField = () => {
@@ -224,6 +272,37 @@ export function NewPhoneDialog({
                 className={`flex-1 ${error ? 'border-red-300' : ''}`}
               />
             </div>
+            {recentNumbers.length > 0 && (
+              <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+                  <History className="h-3 w-3" />
+                  Recent
+                </span>
+                {recentNumbers.map((number) => (
+                  <span
+                    key={number}
+                    className="group inline-flex items-center gap-1 pl-2 pr-1 py-0.5 rounded-full bg-muted text-[11px] font-mono hover:bg-muted/70 transition-colors"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => fillFromRecent(number)}
+                      className="hover:text-foreground transition-colors"
+                      title="Use this number"
+                    >
+                      {number}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => removeRecent(number)}
+                      className="rounded-full p-0.5 text-muted-foreground hover:text-foreground hover:bg-background transition-colors"
+                      title="Remove from recents"
+                    >
+                      <X className="h-2.5 w-2.5" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Call Provider */}
@@ -342,6 +421,7 @@ export function NewPhoneDialog({
       setNewKey('');
       setNewValue('');
       setSelectedTrunk(callProvider || 'vobiz');
+      setRecentNumbers(loadRecentNumbers());
     }
   }, [isOpen, assistantName, callProvider]);
 
