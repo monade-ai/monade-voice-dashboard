@@ -133,11 +133,13 @@ const readThinkingLevel = (toolsConfig: any): ThinkingLevel => {
   return isThinkingLevel(raw) ? raw : 'minimal';
 };
 
-const inferVoiceModel = (toolsConfig: any): VoiceModelId => (
-  toolsConfig?.model_config && 'thinking_level' in toolsConfig.model_config
-    ? 'gemini-3.1-live'
-    : 'gemini-2.5-native-audio'
-);
+const inferVoiceModel = (toolsConfig: any): VoiceModelId => {
+  const hasThinkingLevel = !!toolsConfig?.model_config && 'thinking_level' in toolsConfig.model_config;
+  const hasNoiseCancellation = !!toolsConfig?.noise_cancellation;
+  if (hasThinkingLevel || hasNoiseCancellation) return 'gemini-3.1-live';
+
+  return 'gemini-2.5-native-audio';
+};
 
 const budgetToLevel = (budget: number): ThinkingLevel => {
   if (!Number.isFinite(budget) || budget <= 0) return 'minimal';
@@ -145,6 +147,27 @@ const budgetToLevel = (budget: number): ThinkingLevel => {
   if (budget <= 8192) return 'medium';
 
   return 'high';
+};
+
+type NoiseCancellationModel = 'default' | 'auto' | 'bvc_telephony' | 'bvc' | 'nc';
+const NOISE_CANCELLATION_OPTIONS: { value: NoiseCancellationModel; label: string; description: string }[] = [
+  { value: 'default', label: 'Default', description: 'Backend chooses (BVC Telephony).' },
+  { value: 'auto', label: 'Auto', description: 'BVC Telephony for SIP, BVC otherwise.' },
+  { value: 'bvc_telephony', label: 'BVC Telephony', description: 'Force BVC Telephony.' },
+  { value: 'bvc', label: 'BVC', description: 'Force BVC.' },
+  { value: 'nc', label: 'NC', description: 'Force NC.' },
+];
+
+const isNoiseCancellationModel = (v: unknown): v is Exclude<NoiseCancellationModel, 'default'> => (
+  v === 'auto' || v === 'bvc_telephony' || v === 'bvc' || v === 'nc'
+);
+
+const readNoiseCancellation = (toolsConfig: any): NoiseCancellationModel => {
+  const nc = toolsConfig?.noise_cancellation;
+  if (!nc) return 'default';
+  const raw = String(nc.model ?? '').toLowerCase();
+
+  return isNoiseCancellationModel(raw) ? raw : 'default';
 };
 
 type VadSensitivity = 'HIGH' | 'LOW' | null;
@@ -230,8 +253,9 @@ export default function AssistantStudio() {
     || GEMINI_VOICE_OPTIONS.find((voice) => voice.value === 'Kore');
   const hasUnsavedVoiceChange = (selectedVoiceValue || null) !== savedVoiceValue;
 
-  const [selectedVoiceModel, setSelectedVoiceModel] = useState<VoiceModelId>(() => inferVoiceModel(currentAssistant?.toolsConfig));
+  const selectedVoiceModel = inferVoiceModel(currentAssistant?.toolsConfig);
   const thinkingLevel = readThinkingLevel(currentAssistant?.toolsConfig);
+  const noiseCancellationModel = readNoiseCancellation(currentAssistant?.toolsConfig);
 
   const syncToolsFromBackend = useCallback(async (assistantId: string) => {
     try {
@@ -272,10 +296,6 @@ export default function AssistantStudio() {
   useEffect(() => {
     setSavedVoiceValue(currentAssistant?.voice || null);
   }, [currentAssistant?.id, currentAssistant?.voice]);
-
-  useEffect(() => {
-    setSelectedVoiceModel(inferVoiceModel(currentAssistant?.toolsConfig));
-  }, [currentAssistant?.id]);
 
   useEffect(() => {
     if (!currentAssistant?.id || isDraft) return;
@@ -503,8 +523,8 @@ export default function AssistantStudio() {
 
   const updateVoiceModel = (next: VoiceModelId) => {
     if (!currentAssistant) return;
-    setSelectedVoiceModel(next);
     const existing = { ...(currentAssistant.toolsConfig?.model_config || {}) };
+    const nextToolsConfig: Record<string, any> = { ...(currentAssistant.toolsConfig || {}) };
     if (next === 'gemini-3.1-live') {
       if ('thinking_budget' in existing) {
         existing.thinking_level = budgetToLevel(Number(existing.thinking_budget));
@@ -514,11 +534,10 @@ export default function AssistantStudio() {
       }
     } else {
       delete existing.thinking_level;
+      // 2.5 doesn't use noise_cancellation — strip if present so toolsConfig matches model
+      delete nextToolsConfig.noise_cancellation;
     }
-    const nextToolsConfig = {
-      ...(currentAssistant.toolsConfig || {}),
-      model_config: existing,
-    };
+    nextToolsConfig.model_config = existing;
     handleUpdate('toolsConfig' as keyof Assistant, nextToolsConfig);
   };
 
@@ -531,6 +550,17 @@ export default function AssistantStudio() {
       ...(currentAssistant.toolsConfig || {}),
       model_config: nextModelConfig,
     };
+    handleUpdate('toolsConfig' as keyof Assistant, nextToolsConfig);
+  };
+
+  const updateNoiseCancellation = (model: NoiseCancellationModel) => {
+    if (!currentAssistant) return;
+    const nextToolsConfig: Record<string, any> = { ...(currentAssistant.toolsConfig || {}) };
+    if (model === 'default') {
+      delete nextToolsConfig.noise_cancellation;
+    } else {
+      nextToolsConfig.noise_cancellation = { enabled: true, model };
+    }
     handleUpdate('toolsConfig' as keyof Assistant, nextToolsConfig);
   };
 
@@ -1366,24 +1396,34 @@ export default function AssistantStudio() {
             {/* Voice Lab — always visible, including drafts. Lives directly under the Voice card. Scope: VAD/Speech Detection only. */}
             <PaperCard className="border-primary/30 bg-primary/[0.02]">
               <PaperCardHeader className="p-6 pb-2">
-                <div className="flex items-center gap-2">
-                  <Settings2 size={14} className="text-primary" />
-                  <h4 className="text-[10px] font-bold uppercase tracking-[0.2em] text-foreground">Voice Lab</h4>
-                  <Badge variant="secondary" className="text-[8px] bg-primary/10 text-primary border-primary/20 uppercase">Beta</Badge>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button
-                        type="button"
-                        className="inline-flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
-                        aria-label="About Voice Lab"
-                      >
-                        <Info size={12} />
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent side="top" className="max-w-[280px] text-[11px] leading-relaxed">
-                      Fine-tune how the agent listens — when to start hearing the caller, when to decide they&apos;re done, and how much padding to capture around speech. Voice selection lives in the Voice card above.
-                    </TooltipContent>
-                  </Tooltip>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Settings2 size={14} className="text-primary" />
+                    <h4 className="text-[10px] font-bold uppercase tracking-[0.2em] text-foreground">Voice Lab</h4>
+                    <Badge variant="secondary" className="text-[8px] bg-primary/10 text-primary border-primary/20 uppercase">Beta</Badge>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          type="button"
+                          className="inline-flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+                          aria-label="About Voice Lab"
+                        >
+                          <Info size={12} />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-[280px] text-[11px] leading-relaxed">
+                        Fine-tune how the agent listens — when to start hearing the caller, when to decide they&apos;re done, and how much padding to capture around speech. Voice selection lives in the Voice card above.
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                  {isDirty && (
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse" />
+                      <span className="text-[9px] font-bold uppercase tracking-widest text-orange-500">
+                        {isDraft ? 'Publish to apply' : 'Unsaved — save assistant'}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </PaperCardHeader>
               <PaperCardContent className="p-6 pt-3 space-y-4">
@@ -1441,6 +1481,36 @@ export default function AssistantStudio() {
                     </Select>
                     <p className="text-[10px] text-muted-foreground/60 px-1 italic leading-relaxed">
                       Replaces the legacy <em>thinking_budget</em> field. Sent on save as <span className="font-mono">model_config.thinking_level</span>.
+                    </p>
+                  </div>
+                )}
+
+                {/* Noise Cancellation — 3.1 Live only */}
+                {selectedVoiceModel === 'gemini-3.1-live' && (
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 px-1">
+                      Noise Cancellation
+                    </label>
+                    <Select
+                      value={noiseCancellationModel}
+                      onValueChange={(value) => updateNoiseCancellation(value as NoiseCancellationModel)}
+                    >
+                      <SelectTrigger className="w-full h-10 border-border/40 bg-muted/20 text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {NOISE_CANCELLATION_OPTIONS.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            <div className="flex flex-col">
+                              <span className="font-medium">{option.label}</span>
+                              <span className="text-[10px] text-muted-foreground">{option.description}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-[10px] text-muted-foreground/60 px-1 italic leading-relaxed">
+                      Sent on save as <span className="font-mono">noise_cancellation.model</span>. Choose <em>Default</em> to let the agent pick (BVC Telephony).
                     </p>
                   </div>
                 )}
