@@ -103,15 +103,20 @@ const GEMINI_VOICE_OPTIONS = [
   { value: 'Aoede', label: 'Riya', tone: 'Breezy and energetic.' },
   { value: 'Leda', label: 'Meera', tone: 'Soft and measured.' },
   { value: 'Zephyr', label: 'Diya', tone: 'Bright.' },
+  { value: 'Sulafat', label: 'Kavya', tone: 'Warm middle pitch.' },
+  { value: 'Vindemiatrix', label: 'Naina', tone: 'Gentle middle pitch.' },
+  { value: 'Despina', label: 'Ishita', tone: 'Smooth middle pitch.' },
+  { value: 'Pulcherrima', label: 'Suhani', tone: 'Forward middle pitch.' },
   { value: 'Puck', label: 'Rohan', tone: 'Conversational and friendly.' },
+  { value: 'Achird', label: 'Kabir', tone: 'Friendly middle tone.' },
   { value: 'Charon', label: 'Vikram', tone: 'Deep and authoritative.' },
   { value: 'Fenrir', label: 'Aarav', tone: 'Warm and approachable.' },
   { value: 'Orus', label: 'Arjun', tone: 'Crisp and articulate.' },
 ] as const;
 
 const VOICE_MODEL_OPTIONS = [
-  { value: 'gemini-2.5-native-audio', label: 'Gemini 2.5 Native Audio', tone: 'Original native-audio model.' },
-  { value: 'gemini-3.1-live', label: 'Gemini 3.1 Live', tone: 'New live model with thinking levels.' },
+  { value: 'monade-v1', label: 'Monade V1', tone: 'Stable production model.' },
+  { value: 'monade-v2', label: 'Monade V2', tone: 'Newer model with thinking levels and noise cancellation.' },
 ] as const;
 type VoiceModelId = typeof VOICE_MODEL_OPTIONS[number]['value'];
 
@@ -148,9 +153,9 @@ const readTemperature = (toolsConfig: any): number => {
 const inferVoiceModel = (toolsConfig: any): VoiceModelId => {
   const hasThinkingLevel = !!toolsConfig?.model_config && 'thinking_level' in toolsConfig.model_config;
   const hasNoiseCancellation = !!toolsConfig?.noise_cancellation;
-  if (hasThinkingLevel || hasNoiseCancellation) return 'gemini-3.1-live';
+  if (hasThinkingLevel || hasNoiseCancellation) return 'monade-v2';
 
-  return 'gemini-2.5-native-audio';
+  return 'monade-v1';
 };
 
 const budgetToLevel = (budget: number): ThinkingLevel => {
@@ -374,6 +379,9 @@ export default function AssistantStudio() {
           });
         }
       }
+      if ((currentAssistant.call_direction === 'inbound' || currentAssistant.call_direction === 'both') && currentAssistant.inbound_trunk_id) {
+        await rebakeInboundDispatchRules(savedAssistant ?? currentAssistant, { silentSuccess: true });
+      }
       setSavedVoiceValue(currentAssistant.voice || null);
       setIsDirty(false);
       setSaveStatus('saved');
@@ -442,6 +450,53 @@ export default function AssistantStudio() {
     applyBackgroundAudioLocally(nextConfig);
   };
 
+  const rebakeInboundDispatchRules = useCallback(async (
+    assistant: Assistant,
+    options?: { silentSuccess?: boolean },
+  ) => {
+    const dispatchRuleIds = getDispatchRuleIds(assistant);
+    if (dispatchRuleIds.length === 0) {
+      if (assistant.inbound_trunk_id) {
+        toast.error('Assistant saved, but no inbound dispatch rule exists yet. Save the inbound routing first.');
+      }
+
+      return null;
+    }
+
+    let latestDispatchRuleId = assistant.dispatch_rule_id ?? null;
+    const rebakedDispatchRuleIds: string[] = [];
+    for (const ruleId of dispatchRuleIds) {
+      const response = await fetchJson<any>(
+        `${MONADE_API_BASE}/dispatch-rules/${encodeURIComponent(ruleId)}/rebake`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ assistant_id: assistant.id }),
+          retry: { retries: 0 },
+        },
+      );
+      const nextRuleId = readRebakedDispatchRuleId(response) ?? ruleId;
+      latestDispatchRuleId = nextRuleId;
+      rebakedDispatchRuleIds.push(nextRuleId);
+    }
+
+    if (latestDispatchRuleId !== assistant.dispatch_rule_id) {
+      updateAssistantLocally(assistant.id, {
+        dispatch_rule_id: latestDispatchRuleId,
+        ...(rebakedDispatchRuleIds.length > 1 ? { dispatch_rule_ids: rebakedDispatchRuleIds } : {}),
+      } as Partial<Assistant>);
+    }
+
+    if (!options?.silentSuccess) {
+      toast.success('Inbound dispatch rebaked with the latest assistant settings');
+    }
+
+    return {
+      latestDispatchRuleId,
+      rebakedDispatchRuleIds,
+    };
+  }, [toast, updateAssistantLocally]);
+
   const saveBackgroundAudio = async (updates: Partial<typeof DEFAULT_BACKGROUND_AUDIO>) => {
     if (!currentAssistant || isUpdatingBackgroundAudio || isSyncingTools) return;
     const nextConfig = buildBackgroundAudioConfig(updates);
@@ -489,19 +544,10 @@ export default function AssistantStudio() {
 
       let latestDispatchRuleId = currentAssistant.dispatch_rule_id ?? null;
       const rebakedDispatchRuleIds: string[] = [];
-      for (const ruleId of dispatchRuleIds) {
-        const response = await fetchJson<any>(
-          `${MONADE_API_BASE}/dispatch-rules/${encodeURIComponent(ruleId)}/rebake`,
-          {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ assistant_id: currentAssistant.id }),
-            retry: { retries: 0 },
-          },
-        );
-        const nextRuleId = readRebakedDispatchRuleId(response) ?? ruleId;
-        latestDispatchRuleId = nextRuleId;
-        rebakedDispatchRuleIds.push(nextRuleId);
+      const rebakeResult = await rebakeInboundDispatchRules(currentAssistant, { silentSuccess: true });
+      latestDispatchRuleId = rebakeResult?.latestDispatchRuleId ?? latestDispatchRuleId;
+      if (rebakeResult?.rebakedDispatchRuleIds?.length) {
+        rebakedDispatchRuleIds.push(...rebakeResult.rebakedDispatchRuleIds);
       }
 
       await syncToolsFromBackend(currentAssistant.id);
@@ -543,7 +589,7 @@ export default function AssistantStudio() {
     if (!currentAssistant) return;
     const existing = { ...(currentAssistant.toolsConfig?.model_config || {}) };
     const nextToolsConfig: Record<string, any> = { ...(currentAssistant.toolsConfig || {}) };
-    if (next === 'gemini-3.1-live') {
+    if (next === 'monade-v2') {
       if ('thinking_budget' in existing) {
         existing.thinking_level = budgetToLevel(Number(existing.thinking_budget));
         delete existing.thinking_budget;
@@ -552,7 +598,7 @@ export default function AssistantStudio() {
       }
     } else {
       delete existing.thinking_level;
-      // 2.5 doesn't use noise_cancellation — strip if present so toolsConfig matches model
+      // V1 doesn't use noise_cancellation — strip if present so toolsConfig matches model
       delete nextToolsConfig.noise_cancellation;
     }
     nextToolsConfig.model_config = existing;
@@ -1462,7 +1508,7 @@ export default function AssistantStudio() {
                 </div>
               </PaperCardHeader>
               <PaperCardContent className="p-6 pt-3 space-y-4">
-                {/* Model selector — frontend-only switch between Gemini 2.5 Native Audio and Gemini 3.1 Live */}
+                {/* Model selector — frontend-only switch between Monade V1 (Gemini 2.5 Native Audio) and Monade V2 (Gemini 3.1 Live) */}
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 px-1">
                     Model
@@ -1486,12 +1532,12 @@ export default function AssistantStudio() {
                     </SelectContent>
                   </Select>
                   <p className="text-[10px] text-muted-foreground/60 px-1 italic leading-relaxed">
-                    Pick the underlying Gemini model. 3.1 Live exposes a thinking level instead of a thinking budget.
+                    Pick the underlying voice model. <span className="font-medium">V1</span> = Gemini 2.5 Native Audio · <span className="font-medium">V2</span> = Gemini 3.1 Live (thinking levels, noise cancellation, temperature).
                   </p>
                 </div>
 
-                {/* Thinking Level — 3.1 Live only */}
-                {selectedVoiceModel === 'gemini-3.1-live' && (
+                {/* Thinking Level — Monade V2 only */}
+                {selectedVoiceModel === 'monade-v2' && (
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 px-1">
                       Thinking Level
@@ -1520,8 +1566,8 @@ export default function AssistantStudio() {
                   </div>
                 )}
 
-                {/* Temperature — 3.1 Live only */}
-                {selectedVoiceModel === 'gemini-3.1-live' && (
+                {/* Temperature — Monade V2 only */}
+                {selectedVoiceModel === 'monade-v2' && (
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 px-1">
                       Temperature
@@ -1549,8 +1595,8 @@ export default function AssistantStudio() {
                   </div>
                 )}
 
-                {/* Noise Cancellation — 3.1 Live only */}
-                {selectedVoiceModel === 'gemini-3.1-live' && (
+                {/* Noise Cancellation — Monade V2 only */}
+                {selectedVoiceModel === 'monade-v2' && (
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 px-1">
                       Noise Cancellation
