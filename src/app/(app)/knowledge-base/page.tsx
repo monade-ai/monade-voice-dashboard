@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { AnimatePresence } from 'framer-motion';
 import { 
   Search, 
   Plus, 
@@ -26,6 +27,7 @@ import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 
 import { LibraryWorkshop } from './components/library-workshop';
+import { LibraryOnboarding } from '@/components/onboarding/library-onboarding';
 
 // --- Helpers ---
 
@@ -200,7 +202,13 @@ export default function LibraryPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [isWorkshopOpen, setIsWorkshopOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<LibraryItem | null>(null);
-  
+  const [showOnboarding, setShowOnboarding] = useState(false);
+
+  useEffect(() => {
+    const done = localStorage.getItem('monade_library_onboarding_v1');
+    if (!done) setShowOnboarding(true);
+  }, []);
+
   const itemsPerPage = 8;
 
   const assistantLinksByKnowledgeKey = useMemo(() => {
@@ -292,7 +300,7 @@ export default function LibraryPage() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/60" />
               <Input placeholder="Search your files..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 h-10 w-64 bg-muted/10 border-border/40 text-xs focus:ring-primary focus:border-primary transition-all rounded-md" />
             </div>
-            <Button onClick={() => setIsWorkshopOpen(true)} className="h-10 px-4 gap-2 bg-foreground text-background hover:bg-foreground/90 transition-all rounded-[4px] text-[10px] font-bold uppercase tracking-[0.2em]"><Plus size={16} />Add Info</Button>
+            <Button data-onboarding="add-info" onClick={() => setIsWorkshopOpen(true)} className="h-10 px-4 gap-2 bg-foreground text-background hover:bg-foreground/90 transition-all rounded-[4px] text-[10px] font-bold uppercase tracking-[0.2em]"><Plus size={16} />Add Info</Button>
           </div>
         </div>
 
@@ -362,6 +370,18 @@ export default function LibraryPage() {
         )}
       </main>
       <LibraryWorkshop isOpen={isWorkshopOpen} onClose={handleCloseWorkshop} editItem={editingItem} />
+
+      <AnimatePresence>
+        {showOnboarding && (
+          <LibraryOnboarding
+            isOpen={showOnboarding}
+            onComplete={() => {
+              setShowOnboarding(false);
+              localStorage.setItem('monade_library_onboarding_v1', 'true');
+            }}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
