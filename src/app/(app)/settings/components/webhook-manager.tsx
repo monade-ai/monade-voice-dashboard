@@ -10,6 +10,8 @@ import {
   ToggleRight,
   Check,
   Pencil,
+  MessageCircle,
+  PhoneCall,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -33,7 +35,29 @@ interface WebhookEndpoint {
 
 const EVENT_TYPE_LABELS: Record<string, string> = {
   'call_analytics.completed': 'Call Analytics Completed',
+  'whatsapp.lead_qualified': 'WhatsApp Lead Qualified',
 };
+
+const VOICE_ANALYTICS_EVENT_TYPE = 'call_analytics.completed';
+const WHATSAPP_LEAD_EVENT_TYPE = 'whatsapp.lead_qualified';
+const REQUIRED_EVENT_TYPES = [VOICE_ANALYTICS_EVENT_TYPE, WHATSAPP_LEAD_EVENT_TYPE];
+
+const WEBHOOK_INTEGRATIONS = [
+  {
+    title: 'Voice Call Analytics',
+    eventType: VOICE_ANALYTICS_EVENT_TYPE,
+    description: 'Send completed voice-call summaries, outcomes, and analytics to your CRM or data warehouse.',
+    defaultDescription: 'Voice call analytics webhook',
+    icon: PhoneCall,
+  },
+  {
+    title: 'WhatsApp Bot Flow',
+    eventType: WHATSAPP_LEAD_EVENT_TYPE,
+    description: 'Send qualified, unqualified, and follow-up-ready WhatsApp bot outcomes to your CRM.',
+    defaultDescription: 'WhatsApp qualified lead CRM webhook',
+    icon: MessageCircle,
+  },
+] as const;
 
 /**
  * Sanitize webhook URLs before saving.
@@ -116,8 +140,14 @@ export function WebhookManager() {
     setEditingEndpoint(null);
   };
 
-  const openCreateDialog = () => {
+  const openCreateDialog = (options?: { eventTypes?: string[]; description?: string }) => {
     resetForm();
+    if (options?.eventTypes) {
+      setFormEventTypes(options.eventTypes);
+    }
+    if (options?.description) {
+      setFormDescription(options.description);
+    }
     setShowCreateDialog(true);
   };
 
@@ -133,9 +163,15 @@ export function WebhookManager() {
     setFormEventTypes(prev =>
       prev.includes(eventType)
         ? prev.filter(t => t !== eventType)
-        : [...prev, eventType]
+        : [...prev, eventType],
     );
   };
+
+  const eventTypeOptions = Array.from(new Set([...supportedEvents, ...REQUIRED_EVENT_TYPES]));
+
+  const getEndpointCountForEvent = (eventType: string) => (
+    endpoints.filter((endpoint) => endpoint.event_types.includes(eventType)).length
+  );
 
   // Create endpoint
   const handleCreate = async () => {
@@ -284,13 +320,61 @@ export function WebhookManager() {
           <p className="text-xs text-muted-foreground">Receive real-time POST notifications when events occur.</p>
         </div>
         <Button
-          onClick={openCreateDialog}
+          onClick={() => openCreateDialog()}
           size="sm"
           className="h-8 gap-2 bg-foreground text-background hover:bg-foreground/90 transition-all rounded-[4px] text-[10px] font-bold uppercase tracking-widest"
         >
           <Plus size={12} />
           Add Endpoint
         </Button>
+      </div>
+
+      {/* Guided Integrations */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {WEBHOOK_INTEGRATIONS.map((integration) => {
+          const Icon = integration.icon;
+          const endpointCount = getEndpointCountForEvent(integration.eventType);
+
+          return (
+            <div
+              key={integration.eventType}
+              className="rounded-md border border-border/20 bg-muted/5 p-4 space-y-4"
+            >
+              <div className="flex items-start gap-3">
+                <div className="h-9 w-9 rounded-md bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                  <Icon size={16} />
+                </div>
+                <div className="min-w-0 space-y-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h4 className="text-sm font-medium text-foreground">{integration.title}</h4>
+                    <span className={cn(
+                      'text-[8px] px-1.5 py-0.5 rounded-sm font-bold uppercase tracking-wider',
+                      endpointCount > 0
+                        ? 'bg-green-500/10 text-green-600'
+                        : 'bg-muted/30 text-muted-foreground',
+                    )}>
+                      {endpointCount > 0 ? `${endpointCount} endpoint${endpointCount === 1 ? '' : 's'}` : 'Not configured'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground leading-relaxed">{integration.description}</p>
+                  <p className="text-[10px] text-muted-foreground font-mono">{integration.eventType}</p>
+                </div>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => openCreateDialog({
+                  eventTypes: [integration.eventType],
+                  description: integration.defaultDescription,
+                })}
+                className="h-8 w-full text-[10px] font-bold uppercase tracking-widest border-border/40"
+              >
+                <Plus size={12} />
+                Add {integration.title}
+              </Button>
+            </div>
+          );
+        })}
       </div>
 
       {/* Endpoint List */}
@@ -378,7 +462,7 @@ export function WebhookManager() {
             <DialogDescription className="text-sm text-muted-foreground">
               {editingEndpoint
                 ? 'Update the endpoint URL, events, or description.'
-                : 'We\'ll send a POST request to this URL whenever selected events occur.'}
+                : 'We\'ll send POST requests to this URL for the selected voice or WhatsApp events.'}
             </DialogDescription>
           </DialogHeader>
 
@@ -411,10 +495,10 @@ export function WebhookManager() {
             <div className="space-y-3">
               <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Events to Subscribe</label>
               <div className="space-y-2">
-                {supportedEvents.length === 0 ? (
+                {eventTypeOptions.length === 0 ? (
                   <p className="text-xs text-muted-foreground italic">Loading events...</p>
                 ) : (
-                  supportedEvents.map(eventType => (
+                  eventTypeOptions.map(eventType => (
                     <button
                       key={eventType}
                       type="button"
@@ -423,7 +507,7 @@ export function WebhookManager() {
                         'w-full flex items-center justify-between p-3 rounded-md border transition-all text-left',
                         formEventTypes.includes(eventType)
                           ? 'border-primary/40 bg-primary/5'
-                          : 'border-border/20 bg-muted/5 hover:border-border/40'
+                          : 'border-border/20 bg-muted/5 hover:border-border/40',
                       )}
                     >
                       <div className="flex flex-col">
@@ -436,7 +520,7 @@ export function WebhookManager() {
                         'w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all',
                         formEventTypes.includes(eventType)
                           ? 'border-primary bg-primary'
-                          : 'border-border/40'
+                          : 'border-border/40',
                       )}>
                         {formEventTypes.includes(eventType) && <Check size={12} className="text-background" />}
                       </div>

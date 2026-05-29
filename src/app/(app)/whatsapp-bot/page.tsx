@@ -3,6 +3,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Bot,
+  Check,
+  Copy,
   FilePenLine,
   Loader2,
   Plus,
@@ -11,7 +13,9 @@ import {
   Sparkles,
   Trash2,
   WandSparkles,
+  Webhook,
 } from 'lucide-react';
+import { toast } from 'sonner';
 
 import { DashboardHeader } from '@/components/dashboard-header';
 import { Button } from '@/components/ui/button';
@@ -42,6 +46,7 @@ import {
   type WhatsappBotGenerationConfig,
   type WhatsappBotModel,
   type WhatsappBotPrompt,
+  type WhatsappBotQualificationConfig,
   useWhatsappBot,
 } from '@/app/hooks/use-whatsapp-bot';
 import { ChannelStatusBadge } from '@/app/(app)/whatsapp/components/status-badges';
@@ -52,6 +57,45 @@ const MODEL_OPTIONS: Array<{ value: WhatsappBotModel; label: string; blurb: stri
   { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', blurb: 'Supports thinking budgets for more deliberate replies.' },
   { value: 'gemini-3.1-flash-lite', label: 'Gemini 3.1 Flash Lite', blurb: 'Uses thinking levels for lightweight guided reasoning.' },
 ];
+
+const CRM_LEAD_EVENT_TYPE = 'whatsapp.lead_qualified' as const;
+
+const CRM_DEDUPE_OPTIONS = [
+  { value: '86400', label: '1 day' },
+  { value: '604800', label: '7 days' },
+  { value: '2592000', label: '30 days' },
+  { value: '7776000', label: '90 days' },
+];
+
+const WHATSAPP_CRM_LLMS_HELPER = `# WhatsApp CRM lead sync guidance
+
+You are writing a WhatsApp bot prompt for a bot that can notify the business CRM when a conversation reaches a clear sales, support, admission, booking, or follow-up outcome.
+
+When the conversation clearly satisfies one of the configured business criteria or outcome tags, instruct the bot to propose this action name exactly:
+
+trigger_bot_flow
+
+The bot should return the action in this JSON shape when the CRM flow should run:
+
+{
+  "reply_text": "customer-facing message",
+  "actions": [
+    {
+      "type": "trigger_bot_flow",
+      "outcome": "interested|not_interested|certain|uncertain|callback_requested|custom_outcome",
+      "reason": "short reason grounded in the conversation",
+      "fields": {
+        "field_name": "value supported by the conversation"
+      }
+    }
+  ]
+}
+
+Only propose the action when the user explicitly matches the configured criteria. Good triggers include confirmed interest, a callback or demo request, a purchase or appointment step, a human follow-up request, or enough CRM-ready details such as name, product interest, location, timing, budget, or requirement.
+
+Do not propose the action when the user is only greeting, browsing casually, declining, angry, asking to stop, not the actual lead, ambiguous, or when missing facts would need to be invented.
+
+If triggered, include a concise outcome label, reason, and extracted fields supported by the conversation. If the CRM flow should not run, return an empty actions array. Never tell the customer about internal tools, webhooks, JSON, verification, or CRM automation.`;
 
 type PromptDraft = {
   id?: string;
@@ -70,6 +114,12 @@ type BotFormState = {
   thinkingBudgetMode: 'off' | 'dynamic' | 'custom';
   customThinkingBudget: string;
   thinking_level: 'minimal' | 'low' | 'medium' | 'high';
+  qualification_enabled: boolean;
+  qualification_min_confidence: string;
+  qualification_dedupe_window_seconds: string;
+  qualification_include_conversation: boolean;
+  qualification_include_call_context: boolean;
+  qualification_criteria_addendum: string;
 };
 
 const createPromptDraft = (prompt?: Partial<PromptDraft>): PromptDraft => ({
@@ -85,6 +135,7 @@ const buildFormFromConfig = (config?: WhatsappBotConfig | null): BotFormState =>
     whatsapp_channel_connection_id: '',
   };
   const thinkingBudget = source.generation_config.thinking_budget;
+  const qualification = source.qualification_config ?? DEFAULT_WHATSAPP_BOT_CONFIG.qualification_config;
 
   return {
     enabled: source.enabled,
@@ -96,6 +147,12 @@ const buildFormFromConfig = (config?: WhatsappBotConfig | null): BotFormState =>
     thinkingBudgetMode: thinkingBudget === -1 ? 'dynamic' : thinkingBudget && thinkingBudget > 0 ? 'custom' : 'off',
     customThinkingBudget: thinkingBudget && thinkingBudget > 0 ? String(thinkingBudget) : '512',
     thinking_level: source.generation_config.thinking_level ?? 'minimal',
+    qualification_enabled: Boolean(qualification?.enabled),
+    qualification_min_confidence: String(qualification?.min_confidence ?? 0.8),
+    qualification_dedupe_window_seconds: String(qualification?.dedupe_window_seconds ?? 2592000),
+    qualification_include_conversation: qualification?.include_conversation ?? true,
+    qualification_include_call_context: qualification?.include_call_context ?? true,
+    qualification_criteria_addendum: qualification?.criteria_addendum ?? '',
   };
 };
 
@@ -124,11 +181,26 @@ const serializeBotPayload = (form: BotFormState): SaveWhatsappBotConfigPayload =
     generation_config.thinking_level = form.thinking_level;
   }
 
+  const qualification_config: WhatsappBotQualificationConfig = form.qualification_enabled
+    ? {
+      enabled: true,
+      event_type: CRM_LEAD_EVENT_TYPE,
+      min_confidence: Number(form.qualification_min_confidence),
+      dedupe_window_seconds: Number(form.qualification_dedupe_window_seconds),
+      include_conversation: form.qualification_include_conversation,
+      include_call_context: form.qualification_include_call_context,
+      criteria_addendum: form.qualification_criteria_addendum.trim(),
+    }
+    : {
+      enabled: false,
+    };
+
   return {
     enabled: form.enabled,
     whatsapp_bot_prompt_id: form.whatsapp_bot_prompt_id || null,
     model: form.model,
     generation_config,
+    qualification_config,
   };
 };
 
@@ -244,6 +316,7 @@ export default function WhatsappBotPage() {
   const [promptDialogOpen, setPromptDialogOpen] = useState(false);
   const [promptDraft, setPromptDraft] = useState<PromptDraft>(createPromptDraft());
   const [configErrors, setConfigErrors] = useState<string[]>([]);
+  const [llmsCopyState, setLlmsCopyState] = useState<'idle' | 'copied'>('idle');
   const effectiveSelectedChannelId = selectedChannelId || channels[0]?.id || '';
 
   const selectedChannel = useMemo(
@@ -397,6 +470,19 @@ export default function WhatsappBotPage() {
       };
     });
     setConfigErrors([]);
+  };
+
+  const handleCopyLlmsHelper = async () => {
+    if (!form.qualification_enabled) return;
+
+    try {
+      await navigator.clipboard.writeText(WHATSAPP_CRM_LLMS_HELPER);
+      setLlmsCopyState('copied');
+      toast.success('llms.txt helper copied');
+      setTimeout(() => setLlmsCopyState('idle'), 2200);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Could not copy llms.txt helper');
+    }
   };
 
   const handleSave = async () => {
@@ -813,6 +899,149 @@ export default function WhatsappBotPage() {
                     </Select>
                   </div>
                 )}
+
+                <div className="space-y-4 rounded-md border border-border/20 bg-muted/[0.03] p-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="space-y-1">
+                      <span className="inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                        <Webhook size={13} className="text-primary" />
+                        CRM Lead Sync
+                      </span>
+                      <p className="text-sm text-muted-foreground">
+                        Let the bot notify your CRM webhook when a WhatsApp lead becomes qualified, unqualified, or ready for follow-up.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={form.qualification_enabled}
+                      onClick={() => setForm((current) => ({ ...current, qualification_enabled: !current.qualification_enabled }))}
+                      className={cn(
+                        'relative h-6 w-11 rounded-full transition-colors',
+                        form.qualification_enabled ? 'bg-primary' : 'bg-muted',
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          'absolute top-0.5 h-5 w-5 rounded-full bg-background shadow transition-transform',
+                          form.qualification_enabled ? 'translate-x-[22px]' : 'translate-x-0.5',
+                        )}
+                      />
+                    </button>
+                  </div>
+
+                  <div className="rounded-md border border-primary/20 bg-primary/[0.04] p-3 text-xs leading-relaxed text-muted-foreground">
+                    CRM delivery requires a webhook endpoint subscribed to <span className="font-mono text-foreground">{CRM_LEAD_EVENT_TYPE}</span> in Settings.
+                  </div>
+
+                  {form.qualification_enabled && (
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Minimum Confidence</Label>
+                          <Input
+                            type="number"
+                            min={0.5}
+                            max={1}
+                            step="0.05"
+                            value={form.qualification_min_confidence}
+                            onChange={(event) => setForm((current) => ({ ...current, qualification_min_confidence: event.target.value }))}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Repeat Window</Label>
+                          <Select
+                            value={form.qualification_dedupe_window_seconds}
+                            onValueChange={(value) => setForm((current) => ({ ...current, qualification_dedupe_window_seconds: value }))}
+                          >
+                            <SelectTrigger className="h-10 text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {CRM_DEDUPE_OPTIONS.map((option) => (
+                                <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setForm((current) => ({ ...current, qualification_include_conversation: !current.qualification_include_conversation }))}
+                          className={cn(
+                            'flex items-center justify-between gap-3 rounded-md border p-3 text-left transition-all',
+                            form.qualification_include_conversation ? 'border-primary/35 bg-primary/5' : 'border-border/20 bg-background/70',
+                          )}
+                        >
+                          <span className="text-xs font-medium">Include conversation</span>
+                          <span className={cn(
+                            'flex h-5 w-5 items-center justify-center rounded-full border',
+                            form.qualification_include_conversation ? 'border-primary bg-primary text-background' : 'border-border/40',
+                          )}>
+                            {form.qualification_include_conversation && <Check size={12} />}
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setForm((current) => ({ ...current, qualification_include_call_context: !current.qualification_include_call_context }))}
+                          className={cn(
+                            'flex items-center justify-between gap-3 rounded-md border p-3 text-left transition-all',
+                            form.qualification_include_call_context ? 'border-primary/35 bg-primary/5' : 'border-border/20 bg-background/70',
+                          )}
+                        >
+                          <span className="text-xs font-medium">Include voice-call context</span>
+                          <span className={cn(
+                            'flex h-5 w-5 items-center justify-center rounded-full border',
+                            form.qualification_include_call_context ? 'border-primary bg-primary text-background' : 'border-border/40',
+                          )}>
+                            {form.qualification_include_call_context && <Check size={12} />}
+                          </span>
+                        </button>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Qualification Criteria</Label>
+                        <Textarea
+                          value={form.qualification_criteria_addendum}
+                          onChange={(event) => setForm((current) => ({ ...current, qualification_criteria_addendum: event.target.value }))}
+                          maxLength={4000}
+                          placeholder="Only qualify if the user clearly confirms interest and wants follow-up."
+                          className="min-h-24 bg-background/70 border-border/30 text-sm"
+                        />
+                        <p className="text-[11px] text-muted-foreground">
+                          Optional business rules appended to the verifier. {form.qualification_criteria_addendum.length}/4000
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="space-y-3 rounded-md border border-border/20 bg-background/70 p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">llms.txt Prompt Helper</span>
+                        <p className="text-xs text-muted-foreground">Copy this into the bot prompt only when CRM Lead Sync is enabled.</p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleCopyLlmsHelper}
+                        disabled={!form.qualification_enabled}
+                        className="h-8 px-3 text-[10px] font-bold uppercase tracking-[0.18em] border-border/40"
+                      >
+                        {llmsCopyState === 'copied' ? <Check size={13} /> : <Copy size={13} />}
+                        {llmsCopyState === 'copied' ? 'Copied' : 'Copy'}
+                      </Button>
+                    </div>
+                    <pre className={cn(
+                      'max-h-56 overflow-auto whitespace-pre-wrap rounded-md bg-muted/40 p-3 text-[11px] leading-relaxed',
+                      form.qualification_enabled ? 'text-foreground' : 'text-muted-foreground/45',
+                    )}>
+                      {WHATSAPP_CRM_LLMS_HELPER}
+                    </pre>
+                  </div>
+                </div>
 
                 {configErrors.length > 0 && (
                   <div className="rounded-md border border-destructive/25 bg-destructive/5 p-4 space-y-2">

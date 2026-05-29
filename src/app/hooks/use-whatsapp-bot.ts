@@ -21,6 +21,16 @@ export interface WhatsappBotGenerationConfig {
   thinking_level?: WhatsappBotThinkingLevel;
 }
 
+export interface WhatsappBotQualificationConfig {
+  enabled: boolean;
+  event_type?: 'whatsapp.lead_qualified';
+  min_confidence?: number;
+  dedupe_window_seconds?: number;
+  include_conversation?: boolean;
+  include_call_context?: boolean;
+  criteria_addendum?: string;
+}
+
 export interface WhatsappBotPrompt {
   id: string;
   user_uid?: string | null;
@@ -40,6 +50,7 @@ export interface WhatsappBotConfig {
   enabled: boolean;
   model: WhatsappBotModel;
   generation_config: WhatsappBotGenerationConfig;
+  qualification_config?: WhatsappBotQualificationConfig;
   whatsapp_channel_connection?: {
     id?: string;
     label?: string | null;
@@ -62,6 +73,7 @@ export interface SaveWhatsappBotConfigPayload {
   whatsapp_bot_prompt_id: string | null;
   model: WhatsappBotModel;
   generation_config: WhatsappBotGenerationConfig;
+  qualification_config?: WhatsappBotQualificationConfig;
 }
 
 export const DEFAULT_WHATSAPP_BOT_CONFIG: Omit<WhatsappBotConfig, 'whatsapp_channel_connection_id'> = {
@@ -72,6 +84,15 @@ export const DEFAULT_WHATSAPP_BOT_CONFIG: Omit<WhatsappBotConfig, 'whatsapp_chan
     temperature: 0.4,
     top_p: 0.9,
     max_output_tokens: 512,
+  },
+  qualification_config: {
+    enabled: false,
+    event_type: 'whatsapp.lead_qualified',
+    min_confidence: 0.8,
+    dedupe_window_seconds: 2592000,
+    include_conversation: true,
+    include_call_context: true,
+    criteria_addendum: '',
   },
 };
 
@@ -106,6 +127,24 @@ const normalizeGenerationConfig = (raw: any): WhatsappBotGenerationConfig => ({
   thinking_level: raw?.thinking_level ?? raw?.thinkingLevel ?? undefined,
 });
 
+const normalizeQualificationConfig = (raw: any): WhatsappBotQualificationConfig => ({
+  enabled: Boolean(raw?.enabled),
+  event_type: 'whatsapp.lead_qualified',
+  min_confidence: typeof raw?.min_confidence === 'number'
+    ? raw.min_confidence
+    : (typeof raw?.minConfidence === 'number' ? raw.minConfidence : 0.8),
+  dedupe_window_seconds: typeof raw?.dedupe_window_seconds === 'number'
+    ? raw.dedupe_window_seconds
+    : (typeof raw?.dedupeWindowSeconds === 'number' ? raw.dedupeWindowSeconds : 2592000),
+  include_conversation: typeof raw?.include_conversation === 'boolean'
+    ? raw.include_conversation
+    : (typeof raw?.includeConversation === 'boolean' ? raw.includeConversation : true),
+  include_call_context: typeof raw?.include_call_context === 'boolean'
+    ? raw.include_call_context
+    : (typeof raw?.includeCallContext === 'boolean' ? raw.includeCallContext : true),
+  criteria_addendum: raw?.criteria_addendum ?? raw?.criteriaAddendum ?? '',
+});
+
 const normalizeBotConfig = (raw: any): WhatsappBotConfig => ({
   id: raw?.id,
   user_uid: raw?.user_uid ?? raw?.userUid ?? null,
@@ -114,6 +153,7 @@ const normalizeBotConfig = (raw: any): WhatsappBotConfig => ({
   enabled: Boolean(raw?.enabled),
   model: raw?.model ?? 'gemini-2.0-flash',
   generation_config: normalizeGenerationConfig(raw?.generation_config ?? raw?.generationConfig ?? {}),
+  qualification_config: normalizeQualificationConfig(raw?.qualification_config ?? raw?.qualificationConfig ?? {}),
   whatsapp_channel_connection: raw?.whatsapp_channel_connection ?? raw?.whatsappChannelConnection ?? null,
   whatsapp_bot_prompt: raw?.whatsapp_bot_prompt ? normalizePrompt(raw.whatsapp_bot_prompt) : (raw?.whatsappBotPrompt ? normalizePrompt(raw.whatsappBotPrompt) : null),
 });
