@@ -4,6 +4,8 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Bot,
   Check,
+  ChevronDown,
+  ChevronRight,
   Copy,
   FilePenLine,
   Loader2,
@@ -49,6 +51,10 @@ import {
   type WhatsappBotQualificationConfig,
   useWhatsappBot,
 } from '@/app/hooks/use-whatsapp-bot';
+import {
+  usePostProcessingTemplates,
+  type QualificationBucket,
+} from '@/app/hooks/use-post-processing-templates';
 import { ChannelStatusBadge } from '@/app/(app)/whatsapp/components/status-badges';
 import { cn } from '@/lib/utils';
 
@@ -66,6 +72,13 @@ const CRM_DEDUPE_OPTIONS = [
   { value: '2592000', label: '30 days' },
   { value: '7776000', label: '90 days' },
 ];
+
+const DID_NOT_PICK_UP_BUCKET: QualificationBucket & { system?: boolean } = {
+  key: 'did_not_pick_up',
+  label: 'Call not picked up / No answer',
+  description: 'System bucket used when the original voice call was not answered.',
+  system: true,
+};
 
 const WHATSAPP_CRM_LLMS_HELPER = `# WhatsApp CRM lead sync guidance
 
@@ -104,6 +117,14 @@ type PromptDraft = {
   prompt_text: string;
 };
 
+type OutcomePromptMappingState = {
+  enabled: boolean;
+  whatsapp_bot_prompt_id: string;
+  tool_call_enabled: boolean;
+};
+
+type OutcomeBucket = QualificationBucket & { system?: boolean };
+
 type BotFormState = {
   enabled: boolean;
   whatsapp_bot_prompt_id: string;
@@ -120,6 +141,7 @@ type BotFormState = {
   qualification_include_conversation: boolean;
   qualification_include_call_context: boolean;
   qualification_criteria_addendum: string;
+  outcome_prompt_mappings: Record<string, OutcomePromptMappingState>;
 };
 
 const createPromptDraft = (prompt?: Partial<PromptDraft>): PromptDraft => ({
@@ -128,6 +150,20 @@ const createPromptDraft = (prompt?: Partial<PromptDraft>): PromptDraft => ({
   filename: prompt?.filename ?? '',
   prompt_text: prompt?.prompt_text ?? '',
 });
+
+const normalizeOutcomePromptMappingsForForm = (
+  mappings?: WhatsappBotQualificationConfig['outcome_prompt_mappings'],
+): Record<string, OutcomePromptMappingState> => {
+  if (!mappings) return {};
+
+  return Object.fromEntries(
+    Object.entries(mappings).map(([key, mapping]) => [key, {
+      enabled: Boolean(mapping.enabled),
+      whatsapp_bot_prompt_id: mapping.whatsapp_bot_prompt_id ?? '',
+      tool_call_enabled: mapping.tool_call_enabled ?? true,
+    }]),
+  );
+};
 
 const buildFormFromConfig = (config?: WhatsappBotConfig | null): BotFormState => {
   const source = config ?? {
@@ -153,6 +189,7 @@ const buildFormFromConfig = (config?: WhatsappBotConfig | null): BotFormState =>
     qualification_include_conversation: qualification?.include_conversation ?? true,
     qualification_include_call_context: qualification?.include_call_context ?? true,
     qualification_criteria_addendum: qualification?.criteria_addendum ?? '',
+    outcome_prompt_mappings: normalizeOutcomePromptMappingsForForm(qualification?.outcome_prompt_mappings),
   };
 };
 
@@ -190,9 +227,23 @@ const serializeBotPayload = (form: BotFormState): SaveWhatsappBotConfigPayload =
       include_conversation: form.qualification_include_conversation,
       include_call_context: form.qualification_include_call_context,
       criteria_addendum: form.qualification_criteria_addendum.trim(),
+      outcome_prompt_mappings: Object.fromEntries(
+        Object.entries(form.outcome_prompt_mappings).map(([key, mapping]) => [key, {
+          enabled: mapping.enabled,
+          whatsapp_bot_prompt_id: mapping.whatsapp_bot_prompt_id || null,
+          tool_call_enabled: mapping.tool_call_enabled,
+        }]),
+      ),
     }
     : {
       enabled: false,
+      outcome_prompt_mappings: Object.fromEntries(
+        Object.entries(form.outcome_prompt_mappings).map(([key, mapping]) => [key, {
+          enabled: mapping.enabled,
+          whatsapp_bot_prompt_id: mapping.whatsapp_bot_prompt_id || null,
+          tool_call_enabled: mapping.tool_call_enabled,
+        }]),
+      ),
     };
 
   return {
@@ -235,7 +286,7 @@ function PromptEditorDialog({
             {isEditing ? 'Edit Bot Prompt' : 'Create Bot Prompt'}
           </DialogTitle>
           <DialogDescription className="leading-relaxed">
-            Prompt files define the personality, tone, and response rules for inbound WhatsApp conversations on any connected sender number.
+            Prompt files define the tone, response rules, and CRM handoff behavior for each WhatsApp outcome.
           </DialogDescription>
         </DialogHeader>
 
@@ -292,6 +343,7 @@ function PromptEditorDialog({
 
 export default function WhatsappBotPage() {
   const whatsapp = useVobizWhatsapp();
+  const postProcessingTemplates = usePostProcessingTemplates();
   const {
     loadingPrompts,
     loadingConfigs,
@@ -317,7 +369,9 @@ export default function WhatsappBotPage() {
   const [promptDraft, setPromptDraft] = useState<PromptDraft>(createPromptDraft());
   const [configErrors, setConfigErrors] = useState<string[]>([]);
   const [llmsCopyState, setLlmsCopyState] = useState<'idle' | 'copied'>('idle');
+  const [expandedOutcomeKey, setExpandedOutcomeKey] = useState<string | null>(null);
   const effectiveSelectedChannelId = selectedChannelId || channels[0]?.id || '';
+  const { resolvedTemplate, loading: loadingOutcomeTemplate, fetchResolvedTemplate } = postProcessingTemplates;
 
   const selectedChannel = useMemo(
     () => channels.find((channel) => channel.id === effectiveSelectedChannelId) ?? null,
@@ -334,14 +388,35 @@ export default function WhatsappBotPage() {
     [form.whatsapp_bot_prompt_id, prompts],
   );
 
+  const outcomeBuckets = useMemo<OutcomeBucket[]>(() => {
+    const buckets = resolvedTemplate?.content?.qualification_buckets ?? [];
+
+    return [...buckets, DID_NOT_PICK_UP_BUCKET];
+  }, [resolvedTemplate]);
+
+  const activeOutcomeMappings = useMemo(
+    () => outcomeBuckets.filter((bucket) => form.outcome_prompt_mappings[bucket.key]?.enabled).length,
+    [form.outcome_prompt_mappings, outcomeBuckets],
+  );
+
+  const invalidOutcomeMappings = useMemo(
+    () => outcomeBuckets.filter((bucket) => {
+      const mapping = form.outcome_prompt_mappings[bucket.key];
+
+      return mapping?.enabled && !mapping.whatsapp_bot_prompt_id;
+    }),
+    [form.outcome_prompt_mappings, outcomeBuckets],
+  );
+
   const loadPageData = useCallback(async () => {
     const [nextPrompts, nextConfigs] = await Promise.all([
       fetchPrompts(),
       fetchConfigs(),
+      fetchResolvedTemplate(true).catch(() => null),
     ]);
     setPrompts(nextPrompts);
     setConfigs(nextConfigs);
-  }, [fetchConfigs, fetchPrompts]);
+  }, [fetchConfigs, fetchPrompts, fetchResolvedTemplate]);
 
   useEffect(() => {
     Promise.resolve().then(() => loadPageData().catch(() => undefined));
@@ -438,6 +513,17 @@ export default function WhatsappBotPage() {
     if (form.whatsapp_bot_prompt_id === promptId) {
       setForm((current) => ({ ...current, whatsapp_bot_prompt_id: '' }));
     }
+    setForm((current) => ({
+      ...current,
+      outcome_prompt_mappings: Object.fromEntries(
+        Object.entries(current.outcome_prompt_mappings).map(([key, mapping]) => [
+          key,
+          mapping.whatsapp_bot_prompt_id === promptId
+            ? { ...mapping, whatsapp_bot_prompt_id: '', enabled: false }
+            : mapping,
+        ]),
+      ),
+    }));
   };
 
   const handleModelChange = (model: WhatsappBotModel) => {
@@ -472,6 +558,41 @@ export default function WhatsappBotPage() {
     setConfigErrors([]);
   };
 
+  const updateOutcomeMapping = (outcomeKey: string, updates: Partial<OutcomePromptMappingState>) => {
+    setForm((current) => {
+      const currentMapping = current.outcome_prompt_mappings[outcomeKey] ?? {
+        enabled: false,
+        whatsapp_bot_prompt_id: '',
+        tool_call_enabled: true,
+      };
+
+      return {
+        ...current,
+        outcome_prompt_mappings: {
+          ...current.outcome_prompt_mappings,
+          [outcomeKey]: {
+            ...currentMapping,
+            ...updates,
+          },
+        },
+      };
+    });
+    setConfigErrors([]);
+  };
+
+  const clearOutcomeMapping = (outcomeKey: string) => {
+    setForm((current) => {
+      const next = { ...current.outcome_prompt_mappings };
+      delete next[outcomeKey];
+
+      return {
+        ...current,
+        outcome_prompt_mappings: next,
+      };
+    });
+    setConfigErrors([]);
+  };
+
   const handleCopyLlmsHelper = async () => {
     if (!form.qualification_enabled) return;
 
@@ -489,6 +610,12 @@ export default function WhatsappBotPage() {
     if (!effectiveSelectedChannelId || !form.whatsapp_bot_prompt_id) return;
     setConfigErrors([]);
 
+    if (invalidOutcomeMappings.length > 0) {
+      setConfigErrors(invalidOutcomeMappings.map((bucket) => `${bucket.key} is enabled but has no prompt selected.`));
+
+      return;
+    }
+
     try {
       const { config } = await saveConfig(effectiveSelectedChannelId, serializeBotPayload(form));
       if (config) {
@@ -505,7 +632,7 @@ export default function WhatsappBotPage() {
   };
 
   const noChannels = !loadingChannels && channels.length === 0;
-  const canSave = Boolean(effectiveSelectedChannelId && form.whatsapp_bot_prompt_id) && !savingConfig;
+  const canSave = Boolean(effectiveSelectedChannelId && form.whatsapp_bot_prompt_id && invalidOutcomeMappings.length === 0) && !savingConfig;
 
   return (
     <div className="min-h-screen bg-background flex flex-col font-sans">
@@ -523,7 +650,7 @@ export default function WhatsappBotPage() {
               WhatsApp Bot
             </h1>
             <p className="text-muted-foreground text-sm font-medium max-w-3xl">
-              Shape the personality, prompt files, and Gemini response controls for inbound WhatsApp conversations on each connected sender number.
+              Map active template outcomes to dedicated bot prompts, then tune the shared Gemini response controls for each connected sender number.
             </p>
           </div>
 
@@ -603,6 +730,179 @@ export default function WhatsappBotPage() {
           </PaperCardContent>
         </PaperCard>
 
+        <PaperCard variant="default" className="border-border/40">
+          <PaperCardHeader className="p-6 pb-4">
+            <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+              <div className="space-y-1">
+                <PaperCardTitle>Outcome-Based Bot Prompts</PaperCardTitle>
+                <h2 className="text-2xl font-medium tracking-tight">Map the active template outcomes to prompts</h2>
+                <p className="text-sm text-muted-foreground max-w-3xl">
+                  When a lead replies after a WhatsApp follow-up, the bot can choose a prompt from the original outcome bucket. The fallback prompt is used when no enabled outcome mapping matches.
+                </p>
+              </div>
+              <div className="rounded-md border border-border/20 bg-muted/[0.03] px-4 py-3 min-w-[220px]">
+                <span className="text-[9px] font-bold uppercase tracking-[0.18em] text-muted-foreground/60">Active Template</span>
+                <p className="mt-1 text-sm font-medium truncate">{resolvedTemplate?.name || 'Loading template...'}</p>
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  {activeOutcomeMappings} of {outcomeBuckets.length} outcomes mapped
+                </p>
+              </div>
+            </div>
+          </PaperCardHeader>
+          <PaperCardContent className="p-6 pt-0 space-y-3">
+            {loadingOutcomeTemplate ? (
+              <div className="py-12 flex flex-col items-center gap-3">
+                <Loader2 className="animate-spin text-primary/50" />
+                <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground">Loading active outcomes...</span>
+              </div>
+            ) : outcomeBuckets.length === 0 ? (
+              <div className="rounded-md border border-dashed border-border/30 bg-muted/[0.03] p-8 text-center space-y-2">
+                <h3 className="text-lg font-medium tracking-tight">No active outcome buckets found</h3>
+                <p className="text-sm text-muted-foreground max-w-md mx-auto">
+                  Set an active post-processing template first, then map each outcome to its WhatsApp bot prompt here.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {outcomeBuckets.map((bucket) => {
+                  const mapping = form.outcome_prompt_mappings[bucket.key] ?? {
+                    enabled: false,
+                    whatsapp_bot_prompt_id: '',
+                    tool_call_enabled: true,
+                  };
+                  const isExpanded = expandedOutcomeKey === bucket.key;
+                  const prompt = prompts.find((item) => item.id === mapping.whatsapp_bot_prompt_id) ?? null;
+
+                  return (
+                    <div
+                      key={bucket.key}
+                      className={cn(
+                        'rounded-md border transition-all',
+                        mapping.enabled ? 'border-primary/30 bg-primary/[0.025]' : 'border-border/20 bg-muted/[0.02]',
+                      )}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setExpandedOutcomeKey(isExpanded ? null : bucket.key)}
+                        className="w-full p-4 text-left"
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="min-w-0 space-y-2">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="font-mono text-xs text-foreground">{bucket.key}</span>
+                              <span className="text-sm font-medium">{bucket.label}</span>
+                              {bucket.system ? (
+                                <span className="rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.16em] text-primary">
+                                  System
+                                </span>
+                              ) : null}
+                              <span className={cn(
+                                'rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.16em]',
+                                mapping.enabled
+                                  ? 'bg-green-500/10 text-green-600'
+                                  : 'bg-muted/40 text-muted-foreground',
+                              )}>
+                                {mapping.enabled ? 'Mapped' : 'Not mapped'}
+                              </span>
+                              {mapping.tool_call_enabled && mapping.enabled ? (
+                                <span className="rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.16em] text-primary">
+                                  CRM Tool
+                                </span>
+                              ) : null}
+                            </div>
+                            <p className="text-xs text-muted-foreground line-clamp-2">
+                              {bucket.description || 'No description saved for this outcome.'}
+                            </p>
+                            <p className="text-[11px] text-muted-foreground">
+                              Prompt: <span className="font-medium text-foreground">{prompt?.name || (mapping.enabled ? 'Select a prompt' : 'Fallback prompt')}</span>
+                            </p>
+                          </div>
+                          <div className="h-8 w-8 rounded-md border border-border/30 flex items-center justify-center text-muted-foreground shrink-0">
+                            {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                          </div>
+                        </div>
+                      </button>
+
+                      {isExpanded && (
+                        <div className="border-t border-border/20 p-4 space-y-4">
+                          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_auto_auto] gap-4 items-end">
+                            <div className="space-y-2">
+                              <Label className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Prompt For This Outcome</Label>
+                              <Select
+                                value={mapping.whatsapp_bot_prompt_id || '__none__'}
+                                onValueChange={(value) => updateOutcomeMapping(bucket.key, {
+                                  whatsapp_bot_prompt_id: value === '__none__' ? '' : value,
+                                  enabled: value !== '__none__',
+                                })}
+                              >
+                                <SelectTrigger className="h-10 text-xs">
+                                  <SelectValue placeholder={prompts.length === 0 ? 'Create a prompt first' : 'Select a prompt'} />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="__none__">Use fallback prompt</SelectItem>
+                                  {prompts.map((item) => (
+                                    <SelectItem key={item.id} value={item.id}>{item.name}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            <button
+                              type="button"
+                              role="switch"
+                              aria-checked={mapping.enabled}
+                              onClick={() => updateOutcomeMapping(bucket.key, { enabled: !mapping.enabled })}
+                              className="rounded-md border border-border/20 bg-background/70 p-3 text-left min-w-[150px]"
+                            >
+                              <span className="block text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Mapping</span>
+                              <span className="mt-2 flex items-center justify-between gap-3 text-xs font-medium">
+                                {mapping.enabled ? 'Enabled' : 'Disabled'}
+                                <span className={cn('relative h-5 w-9 rounded-full transition-colors', mapping.enabled ? 'bg-primary' : 'bg-muted')}>
+                                  <span className={cn('absolute top-0.5 h-4 w-4 rounded-full bg-background shadow transition-transform', mapping.enabled ? 'translate-x-[18px]' : 'translate-x-0.5')} />
+                                </span>
+                              </span>
+                            </button>
+
+                            <button
+                              type="button"
+                              role="switch"
+                              aria-checked={mapping.tool_call_enabled}
+                              onClick={() => updateOutcomeMapping(bucket.key, { tool_call_enabled: !mapping.tool_call_enabled })}
+                              className="rounded-md border border-border/20 bg-background/70 p-3 text-left min-w-[150px]"
+                            >
+                              <span className="block text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">CRM Tool</span>
+                              <span className="mt-2 flex items-center justify-between gap-3 text-xs font-medium">
+                                {mapping.tool_call_enabled ? 'Enabled' : 'Disabled'}
+                                <span className={cn('relative h-5 w-9 rounded-full transition-colors', mapping.tool_call_enabled ? 'bg-primary' : 'bg-muted')}>
+                                  <span className={cn('absolute top-0.5 h-4 w-4 rounded-full bg-background shadow transition-transform', mapping.tool_call_enabled ? 'translate-x-[18px]' : 'translate-x-0.5')} />
+                                </span>
+                              </span>
+                            </button>
+                          </div>
+
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                            <p className="text-[11px] text-muted-foreground">
+                              If the CRM tool is disabled for this outcome, the bot replies normally and cannot trigger the verifier/webhook flow for that bucket.
+                            </p>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              onClick={() => clearOutcomeMapping(bucket.key)}
+                              className="h-8 px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground hover:text-foreground"
+                            >
+                              Clear Mapping
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </PaperCardContent>
+        </PaperCard>
+
         <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_420px] gap-8 items-start">
           <PaperCard variant="default" className="border-border/40">
             <PaperCardHeader className="p-6 pb-4">
@@ -611,7 +911,7 @@ export default function WhatsappBotPage() {
                   <PaperCardTitle>Prompt Library</PaperCardTitle>
                   <h2 className="text-2xl font-medium tracking-tight">Reusable Bot Prompt Files</h2>
                   <p className="text-sm text-muted-foreground max-w-2xl">
-                    Create, refine, and reuse prompt files before attaching one to a specific WhatsApp sender number.
+                    Create, refine, and reuse prompt files before assigning them to outcome buckets or the fallback bot behavior.
                   </p>
                 </div>
                 <Button
@@ -663,7 +963,7 @@ export default function WhatsappBotPage() {
                             </div>
                             {isSelected && (
                               <span className="rounded-full border border-primary/20 bg-primary/10 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-primary">
-                                Attached
+                                Fallback
                               </span>
                             )}
                           </div>
@@ -684,7 +984,7 @@ export default function WhatsappBotPage() {
                                 isSelected ? 'bg-foreground text-background hover:bg-foreground/90' : 'border-border/40',
                               )}
                             >
-                              {isSelected ? 'Attached to Bot' : 'Attach to Bot'}
+                              {isSelected ? 'Fallback Prompt' : 'Use as Fallback'}
                             </Button>
                             <div className="flex items-center gap-2">
                               <Button
@@ -724,7 +1024,7 @@ export default function WhatsappBotPage() {
                   <PaperCardTitle>Bot Config</PaperCardTitle>
                   <h2 className="text-2xl font-medium tracking-tight">Inbound Reply Behavior</h2>
                   <p className="text-sm text-muted-foreground">
-                    Save the full bot config per connected sender number. Prompt attachment and model tuning are independent from post-call flow templates.
+                    Save channel-level bot status, fallback prompt, model tuning, and CRM verifier defaults.
                   </p>
                 </div>
               </PaperCardHeader>
@@ -745,7 +1045,7 @@ export default function WhatsappBotPage() {
                       'relative h-6 w-11 rounded-full transition-colors',
                       form.enabled ? 'bg-primary' : 'bg-muted',
                     )}
-                    disabled={!selectedChannelId}
+                    disabled={!effectiveSelectedChannelId}
                   >
                     <span
                       className={cn(
@@ -757,7 +1057,7 @@ export default function WhatsappBotPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Attached Prompt</Label>
+                  <Label className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Fallback Prompt</Label>
                   <Select
                     value={form.whatsapp_bot_prompt_id || '__none__'}
                     onValueChange={(value) => setForm((current) => ({ ...current, whatsapp_bot_prompt_id: value === '__none__' ? '' : value }))}
@@ -766,7 +1066,7 @@ export default function WhatsappBotPage() {
                       <SelectValue placeholder={prompts.length === 0 ? 'Create a prompt first' : 'Select a prompt file'} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="__none__">No prompt attached</SelectItem>
+                      <SelectItem value="__none__">No fallback prompt</SelectItem>
                       {prompts.map((prompt) => (
                         <SelectItem key={prompt.id} value={prompt.id}>{prompt.name}</SelectItem>
                       ))}
@@ -774,7 +1074,7 @@ export default function WhatsappBotPage() {
                   </Select>
                   {selectedPrompt && (
                     <p className="text-[11px] text-muted-foreground">
-                      Attached file: <span className="font-mono">{selectedPrompt.filename}</span>
+                      Fallback file: <span className="font-mono">{selectedPrompt.filename}</span>
                     </p>
                   )}
                 </div>

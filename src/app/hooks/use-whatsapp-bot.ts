@@ -29,6 +29,13 @@ export interface WhatsappBotQualificationConfig {
   include_conversation?: boolean;
   include_call_context?: boolean;
   criteria_addendum?: string;
+  outcome_prompt_mappings?: Record<string, WhatsappBotOutcomePromptMapping>;
+}
+
+export interface WhatsappBotOutcomePromptMapping {
+  enabled: boolean;
+  whatsapp_bot_prompt_id?: string | null;
+  tool_call_enabled?: boolean;
 }
 
 export interface WhatsappBotPrompt {
@@ -93,6 +100,7 @@ export const DEFAULT_WHATSAPP_BOT_CONFIG: Omit<WhatsappBotConfig, 'whatsapp_chan
     include_conversation: true,
     include_call_context: true,
     criteria_addendum: '',
+    outcome_prompt_mappings: {},
   },
 };
 
@@ -143,7 +151,28 @@ const normalizeQualificationConfig = (raw: any): WhatsappBotQualificationConfig 
     ? raw.include_call_context
     : (typeof raw?.includeCallContext === 'boolean' ? raw.includeCallContext : true),
   criteria_addendum: raw?.criteria_addendum ?? raw?.criteriaAddendum ?? '',
+  outcome_prompt_mappings: normalizeOutcomePromptMappings(raw?.outcome_prompt_mappings ?? raw?.outcomePromptMappings ?? {}),
 });
+
+const normalizeOutcomePromptMappings = (raw: any): Record<string, WhatsappBotOutcomePromptMapping> => {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+
+  return Object.fromEntries(
+    Object.entries(raw)
+      .filter(([key]) => Boolean(key))
+      .map(([key, value]) => {
+        const entry = value as any;
+
+        return [key, {
+          enabled: Boolean(entry?.enabled),
+          whatsapp_bot_prompt_id: entry?.whatsapp_bot_prompt_id ?? entry?.whatsappBotPromptId ?? null,
+          tool_call_enabled: typeof entry?.tool_call_enabled === 'boolean'
+            ? entry.tool_call_enabled
+            : (typeof entry?.toolCallEnabled === 'boolean' ? entry.toolCallEnabled : true),
+        }];
+      }),
+  );
+};
 
 const normalizeBotConfig = (raw: any): WhatsappBotConfig => ({
   id: raw?.id,
