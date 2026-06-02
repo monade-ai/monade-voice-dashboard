@@ -119,6 +119,7 @@ const VOICE_MODEL_OPTIONS = [
   { value: 'monade-v2', label: 'Monade V2', tone: 'Newer model with thinking levels and noise cancellation.' },
 ] as const;
 type VoiceModelId = typeof VOICE_MODEL_OPTIONS[number]['value'];
+type BackendModelVersion = 'v1' | 'v2';
 
 type ThinkingLevel = 'minimal' | 'low' | 'medium' | 'high';
 const THINKING_LEVEL_OPTIONS: { value: ThinkingLevel; label: string; description: string }[] = [
@@ -150,7 +151,15 @@ const readTemperature = (toolsConfig: any): number => {
   return Math.min(TEMPERATURE_MAX, Math.max(TEMPERATURE_MIN, n));
 };
 
+const mapVoiceModelToBackendVersion = (value: VoiceModelId): BackendModelVersion => (
+  value === 'monade-v2' ? 'v2' : 'v1'
+);
+
 const inferVoiceModel = (toolsConfig: any): VoiceModelId => {
+  const modelVersion = String(toolsConfig?.model_config?.model_version ?? '').toLowerCase();
+  if (modelVersion === 'v2') return 'monade-v2';
+  if (modelVersion === 'v1') return 'monade-v1';
+
   const hasThinkingLevel = !!toolsConfig?.model_config && 'thinking_level' in toolsConfig.model_config;
   const hasNoiseCancellation = !!toolsConfig?.noise_cancellation;
   if (hasThinkingLevel || hasNoiseCancellation) return 'monade-v2';
@@ -590,6 +599,7 @@ export default function AssistantStudio() {
     if (!currentAssistant) return;
     const existing = { ...(currentAssistant.toolsConfig?.model_config || {}) };
     const nextToolsConfig: Record<string, any> = { ...(currentAssistant.toolsConfig || {}) };
+    existing.model_version = mapVoiceModelToBackendVersion(next);
     if (next === 'monade-v2') {
       if ('thinking_budget' in existing) {
         existing.thinking_level = budgetToLevel(Number(existing.thinking_budget));
@@ -599,8 +609,6 @@ export default function AssistantStudio() {
       }
     } else {
       delete existing.thinking_level;
-      // V1 doesn't use noise_cancellation — strip if present so toolsConfig matches model
-      delete nextToolsConfig.noise_cancellation;
     }
     nextToolsConfig.model_config = existing;
     handleUpdate('toolsConfig' as keyof Assistant, nextToolsConfig);
@@ -610,6 +618,7 @@ export default function AssistantStudio() {
     if (!currentAssistant) return;
     const nextModelConfig = { ...(currentAssistant.toolsConfig?.model_config || {}) };
     nextModelConfig.thinking_level = level;
+    nextModelConfig.model_version = 'v2';
     delete nextModelConfig.thinking_budget;
     const nextToolsConfig = {
       ...(currentAssistant.toolsConfig || {}),
@@ -628,6 +637,7 @@ export default function AssistantStudio() {
     setTemperatureInput(String(clamped));
     const nextModelConfig = { ...(currentAssistant.toolsConfig?.model_config || {}) };
     nextModelConfig.temperature = clamped;
+    nextModelConfig.model_version = selectedVoiceModel === 'monade-v2' ? 'v2' : 'v1';
     const nextToolsConfig = {
       ...(currentAssistant.toolsConfig || {}),
       model_config: nextModelConfig,
@@ -1567,64 +1577,58 @@ export default function AssistantStudio() {
                   </div>
                 )}
 
-                {/* Temperature — Monade V2 only */}
-                {selectedVoiceModel === 'monade-v2' && (
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 px-1">
-                      Temperature
-                    </label>
-                    <Input
-                      type="number"
-                      min={TEMPERATURE_MIN}
-                      max={TEMPERATURE_MAX}
-                      step={0.1}
-                      value={temperatureInput}
-                      onChange={(e) => setTemperatureInput(e.target.value)}
-                      onBlur={(e) => commitTemperature(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          commitTemperature((e.target as HTMLInputElement).value);
-                        }
-                      }}
-                      placeholder={String(TEMPERATURE_DEFAULT)}
-                      className="h-10 bg-muted/20 border-border/40 font-mono text-sm focus:border-primary transition-all rounded-md px-3"
-                    />
-                    <p className="text-[10px] text-muted-foreground/60 px-1 italic leading-relaxed">
-                      Float between {TEMPERATURE_MIN} and {TEMPERATURE_MAX}. Higher = more creative, lower = more deterministic. Sent on save as <span className="font-mono">model_config.temperature</span>.
-                    </p>
-                  </div>
-                )}
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 px-1">
+                    Temperature
+                  </label>
+                  <Input
+                    type="number"
+                    min={TEMPERATURE_MIN}
+                    max={TEMPERATURE_MAX}
+                    step={0.1}
+                    value={temperatureInput}
+                    onChange={(e) => setTemperatureInput(e.target.value)}
+                    onBlur={(e) => commitTemperature(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        commitTemperature((e.target as HTMLInputElement).value);
+                      }
+                    }}
+                    placeholder={String(TEMPERATURE_DEFAULT)}
+                    className="h-10 bg-muted/20 border-border/40 font-mono text-sm focus:border-primary transition-all rounded-md px-3"
+                  />
+                  <p className="text-[10px] text-muted-foreground/60 px-1 italic leading-relaxed">
+                    Shared by V1 and V2. Float between {TEMPERATURE_MIN} and {TEMPERATURE_MAX}. Sent on save as <span className="font-mono">model_config.temperature</span>.
+                  </p>
+                </div>
 
-                {/* Noise Cancellation — Monade V2 only */}
-                {selectedVoiceModel === 'monade-v2' && (
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 px-1">
-                      Noise Cancellation
-                    </label>
-                    <Select
-                      value={noiseCancellationModel}
-                      onValueChange={(value) => updateNoiseCancellation(value as NoiseCancellationModel)}
-                    >
-                      <SelectTrigger className="w-full h-10 border-border/40 bg-muted/20 text-sm">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {NOISE_CANCELLATION_OPTIONS.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            <div className="flex flex-col">
-                              <span className="font-medium">{option.label}</span>
-                              <span className="text-[10px] text-muted-foreground">{option.description}</span>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <p className="text-[10px] text-muted-foreground/60 px-1 italic leading-relaxed">
-                      Sent on save as <span className="font-mono">noise_cancellation.model</span>. Choose <em>Default</em> to let the agent pick (BVC Telephony).
-                    </p>
-                  </div>
-                )}
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 px-1">
+                    Noise Cancellation
+                  </label>
+                  <Select
+                    value={noiseCancellationModel}
+                    onValueChange={(value) => updateNoiseCancellation(value as NoiseCancellationModel)}
+                  >
+                    <SelectTrigger className="w-full h-10 border-border/40 bg-muted/20 text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {NOISE_CANCELLATION_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          <div className="flex flex-col">
+                            <span className="font-medium">{option.label}</span>
+                            <span className="text-[10px] text-muted-foreground">{option.description}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-[10px] text-muted-foreground/60 px-1 italic leading-relaxed">
+                    Shared by V1 and V2. Sent on save as <span className="font-mono">noise_cancellation.model</span>. Choose <em>Default</em> to let the backend apply <span className="font-mono">bvc_telephony</span>.
+                  </p>
+                </div>
 
                 {/* Speech Detection (VAD) tweaks */}
                 <div className="space-y-4">

@@ -186,8 +186,17 @@ export function useRagCorpus() {
         const toolsWithoutEndCall = existingTools.filter((tool: any) => tool?.type !== 'end_call');
         const endCallTool = { type: 'end_call', enabled };
         const toolsConfig = {
-          max_tool_steps: currentToolsConfig?.max_tool_steps ?? 3,
+          ...(currentToolsConfig?.model_config
+            ? { model_config: currentToolsConfig.model_config }
+            : {}),
+          ...(currentToolsConfig?.realtime_input
+            ? { realtime_input: currentToolsConfig.realtime_input }
+            : {}),
+          ...(currentToolsConfig?.noise_cancellation
+            ? { noise_cancellation: currentToolsConfig.noise_cancellation }
+            : {}),
           tools: [...toolsWithoutEndCall, endCallTool],
+          max_tool_steps: currentToolsConfig?.max_tool_steps ?? 1,
           ...(currentToolsConfig?.background_audio
             ? { background_audio: currentToolsConfig.background_audio }
             : {}),
@@ -238,8 +247,17 @@ export function useRagCorpus() {
           },
         };
         const toolsConfig = {
-          max_tool_steps: currentToolsConfig?.max_tool_steps ?? 3,
+          ...(currentToolsConfig?.model_config
+            ? { model_config: currentToolsConfig.model_config }
+            : {}),
+          ...(currentToolsConfig?.realtime_input
+            ? { realtime_input: currentToolsConfig.realtime_input }
+            : {}),
+          ...(currentToolsConfig?.noise_cancellation
+            ? { noise_cancellation: currentToolsConfig.noise_cancellation }
+            : {}),
           tools: [...toolsWithoutVertexRag, vertexRagTool],
+          max_tool_steps: currentToolsConfig?.max_tool_steps ?? 1,
           ...(currentToolsConfig?.background_audio
             ? { background_audio: currentToolsConfig.background_audio }
             : {}),
