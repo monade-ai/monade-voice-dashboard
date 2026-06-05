@@ -1542,9 +1542,6 @@ export default function AssistantStudio() {
                       ))}
                     </SelectContent>
                   </Select>
-                  <p className="text-[10px] text-muted-foreground/60 px-1 italic leading-relaxed">
-                    Pick the underlying voice model. <span className="font-medium">V1</span> = Gemini 2.5 Native Audio · <span className="font-medium">V2</span> = Gemini 3.1 Live (thinking levels, noise cancellation, temperature).
-                  </p>
                 </div>
 
                 {/* Thinking Level — Monade V2 only */}
