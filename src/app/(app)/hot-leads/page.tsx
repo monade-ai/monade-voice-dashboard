@@ -250,7 +250,7 @@ DealRow.displayName = 'DealRow';
 
 export default function HotLeadsPage() {
   const { analytics: allAnalytics, loading, fetchAll } = useUserAnalytics();
-  const { templates, fetchTemplate } = usePostProcessingTemplates();
+  const { templates, fetchTemplates, fetchTemplate } = usePostProcessingTemplates();
   const [search, setSearch] = useState('');
   const [selectedLead, setSelectedLead] = useState<CallAnalytics | null>(null);
 
@@ -268,11 +268,18 @@ export default function HotLeadsPage() {
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
   useEffect(() => {
+    fetchTemplates().catch(() => undefined);
+  }, [fetchTemplates]);
+
+  useEffect(() => {
     let isMounted = true;
     const templateIds = Array.from(new Set(
-      allAnalytics
-        .map((lead) => lead.post_processing_template_id)
-        .filter((templateId): templateId is string => Boolean(templateId)),
+      [
+        ...templates.map((template) => template.id),
+        ...allAnalytics
+          .map((lead) => lead.post_processing_template_id)
+          .filter((templateId): templateId is string => Boolean(templateId)),
+      ].filter(Boolean),
     ));
 
     if (templateIds.length === 0) {
@@ -310,7 +317,7 @@ export default function HotLeadsPage() {
     return () => {
       isMounted = false;
     };
-  }, [allAnalytics, fetchTemplate]);
+  }, [allAnalytics, fetchTemplate, templates]);
 
   const bucketIndexByTemplateId = useMemo(() => {
     const indexMap = new Map<string, Map<string, { bucket: QualificationBucket; index: number }>>();
@@ -422,11 +429,12 @@ export default function HotLeadsPage() {
   }, [hotLeads, verdictOptions]);
 
   const templateOptions = useMemo(() => {
-    const ids = Array.from(new Set(
-      allAnalytics
+    const ids = Array.from(new Set([
+      ...templates.map((template) => template.id),
+      ...allAnalytics
         .map((lead) => lead.post_processing_template_id)
         .filter((templateId): templateId is string => Boolean(templateId)),
-    ));
+    ].filter(Boolean)));
 
     return ids.map((templateId) => ({
       id: templateId,

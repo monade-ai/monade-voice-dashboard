@@ -2,7 +2,7 @@ import { CampaignContact } from '@/types/campaign.types';
 
 export const MAX_EXPORT_ATTEMPTS = 6;
 
-export type ClientAttemptTag = 'Qualified' | 'Not Interested' | 'Did not pick-up' | 'Uncertain';
+export type ClientAttemptTag = 'Qualified' | 'Not Interested' | 'Did not pick-up' | 'Uncertain' | 'Not completed';
 
 export interface CampaignAnalyticsExportRecord {
   call_id?: string;
@@ -138,6 +138,10 @@ function hasDistinctAttemptCallId(row: CampaignCallAttemptExportRow): boolean {
   return getAttemptCallId(row).trim().length > 0;
 }
 
+function isUnattemptedContactRow(row: CampaignCallAttemptExportRow): boolean {
+  return row.attempt_number === '0' && !hasDistinctAttemptCallId(row);
+}
+
 export function extractClientLeadId(metadata: Record<string, unknown> | null | undefined): string {
   if (!metadata) return '';
 
@@ -197,6 +201,7 @@ export function mapAttemptTag(row: AttemptTagInput): ClientAttemptTag {
     row.voicemail ?? (row.analytics_json?.voicemail as boolean | string | undefined) ?? '',
   );
 
+  if (row.attempt_number === '0') return 'Not completed';
   if (callStatus === CALL_STATUS_NOT_PICKED_UP) return 'Did not pick-up';
   if (isVoicemailRow(callStatus, voicemailFlag)) return 'Did not pick-up';
 
@@ -204,6 +209,7 @@ export function mapAttemptTag(row: AttemptTagInput): ClientAttemptTag {
     if (verdict === 'qualified' || verdict === 'interested' || verdict === 'likely_to_book') return 'Qualified';
     if (verdict === 'not_interested') return 'Not Interested';
     if (verdict === 'uncertain' || verdict === 'callback' || verdict === 'call_disconnected') return 'Uncertain';
+
     // Connected call with no/unknown verdict — surface as Uncertain so the row isn't silently dropped.
     return 'Uncertain';
   }
@@ -249,7 +255,7 @@ export function mapAttemptTag(row: AttemptTagInput): ClientAttemptTag {
 type CallConnectedInput = Pick<CampaignCallAttemptExportRow,
   'attempt_status' | 'transcript_text' | 'transcript_url' | 'transcript_message_count'
   | 'duration_seconds' | 'attempt_message' | 'analytics_json'
-> & Partial<Pick<CampaignCallAttemptExportRow, 'call_status' | 'voicemail'>>;
+> & Partial<Pick<CampaignCallAttemptExportRow, 'call_status' | 'voicemail' | 'attempt_number'>>;
 
 // Call_Connected derivation (Rule 2):
 //   not_picked_up        → 'false'
@@ -265,6 +271,7 @@ export function deriveCallConnected(
     row.voicemail ?? (row.analytics_json?.voicemail as boolean | string | undefined) ?? '',
   );
 
+  if (row.attempt_number === '0') return 'false';
   if (callStatus === CALL_STATUS_NOT_PICKED_UP) return 'false';
   if (isVoicemailRow(callStatus, voicemailFlag)) return 'false';
   if (callStatus === CALL_STATUS_PICKED_UP) return 'true';
@@ -316,6 +323,8 @@ export function buildClientCampaignExport(
       `Attempt_${attempt}_Call_ID`,
       `Attempt_${attempt}_Tag`,
       `Attempt_${attempt}_Call_Connected`,
+      `Attempt_${attempt}_Transcript_URL`,
+      `Attempt_${attempt}_Recording_URL`,
     );
   }
 
@@ -341,7 +350,10 @@ export function buildClientCampaignExport(
       uniqueAttemptsByCallId.push(attempt);
     });
 
-    const sortedAttempts = uniqueAttemptsByCallId.slice(0, MAX_EXPORT_ATTEMPTS);
+    const exportableAttempts = uniqueAttemptsByCallId.length > 0
+      ? uniqueAttemptsByCallId
+      : allSortedAttempts.filter(isUnattemptedContactRow).slice(0, 1);
+    const sortedAttempts = exportableAttempts.slice(0, MAX_EXPORT_ATTEMPTS);
 
     const lead = sortedAttempts[0] ?? allSortedAttempts[0];
     if (!lead) continue;
@@ -400,6 +412,7 @@ export function buildClientCampaignExport(
       All_Call_IDs: uniqueCallIds.join('|'),
       Qualified_confidence: qualifiedColumn,
       Transcript: primaryTranscriptAttempt?.transcript_text ?? '',
+      'Transcript URL': primaryTranscriptAttempt?.transcript_url ?? '',
       'Call Recording Link': primaryRecordingAttempt?.recording_url || '',
       'Not Interested_Reason': notInterestedReason,
       'Not Interested_Tag': notInterestedTag,
@@ -409,13 +422,15 @@ export function buildClientCampaignExport(
     };
 
     sortedAttempts.forEach((attempt, index) => {
-      if (!hasDistinctAttemptCallId(attempt)) return;
-
       const attemptNumber = index + 1;
       const tag = mapAttemptTag(attempt);
       output[`Attempt_${attemptNumber}_Call_ID`] = getAttemptCallId(attempt);
       output[`Attempt_${attemptNumber}_Tag`] = tag;
       output[`Attempt_${attemptNumber}_Call_Connected`] = deriveCallConnected(attempt, tag);
+      output[`Attempt_${attemptNumber}_Transcript_URL`] = attempt.transcript_url || '';
+      output[`Attempt_${attemptNumber}_Recording_URL`] = attempt.recording_url || '';
+
+      if (!hasDistinctAttemptCallId(attempt)) return;
 
       // Rule 3: gate Attempt_N_Analytics_* columns behind a real connected conversation
       // (call_status='picked_up' AND not voicemail). Voicemail and not_picked_up rows must
@@ -453,6 +468,7 @@ export function buildClientCampaignExport(
     'All_Call_IDs',
     'Qualified_confidence',
     'Transcript',
+    'Transcript URL',
     'Call Recording Link',
   ];
   const enrichmentFields = [

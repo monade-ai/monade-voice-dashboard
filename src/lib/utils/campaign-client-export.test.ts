@@ -117,7 +117,7 @@ describe('campaign-client-export', () => {
       transcript_text: '',
       transcript_message_count: '',
       duration_seconds: '',
-    }))).toBe('Did not pick-up');
+    }))).toBe('Not completed');
     expect(mapAttemptTag(makeAttempt({ analysis_verdict: 'call_disconnected' }))).toBe('Uncertain');
   });
 
@@ -189,9 +189,15 @@ describe('campaign-client-export', () => {
     expect(result.rows[0].All_Call_IDs).toBe('call_1|call_2|call_3|call_4|call_5|call_6|call_7');
     expect(result.rows[0].Attempt_6_Call_ID).toBe('call_6');
     expect(result.rows[0].Attempt_6_Tag).toBe('Qualified');
+    expect(result.rows[0].Attempt_6_Transcript_URL).toBe('https://storage.googleapis.com/bucket/transcript.jsonl');
+    expect(result.rows[0].Attempt_6_Recording_URL).toBe('https://recording.example/call.mp3');
     expect(result.rows[0].Attempt_7_Call_ID).toBeUndefined();
     expect(result.rows[0].Qualified_confidence).toBe('87');
+    expect(result.rows[0]['Transcript URL']).toBe('https://storage.googleapis.com/bucket/transcript.jsonl');
     expect(result.rows[0]['Call Recording Link']).toBe('https://recording.example/call.mp3');
+    expect(result.fields).toContain('Transcript URL');
+    expect(result.fields).toContain('Attempt_6_Transcript_URL');
+    expect(result.fields).toContain('Attempt_6_Recording_URL');
     expect(result.fields).toContain('Attempt_6_Analytics_key_discoveries.customer_language');
     expect(result.rows[0]['Attempt_6_Analytics_key_discoveries.customer_language']).toBe('english');
     expect(result.totalCalls).toBe(7);
@@ -286,6 +292,35 @@ describe('campaign-client-export', () => {
     expect(result.rows[0].Uncertain_Tag).toBe('');
     expect(result.rows[0].Uncertain_Reason).toBe('');
     expect(result.rows[0]['Uncertain_Feedback for agent']).toBe('');
+  });
+
+  test('unattempted incomplete contacts are exported as not completed', () => {
+    const result = buildClientCampaignExport([
+      makeAttempt({
+        contact_id: 'lead_not_started',
+        contact_name: 'Not Started Lead',
+        contact_status: 'pending',
+        attempt_number: '0',
+        attempt_status: 'not_started',
+        provider_call_id: '',
+        transcript_call_id: '',
+        transcript_url: '',
+        transcript_text: '',
+        transcript_message_count: '',
+        duration_seconds: '',
+        attempt_message: '',
+        analytics_json: null,
+      }),
+    ]);
+
+    expect(result.rows).toHaveLength(1);
+    expect(result.rows[0]['Lead Name']).toBe('Not Started Lead');
+    expect(result.rows[0].All_Call_IDs).toBe('');
+    expect(result.rows[0].Attempt_1_Call_ID).toBe('');
+    expect(result.rows[0].Attempt_1_Tag).toBe('Not completed');
+    expect(result.rows[0].Attempt_1_Call_Connected).toBe('false');
+    expect(result.rows[0].Qualified_confidence).toBe('');
+    expect(result.totalCalls).toBe(0);
   });
 
   test('buildClientCampaignExport skips duplicate or empty follow-up attempt slots', () => {
