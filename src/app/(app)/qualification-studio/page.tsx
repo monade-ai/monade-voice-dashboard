@@ -73,6 +73,10 @@ const toSnakeCase = (value: string) => value
   .replace(/_+/g, '_')
   .slice(0, 41);
 
+const isRecommendedInternalKey = (value: string) => (
+  !value.trim() || /^[a-z][a-z0-9_]{0,40}$/.test(value.trim())
+);
+
 const createBucket = (overrides: Partial<StudioBucket> = {}): StudioBucket => ({
   rowId: createRowId(),
   key: '',
@@ -160,7 +164,6 @@ const validateForm = (form: FormState): ValidationState => {
 
     if (!bucket.label.trim()) rowErrors.push('Label is required.');
     if (!key) rowErrors.push('Internal key is required.');
-    if (key && !/^[a-z][a-z0-9_]{0,40}$/.test(key)) rowErrors.push('Key must be snake_case and start with a letter.');
     if (!bucket.description.trim()) rowErrors.push('Description is required.');
     if (key && bucketKeys.has(key)) rowErrors.push('Each bucket key must be unique.');
     if (bucket.confidence_range) {
@@ -182,7 +185,6 @@ const validateForm = (form: FormState): ValidationState => {
 
     if (!dataPoint.label.trim()) rowErrors.push('Label is required.');
     if (!key) rowErrors.push('Internal key is required.');
-    if (key && !/^[a-z][a-z0-9_]{0,40}$/.test(key)) rowErrors.push('Key must be snake_case and start with a letter.');
     if (!dataPoint.description.trim()) rowErrors.push('Description is required.');
     if (key && dataPointKeys.has(key)) rowErrors.push('Each captured field key must be unique.');
     if (key) dataPointKeys.add(key);
@@ -799,10 +801,15 @@ function QualificationStudioScreen({ selectedTemplateId }: { selectedTemplateId:
                                 <Input
                                   value={bucket.key}
                                   readOnly={isSystemDefault}
-                                  onChange={(event) => updateBucket(bucket.rowId, { key: toSnakeCase(event.target.value) })}
+                                  onChange={(event) => updateBucket(bucket.rowId, { key: event.target.value })}
                                   placeholder="appointment_booked"
                                   className="bg-background/80 border-border/30 font-mono text-xs"
                                 />
+                                {!isRecommendedInternalKey(bucket.key) && (
+                                  <p className="text-xs text-muted-foreground">
+                                    Lowercase snake_case is recommended for CRM connections and cleaner exports.
+                                  </p>
+                                )}
                               </div>
 
                               <div className="lg:col-span-2 space-y-2">
@@ -938,10 +945,15 @@ function QualificationStudioScreen({ selectedTemplateId }: { selectedTemplateId:
                                 <Input
                                   value={dataPoint.key}
                                   readOnly={isSystemDefault}
-                                  onChange={(event) => updateDataPoint(dataPoint.rowId, { key: toSnakeCase(event.target.value) })}
+                                  onChange={(event) => updateDataPoint(dataPoint.rowId, { key: event.target.value })}
                                   placeholder="interest_score"
                                   className="bg-background/80 border-border/30 font-mono text-xs"
                                 />
+                                {!isRecommendedInternalKey(dataPoint.key) && (
+                                  <p className="text-xs text-muted-foreground">
+                                    Lowercase snake_case is recommended for CRM connections and cleaner exports.
+                                  </p>
+                                )}
                               </div>
 
                               <div className="space-y-2">
