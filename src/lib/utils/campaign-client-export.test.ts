@@ -323,6 +323,32 @@ describe('campaign-client-export', () => {
     expect(result.totalCalls).toBe(0);
   });
 
+  test('attempt rows without provider call ids still show not completed', () => {
+    const result = buildClientCampaignExport([
+      makeAttempt({
+        contact_id: 'lead_attempt_without_call',
+        contact_name: 'Queued Lead',
+        contact_status: 'in-progress',
+        attempt_number: '1',
+        attempt_status: 'not_started',
+        provider_call_id: '',
+        transcript_call_id: '',
+        transcript_url: '',
+        transcript_text: '',
+        transcript_message_count: '',
+        duration_seconds: '',
+        attempt_message: '',
+        analytics_json: null,
+      }),
+    ]);
+
+    expect(result.rows).toHaveLength(1);
+    expect(result.rows[0].Attempt_1_Call_ID).toBe('');
+    expect(result.rows[0].Attempt_1_Tag).toBe('Not completed');
+    expect(result.rows[0].Attempt_1_Call_Connected).toBe('false');
+    expect(result.totalCalls).toBe(0);
+  });
+
   test('buildClientCampaignExport skips duplicate or empty follow-up attempt slots', () => {
     const duplicateAttempt = makeAttempt({
       contact_id: 'contact_dupe',

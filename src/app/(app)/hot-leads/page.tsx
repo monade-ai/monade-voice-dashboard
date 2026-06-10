@@ -92,6 +92,10 @@ const isSameLocalDay = (a: Date, b: Date) => (
   && a.getDate() === b.getDate()
 );
 
+const normalizeOutcomeKeyForMatch = (value: string | undefined | null) => (
+  String(value || '').trim().toLowerCase()
+);
+
 // --- Component: DealRow (Memoized for Performance) ---
 
 const DealRow = React.memo(({ lead, onClick, bucketIndex }: {
@@ -347,7 +351,7 @@ export default function HotLeadsPage() {
   const baseHotLeads = useMemo(() => {
     return allAnalytics.filter(a => {
       if ((a.confidence_score || 0) < 50) return false;
-      const v = (a.verdict || '').toLowerCase();
+      const v = normalizeOutcomeKeyForMatch(a.verdict);
       if (!v) return false;
       if (isNegativeKey(v)) return false;
 
@@ -379,10 +383,31 @@ export default function HotLeadsPage() {
   }, [allAnalytics, search, templateFilter, dateFilter, confidenceFilter, isNegativeKey]);
 
   const verdictOptions = useMemo(() => {
+    if (templateFilter !== 'all' && templateFilter !== 'legacy') {
+      const selectedTemplate = templateDetails[templateFilter] || templates.find((template) => template.id === templateFilter);
+      const buckets = selectedTemplate?.content?.qualification_buckets || [];
+      if (buckets.length > 0) {
+        return buckets
+          .filter((bucket) => bucket.key)
+          .map((bucket) => ({
+            key: normalizeOutcomeKeyForMatch(bucket.key),
+            label: bucket.label || humanizeOutcomeKey(bucket.key),
+          }));
+      }
+
+      const outcomeKeys = selectedTemplate?.outcome_keys || [];
+      if (outcomeKeys.length > 0) {
+        return outcomeKeys.map((key) => ({
+          key: normalizeOutcomeKeyForMatch(key),
+          label: humanizeOutcomeKey(key),
+        }));
+      }
+    }
+
     const seen = new Set<string>();
 
     return baseHotLeads.reduce<Array<{ key: string; label: string }>>((accumulator, lead) => {
-      const verdict = (lead.verdict || '').toLowerCase();
+      const verdict = normalizeOutcomeKeyForMatch(lead.verdict);
       if (!verdict || seen.has(verdict)) return accumulator;
       seen.add(verdict);
 
@@ -394,7 +419,7 @@ export default function HotLeadsPage() {
 
       return accumulator;
     }, []);
-  }, [baseHotLeads, bucketIndexByTemplateId]);
+  }, [baseHotLeads, bucketIndexByTemplateId, templateDetails, templateFilter, templates]);
   const effectiveIntentFilter = useMemo(() => {
     if (intentFilter === 'all') return 'all';
 
@@ -403,8 +428,8 @@ export default function HotLeadsPage() {
 
   const hotLeads = useMemo(() => {
     return baseHotLeads.filter((lead) => {
-      const verdict = (lead.verdict || '').toLowerCase();
-      if (effectiveIntentFilter !== 'all' && verdict !== effectiveIntentFilter.toLowerCase()) return false;
+      const verdict = normalizeOutcomeKeyForMatch(lead.verdict);
+      if (effectiveIntentFilter !== 'all' && verdict !== normalizeOutcomeKeyForMatch(effectiveIntentFilter)) return false;
 
       return true;
     });
@@ -424,7 +449,7 @@ export default function HotLeadsPage() {
     return verdictOptions.map((option) => ({
       key: option.key,
       label: option.label,
-      count: hotLeads.filter((l) => (l.verdict || '').toLowerCase() === option.key).length,
+      count: hotLeads.filter((l) => normalizeOutcomeKeyForMatch(l.verdict) === option.key).length,
     }));
   }, [hotLeads, verdictOptions]);
 

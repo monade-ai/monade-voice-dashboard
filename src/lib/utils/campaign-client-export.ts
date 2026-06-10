@@ -142,6 +142,14 @@ function isUnattemptedContactRow(row: CampaignCallAttemptExportRow): boolean {
   return row.attempt_number === '0' && !hasDistinctAttemptCallId(row);
 }
 
+function isNoProviderCallAttempt(row: CampaignCallAttemptExportRow): boolean {
+  return !hasDistinctAttemptCallId(row)
+    && !row.transcript_url
+    && !row.transcript_text
+    && !row.duration_seconds
+    && !row.analytics_json;
+}
+
 export function extractClientLeadId(metadata: Record<string, unknown> | null | undefined): string {
   if (!metadata) return '';
 
@@ -201,7 +209,7 @@ export function mapAttemptTag(row: AttemptTagInput): ClientAttemptTag {
     row.voicemail ?? (row.analytics_json?.voicemail as boolean | string | undefined) ?? '',
   );
 
-  if (row.attempt_number === '0') return 'Not completed';
+  if (row.attempt_number === '0' || isNoProviderCallAttempt(row as CampaignCallAttemptExportRow)) return 'Not completed';
   if (callStatus === CALL_STATUS_NOT_PICKED_UP) return 'Did not pick-up';
   if (isVoicemailRow(callStatus, voicemailFlag)) return 'Did not pick-up';
 
@@ -271,6 +279,7 @@ export function deriveCallConnected(
     row.voicemail ?? (row.analytics_json?.voicemail as boolean | string | undefined) ?? '',
   );
 
+  if (mappedTag === 'Not completed') return 'false';
   if (row.attempt_number === '0') return 'false';
   if (callStatus === CALL_STATUS_NOT_PICKED_UP) return 'false';
   if (isVoicemailRow(callStatus, voicemailFlag)) return 'false';
@@ -352,7 +361,7 @@ export function buildClientCampaignExport(
 
     const exportableAttempts = uniqueAttemptsByCallId.length > 0
       ? uniqueAttemptsByCallId
-      : allSortedAttempts.filter(isUnattemptedContactRow).slice(0, 1);
+      : allSortedAttempts.filter((attempt) => isUnattemptedContactRow(attempt) || isNoProviderCallAttempt(attempt));
     const sortedAttempts = exportableAttempts.slice(0, MAX_EXPORT_ATTEMPTS);
 
     const lead = sortedAttempts[0] ?? allSortedAttempts[0];

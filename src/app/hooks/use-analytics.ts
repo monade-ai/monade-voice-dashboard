@@ -242,6 +242,10 @@ export function useUserAnalytics() {
           id: item.id,
           call_id: item.call_id,
           user_uid: item.user_uid,
+          post_processing_template_id: item.post_processing_template_id
+            ?? item.analytics?.post_processing_template_id
+            ?? item.analytics?.template_id
+            ?? null,
           phone_number: item.phone_number,
           transcript_url: item.transcript_url,
           enhanced_transcript_url: item.enhanced_transcript_url,
@@ -257,6 +261,8 @@ export function useUserAnalytics() {
           duration_seconds: item.duration_seconds,
           billing_data: item.billing_data,
           provider_call_status: item.provider_call_status,
+          call_status: item.call_status ?? item.analytics?.call_status ?? null,
+          voicemail: item.voicemail ?? item.analytics?.voicemail ?? null,
           recording_metadata: item.recording_metadata,
         });
 
