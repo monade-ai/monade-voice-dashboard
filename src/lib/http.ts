@@ -97,6 +97,16 @@ function isHtmlLike(message: string) {
   return trimmed.startsWith('<!doctype html') || trimmed.startsWith('<html');
 }
 
+function getServerMessage(errorData: any) {
+  const detail = errorData?.detail;
+  if (typeof detail === 'string') return detail;
+  if (detail && typeof detail === 'object') {
+    return detail.message || detail.reason || undefined;
+  }
+
+  return errorData?.message || errorData?.error;
+}
+
 export async function fetchJson<T = unknown>(url: string, options: FetchJsonOptions = {}): Promise<T> {
   const method = (options.method || 'GET').toUpperCase();
   const retries = options.retry?.retries ?? (DEFAULT_RETRY_METHODS.has(method) ? DEFAULT_RETRIES : 0);
@@ -125,7 +135,7 @@ export async function fetchJson<T = unknown>(url: string, options: FetchJsonOpti
 
       if (!response.ok) {
         const errorData = await parseResponseBody(response);
-        const serverMessage = errorData?.detail || errorData?.message || errorData?.error;
+        const serverMessage = getServerMessage(errorData);
         const friendlyMessage = getFriendlyErrorMessage(response.status, response.statusText);
         const message = serverMessage
           && response.status < 500
@@ -136,9 +146,9 @@ export async function fetchJson<T = unknown>(url: string, options: FetchJsonOpti
 
         // Full diagnostic logging for non-OK responses
         console.error(`[fetchJson] HTTP ${response.status} ${response.statusText} — ${method} ${url}`);
-        console.error(`[fetchJson] Response body:`, errorData);
-        if (serverMessage) console.error(`[fetchJson] Server message:`, serverMessage);
-        console.error(`[fetchJson] Friendly message:`, message);
+        console.error('[fetchJson] Response body:', errorData);
+        if (serverMessage) console.error('[fetchJson] Server message:', serverMessage);
+        console.error('[fetchJson] Friendly message:', message);
 
         const apiError = new ApiError(message, response.status, errorData);
 
