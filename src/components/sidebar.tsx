@@ -29,6 +29,7 @@ import {
   MessageCircle,
   Workflow,
   Inbox,
+  PlugZap,
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 
@@ -38,7 +39,7 @@ import { useRunningCampaigns } from '@/app/hooks/use-running-campaigns';
 
 interface NavItemProps {
   href: string;
-  icon: React.ReactNode;
+  icon: React.ReactElement<{ size?: number }>;
   label: string;
   isActive?: boolean;
   count?: number;
@@ -69,7 +70,7 @@ function NavItem({ href, icon, label, isActive = false, count, isLive = false, t
           'transition-colors',
           isActive ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground',
         )}>
-          {React.cloneElement(icon as React.ReactElement, { size: 18 })}
+          {React.cloneElement(icon, { size: 18 })}
         </div>
         <span className="text-sm tracking-tight">{label}</span>
       </div>
@@ -247,6 +248,12 @@ export function Sidebar() {
         />
 
         <CategoryLabel>Connectivity</CategoryLabel>
+        <NavItem
+          href="/custom-integrations"
+          icon={<PlugZap />}
+          label="Custom Integrations"
+          isActive={pathname.startsWith('/custom-integrations')}
+        />
         <NavItem
           href="/trunks"
           icon={<Server />}
