@@ -45,7 +45,7 @@ export type QueueJob = {
   job_id: string;
   user_id?: string;
   phone_number?: string;
-  prospect_id?: string;
+  lead_id?: string;
   bucket?: IntegrationBucket;
   status?: string;
   queue_status?: string;

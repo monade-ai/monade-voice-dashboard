@@ -81,6 +81,54 @@ function normalizeJobs(jobs: QueueJobsResponse) {
   })));
 }
 
+function getSpecialParameters(job: QueueJob) {
+  const raw = (job.payload as any)?.special_parameters;
+  const specialParameters = raw && typeof raw === 'object' && !Array.isArray(raw)
+    ? { ...raw }
+    : {};
+
+  if (job.lead_id && !specialParameters.lead_id) {
+    specialParameters.lead_id = job.lead_id;
+  }
+
+  return specialParameters as Record<string, unknown>;
+}
+
+function getJobLeadId(job: QueueJob) {
+  const payloadLeadId = getSpecialParameters(job).lead_id;
+
+  return job.lead_id || (typeof payloadLeadId === 'string' ? payloadLeadId : undefined);
+}
+
+function getSpecialParameterColumns(jobs: QueueJob[]) {
+  const keys = new Set<string>();
+  jobs.forEach((job) => {
+    Object.keys(getSpecialParameters(job)).forEach((key) => keys.add(key));
+  });
+
+  return Array.from(keys).sort((a, b) => {
+    if (a === 'lead_id') return -1;
+    if (b === 'lead_id') return 1;
+
+    return a.localeCompare(b);
+  });
+}
+
+function formatColumnLabel(key: string) {
+  return key
+    .replace(/[_-]+/g, ' ')
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function formatCellValue(value: unknown) {
+  if (value === null || value === undefined || value === '') return 'None';
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+
+  return JSON.stringify(value);
+}
+
 function sanitizePayload(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(sanitizePayload);
   if (!value || typeof value !== 'object') return value;
@@ -209,6 +257,7 @@ function IntegrationQueueTable({
   onRetryNow: (integration: CustomIntegration, job: QueueJob) => void;
 }) {
   const jobs = normalizeJobs(state.jobs);
+  const specialParameterColumns = getSpecialParameterColumns(jobs);
 
   return (
     <PaperCard variant="default">
@@ -237,7 +286,11 @@ function IntegrationQueueTable({
                 <tr className="border-b border-border/30">
                   <th className="px-4 py-3 text-left font-bold">Job</th>
                   <th className="px-4 py-3 text-left font-bold">Phone</th>
-                  <th className="px-4 py-3 text-left font-bold">Prospect</th>
+                  {specialParameterColumns.map((key) => (
+                    <th key={key} className="px-4 py-3 text-left font-bold">
+                      {formatColumnLabel(key)}
+                    </th>
+                  ))}
                   <th className="px-4 py-3 text-left font-bold">Bucket</th>
                   <th className="px-4 py-3 text-left font-bold">Status</th>
                   <th className="px-4 py-3 text-left font-bold">Retries</th>
@@ -263,7 +316,11 @@ function IntegrationQueueTable({
                     >
                       <td className="px-4 py-3 font-mono text-xs max-w-[180px] truncate">{job.job_id}</td>
                       <td className="px-4 py-3 whitespace-nowrap">{job.phone_number || 'Unknown'}</td>
-                      <td className="px-4 py-3 max-w-[160px] truncate">{job.prospect_id || 'None'}</td>
+                      {specialParameterColumns.map((key) => (
+                        <td key={key} className="px-4 py-3 max-w-[160px] truncate">
+                          {formatCellValue(getSpecialParameters(job)[key])}
+                        </td>
+                      ))}
                       <td className="px-4 py-3">
                         <Badge variant="outline" className="rounded-[4px] text-[10px]">
                           {bucketLabels[job.bucket ?? 'ready']}
@@ -353,6 +410,7 @@ function IntegrationJobDrawer({
             <div className="grid grid-cols-2 gap-3 text-xs">
               <DetailItem label="Status" value={job.status || 'Unknown'} />
               <DetailItem label="Queue" value={job.queue_status || job.bucket || 'Unknown'} />
+              <DetailItem label="Lead" value={getJobLeadId(job) || 'None'} />
               <DetailItem label="Assistant" value={(job.payload as any)?.assistant_id || 'Not set'} />
               <DetailItem label="Trunk" value={(job.payload as any)?.telephony?.trunk_name || 'Not set'} />
               <DetailItem label="Last Call" value={job.last_call_id || 'None'} />
