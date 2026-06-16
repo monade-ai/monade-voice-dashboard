@@ -12,6 +12,7 @@ import {
   Pencil,
   MessageCircle,
   PhoneCall,
+  Mail,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -25,7 +26,8 @@ import { cn } from '@/lib/utils';
 interface WebhookEndpoint {
   id: string;
   user_uid: string;
-  url: string;
+  url?: string | null;
+  email?: string | null;
   event_types: string[];
   description: string | null;
   is_active: boolean;
@@ -35,12 +37,16 @@ interface WebhookEndpoint {
 
 const EVENT_TYPE_LABELS: Record<string, string> = {
   'call_analytics.completed': 'Call Analytics Completed',
+  'call_analytics.email': 'Call Analytics Email',
   'whatsapp.lead_qualified': 'WhatsApp Lead Qualified',
 };
 
 const VOICE_ANALYTICS_EVENT_TYPE = 'call_analytics.completed';
+const VOICE_ANALYTICS_EMAIL_EVENT_TYPE = 'call_analytics.email';
 const WHATSAPP_LEAD_EVENT_TYPE = 'whatsapp.lead_qualified';
-const REQUIRED_EVENT_TYPES = [VOICE_ANALYTICS_EVENT_TYPE, WHATSAPP_LEAD_EVENT_TYPE];
+const DEFAULT_EVENT_TYPES = [VOICE_ANALYTICS_EVENT_TYPE, VOICE_ANALYTICS_EMAIL_EVENT_TYPE, WHATSAPP_LEAD_EVENT_TYPE];
+const URL_REQUIRED_EVENT_TYPES = [VOICE_ANALYTICS_EVENT_TYPE, WHATSAPP_LEAD_EVENT_TYPE];
+const EMAIL_REQUIRED_EVENT_TYPES = [VOICE_ANALYTICS_EMAIL_EVENT_TYPE];
 
 const WEBHOOK_INTEGRATIONS = [
   {
@@ -49,6 +55,13 @@ const WEBHOOK_INTEGRATIONS = [
     description: 'Send completed voice-call summaries, outcomes, and analytics to your CRM or data warehouse.',
     defaultDescription: 'Voice call analytics webhook',
     icon: PhoneCall,
+  },
+  {
+    title: 'Call Analytics Email',
+    eventType: VOICE_ANALYTICS_EMAIL_EVENT_TYPE,
+    description: 'Send completed call analytics to an operations inbox without adding a webhook receiver.',
+    defaultDescription: 'Call analytics email',
+    icon: Mail,
   },
   {
     title: 'WhatsApp Bot Flow',
@@ -75,8 +88,21 @@ const sanitizeWebhookUrl = (url: string): string => {
   }
   // Remove trailing slashes for consistency
   sanitized = sanitized.replace(/\/+$/, '');
+
   return sanitized;
 };
+
+const requiresUrl = (eventTypes: string[]) => (
+  eventTypes.some(eventType => URL_REQUIRED_EVENT_TYPES.includes(eventType))
+);
+
+const requiresEmail = (eventTypes: string[]) => (
+  eventTypes.some(eventType => EMAIL_REQUIRED_EVENT_TYPES.includes(eventType))
+);
+
+const isValidEmail = (email: string) => (
+  /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
+);
 
 export function WebhookManager() {
   const { userUid } = useMonadeUser();
@@ -89,13 +115,14 @@ export function WebhookManager() {
 
   // Form state
   const [formUrl, setFormUrl] = useState('');
+  const [formEmail, setFormEmail] = useState('');
   const [formDescription, setFormDescription] = useState('');
   const [formEventTypes, setFormEventTypes] = useState<string[]>([]);
 
   const baseUrl = MONADE_API_CONFIG.BASE_URL;
 
   // Fetch endpoints
-  const fetchEndpoints = async () => {
+  const fetchEndpoints = React.useCallback(async () => {
     if (!userUid) return;
     try {
       setLoading(true);
@@ -111,10 +138,10 @@ export function WebhookManager() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [baseUrl, userUid]);
 
   // Fetch supported event types
-  const fetchSupportedEvents = async () => {
+  const fetchSupportedEvents = React.useCallback(async () => {
     try {
       const res = await fetch(`${baseUrl}/api/webhooks/supported-events`, {
         credentials: 'include',
@@ -126,15 +153,16 @@ export function WebhookManager() {
     } catch (err) {
       console.error('Failed to fetch supported events:', err);
     }
-  };
+  }, [baseUrl]);
 
   useEffect(() => {
     fetchEndpoints();
     fetchSupportedEvents();
-  }, [userUid]);
+  }, [fetchEndpoints, fetchSupportedEvents]);
 
   const resetForm = () => {
     setFormUrl('');
+    setFormEmail('');
     setFormDescription('');
     setFormEventTypes([]);
     setEditingEndpoint(null);
@@ -153,7 +181,8 @@ export function WebhookManager() {
 
   const openEditDialog = (endpoint: WebhookEndpoint) => {
     setEditingEndpoint(endpoint);
-    setFormUrl(endpoint.url);
+    setFormUrl(endpoint.url || '');
+    setFormEmail(endpoint.email || '');
     setFormDescription(endpoint.description || '');
     setFormEventTypes([...endpoint.event_types]);
     setShowCreateDialog(true);
@@ -167,29 +196,65 @@ export function WebhookManager() {
     );
   };
 
-  const eventTypeOptions = Array.from(new Set([...supportedEvents, ...REQUIRED_EVENT_TYPES]));
+  const eventTypeOptions = Array.from(new Set([...supportedEvents, ...DEFAULT_EVENT_TYPES]));
 
   const getEndpointCountForEvent = (eventType: string) => (
     endpoints.filter((endpoint) => endpoint.event_types.includes(eventType)).length
   );
 
+  const validateForm = () => {
+    if (formEventTypes.length === 0) {
+      toast.error('Select at least one event type.');
+
+      return null;
+    }
+
+    const trimmedUrl = formUrl.trim();
+    const trimmedEmail = formEmail.trim();
+    const needsUrl = requiresUrl(formEventTypes);
+    const needsEmail = requiresEmail(formEventTypes);
+
+    if (needsUrl && !trimmedUrl) {
+      toast.error('Endpoint URL is required for webhook and WhatsApp events.');
+
+      return null;
+    }
+
+    if (needsEmail && !trimmedEmail) {
+      toast.error('Email address is required for email events.');
+
+      return null;
+    }
+
+    if (trimmedUrl) {
+      try {
+        new URL(trimmedUrl);
+      } catch {
+        toast.error('Please enter a valid URL (e.g. https://example.com/webhook)');
+
+        return null;
+      }
+    }
+
+    if (trimmedEmail && !isValidEmail(trimmedEmail)) {
+      toast.error('Please enter a valid email address.');
+
+      return null;
+    }
+
+    return {
+      url: trimmedUrl ? sanitizeWebhookUrl(trimmedUrl) : undefined,
+      email: trimmedEmail || undefined,
+      event_types: formEventTypes,
+      description: formDescription || undefined,
+    };
+  };
+
   // Create endpoint
   const handleCreate = async () => {
     if (!userUid) return;
-    if (!formUrl || formEventTypes.length === 0) {
-      toast.error('URL and at least one event type are required.');
-      return;
-    }
-
-    // Basic URL validation
-    try {
-      new URL(formUrl);
-    } catch {
-      toast.error('Please enter a valid URL (e.g. https://example.com/webhook)');
-      return;
-    }
-
-    const targetUrl = sanitizeWebhookUrl(formUrl);
+    const payload = validateForm();
+    if (!payload) return;
 
     setIsCreating(true);
     try {
@@ -197,11 +262,7 @@ export function WebhookManager() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({
-          url: targetUrl,
-          event_types: formEventTypes,
-          description: formDescription || undefined,
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (res.ok) {
@@ -213,7 +274,7 @@ export function WebhookManager() {
         const data = await res.json().catch(() => ({}));
         toast.error(data.error || 'Failed to create webhook');
       }
-    } catch (err) {
+    } catch {
       toast.error('Network error');
     } finally {
       setIsCreating(false);
@@ -223,19 +284,8 @@ export function WebhookManager() {
   // Update endpoint
   const handleUpdate = async () => {
     if (!userUid || !editingEndpoint) return;
-    if (!formUrl || formEventTypes.length === 0) {
-      toast.error('URL and at least one event type are required.');
-      return;
-    }
-
-    try {
-      new URL(formUrl);
-    } catch {
-      toast.error('Please enter a valid URL');
-      return;
-    }
-
-    const targetUrl = sanitizeWebhookUrl(formUrl);
+    const payload = validateForm();
+    if (!payload) return;
 
     setIsCreating(true);
     try {
@@ -243,11 +293,7 @@ export function WebhookManager() {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({
-          url: targetUrl,
-          event_types: formEventTypes,
-          description: formDescription || undefined,
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (res.ok) {
@@ -259,7 +305,7 @@ export function WebhookManager() {
         const data = await res.json().catch(() => ({}));
         toast.error(data.error || 'Failed to update webhook');
       }
-    } catch (err) {
+    } catch {
       toast.error('Network error');
     } finally {
       setIsCreating(false);
@@ -279,13 +325,13 @@ export function WebhookManager() {
 
       if (res.ok) {
         setEndpoints(prev =>
-          prev.map(ep => ep.id === endpoint.id ? { ...ep, is_active: !ep.is_active } : ep)
+          prev.map(ep => ep.id === endpoint.id ? { ...ep, is_active: !ep.is_active } : ep),
         );
         toast.success(endpoint.is_active ? 'Webhook paused' : 'Webhook activated');
       } else {
         toast.error('Failed to update webhook');
       }
-    } catch (err) {
+    } catch {
       toast.error('Network error');
     }
   };
@@ -306,7 +352,7 @@ export function WebhookManager() {
       } else {
         toast.error('Failed to delete webhook');
       }
-    } catch (err) {
+    } catch {
       toast.error('Network error');
     }
   };
@@ -317,7 +363,7 @@ export function WebhookManager() {
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-sm font-medium text-foreground">Webhook Endpoints</h3>
-          <p className="text-xs text-muted-foreground">Receive real-time POST notifications when events occur.</p>
+          <p className="text-xs text-muted-foreground">Receive event notifications by webhook URL, email, or both.</p>
         </div>
         <Button
           onClick={() => openCreateDialog()}
@@ -330,7 +376,7 @@ export function WebhookManager() {
       </div>
 
       {/* Guided Integrations */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         {WEBHOOK_INTEGRATIONS.map((integration) => {
           const Icon = integration.icon;
           const endpointCount = getEndpointCountForEvent(integration.eventType);
@@ -385,69 +431,78 @@ export function WebhookManager() {
           <div className="py-8 text-center border border-dashed border-border/40 rounded-md bg-muted/5">
             <Webhook size={20} className="mx-auto mb-2 text-muted-foreground/40" />
             <p className="text-xs text-muted-foreground italic">No webhook endpoints configured.</p>
-            <p className="text-[10px] text-muted-foreground/60 mt-1">Add one to receive event notifications via HTTP POST.</p>
+            <p className="text-[10px] text-muted-foreground/60 mt-1">Add one to receive event notifications by webhook URL or email.</p>
           </div>
         ) : (
-          endpoints.map((ep) => (
-            <div key={ep.id} className="group flex items-center justify-between p-3 rounded-md bg-muted/10 border border-border/20 hover:border-primary/30 transition-all">
-              <div className="flex items-center gap-3 min-w-0 flex-1">
-                <div className={cn(
-                  'w-8 h-8 rounded-full flex items-center justify-center shrink-0',
-                  ep.is_active ? 'bg-primary/10 text-primary' : 'bg-muted/30 text-muted-foreground'
-                )}>
-                  <Webhook size={14} />
-                </div>
-                <div className="flex flex-col min-w-0">
-                  <span className="text-xs font-mono font-medium text-foreground truncate">
-                    {ep.url}
-                  </span>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    {ep.description && (
-                      <span className="text-[9px] text-muted-foreground truncate max-w-[200px]">{ep.description}</span>
-                    )}
-                    <div className="flex items-center gap-1">
-                      {ep.event_types.map(t => (
-                        <span key={t} className="text-[8px] px-1.5 py-0.5 rounded-sm bg-primary/10 text-primary/80 font-medium uppercase tracking-wider">
-                          {t.split('.').pop()}
-                        </span>
-                      ))}
-                    </div>
-                    <span className={cn(
-                      'text-[8px] px-1.5 py-0.5 rounded-sm font-bold uppercase tracking-wider',
-                      ep.is_active
-                        ? 'bg-green-500/10 text-green-600'
-                        : 'bg-muted/30 text-muted-foreground'
-                    )}>
-                      {ep.is_active ? 'Active' : 'Paused'}
+          endpoints.map((ep) => {
+            const hasUrl = Boolean(ep.url);
+            const hasEmail = Boolean(ep.email);
+            const EndpointIcon = hasUrl ? Webhook : Mail;
+
+            return (
+              <div key={ep.id} className="group flex items-center justify-between p-3 rounded-md bg-muted/10 border border-border/20 hover:border-primary/30 transition-all">
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <div className={cn(
+                    'w-8 h-8 rounded-full flex items-center justify-center shrink-0',
+                    ep.is_active ? 'bg-primary/10 text-primary' : 'bg-muted/30 text-muted-foreground',
+                  )}>
+                    <EndpointIcon size={14} />
+                  </div>
+                  <div className="flex flex-col min-w-0">
+                    <span className="text-xs font-mono font-medium text-foreground truncate">
+                      {hasUrl ? ep.url : ep.email}
                     </span>
+                    <div className="flex flex-wrap items-center gap-2 mt-0.5">
+                      {hasUrl && hasEmail && (
+                        <span className="text-[9px] text-muted-foreground truncate max-w-[220px]">{ep.email}</span>
+                      )}
+                      {ep.description && (
+                        <span className="text-[9px] text-muted-foreground truncate max-w-[200px]">{ep.description}</span>
+                      )}
+                      <div className="flex items-center gap-1">
+                        {ep.event_types.map(t => (
+                          <span key={t} className="text-[8px] px-1.5 py-0.5 rounded-sm bg-primary/10 text-primary/80 font-medium uppercase tracking-wider">
+                            {t.split('.').pop()}
+                          </span>
+                        ))}
+                      </div>
+                      <span className={cn(
+                        'text-[8px] px-1.5 py-0.5 rounded-sm font-bold uppercase tracking-wider',
+                        ep.is_active
+                          ? 'bg-green-500/10 text-green-600'
+                          : 'bg-muted/30 text-muted-foreground',
+                      )}>
+                        {ep.is_active ? 'Active' : 'Paused'}
+                      </span>
+                    </div>
                   </div>
                 </div>
+                <div className="flex items-center gap-1 shrink-0 ml-2">
+                  <button
+                    onClick={() => handleToggle(ep)}
+                    className="h-9 w-9 inline-flex items-center justify-center rounded-[4px] border border-border/30 text-muted-foreground hover:text-foreground hover:bg-background/80 transition-all"
+                    title={ep.is_active ? 'Pause webhook' : 'Activate webhook'}
+                  >
+                    {ep.is_active ? <ToggleRight size={16} className="text-primary" /> : <ToggleLeft size={16} />}
+                  </button>
+                  <button
+                    onClick={() => openEditDialog(ep)}
+                    className="h-9 w-9 inline-flex items-center justify-center rounded-[4px] border border-border/30 text-muted-foreground hover:text-foreground hover:bg-background/80 transition-all"
+                    title="Edit"
+                  >
+                    <Pencil size={14} />
+                  </button>
+                  <button
+                    onClick={() => handleDelete(ep.id)}
+                    className="h-9 w-9 inline-flex items-center justify-center rounded-[4px] border border-border/30 text-muted-foreground hover:text-destructive hover:bg-background/80 transition-all"
+                    title="Delete"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
               </div>
-              <div className="flex items-center gap-1 shrink-0 ml-2">
-                <button
-                  onClick={() => handleToggle(ep)}
-                  className="h-9 w-9 inline-flex items-center justify-center rounded-[4px] border border-border/30 text-muted-foreground hover:text-foreground hover:bg-background/80 transition-all"
-                  title={ep.is_active ? 'Pause webhook' : 'Activate webhook'}
-                >
-                  {ep.is_active ? <ToggleRight size={16} className="text-primary" /> : <ToggleLeft size={16} />}
-                </button>
-                <button
-                  onClick={() => openEditDialog(ep)}
-                  className="h-9 w-9 inline-flex items-center justify-center rounded-[4px] border border-border/30 text-muted-foreground hover:text-foreground hover:bg-background/80 transition-all"
-                  title="Edit"
-                >
-                  <Pencil size={14} />
-                </button>
-                <button
-                  onClick={() => handleDelete(ep.id)}
-                  className="h-9 w-9 inline-flex items-center justify-center rounded-[4px] border border-border/30 text-muted-foreground hover:text-destructive hover:bg-background/80 transition-all"
-                  title="Delete"
-                >
-                  <Trash2 size={14} />
-                </button>
-              </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
 
@@ -461,19 +516,35 @@ export function WebhookManager() {
             </DialogTitle>
             <DialogDescription className="text-sm text-muted-foreground">
               {editingEndpoint
-                ? 'Update the endpoint URL, events, or description.'
-                : 'We\'ll send POST requests to this URL for the selected voice or WhatsApp events.'}
+                ? 'Update the endpoint URL, email, events, or description.'
+                : 'Send selected events to a webhook URL, an email address, or both.'}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-5 my-2">
             {/* URL */}
             <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Endpoint URL</label>
+              <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                Endpoint URL <span className="text-muted-foreground/50">(required for webhook events)</span>
+              </label>
               <Input
                 value={formUrl}
                 onChange={(e) => setFormUrl(e.target.value)}
                 placeholder="https://your-server.com/webhook"
+                className="bg-muted/10 border-border/20 font-mono text-xs"
+              />
+            </div>
+
+            {/* Email */}
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                Email <span className="text-muted-foreground/50">(required for email events)</span>
+              </label>
+              <Input
+                type="email"
+                value={formEmail}
+                onChange={(e) => setFormEmail(e.target.value)}
+                placeholder="ops@client.com"
                 className="bg-muted/10 border-border/20 font-mono text-xs"
               />
             </div>
@@ -541,7 +612,7 @@ export function WebhookManager() {
             </Button>
             <Button
               onClick={editingEndpoint ? handleUpdate : handleCreate}
-              disabled={isCreating || !formUrl || formEventTypes.length === 0}
+              disabled={isCreating || formEventTypes.length === 0}
               className="h-9 text-[10px] font-bold uppercase tracking-widest bg-foreground text-background hover:bg-foreground/90"
             >
               {isCreating ? (
