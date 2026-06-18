@@ -8,7 +8,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
-import { useLibrary, LibraryItem } from '@/app/hooks/use-knowledge-base';
+import { LIBRARY_CATEGORY_META, useLibrary, LibraryItem, type LibraryCategory } from '@/app/hooks/use-knowledge-base';
 import { fetchJson } from '@/lib/http';
 import { cn } from '@/lib/utils';
 
@@ -16,10 +16,13 @@ interface LibraryWorkshopProps {
   isOpen: boolean;
   onClose: () => void;
   editItem?: LibraryItem | null;
+  category?: LibraryCategory;
 }
 
-export function LibraryWorkshop({ isOpen, onClose, editItem }: LibraryWorkshopProps) {
+export function LibraryWorkshop({ isOpen, onClose, editItem, category = 'knowledge' }: LibraryWorkshopProps) {
   const { addIntelligence, isLoading } = useLibrary();
+  const activeCategory = editItem?.category ?? category;
+  const categoryMeta = LIBRARY_CATEGORY_META[activeCategory];
   const [mode, setMode] = useState<'write' | 'upload'>('write');
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
@@ -31,7 +34,7 @@ export function LibraryWorkshop({ isOpen, onClose, editItem }: LibraryWorkshopPr
   // Load item for editing
   useEffect(() => {
     if (editItem && isOpen) {
-      setTitle(editItem.filename.replace('.txt', ''));
+      setTitle((editItem.displayName || editItem.filename).replace('.txt', ''));
       setMode('write');
       fetchOriginalContent(editItem.url);
     } else {
@@ -110,7 +113,7 @@ export function LibraryWorkshop({ isOpen, onClose, editItem }: LibraryWorkshopPr
       ? `${title}_v${Date.now().toString().slice(-4)}.txt` 
       : `${title}.txt`;
 
-    const payload: Parameters<typeof addIntelligence>[0] = { filename: finalFilename };
+    const payload: Parameters<typeof addIntelligence>[0] = { filename: finalFilename, category: activeCategory };
     if (fileBase64) {
       payload.kb_file_base64 = fileBase64;
     } else {
@@ -142,10 +145,10 @@ export function LibraryWorkshop({ isOpen, onClose, editItem }: LibraryWorkshopPr
             <div className="p-6 border-b border-border/40 flex items-center justify-between">
               <div className="space-y-1">
                 <h2 className="text-xl font-medium tracking-tight">
-                  {editItem ? 'Refine Memory' : 'Add Intelligence'}
+                  {editItem ? `Refine ${categoryMeta.label}` : `Add ${categoryMeta.label}`}
                 </h2>
                 <p className="text-[10px] text-primary font-bold uppercase tracking-[0.2em]">
-                  {editItem ? `Editing: ${editItem.filename}` : 'New Memory Fragment'}
+                  {editItem ? `Editing: ${editItem.displayName || editItem.filename}` : categoryMeta.description}
                 </p>
               </div>
               <button onClick={onClose} className="p-2 hover:bg-muted rounded-full transition-colors"><X size={20} /></button>
@@ -176,7 +179,7 @@ export function LibraryWorkshop({ isOpen, onClose, editItem }: LibraryWorkshopPr
                   <div className="space-y-2">
                     <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60">Title</label>
                     <Input 
-                      placeholder="Fragment name..." 
+                      placeholder={`${categoryMeta.label} name...`} 
                       value={title}
                       onChange={(e) => setTitle(e.target.value)}
                       className="border-border/40 focus:border-primary transition-all rounded-md"
@@ -185,7 +188,7 @@ export function LibraryWorkshop({ isOpen, onClose, editItem }: LibraryWorkshopPr
                   <div className="space-y-2">
                     <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60">Content</label>
                     <Textarea 
-                      placeholder="Paste the facts here..." 
+                      placeholder={activeCategory === 'knowledge' ? 'Paste the facts here...' : 'Paste the prompt text here...'} 
                       value={content}
                       onChange={(e) => setContent(e.target.value)}
                       className="min-h-[400px] border-border/40 focus:border-primary transition-all font-mono text-sm leading-relaxed rounded-md"
@@ -221,7 +224,7 @@ export function LibraryWorkshop({ isOpen, onClose, editItem }: LibraryWorkshopPr
                     <div className="space-y-2">
                       <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60">Title</label>
                       <Input
-                        placeholder="Fragment name..."
+                        placeholder={`${categoryMeta.label} name...`}
                         value={title}
                         onChange={(e) => setTitle(e.target.value)}
                         className="border-border/40 focus:border-primary transition-all rounded-md"
@@ -242,7 +245,7 @@ export function LibraryWorkshop({ isOpen, onClose, editItem }: LibraryWorkshopPr
                   <div className="space-y-1">
                     <p className="text-xs font-bold text-foreground uppercase tracking-wider">Confirm New Version</p>
                     <p className="text-[11px] text-muted-foreground leading-relaxed">
-                                This will save a new fragment in your library. Assistants using the old version will not be affected unless manually updated.
+                                This will save a new version in your library. Assistants using the old version will not be affected unless manually updated.
                     </p>
                     <div className="flex gap-3 mt-3">
                       <button onClick={executeSave} className="text-[10px] font-bold text-primary uppercase tracking-widest hover:underline">Yes, Save Version</button>
@@ -259,7 +262,7 @@ export function LibraryWorkshop({ isOpen, onClose, editItem }: LibraryWorkshopPr
                   className="w-full h-12 gap-2 bg-foreground text-background hover:bg-foreground/90 transition-all rounded-[4px] text-[11px] font-bold uppercase tracking-[0.2em]"
                 >
                   {isLoading ? <Loader2 className="animate-spin" /> : <Sparkles size={16} />}
-                  {editItem ? 'Deploy New Version' : 'Sync to Memory'}
+                  {editItem ? 'Deploy New Version' : `Save ${categoryMeta.label}`}
                 </Button>
               )}
             </div>

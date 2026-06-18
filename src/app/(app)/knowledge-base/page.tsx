@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { 
+import {
   Search, 
   Plus, 
   Trash2, 
@@ -14,15 +14,18 @@ import {
   ChevronLeft,
   CalendarDays,
   Bot,
+  MessageSquare,
 } from 'lucide-react';
 
-import { useLibrary, LibraryItem } from '@/app/hooks/use-knowledge-base';
+import { LIBRARY_CATEGORY_META, useLibrary, LibraryItem, type LibraryCategory } from '@/app/hooks/use-knowledge-base';
 import { useAssistants, type Assistant } from '@/app/hooks/use-assistants-context';
 import { PaperCard, PaperCardContent, PaperCardHeader } from '@/components/ui/paper-card';
 import { DashboardHeader } from '@/components/dashboard-header';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { MONADE_API_BASE } from '@/config';
+import { fetchJson } from '@/lib/http';
 import { cn } from '@/lib/utils';
 
 import { LibraryWorkshop } from './components/library-workshop';
@@ -45,6 +48,11 @@ const detectLanguage = (text: string) => {
 
   return hasHindi ? 'Hindi / Hinglish' : 'English (Global)';
 };
+
+interface AssistantGreetingConfig {
+  initialGreetingUrl?: string | null;
+  initialGreetingSystemPromptUrl?: string | null;
+}
 
 // --- Component: MemoryCard ---
 
@@ -97,7 +105,7 @@ const LinkedMemoryCard = ({
             
       <PaperCardContent className="px-8 pb-6 flex-1 flex flex-col justify-between mt-4 z-10">
         <div className="space-y-4 relative">
-          <h3 className="text-2xl font-medium tracking-tighter text-foreground leading-tight truncate pr-4">{item.filename.replace('.txt', '')}</h3>
+          <h3 className="text-2xl font-medium tracking-tighter text-foreground leading-tight truncate pr-4">{(item.displayName || item.filename).replace('.txt', '')}</h3>
           <div className="relative">
             {loadingSnippet ? (
               <div className="space-y-2 animate-pulse">
@@ -178,7 +186,7 @@ const ArchiveRow = ({ item, onEdit, onDelete }: { item: LibraryItem, onEdit: (it
     <div className="flex items-center gap-4 flex-1">
       <div className="w-8 h-8 rounded-md bg-muted flex items-center justify-center text-muted-foreground group-hover:text-primary transition-colors"><FileText size={16} /></div>
       <div className="flex flex-col">
-        <span className="text-sm font-medium text-foreground">{item.filename}</span>
+        <span className="text-sm font-medium text-foreground">{item.displayName || item.filename}</span>
         <span className="text-[10px] text-muted-foreground uppercase tracking-widest">Added on {item.createdAt.toLocaleDateString()}</span>
       </div>
     </div>
@@ -197,11 +205,19 @@ export default function LibraryPage() {
   
   const [search, setSearch] = useState('');
   const [dateFilter, setDateFilter] = useState<'all' | '7d' | '30d'>('all');
+  const [activeCategory, setActiveCategory] = useState<LibraryCategory>('knowledge');
   const [currentPage, setCurrentPage] = useState(1);
   const [isWorkshopOpen, setIsWorkshopOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<LibraryItem | null>(null);
+  const [greetingLinksByUrl, setGreetingLinksByUrl] = useState<Record<string, Assistant[]>>({});
   
   const itemsPerPage = 8;
+  const categoryMeta = LIBRARY_CATEGORY_META[activeCategory];
+  const categoryOptions: { value: LibraryCategory; icon: React.ElementType }[] = [
+    { value: 'knowledge', icon: FileText },
+    { value: 'initial_greeting', icon: MessageSquare },
+    { value: 'initial_greeting_system_prompt', icon: Bot },
+  ];
 
   const assistantLinksByKnowledgeKey = useMemo(() => {
     const lookup = new Map<string, Assistant[]>();
@@ -229,7 +245,62 @@ export default function LibraryPage() {
     return lookup;
   }, [assistants]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    if (activeCategory === 'knowledge') {
+      return;
+    }
+
+    const publishedAssistants = assistants.filter(assistant => !assistant.id.startsWith('local-'));
+
+    const loadGreetingLinks = async () => {
+      await Promise.resolve();
+      if (cancelled) return;
+
+      if (publishedAssistants.length === 0) {
+        setGreetingLinksByUrl({});
+
+        return;
+      }
+
+      const results = await Promise.allSettled(
+        publishedAssistants.map(async (assistant) => {
+          const config = await fetchJson<AssistantGreetingConfig>(
+            `${MONADE_API_BASE}/api/assistants/${encodeURIComponent(assistant.id)}/greeting-prompt`,
+            { retry: { retries: 0 } },
+          );
+
+          return { assistant, config };
+        }),
+      );
+
+      if (cancelled) return;
+
+      const nextLinks: Record<string, Assistant[]> = {};
+      results.forEach((result) => {
+        if (result.status !== 'fulfilled') return;
+        const url = activeCategory === 'initial_greeting'
+          ? result.value.config.initialGreetingUrl
+          : result.value.config.initialGreetingSystemPromptUrl;
+        if (!url) return;
+        nextLinks[url] = [...(nextLinks[url] || []), result.value.assistant];
+      });
+      setGreetingLinksByUrl(nextLinks);
+    };
+
+    loadGreetingLinks();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeCategory, assistants]);
+
   const getConnectedAssistants = useCallback((item: LibraryItem) => {
+    if (activeCategory !== 'knowledge') {
+      return greetingLinksByUrl[item.url] || [];
+    }
+
     const byId = assistantLinksByKnowledgeKey.get(item.id) ?? [];
     const byUrl = assistantLinksByKnowledgeKey.get(item.url) ?? [];
 
@@ -245,10 +316,11 @@ export default function LibraryPage() {
     });
 
     return merged;
-  }, [assistantLinksByKnowledgeKey]);
+  }, [activeCategory, assistantLinksByKnowledgeKey, greetingLinksByUrl]);
 
   const { linkedItems, filteredArchive } = useMemo(() => {
-    const all = items.filter(i => i.filename.toLowerCase().includes(search.toLowerCase()));
+    const categoryItems = items.filter(item => (item.category || 'knowledge') === activeCategory);
+    const all = categoryItems.filter(i => (i.displayName || i.filename).toLowerCase().includes(search.toLowerCase()));
     const linked: LibraryItem[] = [];
     const unlinked: LibraryItem[] = [];
 
@@ -269,7 +341,7 @@ export default function LibraryPage() {
     });
 
     return { linkedItems: linked, filteredArchive: filtered };
-  }, [items, search, dateFilter, getConnectedAssistants]);
+  }, [items, activeCategory, search, dateFilter, getConnectedAssistants]);
 
   const totalPages = Math.ceil(filteredArchive.length / itemsPerPage);
   const paginatedArchive = filteredArchive.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
@@ -284,16 +356,53 @@ export default function LibraryPage() {
         
         <div className="flex items-end justify-between border-b border-border/40 pb-8">
           <div className="space-y-2">
-            <h1 className="text-5xl font-medium tracking-tighter">Knowledge</h1>
-            <p className="text-muted-foreground text-sm font-medium">Factual base for your voice fleet.</p>
+            <h1 className="text-5xl font-medium tracking-tighter">Library</h1>
+            <p className="text-muted-foreground text-sm font-medium">{categoryMeta.description}</p>
           </div>
           <div className="flex items-center gap-4">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/60" />
-              <Input placeholder="Search your files..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 h-10 w-64 bg-muted/10 border-border/40 text-xs focus:ring-primary focus:border-primary transition-all rounded-md" />
+              <Input placeholder={`Search ${categoryMeta.pluralLabel.toLowerCase()}...`} value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 h-10 w-64 bg-muted/10 border-border/40 text-xs focus:ring-primary focus:border-primary transition-all rounded-md" />
             </div>
-            <Button onClick={() => setIsWorkshopOpen(true)} className="h-10 px-4 gap-2 bg-foreground text-background hover:bg-foreground/90 transition-all rounded-[4px] text-[10px] font-bold uppercase tracking-[0.2em]"><Plus size={16} />Add Info</Button>
+            <Button onClick={() => setIsWorkshopOpen(true)} className="h-10 px-4 gap-2 bg-foreground text-background hover:bg-foreground/90 transition-all rounded-[4px] text-[10px] font-bold uppercase tracking-[0.2em]"><Plus size={16} />Add {categoryMeta.label}</Button>
           </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          {categoryOptions.map(({ value, icon: Icon }) => {
+            const meta = LIBRARY_CATEGORY_META[value];
+            const count = items.filter(item => (item.category || 'knowledge') === value).length;
+            const active = activeCategory === value;
+
+            return (
+              <button
+                key={value}
+                type="button"
+                onClick={() => {
+                  setActiveCategory(value);
+                  setCurrentPage(1);
+                  setSearch('');
+                }}
+                className={cn(
+                  'p-4 rounded-md border text-left transition-all bg-muted/5',
+                  active ? 'border-primary/50 bg-primary/5' : 'border-border/30 hover:border-border/60',
+                )}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className={cn('h-9 w-9 rounded-md flex items-center justify-center', active ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground')}>
+                      <Icon size={16} />
+                    </div>
+                    <div>
+                      <div className="text-sm font-medium">{meta.pluralLabel}</div>
+                      <div className="mt-1 text-[10px] text-muted-foreground leading-relaxed">{meta.description}</div>
+                    </div>
+                  </div>
+                  <Badge variant="outline" className="rounded-[4px] text-[9px] font-mono">{count}</Badge>
+                </div>
+              </button>
+            );
+          })}
         </div>
 
         {isLoading && items.length === 0 ? (
@@ -309,7 +418,7 @@ export default function LibraryPage() {
                 <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20 text-[9px] font-mono">{linkedItems.length} ACTIVE</Badge>
               </div>
               {linkedItems.length === 0 ? (
-                <div className="py-12 text-center border border-dashed border-border/40 rounded-lg bg-muted/5"><p className="text-xs text-muted-foreground italic tracking-widest">No files are connected to assistants yet.</p></div>
+                <div className="py-12 text-center border border-dashed border-border/40 rounded-lg bg-muted/5"><p className="text-xs text-muted-foreground italic tracking-widest">No {categoryMeta.pluralLabel.toLowerCase()} are connected to assistants yet.</p></div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                   {linkedItems.map((item) => <LinkedMemoryCard key={item.id} item={item} onEdit={handleEdit} connectedAssistants={getConnectedAssistants(item)} />)}
@@ -321,7 +430,7 @@ export default function LibraryPage() {
             <section className="space-y-8 pb-40">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border/40 pb-4">
                 <div className="flex items-center gap-4">
-                  <h2 className="text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground">All Documents</h2>
+                  <h2 className="text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground">All {categoryMeta.pluralLabel}</h2>
                   <div className="flex p-1 bg-muted rounded-md">
                     {['all', '7d', '30d'].map((f) => (
                       <button 
@@ -339,7 +448,7 @@ export default function LibraryPage() {
               <div className="bg-card/30 rounded-md border border-border/20 overflow-hidden min-h-[400px] flex flex-col shadow-sm">
                 <div className="flex-1">
                   {paginatedArchive.length === 0 ? (
-                    <div className="p-20 text-center text-xs text-muted-foreground italic uppercase tracking-widest">No documents found in this range.</div>
+                    <div className="p-20 text-center text-xs text-muted-foreground italic uppercase tracking-widest">No {categoryMeta.pluralLabel.toLowerCase()} found in this range.</div>
                   ) : (
                     <div className="flex flex-col">
                       {paginatedArchive.map((item) => <ArchiveRow key={item.id} item={item} onEdit={handleEdit} onDelete={removeIntelligence} />)}
@@ -361,7 +470,7 @@ export default function LibraryPage() {
           </div>
         )}
       </main>
-      <LibraryWorkshop isOpen={isWorkshopOpen} onClose={handleCloseWorkshop} editItem={editingItem} />
+      <LibraryWorkshop isOpen={isWorkshopOpen} onClose={handleCloseWorkshop} editItem={editingItem} category={activeCategory} />
     </div>
   );
 }

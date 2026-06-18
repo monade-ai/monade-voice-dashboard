@@ -13,12 +13,17 @@ export interface LibraryItem {
   url: string;
   createdAt: Date;
   connectedAssistantIds?: string[];
+  category?: LibraryCategory;
+  displayName?: string;
 }
+
+export type LibraryCategory = 'knowledge' | 'initial_greeting' | 'initial_greeting_system_prompt';
 
 interface CreatePayload {
   kb_text?: string;
   kb_file_base64?: string;
   filename: string;
+  category?: LibraryCategory;
 }
 
 interface LibraryContextType {
@@ -37,6 +42,53 @@ export const LibraryContext = createContext<LibraryContextType | undefined>(unde
 
 const API_BASE_URL = MONADE_API_CONFIG.BASE_URL;
 const LIBRARY_CACHE_TTL_MS = 60_000;
+const LIBRARY_CATEGORY_PREFIXES: Record<Exclude<LibraryCategory, 'knowledge'>, string> = {
+  initial_greeting: '__initial_greeting__',
+  initial_greeting_system_prompt: '__initial_greeting_system_prompt__',
+};
+
+export const LIBRARY_CATEGORY_META: Record<LibraryCategory, { label: string; pluralLabel: string; description: string }> = {
+  knowledge: {
+    label: 'Knowledge Base',
+    pluralLabel: 'Knowledge Bases',
+    description: 'Full prompts and factual context for normal assistant behavior.',
+  },
+  initial_greeting: {
+    label: 'Initial Greeting',
+    pluralLabel: 'Initial Greetings',
+    description: 'First spoken line after the call connects.',
+  },
+  initial_greeting_system_prompt: {
+    label: 'Greeting System Prompt',
+    pluralLabel: 'Greeting System Prompts',
+    description: 'First-turn instruction wrapper for speaking the initial greeting.',
+  },
+};
+
+export function getLibraryItemCategory(filename: string): LibraryCategory {
+  if (filename.startsWith(LIBRARY_CATEGORY_PREFIXES.initial_greeting_system_prompt)) {
+    return 'initial_greeting_system_prompt';
+  }
+  if (filename.startsWith(LIBRARY_CATEGORY_PREFIXES.initial_greeting)) {
+    return 'initial_greeting';
+  }
+
+  return 'knowledge';
+}
+
+export function getLibraryDisplayName(filename: string): string {
+  const category = getLibraryItemCategory(filename);
+  if (category === 'knowledge') return filename;
+
+  return filename.replace(LIBRARY_CATEGORY_PREFIXES[category], '');
+}
+
+function buildLibraryFilename(filename: string, category: LibraryCategory = 'knowledge') {
+  if (category === 'knowledge') return filename;
+  const prefix = LIBRARY_CATEGORY_PREFIXES[category];
+
+  return filename.startsWith(prefix) ? filename : `${prefix}${filename}`;
+}
 
 interface LibraryCacheEntry {
   items: LibraryItem[];
@@ -88,10 +140,16 @@ export const LibraryProvider = ({ children }: { children: ReactNode }) => {
       });
       if (!res.ok) throw new Error('Sync failed');
       const data = await res.json();
-      const processed = data.map((kb: any) => ({
-        ...kb,
-        createdAt: new Date(kb.createdAt || Date.now()),
-      })).sort((a: any, b: any) => b.createdAt.getTime() - a.createdAt.getTime());
+      const processed = data.map((kb: any) => {
+        const category = getLibraryItemCategory(kb.filename || '');
+
+        return {
+          ...kb,
+          category,
+          displayName: getLibraryDisplayName(kb.filename || ''),
+          createdAt: new Date(kb.createdAt || Date.now()),
+        };
+      }).sort((a: any, b: any) => b.createdAt.getTime() - a.createdAt.getTime());
       setItems(processed);
       setError(null);
       updateUserCache((current) => ({
@@ -143,7 +201,11 @@ export const LibraryProvider = ({ children }: { children: ReactNode }) => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ ...payload, user_uid: userUid }),
+        body: JSON.stringify({
+          ...payload,
+          filename: buildLibraryFilename(payload.filename, payload.category),
+          user_uid: userUid,
+        }),
       });
       if (!res.ok) throw new Error('Save failed');
       toast.success('Library Updated');

@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 
 import { useAssistants, Assistant } from '@/app/hooks/use-assistants-context';
-import { useLibrary } from '@/app/hooks/use-knowledge-base';
+import { useLibrary, type LibraryCategory } from '@/app/hooks/use-knowledge-base';
 import { useRagCorpus } from '@/app/hooks/use-rag-corpus';
 import { useTrunks } from '@/app/hooks/use-trunks';
 import { useUserTrunks } from '@/app/hooks/use-user-trunks';
@@ -242,6 +242,16 @@ const buildRealtimeInputPayload = (config: RealtimeInputConfig) => ({
   silence_duration_ms: config.silence_duration_ms ?? DEFAULT_REALTIME_INPUT.silence_duration_ms,
 });
 
+interface AssistantGreetingConfig {
+  initialGreetingUrl: string | null;
+  initialGreetingSystemPromptUrl: string | null;
+}
+
+const DEFAULT_GREETING_CONFIG: AssistantGreetingConfig = {
+  initialGreetingUrl: null,
+  initialGreetingSystemPromptUrl: null,
+};
+
 export default function AssistantStudio() {
   const {
     currentAssistant,
@@ -251,6 +261,9 @@ export default function AssistantStudio() {
     updateAssistantLocally,
   } = useAssistants();
   const { items: libraryItems } = useLibrary();
+  const knowledgeItems = libraryItems.filter(item => (item.category || 'knowledge') === 'knowledge');
+  const initialGreetingItems = libraryItems.filter(item => item.category === 'initial_greeting');
+  const initialGreetingSystemPromptItems = libraryItems.filter(item => item.category === 'initial_greeting_system_prompt');
   const { trunks, phoneNumbers } = useTrunks({ checkAssignments: false });
   const { trunks: userTrunks } = useUserTrunks();
   const inboundTrunks = userTrunks.filter(t => t.trunk_type === 'inbound');
@@ -261,6 +274,7 @@ export default function AssistantStudio() {
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saved' | 'error'>('idle');
   const [isDeploying, setIsDeploying] = useState(false);
   const [isWorkshopOpen, setIsWorkshopOpen] = useState(false);
+  const [workshopCategory, setWorkshopCategory] = useState<LibraryCategory>('knowledge');
   const [isTogglingTools, setIsTogglingTools] = useState(false);
   const [isTogglingRag, setIsTogglingRag] = useState(false);
   const [isTogglingCallCompletion, setIsTogglingCallCompletion] = useState(false);
@@ -268,8 +282,13 @@ export default function AssistantStudio() {
   const [backgroundVolumeInput, setBackgroundVolumeInput] = useState(String(DEFAULT_BACKGROUND_AUDIO.ambient_volume));
   const [isSyncingTools, setIsSyncingTools] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
+  const [greetingConfig, setGreetingConfig] = useState<AssistantGreetingConfig>(DEFAULT_GREETING_CONFIG);
+  const [isGreetingLoading, setIsGreetingLoading] = useState(false);
   const [savedVoiceValue, setSavedVoiceValue] = useState<string | null>(null);
   const currentAssistantRef = useRef<Assistant | null>(null);
+  const selectedKnowledgeItem = knowledgeItems.find(item => item.id === currentAssistant?.knowledgeBase);
+  const selectedInitialGreetingItem = initialGreetingItems.find(item => item.url === greetingConfig.initialGreetingUrl);
+  const selectedInitialGreetingSystemPromptItem = initialGreetingSystemPromptItems.find(item => item.url === greetingConfig.initialGreetingSystemPromptUrl);
 
   const isDraft = currentAssistant?.id.startsWith('local-');
   const backgroundAudio = readBackgroundAudio(currentAssistant?.toolsConfig);
@@ -334,6 +353,66 @@ export default function AssistantStudio() {
     syncToolsFromBackend(currentAssistant.id);
   }, [currentAssistant?.id, isDraft, syncToolsFromBackend]);
 
+  useEffect(() => {
+    if (!currentAssistant?.id || isDraft) {
+      setGreetingConfig(DEFAULT_GREETING_CONFIG);
+
+      return;
+    }
+
+    let cancelled = false;
+    const fetchGreetingConfig = async () => {
+      setIsGreetingLoading(true);
+      try {
+        const data = await fetchJson<any>(
+          `${MONADE_API_BASE}/api/assistants/${encodeURIComponent(currentAssistant.id)}/greeting-prompt`,
+          { retry: { retries: 1 } },
+        );
+        if (cancelled) return;
+        setGreetingConfig({
+          initialGreetingUrl: data?.initialGreetingUrl ?? null,
+          initialGreetingSystemPromptUrl: data?.initialGreetingSystemPromptUrl ?? null,
+        });
+      } catch (err) {
+        if (!cancelled) {
+          console.error('[AssistantStudio] Failed to load greeting prompt config:', err);
+          setGreetingConfig(DEFAULT_GREETING_CONFIG);
+        }
+      } finally {
+        if (!cancelled) setIsGreetingLoading(false);
+      }
+    };
+
+    fetchGreetingConfig();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentAssistant?.id, isDraft]);
+
+  const updateGreetingConfig = (updates: Partial<AssistantGreetingConfig>) => {
+    setGreetingConfig((current) => ({ ...current, ...updates }));
+    setIsDirty(true);
+    setSaveStatus('idle');
+  };
+
+  const saveGreetingConfig = async (assistantId: string) => {
+    const payload = {
+      initialGreetingUrl: greetingConfig.initialGreetingUrl,
+      initialGreetingSystemPromptUrl: greetingConfig.initialGreetingSystemPromptUrl,
+    };
+
+    await fetchJson<any>(
+      `${MONADE_API_BASE}/api/assistants/${encodeURIComponent(assistantId)}/greeting-prompt`,
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        retry: { retries: 0 },
+      },
+    );
+  };
+
   // Local-only update: updates state but does NOT save to backend
   const handleUpdate = (field: keyof Assistant, value: any) => {
     if (!currentAssistant) return;
@@ -369,6 +448,7 @@ export default function AssistantStudio() {
         ...updates,
         knowledgeBaseId: knowledgeBase,
       }, { silentSuccess: true });
+      await saveGreetingConfig(id);
       const nextRealtimeInput = readRealtimeInput(currentAssistant.toolsConfig);
       const hasRealtimeInputConfig = !!currentAssistant.toolsConfig?.realtime_input || !!currentAssistant.toolsConfig?.vad;
       if (hasRealtimeInputConfig) {
@@ -414,6 +494,7 @@ export default function AssistantStudio() {
           knowledgeBaseId: knowledgeBase,
         });
         if (published) {
+          await saveGreetingConfig(published.id);
           setCurrentAssistant(published);
           setSavedVoiceValue(published.voice || null);
           setIsDirty(false);
@@ -422,42 +503,6 @@ export default function AssistantStudio() {
     } finally {
       setIsDeploying(false);
     }
-  };
-
-  if (!currentAssistant) return null;
-
-  const isInbound = currentAssistant.call_direction === 'inbound';
-  const isInboundBound = currentAssistant.call_direction === 'inbound' || currentAssistant.call_direction === 'both';
-  const ragTool = currentAssistant.toolsConfig?.tools?.find((t: any) => t.type === 'vertex_rag');
-  const hasAttachedRagCorpus = !!ragTool?.config?.rag_corpus;
-
-  const buildBackgroundAudioConfig = (updates: Partial<typeof DEFAULT_BACKGROUND_AUDIO> = {}) => {
-    const nextConfig = {
-      ...backgroundAudio,
-      ...updates,
-      ambient_clip: updates.ambient_clip || backgroundAudio.ambient_clip,
-      ambient_volume: clampBackgroundVolume(Number(updates.ambient_volume ?? backgroundAudio.ambient_volume) || 0),
-    };
-
-    return nextConfig;
-  };
-
-  const applyBackgroundAudioLocally = (nextConfig: typeof DEFAULT_BACKGROUND_AUDIO) => {
-    if (!currentAssistant) return;
-    const updatedAssistant = {
-      ...currentAssistant,
-      toolsConfig: {
-        ...(currentAssistant.toolsConfig || {}),
-        background_audio: nextConfig,
-      },
-    };
-    setCurrentAssistant(updatedAssistant);
-    updateAssistantLocally(updatedAssistant.id, updatedAssistant);
-  };
-
-  const stageBackgroundAudio = (updates: Partial<typeof DEFAULT_BACKGROUND_AUDIO>) => {
-    const nextConfig = buildBackgroundAudioConfig(updates);
-    applyBackgroundAudioLocally(nextConfig);
   };
 
   const rebakeInboundDispatchRules = useCallback(async (
@@ -506,6 +551,42 @@ export default function AssistantStudio() {
       rebakedDispatchRuleIds,
     };
   }, [toast, updateAssistantLocally]);
+
+  if (!currentAssistant) return null;
+
+  const isInbound = currentAssistant.call_direction === 'inbound';
+  const isInboundBound = currentAssistant.call_direction === 'inbound' || currentAssistant.call_direction === 'both';
+  const ragTool = currentAssistant.toolsConfig?.tools?.find((t: any) => t.type === 'vertex_rag');
+  const hasAttachedRagCorpus = !!ragTool?.config?.rag_corpus;
+
+  const buildBackgroundAudioConfig = (updates: Partial<typeof DEFAULT_BACKGROUND_AUDIO> = {}) => {
+    const nextConfig = {
+      ...backgroundAudio,
+      ...updates,
+      ambient_clip: updates.ambient_clip || backgroundAudio.ambient_clip,
+      ambient_volume: clampBackgroundVolume(Number(updates.ambient_volume ?? backgroundAudio.ambient_volume) || 0),
+    };
+
+    return nextConfig;
+  };
+
+  const applyBackgroundAudioLocally = (nextConfig: typeof DEFAULT_BACKGROUND_AUDIO) => {
+    if (!currentAssistant) return;
+    const updatedAssistant = {
+      ...currentAssistant,
+      toolsConfig: {
+        ...(currentAssistant.toolsConfig || {}),
+        background_audio: nextConfig,
+      },
+    };
+    setCurrentAssistant(updatedAssistant);
+    updateAssistantLocally(updatedAssistant.id, updatedAssistant);
+  };
+
+  const stageBackgroundAudio = (updates: Partial<typeof DEFAULT_BACKGROUND_AUDIO>) => {
+    const nextConfig = buildBackgroundAudioConfig(updates);
+    applyBackgroundAudioLocally(nextConfig);
+  };
 
   const saveBackgroundAudio = async (updates: Partial<typeof DEFAULT_BACKGROUND_AUDIO>) => {
     if (!currentAssistant || isUpdatingBackgroundAudio || isSyncingTools) return;
@@ -963,11 +1044,27 @@ export default function AssistantStudio() {
             <WorkflowStep
               number="02"
               title="Knowledge"
-              description="Equip your agent with the facts it needs to answer questions."
+              description="Equip your agent with its full prompt and optional first-turn greeting assets."
             >
               <div className="space-y-6">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 px-1">Selected Brain</label>
+                  <div className="flex items-center gap-1.5 px-1">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">Full Prompt / Knowledge Base</label>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          type="button"
+                          className="inline-flex items-center justify-center text-muted-foreground/60 hover:text-foreground transition-colors"
+                          aria-label="About full prompt"
+                        >
+                          <Info size={12} />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-[280px] text-[11px] leading-relaxed">
+                        The full prompt is the agent&apos;s main brain: role, rules, knowledge, flow, and fallback behavior for the whole call.
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
                   <Select
                     value={currentAssistant.knowledgeBase || '__none__'}
                     onValueChange={(value) => handleUpdate('knowledgeBase', value === '__none__' ? '' : value)}
@@ -979,8 +1076,8 @@ export default function AssistantStudio() {
                       <SelectItem value="__none__">
                         <span className="text-muted-foreground">No memory linked (Standard Mode)</span>
                       </SelectItem>
-                      {libraryItems.map(item => (
-                        <SelectItem key={item.id} value={item.id}>{item.filename}</SelectItem>
+                      {knowledgeItems.map(item => (
+                        <SelectItem key={item.id} value={item.id}>{item.displayName || item.filename}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -989,18 +1086,122 @@ export default function AssistantStudio() {
                   </p>
                 </div>
 
-                {/* Add new knowledge base */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-1.5 px-1">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">Initial Greeting</label>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            className="inline-flex items-center justify-center text-muted-foreground/60 hover:text-foreground transition-colors"
+                            aria-label="About initial greeting"
+                          >
+                            <Info size={12} />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="max-w-[280px] text-[11px] leading-relaxed">
+                          The initial greeting is the exact first line the agent should speak when the call connects. Keep it short and natural.
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                    <Select
+                      value={greetingConfig.initialGreetingUrl || '__none__'}
+                      disabled={isGreetingLoading}
+                      onValueChange={(value) => updateGreetingConfig({ initialGreetingUrl: value === '__none__' ? null : value })}
+                    >
+                      <SelectTrigger className="bg-background border-border/40 h-12 text-base focus:border-primary transition-all rounded-md px-4">
+                        <SelectValue placeholder="Select greeting" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">
+                          <span className="text-muted-foreground">Use default greeting behavior</span>
+                        </SelectItem>
+                        {initialGreetingItems.map(item => (
+                          <SelectItem key={item.id} value={item.url}>{item.displayName || item.filename}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-[10px] text-muted-foreground/60 px-1 italic">
+                      The exact first line spoken after call connect. Variables like {'{{call_date}}'} are supported.
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-1.5 px-1">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">Greeting System Prompt</label>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            className="inline-flex items-center justify-center text-muted-foreground/60 hover:text-foreground transition-colors"
+                            aria-label="About greeting system prompt"
+                          >
+                            <Info size={12} />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="max-w-[280px] text-[11px] leading-relaxed">
+                          This only controls how the first greeting is delivered. It does not replace the full prompt or add call-wide rules.
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                    <Select
+                      value={greetingConfig.initialGreetingSystemPromptUrl || '__none__'}
+                      disabled={isGreetingLoading}
+                      onValueChange={(value) => updateGreetingConfig({ initialGreetingSystemPromptUrl: value === '__none__' ? null : value })}
+                    >
+                      <SelectTrigger className="bg-background border-border/40 h-12 text-base focus:border-primary transition-all rounded-md px-4">
+                        <SelectValue placeholder="Select first-turn system prompt" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">
+                          <span className="text-muted-foreground">Use safe default instruction</span>
+                        </SelectItem>
+                        {initialGreetingSystemPromptItems.map(item => (
+                          <SelectItem key={item.id} value={item.url}>{item.displayName || item.filename}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-[10px] text-muted-foreground/60 px-1 italic">
+                      Controls how the model speaks the first greeting turn only.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Add new library asset */}
                 <div
-                  onClick={() => setIsWorkshopOpen(true)}
+                  onClick={() => {
+                    setWorkshopCategory('knowledge');
+                    setIsWorkshopOpen(true);
+                  }}
                   className="group p-8 border-2 border-dashed border-border/40 hover:border-primary/40 rounded-md flex flex-col items-center justify-center gap-3 cursor-pointer bg-muted/[0.02] hover:bg-primary/[0.02] transition-all"
                 >
                   <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center text-muted-foreground group-hover:text-primary transition-colors">
                     <Plus size={20} />
                   </div>
                   <div className="text-center">
-                    <p className="text-sm font-bold uppercase tracking-widest text-muted-foreground group-hover:text-foreground transition-colors">Add script</p>
-                    <p className="text-[10px] text-muted-foreground/60 mt-1">Create a new factual fragment for this agent.</p>
+                    <p className="text-sm font-bold uppercase tracking-widest text-muted-foreground group-hover:text-foreground transition-colors">Add full prompt</p>
+                    <p className="text-[10px] text-muted-foreground/60 mt-1">Create a new knowledge asset for this agent.</p>
                   </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {[
+                    { label: 'Add greeting', category: 'initial_greeting' as LibraryCategory },
+                    { label: 'Add greeting system prompt', category: 'initial_greeting_system_prompt' as LibraryCategory },
+                  ].map((action) => (
+                    <button
+                      key={action.category}
+                      type="button"
+                      onClick={() => {
+                        setWorkshopCategory(action.category);
+                        setIsWorkshopOpen(true);
+                      }}
+                      className="h-10 rounded-md border border-border/40 bg-muted/[0.02] hover:border-primary/40 hover:bg-primary/[0.02] text-[10px] font-bold uppercase tracking-widest text-muted-foreground hover:text-foreground transition-all"
+                    >
+                      {action.label}
+                    </button>
+                  ))}
                 </div>
               </div>
             </WorkflowStep>
@@ -1745,7 +1946,15 @@ export default function AssistantStudio() {
                   { label: 'Direction', value: isInbound ? 'Inbound' : 'Outbound' },
                   { label: 'Model', value: currentAssistant.model || 'Muvel' },
                   { label: 'Accent', value: currentAssistant.speakingAccent || 'Default' },
-                  { label: 'Knowledge', value: libraryItems.find(kb => kb.id === currentAssistant.knowledgeBase)?.filename || 'None' },
+                  { label: 'Full Prompt', value: selectedKnowledgeItem?.displayName || selectedKnowledgeItem?.filename || 'None' },
+                  {
+                    label: 'Greeting',
+                    value: selectedInitialGreetingItem?.displayName || selectedInitialGreetingItem?.filename || 'Default',
+                  },
+                  {
+                    label: 'Greeting Prompt',
+                    value: selectedInitialGreetingSystemPromptItem?.displayName || selectedInitialGreetingSystemPromptItem?.filename || 'Default',
+                  },
                 ].map((spec) => (
                   <div key={spec.label} className="flex justify-between py-1 border-b border-border/10">
                     <span className="text-xs text-muted-foreground">{spec.label}</span>
@@ -1758,7 +1967,11 @@ export default function AssistantStudio() {
         </div>
       </div>
 
-      <LibraryWorkshop isOpen={isWorkshopOpen} onClose={() => setIsWorkshopOpen(false)} />
+      <LibraryWorkshop
+        isOpen={isWorkshopOpen}
+        onClose={() => setIsWorkshopOpen(false)}
+        category={workshopCategory}
+      />
       <DeleteConfirmationModal isOpen={isDeleteModalOpen} onClose={() => setIsDeleteModalOpen(false)} />
     </motion.div>
   );
