@@ -121,6 +121,22 @@ const VOICE_MODEL_OPTIONS = [
 type VoiceModelId = typeof VOICE_MODEL_OPTIONS[number]['value'];
 type BackendModelVersion = 'v1' | 'v2';
 
+const AGENT_NAME_OPTIONS = [
+  { value: 'voice-agent', label: 'voice-agent' },
+  { value: 'monade-test', label: 'monade-test' },
+] as const;
+type AgentName = typeof AGENT_NAME_OPTIONS[number]['value'];
+
+const isAgentName = (v: unknown): v is AgentName => (
+  v === 'voice-agent' || v === 'monade-test'
+);
+
+const readAgentName = (toolsConfig: any): AgentName => {
+  const raw = toolsConfig?.agent_name;
+
+  return isAgentName(raw) ? raw : 'voice-agent';
+};
+
 type ThinkingLevel = 'minimal' | 'low' | 'medium' | 'high';
 const THINKING_LEVEL_OPTIONS: { value: ThinkingLevel; label: string; description: string }[] = [
   { value: 'minimal', label: 'Minimal', description: 'No thinking — fastest, cheapest.' },
@@ -301,6 +317,7 @@ export default function AssistantStudio() {
   const selectedVoiceModel = inferVoiceModel(currentAssistant?.toolsConfig);
   const thinkingLevel = readThinkingLevel(currentAssistant?.toolsConfig);
   const noiseCancellationModel = readNoiseCancellation(currentAssistant?.toolsConfig);
+  const agentName = readAgentName(currentAssistant?.toolsConfig);
   const temperature = readTemperature(currentAssistant?.toolsConfig);
   const [temperatureInput, setTemperatureInput] = useState<string>(String(temperature));
 
@@ -734,6 +751,15 @@ export default function AssistantStudio() {
     } else {
       nextToolsConfig.noise_cancellation = { enabled: true, model };
     }
+    handleUpdate('toolsConfig' as keyof Assistant, nextToolsConfig);
+  };
+
+  const updateAgentName = (next: AgentName) => {
+    if (!currentAssistant) return;
+    const nextToolsConfig: Record<string, any> = {
+      ...(currentAssistant.toolsConfig || {}),
+      agent_name: next,
+    };
     handleUpdate('toolsConfig' as keyof Assistant, nextToolsConfig);
   };
 
@@ -1933,6 +1959,40 @@ export default function AssistantStudio() {
                     </p>
                   </div>
                 </div>
+
+                {/* Agent runtime selector */}
+                <div className="space-y-4 pt-2 border-t border-border/20">
+                  <div className="space-y-1">
+                    <h5 className="text-[10px] font-bold uppercase tracking-[0.22em] text-foreground">Agent Runtime</h5>
+                    <p className="text-[10px] text-muted-foreground/70 leading-relaxed">
+                      Select which backend voice agent should run this assistant.
+                    </p>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 px-1">
+                      Agent Name
+                    </label>
+                    <Select
+                      value={agentName}
+                      onValueChange={(value) => updateAgentName(value as AgentName)}
+                    >
+                      <SelectTrigger className="w-full h-10 border-border/40 bg-muted/20 text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {AGENT_NAME_OPTIONS.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-[10px] text-muted-foreground/60 px-1 italic leading-relaxed">
+                      Sent on save as <span className="font-mono">toolsConfig.agent_name</span>.
+                    </p>
+                  </div>
+                </div>
               </PaperCardContent>
             </PaperCard>
 
@@ -1945,6 +2005,7 @@ export default function AssistantStudio() {
                 {[
                   { label: 'Direction', value: isInbound ? 'Inbound' : 'Outbound' },
                   { label: 'Model', value: currentAssistant.model || 'Muvel' },
+                  { label: 'Agent', value: agentName },
                   { label: 'Accent', value: currentAssistant.speakingAccent || 'Default' },
                   { label: 'Full Prompt', value: selectedKnowledgeItem?.displayName || selectedKnowledgeItem?.filename || 'None' },
                   {
