@@ -131,10 +131,10 @@ const isAgentName = (v: unknown): v is AgentName => (
   v === 'voice-agent' || v === 'monade-test'
 );
 
-const readAgentName = (toolsConfig: any): AgentName => {
+const readAgentName = (toolsConfig: any): AgentName | null => {
   const raw = toolsConfig?.agent_name;
 
-  return isAgentName(raw) ? raw : 'voice-agent';
+  return isAgentName(raw) ? raw : null;
 };
 
 type ThinkingLevel = 'minimal' | 'low' | 'medium' | 'high';
@@ -754,12 +754,14 @@ export default function AssistantStudio() {
     handleUpdate('toolsConfig' as keyof Assistant, nextToolsConfig);
   };
 
-  const updateAgentName = (next: AgentName) => {
+  const updateAgentName = (next: AgentName | null) => {
     if (!currentAssistant) return;
-    const nextToolsConfig: Record<string, any> = {
-      ...(currentAssistant.toolsConfig || {}),
-      agent_name: next,
-    };
+    const nextToolsConfig: Record<string, any> = { ...(currentAssistant.toolsConfig || {}) };
+    if (next) {
+      nextToolsConfig.agent_name = next;
+    } else {
+      delete nextToolsConfig.agent_name;
+    }
     handleUpdate('toolsConfig' as keyof Assistant, nextToolsConfig);
   };
 
@@ -1974,13 +1976,16 @@ export default function AssistantStudio() {
                       Agent Name
                     </label>
                     <Select
-                      value={agentName}
-                      onValueChange={(value) => updateAgentName(value as AgentName)}
+                      value={agentName || '__unset__'}
+                      onValueChange={(value) => updateAgentName(value === '__unset__' ? null : (value as AgentName))}
                     >
                       <SelectTrigger className="w-full h-10 border-border/40 bg-muted/20 text-sm">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
+                        <SelectItem value="__unset__">
+                          <span className="text-muted-foreground">Not set</span>
+                        </SelectItem>
                         {AGENT_NAME_OPTIONS.map((option) => (
                           <SelectItem key={option.value} value={option.value}>
                             {option.label}
@@ -1989,7 +1994,7 @@ export default function AssistantStudio() {
                       </SelectContent>
                     </Select>
                     <p className="text-[10px] text-muted-foreground/60 px-1 italic leading-relaxed">
-                      Sent on save as <span className="font-mono">toolsConfig.agent_name</span>.
+                      Sent on save as <span className="font-mono">toolsConfig.agent_name</span>. Leave unset to omit the key.
                     </p>
                   </div>
                 </div>
@@ -2005,7 +2010,7 @@ export default function AssistantStudio() {
                 {[
                   { label: 'Direction', value: isInbound ? 'Inbound' : 'Outbound' },
                   { label: 'Model', value: currentAssistant.model || 'Muvel' },
-                  { label: 'Agent', value: agentName },
+                  { label: 'Agent', value: agentName || 'Not set' },
                   { label: 'Accent', value: currentAssistant.speakingAccent || 'Default' },
                   { label: 'Full Prompt', value: selectedKnowledgeItem?.displayName || selectedKnowledgeItem?.filename || 'None' },
                   {
