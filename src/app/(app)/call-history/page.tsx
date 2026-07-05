@@ -349,7 +349,11 @@ export default function CallHistoryPage() {
             </div>
 
             <div className="overflow-hidden">
-              <table className="w-full text-left">
+              {/* On mobile the fixed-width table can't shrink to fit; scroll it
+                  horizontally instead of clipping the right-side Actions column.
+                  Desktop container is wide enough that no scrollbar appears. */}
+              <div className="overflow-x-auto">
+                <table className="w-full text-left min-w-[760px]">
                 <thead>
                   <tr className="border-b border-border/40">
                     <th className="py-4 px-6 text-[10px] font-bold uppercase tracking-[0.2em] text-foreground/70 w-[25%]">Lead Identity</th>
@@ -387,7 +391,8 @@ export default function CallHistoryPage() {
                     ))
                   )}
                 </tbody>
-              </table>
+                </table>
+              </div>
 
               {totalPages > 1 && (
                 <div className="px-6 py-8 flex items-center justify-between border-t border-border/20">

@@ -303,7 +303,7 @@ export const CallHistoryRow = React.memo(({
                 </button>
               )}
 
-              <div className="flex items-center min-w-[14px] group-hover:hidden transition-all">
+              <div className="hidden md:flex items-center min-w-[14px] md:group-hover:hidden transition-all">
                 <MessageSquare
                   size={14}
                   className="text-muted-foreground/60"
@@ -311,12 +311,12 @@ export const CallHistoryRow = React.memo(({
               </div>
             </div>
           ) : (
-            <MessageSquare size={14} className="text-muted-foreground/60 group-hover:hidden" />
+            <MessageSquare size={14} className="hidden md:inline text-muted-foreground/60 md:group-hover:hidden" />
           )}
 
           <button
             onClick={(e) => { e.stopPropagation(); onView(); }}
-            className="opacity-0 group-hover:opacity-100 h-7 px-4 rounded-[4px] bg-foreground text-background hover:bg-foreground/90 transition-all flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest"
+            className="opacity-100 md:opacity-0 md:group-hover:opacity-100 h-7 px-4 rounded-[4px] bg-foreground text-background hover:bg-foreground/90 transition-all flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest"
           >
             Details
             <ArrowUpRight size={14} />
