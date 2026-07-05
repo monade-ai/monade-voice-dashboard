@@ -66,15 +66,18 @@ export function DashboardHeader() {
   return (
     <>
       <header className="sticky top-0 z-30 w-full bg-background/50 backdrop-blur-xl border-b border-border/20">
-        <div className="flex h-14 items-center px-8 justify-between">
+        <div className="flex h-14 items-center px-4 md:px-8 justify-between gap-2">
 
-          {/* Left: Brand / Section (Clean) */}
-          <div className="flex items-center gap-8">
+          {/* Left: Brand / Section (Clean).
+              On mobile, reserve room so content clears the fixed hamburger toggle. */}
+          <div className="flex items-center gap-8 w-10 md:w-auto shrink-0">
 
           </div>
 
-          {/* Center: Ghost Command Center */}
-          <div className="flex-1 flex justify-center px-4 max-w-xl">
+          {/* Center: Ghost Command Center.
+              Hidden on mobile — it's a non-functional placeholder and its flex-1 width
+              was crowding out the balance/Create cluster on narrow screens. */}
+          <div className="hidden md:flex flex-1 justify-center px-4 max-w-xl">
             <button
               className="group relative flex items-center gap-3 px-4 py-1.5 w-full max-w-sm rounded-full bg-muted/30 hover:bg-muted/50 border border-transparent hover:border-border/40 transition-all duration-300"
               onClick={() => {/* Command Palette Trigger */ }}
@@ -88,7 +91,7 @@ export function DashboardHeader() {
           </div>
 
           {/* Right: Balance Capsule & Create */}
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 md:gap-4 shrink-0">
 
             {/* Balance Folio Dropdown */}
             <DropdownMenu>
