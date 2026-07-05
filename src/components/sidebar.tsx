@@ -30,6 +30,8 @@ import {
   Workflow,
   Inbox,
   PlugZap,
+  Menu,
+  X,
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 
@@ -104,11 +106,18 @@ export function Sidebar() {
   const { theme, setTheme, resolvedTheme } = useTheme();
   const { user } = useAuth();
   const [mounted, setMounted] = React.useState(false);
+  // Mobile-only: the sidebar becomes an off-canvas drawer. Desktop (md+) ignores this.
+  const [mobileOpen, setMobileOpen] = React.useState(false);
   const runningCampaigns = useRunningCampaigns();
 
   React.useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Close the mobile drawer whenever the route changes (i.e. a nav item was tapped).
+  React.useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname]);
 
   const effectiveTheme = mounted ? (resolvedTheme ?? theme) : undefined;
   const isDark = effectiveTheme === 'dark';
@@ -122,7 +131,47 @@ export function Sidebar() {
   if (noSidebarRoutes.includes(pathname)) return null;
 
   return (
-    <div className="w-64 h-full bg-background flex flex-col relative group/sidebar">
+    <>
+      {/* Mobile-only hamburger toggle. Sits in the header's empty left slot.
+          Hidden on md+ where the sidebar is always visible. */}
+      <button
+        type="button"
+        onClick={() => setMobileOpen(true)}
+        aria-label="Open navigation"
+        className="md:hidden fixed top-3 left-3 z-40 flex items-center justify-center h-9 w-9 rounded-[6px] bg-background/80 backdrop-blur border border-border/40 text-foreground hover:bg-muted/50 transition-colors"
+      >
+        <Menu size={18} />
+      </button>
+
+      {/* Backdrop — only rendered/active on mobile while the drawer is open. */}
+      <div
+        onClick={() => setMobileOpen(false)}
+        aria-hidden="true"
+        className={cn(
+          'md:hidden fixed inset-0 z-40 bg-black/50 backdrop-blur-sm transition-opacity duration-300',
+          mobileOpen ? 'opacity-100' : 'opacity-0 pointer-events-none',
+        )}
+      />
+
+    <div
+      className={cn(
+        'w-64 h-full bg-background flex flex-col relative group/sidebar',
+        // Mobile: off-canvas drawer that slides in. Desktop: static in-flow column.
+        'fixed inset-y-0 left-0 z-50 transition-transform duration-300 ease-in-out',
+        'md:static md:z-auto md:translate-x-0',
+        mobileOpen ? 'translate-x-0' : '-translate-x-full',
+      )}
+    >
+
+      {/* Mobile-only close button */}
+      <button
+        type="button"
+        onClick={() => setMobileOpen(false)}
+        aria-label="Close navigation"
+        className="md:hidden absolute top-4 right-3 z-10 flex items-center justify-center h-8 w-8 rounded-[6px] text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+      >
+        <X size={18} />
+      </button>
 
       {/* Ghost Border */}
       <div className="absolute right-0 top-10 bottom-10 w-[1px] bg-border/40" />
@@ -341,5 +390,6 @@ export function Sidebar() {
 
       </div>
     </div>
+    </>
   );
 }
