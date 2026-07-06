@@ -859,11 +859,13 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
         </div>
 
         {/* --- Right Pane: High-Contrast Conversation --- */}
-        <div className="flex-1 bg-background flex flex-col h-full relative">
+        {/* min-h-0 lets the inner body scroll on mobile; md:h-full keeps desktop full-height.
+            (An unconditional h-full here overflowed the modal on mobile and clipped the scroll.) */}
+        <div className="flex-1 min-h-0 bg-background flex flex-col md:h-full relative">
 
-          <div className="h-14 border-b border-border/40 flex items-center justify-between px-8 shrink-0">
-            <div className="flex items-center gap-4">
-              <h2 className="text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground">Conversation Log</h2>
+          <div className="min-h-14 md:h-14 border-b border-border/40 flex flex-wrap md:flex-nowrap items-center justify-between gap-x-3 gap-y-2 px-4 md:px-8 py-2 md:py-0 shrink-0">
+            <div className="flex items-center gap-2 md:gap-4 min-w-0">
+              <h2 className="text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground whitespace-nowrap">Conversation Log</h2>
               <Separator orientation="vertical" className="h-3 opacity-20" />
               {hasEnhancedTranscript ? (
                 <Badge variant="outline" className="h-6 rounded-full border-primary/25 bg-primary/5 px-2.5 text-[9px] font-bold uppercase tracking-[0.25em] text-primary">
@@ -871,12 +873,21 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
                 </Badge>
               ) : null}
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 md:gap-3 shrink-0">
               <button
                 onClick={handleEnhanceTranscript}
                 disabled={enhancedTranscript.status === 'processing'}
+                aria-label={
+                  enhancedTranscript.status === 'processing'
+                    ? 'Preparing Enhancement'
+                    : enhancedTranscript.status === 'failed'
+                      ? 'Retry Enhancement'
+                      : hasEnhancedTranscript
+                        ? 'Refresh Enhanced View'
+                        : 'Enhance Transcript'
+                }
                 className={cn(
-                  'inline-flex items-center gap-2 rounded-full border px-3.5 py-2 text-[10px] font-bold uppercase tracking-[0.24em] transition-all',
+                  'inline-flex items-center gap-2 rounded-full border px-3 md:px-3.5 py-2 text-[10px] font-bold uppercase tracking-[0.24em] transition-all',
                   enhancedTranscript.status === 'processing'
                     ? 'border-primary/20 bg-primary/10 text-primary/70'
                     : 'border-border/60 bg-background text-foreground hover:border-primary/30 hover:bg-primary/5 hover:text-primary',
@@ -889,21 +900,24 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
                 ) : (
                   <Sparkles size={12} />
                 )}
-                {enhancedTranscript.status === 'processing'
-                  ? 'Preparing Enhancement'
-                  : enhancedTranscript.status === 'failed'
-                    ? 'Retry Enhancement'
-                    : hasEnhancedTranscript
-                      ? 'Refresh Enhanced View'
-                      : 'Enhance Transcript'}
+                {/* Label is hidden on mobile to keep the header on one line; icon carries the action. */}
+                <span className="hidden sm:inline">
+                  {enhancedTranscript.status === 'processing'
+                    ? 'Preparing Enhancement'
+                    : enhancedTranscript.status === 'failed'
+                      ? 'Retry Enhancement'
+                      : hasEnhancedTranscript
+                        ? 'Refresh Enhanced View'
+                        : 'Enhance Transcript'}
+                </span>
               </button>
-              <button onClick={onClose} className="p-1 hover:bg-muted rounded-md transition-colors">
+              <button onClick={onClose} aria-label="Close" className="shrink-0 p-1 hover:bg-muted rounded-md transition-colors">
                 <X size={16} className="text-muted-foreground hover:text-foreground" />
               </button>
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-6 md:p-10 custom-scrollbar">
+          <div className="flex-1 min-h-0 overflow-y-auto p-6 md:p-10 custom-scrollbar">
             <div className="max-w-xl mx-auto space-y-4">
               <AnimatePresence initial={false}>
                 {enhancedTranscript.status === 'processing' ? (
