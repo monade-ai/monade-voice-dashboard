@@ -272,7 +272,7 @@ export default function CampaignsPage() {
       await Promise.allSettled(
         listed
           .filter((campaign) => campaign.status === 'active' || campaign.status === 'paused')
-          .map((campaign) => refreshCampaignStats(campaign.id)),
+          .map((campaign) => refreshCampaignStats(campaign.id, true)),
       );
     };
     void bootstrap().catch(() => {}).finally(() => setIsInitialLoad(false));
@@ -282,15 +282,15 @@ export default function CampaignsPage() {
   useEffect(() => {
     const interval = setInterval(() => {
       void (async () => {
-        const listed = await listCampaigns();
+        const listed = await listCampaigns(true);
         await Promise.allSettled([
-          refreshQueueStatus(),
-          refreshCreditStatus(),
+          refreshQueueStatus(true),
+          refreshCreditStatus(true),
         ]);
         await Promise.allSettled(
           listed
             .filter((campaign) => campaign.status === 'active' || campaign.status === 'paused')
-            .map((campaign) => refreshCampaignStats(campaign.id)),
+            .map((campaign) => refreshCampaignStats(campaign.id, true)),
         );
       })();
     }, CAMPAIGN_API_CONFIG.POLL_INTERVALS.CAMPAIGN_LIST);
@@ -301,7 +301,7 @@ export default function CampaignsPage() {
   const handleRefresh = async () => {
     try {
       setIsRefreshing(true);
-      await Promise.all([listCampaigns(), refreshQueueStatus(), refreshCreditStatus()]);
+      await Promise.all([listCampaigns(true), refreshQueueStatus(true), refreshCreditStatus(true)]);
       toast.success('System Status Updated');
     } finally {
       setIsRefreshing(false);

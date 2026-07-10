@@ -429,21 +429,14 @@ export async function getUserAnalyticsDetail(
 }
 
 /**
- * Get campaign recording readiness and optionally refresh missing Vobiz URLs.
+ * Get campaign recording readiness from cached CallAnalytics recording URLs.
  */
 export async function getCampaignRecordingStatus(
   userUid: string,
   campaignId: string,
-  options: { refreshMissing?: boolean; maxRefresh?: number } = {},
 ): Promise<CampaignRecordingStatus> {
-  const params = new URLSearchParams();
-  params.set('refresh_missing', String(options.refreshMissing ?? true));
-  if (options.maxRefresh !== undefined) {
-    params.set('max_refresh', String(options.maxRefresh));
-  }
-
   return fetchDbServicesApi<CampaignRecordingStatus>(
-    `/analytics/user/${encodeURIComponent(userUid)}/campaign/${encodeURIComponent(campaignId)}/recordings/status?${params.toString()}`,
+    `/analytics/user/${encodeURIComponent(userUid)}/campaign/${encodeURIComponent(campaignId)}/recordings/status`,
   );
 }
 

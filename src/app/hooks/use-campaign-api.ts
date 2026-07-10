@@ -15,6 +15,13 @@ import {
   CampaignAnalytics,
 } from '@/types/campaign.types';
 import { ApiError } from '@/lib/http';
+import {
+  clearLocalCacheByResource,
+  createScopedCacheKey,
+  getCurrentOrganizationId,
+  readLocalCache,
+  writeLocalCache,
+} from '@/lib/utils/client-cache';
 
 interface UseCampaignApiState {
   campaigns: Campaign[];
@@ -30,8 +37,8 @@ interface UseCampaignApiState {
 interface UseCampaignApiReturn extends UseCampaignApiState {
   // CRUD
   createCampaign: (data: Omit<CreateCampaignRequest, 'user_uid'>) => Promise<Campaign>;
-  listCampaigns: () => Promise<Campaign[]>;
-  getCampaign: (campaignId: string) => Promise<Campaign>;
+  listCampaigns: (forceRefresh?: boolean) => Promise<Campaign[]>;
+  getCampaign: (campaignId: string, forceRefresh?: boolean) => Promise<Campaign>;
   updateCampaign: (campaignId: string, data: UpdateCampaignRequest) => Promise<Campaign>;
   deleteCampaign: (campaignId: string) => Promise<void>;
 
@@ -45,10 +52,10 @@ interface UseCampaignApiReturn extends UseCampaignApiState {
   stopCampaign: (campaignId: string) => Promise<void>;
 
   // Monitoring
-  refreshQueueStatus: () => Promise<QueueStatus>;
-  refreshCampaignStats: (campaignId: string) => Promise<CampaignMonitoringStats>;
-  refreshCampaignContacts: (campaignId: string, options?: { skip?: number; limit?: number }) => Promise<CampaignContact[]>;
-  refreshCreditStatus: () => Promise<CreditStatus>;
+  refreshQueueStatus: (forceRefresh?: boolean) => Promise<QueueStatus>;
+  refreshCampaignStats: (campaignId: string, forceRefresh?: boolean) => Promise<CampaignMonitoringStats>;
+  refreshCampaignContacts: (campaignId: string, options?: CampaignContactsOptions) => Promise<CampaignContact[]>;
+  refreshCreditStatus: (forceRefresh?: boolean) => Promise<CreditStatus>;
 
   // Analytics
   getCampaignAnalytics: (campaignId: string) => Promise<CampaignAnalytics>;
@@ -57,6 +64,25 @@ interface UseCampaignApiReturn extends UseCampaignApiState {
   clearError: () => void;
   setCurrentCampaign: (campaign: Campaign | null) => void;
 }
+
+type CampaignContactsOptions = {
+  skip?: number;
+  limit?: number;
+  forceRefresh?: boolean;
+};
+
+const CAMPAIGN_LIST_CACHE_RESOURCE = 'campaign-list';
+const CAMPAIGN_DETAIL_CACHE_RESOURCE = 'campaign-detail';
+const CAMPAIGN_QUEUE_CACHE_RESOURCE = 'campaign-queue';
+const CAMPAIGN_STATS_CACHE_RESOURCE = 'campaign-stats';
+const CAMPAIGN_CONTACTS_CACHE_RESOURCE = 'campaign-contacts';
+const CAMPAIGN_CREDIT_CACHE_RESOURCE = 'campaign-credit';
+const CAMPAIGN_LIST_CACHE_TTL_MS = 30_000;
+const CAMPAIGN_DETAIL_CACHE_TTL_MS = 20_000;
+const CAMPAIGN_QUEUE_CACHE_TTL_MS = 15_000;
+const CAMPAIGN_STATS_CACHE_TTL_MS = 20_000;
+const CAMPAIGN_CONTACTS_CACHE_TTL_MS = 60_000;
+const CAMPAIGN_CREDIT_CACHE_TTL_MS = 30_000;
 
 export function useCampaignApi(): UseCampaignApiReturn {
   const { userUid, loading: userLoading } = useMonadeUser();
@@ -89,6 +115,25 @@ export function useCampaignApi(): UseCampaignApiReturn {
     return 'An unexpected error occurred';
   };
 
+  const scopedCacheKey = useCallback((resource: string, params?: unknown) => {
+    if (!userUid) return null;
+
+    return createScopedCacheKey(
+      { userUid, organizationId: getCurrentOrganizationId() },
+      resource,
+      params,
+    );
+  }, [userUid]);
+
+  const clearCampaignCaches = useCallback(() => {
+    clearLocalCacheByResource(CAMPAIGN_LIST_CACHE_RESOURCE);
+    clearLocalCacheByResource(CAMPAIGN_DETAIL_CACHE_RESOURCE);
+    clearLocalCacheByResource(CAMPAIGN_QUEUE_CACHE_RESOURCE);
+    clearLocalCacheByResource(CAMPAIGN_STATS_CACHE_RESOURCE);
+    clearLocalCacheByResource(CAMPAIGN_CONTACTS_CACHE_RESOURCE);
+    clearLocalCacheByResource(CAMPAIGN_CREDIT_CACHE_RESOURCE);
+  }, []);
+
   // ============================================
   // CRUD Operations
   // ============================================
@@ -99,6 +144,7 @@ export function useCampaignApi(): UseCampaignApiReturn {
       setLoading(true);
       try {
         const campaign = await campaignApi.create({ ...data, user_uid: userUid });
+        clearCampaignCaches();
         setState((prev) => ({
           ...prev,
           campaigns: [...prev.campaigns, campaign],
@@ -113,10 +159,10 @@ export function useCampaignApi(): UseCampaignApiReturn {
         throw error;
       }
     },
-    [userUid],
+    [clearCampaignCaches, userUid],
   );
 
-  const listCampaigns = useCallback(async (): Promise<Campaign[]> => {
+  const listCampaigns = useCallback(async (forceRefresh = false): Promise<Campaign[]> => {
     if (!userUid) {
       if (userLoading) {
         setLoading(false);
@@ -125,10 +171,20 @@ export function useCampaignApi(): UseCampaignApiReturn {
       }
       throw new Error('User not authenticated');
     }
+    const cacheKey = scopedCacheKey(CAMPAIGN_LIST_CACHE_RESOURCE, { userUid });
+    if (!forceRefresh && cacheKey) {
+      const cached = readLocalCache<Campaign[]>(cacheKey);
+      if (cached) {
+        setState((prev) => ({ ...prev, campaigns: cached.value, loading: false }));
+
+        return cached.value;
+      }
+    }
     setLoading(true);
     try {
       const campaigns = await campaignApi.list(userUid);
       setState((prev) => ({ ...prev, campaigns, loading: false }));
+      if (cacheKey) writeLocalCache(cacheKey, campaigns, CAMPAIGN_LIST_CACHE_TTL_MS);
 
       return campaigns;
     } catch (error) {
@@ -136,10 +192,10 @@ export function useCampaignApi(): UseCampaignApiReturn {
       setError(message);
       throw error;
     }
-  }, [userUid, userLoading]);
+  }, [scopedCacheKey, userUid, userLoading]);
 
   const getCampaign = useCallback(
-    async (campaignId: string): Promise<Campaign> => {
+    async (campaignId: string, forceRefresh = false): Promise<Campaign> => {
       if (!userUid) {
         if (userLoading) {
           setLoading(false);
@@ -149,8 +205,17 @@ export function useCampaignApi(): UseCampaignApiReturn {
       }
       setLoading(true);
       try {
+        const cacheKey = scopedCacheKey(CAMPAIGN_DETAIL_CACHE_RESOURCE, { campaignId, userUid });
+        const cached = !forceRefresh && cacheKey ? readLocalCache<Campaign>(cacheKey) : null;
+        if (cached) {
+          setState((prev) => ({ ...prev, currentCampaign: cached.value, loading: false }));
+
+          return cached.value;
+        }
+
         const campaign = await campaignApi.get(campaignId, userUid);
         setState((prev) => ({ ...prev, currentCampaign: campaign, loading: false }));
+        if (cacheKey) writeLocalCache(cacheKey, campaign, CAMPAIGN_DETAIL_CACHE_TTL_MS);
 
         return campaign;
       } catch (error) {
@@ -159,7 +224,7 @@ export function useCampaignApi(): UseCampaignApiReturn {
         throw error;
       }
     },
-    [userUid, userLoading],
+    [scopedCacheKey, userUid, userLoading],
   );
 
   const updateCampaign = useCallback(
@@ -168,6 +233,7 @@ export function useCampaignApi(): UseCampaignApiReturn {
       setLoading(true);
       try {
         const updated = await campaignApi.update(campaignId, userUid, data);
+        clearCampaignCaches();
         setState((prev) => ({
           ...prev,
           campaigns: prev.campaigns.map((c) => (c.id === campaignId ? updated : c)),
@@ -183,7 +249,7 @@ export function useCampaignApi(): UseCampaignApiReturn {
         throw error;
       }
     },
-    [userUid],
+    [clearCampaignCaches, userUid],
   );
 
   const deleteCampaign = useCallback(
@@ -192,6 +258,7 @@ export function useCampaignApi(): UseCampaignApiReturn {
       setLoading(true);
       try {
         await campaignApi.delete(campaignId, userUid);
+        clearCampaignCaches();
         setState((prev) => ({
           ...prev,
           campaigns: prev.campaigns.filter((c) => c.id !== campaignId),
@@ -205,7 +272,7 @@ export function useCampaignApi(): UseCampaignApiReturn {
         throw error;
       }
     },
-    [userUid],
+    [clearCampaignCaches, userUid],
   );
 
   // ============================================
@@ -218,6 +285,7 @@ export function useCampaignApi(): UseCampaignApiReturn {
       setLoading(true);
       try {
         const response = await campaignApi.uploadCSV(campaignId, userUid, file);
+        clearCampaignCaches();
         // Refresh campaign to get updated contact count
         const updated = await campaignApi.get(campaignId, userUid);
         setState((prev) => ({
@@ -235,7 +303,7 @@ export function useCampaignApi(): UseCampaignApiReturn {
         throw error;
       }
     },
-    [userUid],
+    [clearCampaignCaches, userUid],
   );
 
   // ============================================
@@ -248,6 +316,7 @@ export function useCampaignApi(): UseCampaignApiReturn {
       setLoading(true);
       try {
         await campaignApi.start(campaignId, userUid);
+        clearCampaignCaches();
         const updated = await campaignApi.get(campaignId, userUid);
         setState((prev) => ({
           ...prev,
@@ -262,7 +331,7 @@ export function useCampaignApi(): UseCampaignApiReturn {
         throw error;
       }
     },
-    [userUid],
+    [clearCampaignCaches, userUid],
   );
 
   const pauseCampaign = useCallback(
@@ -271,6 +340,7 @@ export function useCampaignApi(): UseCampaignApiReturn {
       setLoading(true);
       try {
         await campaignApi.pause(campaignId, userUid);
+        clearCampaignCaches();
         const updated = await campaignApi.get(campaignId, userUid);
         setState((prev) => ({
           ...prev,
@@ -285,7 +355,7 @@ export function useCampaignApi(): UseCampaignApiReturn {
         throw error;
       }
     },
-    [userUid],
+    [clearCampaignCaches, userUid],
   );
 
   const resumeCampaign = useCallback(
@@ -294,6 +364,7 @@ export function useCampaignApi(): UseCampaignApiReturn {
       setLoading(true);
       try {
         await campaignApi.resume(campaignId, userUid);
+        clearCampaignCaches();
         const updated = await campaignApi.get(campaignId, userUid);
         setState((prev) => ({
           ...prev,
@@ -308,7 +379,7 @@ export function useCampaignApi(): UseCampaignApiReturn {
         throw error;
       }
     },
-    [userUid],
+    [clearCampaignCaches, userUid],
   );
 
   const stopCampaign = useCallback(
@@ -317,6 +388,7 @@ export function useCampaignApi(): UseCampaignApiReturn {
       setLoading(true);
       try {
         await campaignApi.stop(campaignId, userUid);
+        clearCampaignCaches();
         const updated = await campaignApi.get(campaignId, userUid);
         setState((prev) => ({
           ...prev,
@@ -331,21 +403,30 @@ export function useCampaignApi(): UseCampaignApiReturn {
         throw error;
       }
     },
-    [userUid],
+    [clearCampaignCaches, userUid],
   );
 
   // ============================================
   // Monitoring Operations
   // ============================================
 
-  const refreshQueueStatus = useCallback(async (): Promise<QueueStatus> => {
+  const refreshQueueStatus = useCallback(async (forceRefresh = false): Promise<QueueStatus> => {
     if (!userUid) {
       if (userLoading) throw new Error('User not ready');
       throw new Error('User not authenticated');
     }
     try {
+      const cacheKey = scopedCacheKey(CAMPAIGN_QUEUE_CACHE_RESOURCE, { userUid });
+      const cached = !forceRefresh && cacheKey ? readLocalCache<QueueStatus>(cacheKey) : null;
+      if (cached) {
+        setState((prev) => ({ ...prev, queueStatus: cached.value }));
+
+        return cached.value;
+      }
+
       const queueStatus = await campaignApi.getQueueStatus(userUid);
       setState((prev) => ({ ...prev, queueStatus }));
+      if (cacheKey) writeLocalCache(cacheKey, queueStatus, CAMPAIGN_QUEUE_CACHE_TTL_MS);
 
       return queueStatus;
     } catch (error) {
@@ -353,15 +434,29 @@ export function useCampaignApi(): UseCampaignApiReturn {
       setError(message);
       throw error;
     }
-  }, [userUid, userLoading]);
+  }, [scopedCacheKey, userUid, userLoading]);
 
   const refreshCampaignStats = useCallback(
-    async (campaignId: string): Promise<CampaignMonitoringStats> => {
+    async (campaignId: string, forceRefresh = false): Promise<CampaignMonitoringStats> => {
       if (!userUid) {
         if (userLoading) throw new Error('User not ready');
         throw new Error('User not authenticated');
       }
       try {
+        const cacheKey = scopedCacheKey(CAMPAIGN_STATS_CACHE_RESOURCE, { campaignId, userUid });
+        const cached = !forceRefresh && cacheKey ? readLocalCache<CampaignMonitoringStats>(cacheKey) : null;
+        if (cached) {
+          setState((prev) => ({
+            ...prev,
+            campaignStats: {
+              ...prev.campaignStats,
+              [campaignId]: cached.value,
+            },
+          }));
+
+          return cached.value;
+        }
+
         const stats = await campaignApi.getCampaignMonitoringStats(campaignId, userUid);
         setState((prev) => ({
           ...prev,
@@ -370,6 +465,7 @@ export function useCampaignApi(): UseCampaignApiReturn {
             [campaignId]: stats,
           },
         }));
+        if (cacheKey) writeLocalCache(cacheKey, stats, CAMPAIGN_STATS_CACHE_TTL_MS);
 
         return stats;
       } catch (error) {
@@ -378,19 +474,39 @@ export function useCampaignApi(): UseCampaignApiReturn {
         throw error;
       }
     },
-    [userUid, userLoading],
+    [scopedCacheKey, userUid, userLoading],
   );
 
   const refreshCampaignContacts = useCallback(
     async (
       campaignId: string,
-      options?: { skip?: number; limit?: number },
+      options?: CampaignContactsOptions,
     ): Promise<CampaignContact[]> => {
       if (!userUid) {
         if (userLoading) throw new Error('User not ready');
         throw new Error('User not authenticated');
       }
       try {
+        const cacheParams = {
+          campaignId,
+          userUid,
+          skip: options?.skip ?? 0,
+          limit: options?.limit ?? 200,
+        };
+        const cacheKey = scopedCacheKey(CAMPAIGN_CONTACTS_CACHE_RESOURCE, cacheParams);
+        const cached = !options?.forceRefresh && cacheKey ? readLocalCache<CampaignContact[]>(cacheKey) : null;
+        if (cached) {
+          setState((prev) => ({
+            ...prev,
+            campaignContacts: {
+              ...prev.campaignContacts,
+              [campaignId]: cached.value,
+            },
+          }));
+
+          return cached.value;
+        }
+
         const contacts = await campaignApi.getCampaignContacts(
           campaignId,
           userUid,
@@ -404,6 +520,7 @@ export function useCampaignApi(): UseCampaignApiReturn {
             [campaignId]: contacts,
           },
         }));
+        if (cacheKey) writeLocalCache(cacheKey, contacts, CAMPAIGN_CONTACTS_CACHE_TTL_MS);
 
         return contacts;
       } catch (error) {
@@ -412,17 +529,26 @@ export function useCampaignApi(): UseCampaignApiReturn {
         throw error;
       }
     },
-    [userUid, userLoading],
+    [scopedCacheKey, userUid, userLoading],
   );
 
-  const refreshCreditStatus = useCallback(async (): Promise<CreditStatus> => {
+  const refreshCreditStatus = useCallback(async (forceRefresh = false): Promise<CreditStatus> => {
     if (!userUid) {
       if (userLoading) throw new Error('User not ready');
       throw new Error('User not authenticated');
     }
     try {
+      const cacheKey = scopedCacheKey(CAMPAIGN_CREDIT_CACHE_RESOURCE, { userUid });
+      const cached = !forceRefresh && cacheKey ? readLocalCache<CreditStatus>(cacheKey) : null;
+      if (cached) {
+        setState((prev) => ({ ...prev, creditStatus: cached.value }));
+
+        return cached.value;
+      }
+
       const creditStatus = await campaignApi.getCreditStatus(userUid);
       setState((prev) => ({ ...prev, creditStatus }));
+      if (cacheKey) writeLocalCache(cacheKey, creditStatus, CAMPAIGN_CREDIT_CACHE_TTL_MS);
 
       return creditStatus;
     } catch (error) {
@@ -430,7 +556,7 @@ export function useCampaignApi(): UseCampaignApiReturn {
       setError(message);
       throw error;
     }
-  }, [userUid, userLoading]);
+  }, [scopedCacheKey, userUid, userLoading]);
 
   // ============================================
   // Analytics

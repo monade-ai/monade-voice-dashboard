@@ -640,11 +640,11 @@ export default function CampaignDetailPage() {
 
   useEffect(() => {
     const bootstrap = async () => {
-      await getCampaign(campaignId);
+      await getCampaign(campaignId, true);
       await Promise.allSettled([
-        refreshQueueStatus(),
-        refreshCampaignStats(campaignId),
-        refreshCampaignContacts(campaignId, { limit: 300 }),
+        refreshQueueStatus(true),
+        refreshCampaignStats(campaignId, true),
+        refreshCampaignContacts(campaignId, { limit: 300, forceRefresh: true }),
       ]);
     };
 
@@ -662,7 +662,7 @@ export default function CampaignDetailPage() {
     setEditDraft(toCampaignEditDraft(campaign));
   }, [campaign, isEditingParams]);
 
-  const refreshRecordingStatus = useCallback(async (refreshMissing = true) => {
+  const refreshRecordingStatus = useCallback(async () => {
     if (!campaign) return;
 
     setIsRefreshingRecordingStatus(true);
@@ -670,7 +670,6 @@ export default function CampaignDetailPage() {
       const status = await campaignApi.getCampaignRecordingStatus(
         campaign.user_uid,
         campaign.id,
-        { refreshMissing, maxRefresh: 25 },
       );
       setRecordingStatus(status);
     } catch (error) {
@@ -682,7 +681,7 @@ export default function CampaignDetailPage() {
 
   useEffect(() => {
     if (!campaign) return;
-    void refreshRecordingStatus(true);
+    void refreshRecordingStatus();
   }, [campaign, refreshRecordingStatus]);
 
   useEffect(() => {
@@ -692,7 +691,7 @@ export default function CampaignDetailPage() {
     if (campaign.status !== 'active' && !isInsideRecordingDelayWindow) return;
 
     const interval = setInterval(() => {
-      void refreshRecordingStatus(true);
+      void refreshRecordingStatus();
     }, 30_000);
 
     return () => clearInterval(interval);
@@ -703,10 +702,10 @@ export default function CampaignDetailPage() {
     const interval = setInterval(() => {
       void (async () => {
         await Promise.allSettled([
-          getCampaign(campaignId),
-          refreshQueueStatus(),
-          refreshCampaignStats(campaignId),
-          refreshCampaignContacts(campaignId, { limit: 300 }),
+          getCampaign(campaignId, true),
+          refreshQueueStatus(true),
+          refreshCampaignStats(campaignId, true),
+          refreshCampaignContacts(campaignId, { limit: 300, forceRefresh: true }),
         ]);
       })();
     }, CAMPAIGN_API_CONFIG.POLL_INTERVALS.QUEUE_STATUS);
@@ -736,10 +735,10 @@ export default function CampaignDetailPage() {
         }
       }
       await Promise.allSettled([
-        getCampaign(campaignId),
-        refreshQueueStatus(),
-        refreshCampaignStats(campaignId),
-        refreshCampaignContacts(campaignId, { limit: 300 }),
+        getCampaign(campaignId, true),
+        refreshQueueStatus(true),
+        refreshCampaignStats(campaignId, true),
+        refreshCampaignContacts(campaignId, { limit: 300, forceRefresh: true }),
       ]);
       setIsImportMode(false);
       setIsImportPausedForUpload(false);
@@ -777,8 +776,8 @@ export default function CampaignDetailPage() {
       if (!ready) return;
       await startCampaignApi(campaign.id);
       await Promise.allSettled([
-        refreshCampaignStats(campaign.id),
-        refreshCampaignContacts(campaign.id, { limit: 300 }),
+        refreshCampaignStats(campaign.id, true),
+        refreshCampaignContacts(campaign.id, { limit: 300, forceRefresh: true }),
       ]);
       toast.success('Campaign initiated');
     } catch (err) {
@@ -793,8 +792,8 @@ export default function CampaignDetailPage() {
       if (!ready) return;
       await resumeCampaignApi(campaign.id);
       await Promise.allSettled([
-        refreshCampaignStats(campaign.id),
-        refreshCampaignContacts(campaign.id, { limit: 300 }),
+        refreshCampaignStats(campaign.id, true),
+        refreshCampaignContacts(campaign.id, { limit: 300, forceRefresh: true }),
       ]);
       toast.success('Campaign resumed');
     } catch (err) {
@@ -806,8 +805,8 @@ export default function CampaignDetailPage() {
     if (!campaign) return;
     await pauseCampaignApi(campaign.id);
     await Promise.allSettled([
-      refreshCampaignStats(campaign.id),
-      refreshCampaignContacts(campaign.id, { limit: 300 }),
+      refreshCampaignStats(campaign.id, true),
+      refreshCampaignContacts(campaign.id, { limit: 300, forceRefresh: true }),
     ]);
     toast.success('Campaign paused');
   };
@@ -816,19 +815,19 @@ export default function CampaignDetailPage() {
     if (!campaign) return;
     await stopCampaignApi(campaign.id);
     await Promise.allSettled([
-      refreshCampaignStats(campaign.id),
-      refreshCampaignContacts(campaign.id, { limit: 300 }),
+      refreshCampaignStats(campaign.id, true),
+      refreshCampaignContacts(campaign.id, { limit: 300, forceRefresh: true }),
     ]);
     toast.success('Campaign stopped');
   };
 
   const handleRefresh = async () => {
     await Promise.allSettled([
-      getCampaign(campaignId),
-      refreshQueueStatus(),
-      refreshCampaignStats(campaignId),
-      refreshCampaignContacts(campaignId, { limit: 300 }),
-      refreshRecordingStatus(true),
+      getCampaign(campaignId, true),
+      refreshQueueStatus(true),
+      refreshCampaignStats(campaignId, true),
+      refreshCampaignContacts(campaignId, { limit: 300, forceRefresh: true }),
+      refreshRecordingStatus(),
     ]);
     toast.success('Telemetry refreshed');
   };
@@ -841,8 +840,8 @@ export default function CampaignDetailPage() {
     try {
       await updateCampaign(campaign.id, { max_retries: retryDraftValue });
       await Promise.allSettled([
-        getCampaign(campaign.id),
-        refreshCampaignStats(campaign.id),
+        getCampaign(campaign.id, true),
+        refreshCampaignStats(campaign.id, true),
       ]);
       toast.success(`Retries updated to ${retryDraftValue}`);
     } catch (error) {
@@ -897,10 +896,10 @@ export default function CampaignDetailPage() {
       }
 
       await Promise.allSettled([
-        getCampaign(campaign.id),
-        refreshQueueStatus(),
-        refreshCampaignStats(campaign.id),
-        refreshCampaignContacts(campaign.id, { limit: 300 }),
+        getCampaign(campaign.id, true),
+        refreshQueueStatus(true),
+        refreshCampaignStats(campaign.id, true),
+        refreshCampaignContacts(campaign.id, { limit: 300, forceRefresh: true }),
       ]);
       setPendingEdit(null);
       setIsEditingParams(false);
@@ -956,10 +955,10 @@ export default function CampaignDetailPage() {
     try {
       await pauseCampaignApi(campaign.id);
       await Promise.allSettled([
-        getCampaign(campaign.id),
-        refreshQueueStatus(),
-        refreshCampaignStats(campaign.id),
-        refreshCampaignContacts(campaign.id, { limit: 300 }),
+        getCampaign(campaign.id, true),
+        refreshQueueStatus(true),
+        refreshCampaignStats(campaign.id, true),
+        refreshCampaignContacts(campaign.id, { limit: 300, forceRefresh: true }),
       ]);
       setIsImportPausedForUpload(true);
       setIsImportMode(true);
@@ -1278,9 +1277,6 @@ export default function CampaignDetailPage() {
           available_recordings: exportResult.availableRecordings,
           pending_recordings: Math.max(exportResult.totalCalls - exportResult.availableRecordings, 0),
           missing_sip_call_id: current?.missing_sip_call_id,
-          refreshed_recordings: current?.refreshed_recordings,
-          lookup_errors: current?.lookup_errors,
-          vobiz_configured: current?.vobiz_configured,
         }));
       }
 

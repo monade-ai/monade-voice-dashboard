@@ -40,12 +40,16 @@ export default function CallHistoryPage() {
 
   const { transcripts, loading: transcriptsLoading } = useTranscripts();
   const { analytics: allAnalytics, fetchAll: fetchAnalytics } = useUserAnalytics();
+  const transcriptCallIds = useMemo(
+    () => transcripts.map((transcript) => transcript.call_id).filter(Boolean),
+    [transcripts],
+  );
 
   useEffect(() => {
-    if (transcripts.length > 0) {
-      fetchAnalytics();
+    if (transcriptCallIds.length > 0) {
+      fetchAnalytics({ expectedCallIds: transcriptCallIds });
     }
-  }, [transcripts.length, fetchAnalytics]);
+  }, [transcriptCallIds, fetchAnalytics]);
 
   // Union transcripts and analytics by call_id so calls that have analytics but no
   // transcript file (common for inbound/missed/failed calls) still show up. Source of

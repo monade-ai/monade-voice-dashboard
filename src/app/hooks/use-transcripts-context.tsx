@@ -3,6 +3,12 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 
 import { fetchJson } from '@/lib/http';
+import {
+  createScopedCacheKey,
+  getCurrentOrganizationId,
+  readLocalCache,
+  writeLocalCache,
+} from '@/lib/utils/client-cache';
 import { MONADE_API_CONFIG } from '@/types/monade-api.types';
 
 import { useMonadeUser } from './use-monade-user';
@@ -28,11 +34,22 @@ interface TranscriptsContextType {
 
 const TranscriptsContext = createContext<TranscriptsContextType | null>(null);
 
-const CACHE_KEY = 'monade_transcripts_cache';
+const CACHE_KEY = 'transcripts';
+const CONVERSATION_CACHE_KEY = 'transcript-conversation';
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+const CONVERSATION_TRUE_CACHE_DURATION = 60 * 60 * 1000; // transcript files with content are immutable by URL
+const CONVERSATION_FALSE_CACHE_DURATION = 30 * 1000; // content can arrive shortly after the transcript URL exists
 
 // Check if transcript has actual conversation
-async function checkHasConversation(transcriptUrl: string): Promise<boolean> {
+async function checkHasConversation(userUid: string, transcriptUrl: string): Promise<boolean> {
+  const cacheKey = createScopedCacheKey(
+    { userUid, organizationId: getCurrentOrganizationId() },
+    CONVERSATION_CACHE_KEY,
+    { transcriptUrl },
+  );
+  const cached = readLocalCache<boolean>(cacheKey);
+  if (cached) return cached.value;
+
   try {
     const data = await fetchJson<{ messageCount?: number }>('/api/transcript-content', {
       method: 'POST',
@@ -41,7 +58,14 @@ async function checkHasConversation(transcriptUrl: string): Promise<boolean> {
       retry: { retries: 2 },
     });
 
-    return (data.messageCount || 0) > 0;
+    const hasConversation = (data.messageCount || 0) > 0;
+    writeLocalCache(
+      cacheKey,
+      hasConversation,
+      hasConversation ? CONVERSATION_TRUE_CACHE_DURATION : CONVERSATION_FALSE_CACHE_DURATION,
+    );
+
+    return hasConversation;
   } catch (err) {
     console.error('Error checking conversation:', err);
   }
@@ -62,20 +86,16 @@ export function TranscriptsProvider({ children }: { children: React.ReactNode })
   useEffect(() => {
     if (!userUid) return;
 
-    try {
-      const cached = sessionStorage.getItem(`${CACHE_KEY}_${userUid}`);
-      if (cached) {
-        const { data, timestamp } = JSON.parse(cached);
-        const age = Date.now() - timestamp;
-
-        if (age < CACHE_DURATION && Array.isArray(data)) {
-          setTranscripts(data);
-          setLastFetched(timestamp);
-          setLoading(false);
-        }
-      }
-    } catch (err) {
-      console.error('Error loading cached transcripts:', err);
+    const cacheKey = createScopedCacheKey(
+      { userUid, organizationId: getCurrentOrganizationId() },
+      CACHE_KEY,
+      { userUid },
+    );
+    const cached = readLocalCache<Transcript[]>(cacheKey);
+    if (cached && Array.isArray(cached.value)) {
+      setTranscripts(cached.value);
+      setLastFetched(cached.cachedAt);
+      setLoading(false);
     }
   }, [userUid]);
 
@@ -114,7 +134,7 @@ export function TranscriptsProvider({ children }: { children: React.ReactNode })
       const transcriptsWithStatus = await Promise.all(
         transcriptList.slice(0, 50).map(async (t) => {
           const hasConversation = t.transcript_url
-            ? await checkHasConversation(t.transcript_url)
+            ? await checkHasConversation(userUid, t.transcript_url)
             : false;
 
           return { ...t, has_conversation: hasConversation };
@@ -125,13 +145,16 @@ export function TranscriptsProvider({ children }: { children: React.ReactNode })
       const allTranscripts = [...transcriptsWithStatus, ...remaining];
 
       setTranscripts(allTranscripts);
-      setLastFetched(Date.now());
+      const fetchedAt = Date.now();
+      setLastFetched(fetchedAt);
 
       // Save to cache
-      sessionStorage.setItem(`${CACHE_KEY}_${userUid}`, JSON.stringify({
-        data: allTranscripts,
-        timestamp: Date.now(),
-      }));
+      const cacheKey = createScopedCacheKey(
+        { userUid, organizationId: getCurrentOrganizationId() },
+        CACHE_KEY,
+        { userUid },
+      );
+      writeLocalCache(cacheKey, allTranscripts, CACHE_DURATION);
     } catch (err) {
       console.error('Error fetching transcripts:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch transcripts');

@@ -117,9 +117,7 @@ const DealRow = React.memo(({ lead, onClick, bucketIndex }: {
     formattedCurrentTime,
     progress,
     togglePlay,
-    downloadUrl,
-    recordingUrl,
-    fetchRecording,
+    downloadRecording,
   } = useCallRecording(
     lead.call_id,
     lead.recording_url,
@@ -223,15 +221,9 @@ const DealRow = React.memo(({ lead, onClick, bucketIndex }: {
               <button
                 onClick={async (e) => {
                   e.stopPropagation();
-                  const url = downloadUrl || recordingUrl || await fetchRecording();
-                  if (!url) return;
-                  const a = document.createElement('a');
-                  a.href = url;
-                  a.download = `recording-${lead.call_id}.mp3`;
-                  a.target = '_blank';
-                  a.rel = 'noopener noreferrer';
-                  a.click();
+                  await downloadRecording();
                 }}
+                disabled={recordingLoading}
                 className="h-8 w-8 flex items-center justify-center rounded-full border border-border/30 text-muted-foreground hover:text-foreground hover:border-border/60 transition-all"
                 title="Download recording"
               >
@@ -384,8 +376,9 @@ export default function HotLeadsPage() {
 
   const verdictOptions = useMemo(() => {
     if (templateFilter !== 'all' && templateFilter !== 'legacy') {
-      const selectedTemplate = templateDetails[templateFilter] || templates.find((template) => template.id === templateFilter);
-      const buckets = selectedTemplate?.content?.qualification_buckets || [];
+      const selectedTemplateDetail = templateDetails[templateFilter];
+      const selectedTemplateSummary = templates.find((template) => template.id === templateFilter);
+      const buckets = selectedTemplateDetail?.content?.qualification_buckets || [];
       if (buckets.length > 0) {
         return buckets
           .filter((bucket) => bucket.key)
@@ -395,7 +388,7 @@ export default function HotLeadsPage() {
           }));
       }
 
-      const outcomeKeys = selectedTemplate?.outcome_keys || [];
+      const outcomeKeys = selectedTemplateDetail?.outcome_keys || selectedTemplateSummary?.outcome_keys || [];
       if (outcomeKeys.length > 0) {
         return outcomeKeys.map((key) => ({
           key: normalizeOutcomeKeyForMatch(key),

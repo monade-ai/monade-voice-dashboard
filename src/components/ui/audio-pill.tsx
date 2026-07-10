@@ -21,7 +21,6 @@ interface AudioPillProps {
 export function AudioPill({ callId, sipCallId, recordingUrl: existingUrl, durationMs: existingDurationMs }: AudioPillProps) {
   const {
     recordingUrl,
-    downloadUrl,
     loading,
     error,
     errorType,
@@ -33,6 +32,7 @@ export function AudioPill({ callId, sipCallId, recordingUrl: existingUrl, durati
     seek,
     audioDuration,
     fetchRecording,
+    downloadRecording,
   } = useCallRecording(callId, existingUrl, existingDurationMs);
 
   const handleSeek = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
@@ -43,21 +43,8 @@ export function AudioPill({ callId, sipCallId, recordingUrl: existingUrl, durati
   }, [audioDuration, seek]);
 
   const handleDownload = useCallback(() => {
-    const triggerDownload = async () => {
-      // Prefer the dedicated download_url (triggers save-as), fall back to the
-      // signed playback URL returned by the prepare -> status flow.
-      const url = downloadUrl || recordingUrl || await fetchRecording();
-      if (!url) return;
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `recording-${callId}.mp3`;
-      a.target = '_blank';
-      a.rel = 'noopener noreferrer';
-      a.click();
-    };
-
-    void triggerDownload();
-  }, [downloadUrl, recordingUrl, fetchRecording, callId]);
+    void downloadRecording();
+  }, [downloadRecording]);
 
   // No SIP call ID — recording not possible
   if (!sipCallId && !existingUrl && !recordingUrl) {
@@ -147,7 +134,7 @@ export function AudioPill({ callId, sipCallId, recordingUrl: existingUrl, durati
             <DropdownMenuItem
               className="gap-3 cursor-pointer py-2.5"
               onClick={handleDownload}
-              disabled={loading || (!sipCallId && !existingUrl && !recordingUrl && !downloadUrl)}
+              disabled={loading || (!sipCallId && !existingUrl && !recordingUrl)}
             >
               <Download size={14} className="text-muted-foreground" />
               <span className="text-[11px] font-bold uppercase tracking-widest">Download Recording</span>

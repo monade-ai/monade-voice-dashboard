@@ -4,10 +4,21 @@ import { useState, useCallback } from 'react';
 
 import { ApiError, fetchJson } from '@/lib/http';
 import { MONADE_API_BASE } from '@/config';
+import {
+  clearLocalCacheByResource,
+  createScopedCacheKey,
+  getCurrentOrganizationId,
+  readLocalCache,
+  writeLocalCache,
+} from '@/lib/utils/client-cache';
 
 import { useMonadeUser } from './use-monade-user';
 
-const ANALYTICS_CACHE_TTL_MS = 60_000;
+const CALL_ANALYTICS_CACHE_TTL_MS = 5 * 60_000;
+const CALL_ANALYTICS_MISS_CACHE_TTL_MS = 15_000;
+const USER_ANALYTICS_CACHE_TTL_MS = 60_000;
+const CALL_ANALYTICS_RESOURCE = 'call-analytics';
+const USER_ANALYTICS_RESOURCE = 'user-analytics';
 
 interface CachedCallAnalytics {
   data: CallAnalytics | null;
@@ -24,14 +35,52 @@ const callAnalyticsInFlight = new Map<string, Promise<CallAnalytics | null>>();
 const userAnalyticsCache = new Map<string, CachedUserAnalytics>();
 const userAnalyticsInFlight = new Map<string, Promise<CallAnalytics[]>>();
 
+type FetchAllOptions = boolean | {
+  forceRefresh?: boolean;
+  expectedCallIds?: string[];
+};
+
+function analyticsCacheKey(userUid: string, resource: string, params?: unknown) {
+  return createScopedCacheKey(
+    { userUid, organizationId: getCurrentOrganizationId() },
+    resource,
+    params,
+  );
+}
+
+function callCacheTtl(data: CallAnalytics | null) {
+  return data ? CALL_ANALYTICS_CACHE_TTL_MS : CALL_ANALYTICS_MISS_CACHE_TTL_MS;
+}
+
+function normalizeFetchAllOptions(options: FetchAllOptions = false) {
+  if (typeof options === 'boolean') {
+    return { forceRefresh: options, expectedCallIds: undefined };
+  }
+
+  return {
+    forceRefresh: options.forceRefresh ?? false,
+    expectedCallIds: options.expectedCallIds,
+  };
+}
+
+function cacheCoversExpectedCalls(data: CallAnalytics[], expectedCallIds?: string[]) {
+  if (!expectedCallIds?.length) return true;
+
+  const cachedCallIds = new Set(data.map((item) => item.call_id).filter(Boolean));
+
+  return expectedCallIds.every((callId) => cachedCallIds.has(callId));
+}
+
 export function invalidateAnalyticsCaches(callId?: string) {
   if (callId) {
-    callAnalyticsCache.delete(callId);
-    callAnalyticsInFlight.delete(callId);
+    callAnalyticsCache.clear();
+    callAnalyticsInFlight.clear();
   }
 
   userAnalyticsCache.clear();
   userAnalyticsInFlight.clear();
+  clearLocalCacheByResource(CALL_ANALYTICS_RESOURCE);
+  clearLocalCacheByResource(USER_ANALYTICS_RESOURCE);
 }
 
 // Analytics data structure matching actual API response
@@ -110,26 +159,41 @@ export interface CallAnalytics {
 
 // Hook to fetch analytics for a specific call
 export function useCallAnalytics() {
+  const { userUid } = useMonadeUser();
   const [analytics, setAnalytics] = useState<CallAnalytics | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const fetchByCallId = useCallback(async (callId: string, forceRefresh = false) => {
     if (!callId) return null;
+    const scopedCallId = analyticsCacheKey(userUid ?? 'anonymous', CALL_ANALYTICS_RESOURCE, { callId });
+    const localCacheKey = userUid
+      ? analyticsCacheKey(userUid, CALL_ANALYTICS_RESOURCE, { callId })
+      : null;
 
     if (!forceRefresh) {
-      const cached = callAnalyticsCache.get(callId);
-      if (cached && Date.now() - cached.cachedAt < ANALYTICS_CACHE_TTL_MS) {
+      const cached = callAnalyticsCache.get(scopedCallId);
+      if (cached && Date.now() - cached.cachedAt < callCacheTtl(cached.data)) {
         setAnalytics(cached.data);
         setError(null);
         setLoading(false);
 
         return cached.data;
       }
+
+      const persisted = localCacheKey ? readLocalCache<CallAnalytics | null>(localCacheKey) : null;
+      if (persisted && persisted.value) {
+        callAnalyticsCache.set(scopedCallId, { data: persisted.value, cachedAt: persisted.cachedAt });
+        setAnalytics(persisted.value);
+        setError(null);
+        setLoading(false);
+
+        return persisted.value;
+      }
     }
 
     if (!forceRefresh) {
-      const inFlight = callAnalyticsInFlight.get(callId);
+      const inFlight = callAnalyticsInFlight.get(scopedCallId);
       if (inFlight) {
         const result = await inFlight;
         setAnalytics(result);
@@ -144,22 +208,25 @@ export function useCallAnalytics() {
       try {
         const data = await fetchJson<any>(`${MONADE_API_BASE}/api/analytics/${callId}`);
         const analyticsData = (data.analytics || data) as CallAnalytics;
-        callAnalyticsCache.set(callId, { data: analyticsData, cachedAt: Date.now() });
+        const cachedAt = Date.now();
+        callAnalyticsCache.set(scopedCallId, { data: analyticsData, cachedAt });
+        if (localCacheKey) writeLocalCache(localCacheKey, analyticsData, CALL_ANALYTICS_CACHE_TTL_MS);
 
         return analyticsData;
       } catch (err) {
         if (err instanceof ApiError && err.status === 404) {
-          callAnalyticsCache.set(callId, { data: null, cachedAt: Date.now() });
+          const cachedAt = Date.now();
+          callAnalyticsCache.set(scopedCallId, { data: null, cachedAt });
 
           return null;
         }
         throw err;
       } finally {
-        callAnalyticsInFlight.delete(callId);
+        callAnalyticsInFlight.delete(scopedCallId);
       }
     })();
 
-    callAnalyticsInFlight.set(callId, request);
+    callAnalyticsInFlight.set(scopedCallId, request);
 
     try {
       setLoading(true);
@@ -181,7 +248,7 @@ export function useCallAnalytics() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [userUid]);
 
   return {
     analytics,
@@ -198,26 +265,42 @@ export function useUserAnalytics() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchAll = useCallback(async (forceRefresh = false) => {
+  const fetchAll = useCallback(async (options: FetchAllOptions = false) => {
     if (!userUid) {
       setAnalytics([]);
 
       return [];
     }
+    const { forceRefresh, expectedCallIds } = normalizeFetchAllOptions(options);
+    const scopedUserKey = analyticsCacheKey(userUid, USER_ANALYTICS_RESOURCE, { userUid });
 
     if (!forceRefresh) {
-      const cached = userAnalyticsCache.get(userUid);
-      if (cached && Date.now() - cached.cachedAt < ANALYTICS_CACHE_TTL_MS) {
+      const cached = userAnalyticsCache.get(scopedUserKey);
+      if (
+        cached
+        && Date.now() - cached.cachedAt < USER_ANALYTICS_CACHE_TTL_MS
+        && cacheCoversExpectedCalls(cached.data, expectedCallIds)
+      ) {
         setAnalytics(cached.data);
         setError(null);
         setLoading(false);
 
         return cached.data;
       }
+
+      const persisted = readLocalCache<CallAnalytics[]>(scopedUserKey);
+      if (persisted && cacheCoversExpectedCalls(persisted.value, expectedCallIds)) {
+        userAnalyticsCache.set(scopedUserKey, { data: persisted.value, cachedAt: persisted.cachedAt });
+        setAnalytics(persisted.value);
+        setError(null);
+        setLoading(false);
+
+        return persisted.value;
+      }
     }
 
     if (!forceRefresh) {
-      const inFlight = userAnalyticsInFlight.get(userUid);
+      const inFlight = userAnalyticsInFlight.get(scopedUserKey);
       if (inFlight) {
         const result = await inFlight;
         setAnalytics(result);
@@ -275,15 +358,16 @@ export function useUserAnalytics() {
             : [data.analytics];
         }
 
-        userAnalyticsCache.set(userUid, { data: analyticsArray, cachedAt: Date.now() });
+        userAnalyticsCache.set(scopedUserKey, { data: analyticsArray, cachedAt: Date.now() });
+        writeLocalCache(scopedUserKey, analyticsArray, USER_ANALYTICS_CACHE_TTL_MS);
 
         return analyticsArray;
       } finally {
-        userAnalyticsInFlight.delete(userUid);
+        userAnalyticsInFlight.delete(scopedUserKey);
       }
     })();
 
-    userAnalyticsInFlight.set(userUid, request);
+    userAnalyticsInFlight.set(scopedUserKey, request);
 
     try {
       setLoading(true);

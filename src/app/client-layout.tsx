@@ -13,7 +13,16 @@ export default function ClientLayout({
   children: React.ReactNode;
 }) {
   // Memoize QueryClient so it's not recreated on every render
-  const [queryClient] = React.useState(() => new QueryClient());
+  const [queryClient] = React.useState(() => new QueryClient({
+    defaultOptions: {
+      queries: {
+        staleTime: 60_000,
+        gcTime: 10 * 60_000,
+        refetchOnWindowFocus: false,
+        refetchOnReconnect: false,
+      },
+    },
+  }));
 
   return (
     <QueryClientProvider client={queryClient}>

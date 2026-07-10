@@ -5,6 +5,16 @@ import { toast } from 'sonner';
 
 import { ApiError, fetchJson } from '@/lib/http';
 import { MONADE_API_BASE } from '@/config';
+import {
+  clearLocalCacheByResource,
+  createScopedCacheKey,
+  getCurrentOrganizationId,
+  readLocalCache,
+  removeLocalCache,
+  writeLocalCache,
+} from '@/lib/utils/client-cache';
+
+import { useMonadeUser } from './use-monade-user';
 
 // --- Types ---
 
@@ -35,9 +45,20 @@ interface CachedRecording {
   cachedAt: number;
 }
 
+class RecordingPreparationError extends Error {
+  errorType: RecordingErrorType;
+
+  constructor(message: string, errorType: RecordingErrorType) {
+    super(message);
+    this.name = 'RecordingPreparationError';
+    this.errorType = errorType;
+  }
+}
+
 // --- Client-side cache ---
 
 const recordingCache = new Map<string, CachedRecording>();
+const recordingInFlight = new Map<string, Promise<CachedRecording>>();
 const toastCooldowns = new Map<string, number>();
 
 // --- Global singleton audio for one-at-a-time playback ---
@@ -48,6 +69,7 @@ const listeners = new Set<() => void>();
 
 const SIGNED_URL_TTL_MS = 29 * 60 * 1000;
 const TOAST_COOLDOWN_MS = 6000;
+const RECORDING_CACHE_RESOURCE = 'recording-signed-url';
 
 function notifyListeners() {
   listeners.forEach((fn) => fn());
@@ -65,13 +87,60 @@ function isLegacyProviderRecordingUrl(url?: string | null) {
   return Boolean(url && url.includes('media.vobiz.ai'));
 }
 
-function getFreshCachedRecording(callId: string) {
-  const cached = recordingCache.get(callId);
-  return shouldUseCachedRecording(cached) ? cached : null;
+function getRecordingMemoryKey(userUid: string | null | undefined, callId: string) {
+  return createScopedCacheKey(
+    { userUid: userUid || 'anonymous', organizationId: getCurrentOrganizationId() },
+    RECORDING_CACHE_RESOURCE,
+    { callId },
+  );
 }
 
-function clearCachedRecording(callId: string) {
-  recordingCache.delete(callId);
+function getRecordingLocalCacheKey(userUid: string, callId: string) {
+  return createScopedCacheKey(
+    { userUid, organizationId: getCurrentOrganizationId() },
+    RECORDING_CACHE_RESOURCE,
+    { callId },
+  );
+}
+
+function getFreshCachedRecording(callId: string, userUid?: string | null) {
+  const memoryKey = getRecordingMemoryKey(userUid, callId);
+  const cached = recordingCache.get(memoryKey);
+  if (shouldUseCachedRecording(cached)) return cached;
+  if (cached) recordingCache.delete(memoryKey);
+
+  if (!userUid) return null;
+
+  const localCacheKey = getRecordingLocalCacheKey(userUid, callId);
+  const persisted = readLocalCache<CachedRecording>(localCacheKey);
+  if (persisted && shouldUseCachedRecording(persisted.value)) {
+    recordingCache.set(memoryKey, persisted.value);
+
+    return persisted.value;
+  }
+
+  return null;
+}
+
+function cacheRecording(callId: string, userUid: string | null | undefined, cached: CachedRecording) {
+  recordingCache.set(getRecordingMemoryKey(userUid, callId), cached);
+  if (userUid) {
+    writeLocalCache(getRecordingLocalCacheKey(userUid, callId), cached, SIGNED_URL_TTL_MS);
+  }
+}
+
+function clearCachedRecording(callId: string, userUid?: string | null) {
+  if (userUid) {
+    recordingCache.delete(getRecordingMemoryKey(userUid, callId));
+    removeLocalCache(getRecordingLocalCacheKey(userUid, callId));
+
+    return;
+  }
+
+  for (const key of recordingCache.keys()) {
+    recordingCache.delete(key);
+  }
+  clearLocalCacheByResource(RECORDING_CACHE_RESOURCE);
 }
 
 function showRecordingToast(key: string, title: string, description: string) {
@@ -132,6 +201,7 @@ function formatDuration(ms: number): string {
 }
 
 function classifyError(err: unknown): RecordingErrorType {
+  if (err instanceof RecordingPreparationError) return err.errorType;
   if (err instanceof ApiError) {
     if (err.status === 503) return 'service_not_configured';
     if (err.status === 404) {
@@ -150,9 +220,78 @@ function classifyError(err: unknown): RecordingErrorType {
 const POLL_INTERVAL_MS = 3000;
 const POLL_TIMEOUT_MS = 120_000;
 
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+function toCachedRecording(
+  data: { url?: string; download_url?: string },
+  durationMs: number | null,
+): CachedRecording {
+  if (!data.url || isLegacyProviderRecordingUrl(data.url)) {
+    throw new RecordingPreparationError('Recording link was invalid. Please try again.', 'unknown');
+  }
+
+  return {
+    url: data.url,
+    downloadUrl: data.download_url || null,
+    durationMs,
+    cachedAt: Date.now(),
+  };
+}
+
+async function prepareRecordingUntilReady(callId: string, durationMs: number | null): Promise<CachedRecording> {
+  const data = await fetchJson<PrepareResponse>(
+    `${MONADE_API_BASE}/api/analytics/${callId}/recording/prepare`,
+    { method: 'POST', retry: { retries: 0 } },
+  );
+
+  if (data.status === 'ready') return toCachedRecording(data, durationMs);
+  if (data.status === 'failed') {
+    throw new RecordingPreparationError(data.error || 'Recording preparation failed', 'not_yet_available');
+  }
+
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < POLL_TIMEOUT_MS) {
+    await sleep(POLL_INTERVAL_MS);
+    const status = await fetchJson<StatusResponse>(
+      `${MONADE_API_BASE}/api/analytics/${callId}/recording/status`,
+      { retry: { retries: 0 } },
+    );
+
+    if (status.status === 'ready') return toCachedRecording(status, durationMs);
+    if (status.status === 'failed') {
+      throw new RecordingPreparationError(status.error || 'Recording preparation failed', 'not_yet_available');
+    }
+  }
+
+  throw new RecordingPreparationError('Recording preparation timed out. Try again.', 'not_yet_available');
+}
+
+function startRecordingDownload(url: string, callId: string, openInNewTab = false) {
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `recording-${callId}.mp3`;
+  a.rel = 'noopener noreferrer';
+  a.style.display = 'none';
+  if (openInNewTab) a.target = '_blank';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
+async function downloadPlaybackUrlAsBlob(url: string, callId: string) {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`Recording download failed with ${response.status}`);
+
+  const blob = await response.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  startRecordingDownload(objectUrl, callId);
+  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+}
+
 // --- Hook ---
 
 export function useCallRecording(callId: string, existingRecordingUrl?: string | null, existingDurationMs?: string | null) {
+  const { userUid } = useMonadeUser();
   const [recordingUrl, setRecordingUrl] = useState<string | null>(null);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const [durationMs, setDurationMs] = useState<number | null>(null);
@@ -163,16 +302,10 @@ export function useCallRecording(callId: string, existingRecordingUrl?: string |
   const [currentTime, setCurrentTime] = useState(0);
   const [audioDuration, setAudioDuration] = useState(0);
   const animFrameRef = useRef<number>(0);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Cleanup polling on unmount
-  useEffect(() => {
-    return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    };
-  }, []);
+  const parsedExistingDurationMs = existingDurationMs && Number.isFinite(parseFloat(existingDurationMs))
+    ? parseFloat(existingDurationMs)
+    : null;
 
   // Initialize from cache only. The analytics `recording_url` field comes from the
   // legacy endpoint path, so we treat it as an availability hint rather than a
@@ -184,21 +317,15 @@ export function useCallRecording(callId: string, existingRecordingUrl?: string |
     setError(null);
     setErrorType(null);
 
-    if (existingDurationMs) {
-      setDurationMs(parseFloat(existingDurationMs));
-    } else {
-      setDurationMs(null);
-    }
+    setDurationMs(parsedExistingDurationMs);
 
-    const cached = recordingCache.get(callId);
+    const cached = getFreshCachedRecording(callId, userUid);
     if (shouldUseCachedRecording(cached)) {
       setRecordingUrl(cached.url);
       setDownloadUrl(cached.downloadUrl);
-      setDurationMs(cached.durationMs ?? (existingDurationMs ? parseFloat(existingDurationMs) : null));
-    } else if (cached) {
-      clearCachedRecording(callId);
+      setDurationMs(cached.durationMs ?? parsedExistingDurationMs);
     }
-  }, [callId, existingRecordingUrl, existingDurationMs]);
+  }, [callId, existingRecordingUrl, parsedExistingDurationMs, userUid]);
 
   // Subscribe to global audio state changes
   useEffect(() => {
@@ -246,82 +373,31 @@ export function useCallRecording(callId: string, existingRecordingUrl?: string |
     const cached: CachedRecording = {
       url,
       downloadUrl: dlUrl || null,
-      durationMs: null,
+      durationMs: parsedExistingDurationMs,
       cachedAt: Date.now(),
     };
-    recordingCache.set(callId, cached);
+    cacheRecording(callId, userUid, cached);
     setRecordingUrl(url);
     setDownloadUrl(dlUrl || null);
+    setDurationMs(parsedExistingDurationMs);
     setError(null);
     setErrorType(null);
-  }, [callId]);
-
-  /** Stop any active polling */
-  const stopPolling = useCallback(() => {
-    if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
-    if (timeoutRef.current) { clearTimeout(timeoutRef.current); timeoutRef.current = null; }
-  }, []);
-
-  /** Start polling /recording/status until ready or timeout */
-  const startPolling = useCallback(() => {
-    stopPolling();
-
-    pollRef.current = setInterval(async () => {
-      try {
-        const data = await fetchJson<StatusResponse>(
-          `${MONADE_API_BASE}/api/analytics/${callId}/recording/status`,
-          { retry: { retries: 0 } },
-        );
-
-        if (data.status === 'ready' && data.url) {
-          if (isLegacyProviderRecordingUrl(data.url)) {
-            stopPolling();
-            setError('Recording link was invalid. Please try again.');
-            setErrorType('unknown');
-            setLoading(false);
-            return;
-          }
-
-          stopPolling();
-          handleReady(data.url, data.download_url);
-          setLoading(false);
-        } else if (data.status === 'failed') {
-          stopPolling();
-          setErrorType('not_yet_available');
-          setError(data.error || 'Recording preparation failed');
-          setLoading(false);
-        }
-        // 'processing' → keep polling
-      } catch {
-        stopPolling();
-        setError('Network error while checking recording status');
-        setErrorType('unknown');
-        setLoading(false);
-      }
-    }, POLL_INTERVAL_MS);
-
-    // Safety timeout — stop polling after 2 minutes
-    timeoutRef.current = setTimeout(() => {
-      stopPolling();
-      setLoading(false);
-      setError('Recording preparation timed out. Try again.');
-      setErrorType('not_yet_available');
-    }, POLL_TIMEOUT_MS);
-  }, [callId, handleReady, stopPolling]);
+  }, [callId, parsedExistingDurationMs, userUid]);
 
   const fetchRecording = useCallback(async (): Promise<string | null> => {
     // Check cache first
-    const freshCached = getFreshCachedRecording(callId);
+    const freshCached = getFreshCachedRecording(callId, userUid);
     if (freshCached) {
       setRecordingUrl(freshCached.url);
       setDownloadUrl(freshCached.downloadUrl);
-      setDurationMs(freshCached.durationMs);
+      setDurationMs(freshCached.durationMs ?? parsedExistingDurationMs);
       return freshCached.url;
     }
 
-    const cached = recordingCache.get(callId);
+    const memoryKey = getRecordingMemoryKey(userUid, callId);
+    const cached = recordingCache.get(memoryKey);
     if (cached) {
-      clearCachedRecording(callId);
+      clearCachedRecording(callId, userUid);
       setRecordingUrl(null);
       setDownloadUrl(null);
       showRecordingToast(
@@ -342,36 +418,24 @@ export function useCallRecording(callId: string, existingRecordingUrl?: string |
     setErrorType(null);
 
     try {
-      // Step 1: POST /recording/prepare
-      const data = await fetchJson<PrepareResponse>(
-        `${MONADE_API_BASE}/api/analytics/${callId}/recording/prepare`,
-        { method: 'POST', retry: { retries: 0 } },
-      );
+      let request = recordingInFlight.get(memoryKey);
+      if (!request) {
+        request = prepareRecordingUntilReady(callId, parsedExistingDurationMs).then((recording) => {
+          cacheRecording(callId, userUid, recording);
 
-      if (data.status === 'ready' && data.url) {
-        if (isLegacyProviderRecordingUrl(data.url)) {
-          setError('Recording link was invalid. Please try again.');
-          setErrorType('unknown');
-          setLoading(false);
-          return null;
-        }
-
-        // Cache hit — URL available immediately
-        handleReady(data.url, data.download_url);
-        setLoading(false);
-        return data.url;
+          return recording;
+        }).finally(() => {
+          recordingInFlight.delete(memoryKey);
+        });
+        recordingInFlight.set(memoryKey, request);
       }
 
-      if (data.status === 'failed') {
-        setErrorType('not_yet_available');
-        setError(data.error || 'Recording preparation failed');
-        setLoading(false);
-        return null;
-      }
+      const recording = await request;
+      handleReady(recording.url, recording.downloadUrl ?? undefined);
+      setDurationMs(recording.durationMs ?? parsedExistingDurationMs);
+      setLoading(false);
 
-      // status === 'processing' — start polling
-      startPolling();
-      return null;
+      return recording.url;
     } catch (err) {
       const errType = classifyError(err);
       setErrorType(errType);
@@ -386,10 +450,10 @@ export function useCallRecording(callId: string, existingRecordingUrl?: string |
       setLoading(false);
       return null;
     }
-  }, [callId, existingRecordingUrl, handleReady, startPolling]);
+  }, [callId, existingRecordingUrl, handleReady, parsedExistingDurationMs, userUid]);
 
   const play = useCallback(async () => {
-    const freshCached = getFreshCachedRecording(callId);
+    const freshCached = getFreshCachedRecording(callId, userUid);
     const url = freshCached?.url ?? await fetchRecording();
     if (!url) return;
 
@@ -413,7 +477,34 @@ export function useCallRecording(callId: string, existingRecordingUrl?: string |
     globalActiveCallId = callId;
     notifyListeners();
     audio.play().catch(console.error);
-  }, [callId, fetchRecording]);
+  }, [callId, fetchRecording, userUid]);
+
+  const downloadRecording = useCallback(async () => {
+    const freshCached = getFreshCachedRecording(callId, userUid);
+    let downloadUrl = freshCached?.downloadUrl || null;
+    let playbackUrl = freshCached?.url || null;
+    if (!downloadUrl && !playbackUrl) {
+      const preparedPlaybackUrl = await fetchRecording();
+      const prepared = getFreshCachedRecording(callId, userUid);
+      downloadUrl = prepared?.downloadUrl || null;
+      playbackUrl = prepared?.url || preparedPlaybackUrl;
+    }
+    if (downloadUrl) {
+      startRecordingDownload(downloadUrl, callId);
+
+      return true;
+    }
+    if (!playbackUrl) return false;
+
+    try {
+      await downloadPlaybackUrlAsBlob(playbackUrl, callId);
+    } catch (err) {
+      console.warn('[useCallRecording] Falling back to opening recording URL:', err);
+      startRecordingDownload(playbackUrl, callId, true);
+    }
+
+    return true;
+  }, [callId, fetchRecording, userUid]);
 
   const pause = useCallback(() => {
     if (globalActiveCallId === callId && globalAudio) {
@@ -436,7 +527,7 @@ export function useCallRecording(callId: string, existingRecordingUrl?: string |
     }
   }, [isPlaying, pause, play]);
 
-  const freshCached = getFreshCachedRecording(callId);
+  const freshCached = getFreshCachedRecording(callId, userUid);
   const activeRecordingUrl = freshCached ? recordingUrl : null;
   const activeDownloadUrl = freshCached ? downloadUrl : null;
 
@@ -451,6 +542,7 @@ export function useCallRecording(callId: string, existingRecordingUrl?: string |
     currentTime,
     audioDuration,
     fetchRecording,
+    downloadRecording,
     play,
     pause,
     seek,

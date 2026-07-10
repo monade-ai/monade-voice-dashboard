@@ -76,9 +76,7 @@ export const CallHistoryRow = React.memo(({
     formattedCurrentTime,
     progress,
     togglePlay,
-    downloadUrl,
-    recordingUrl,
-    fetchRecording,
+    downloadRecording,
   } = useCallRecording(
     transcript.call_id,
     analytics?.recording_url,
@@ -287,15 +285,9 @@ export const CallHistoryRow = React.memo(({
                 <button
                   onClick={async (e) => {
                     e.stopPropagation();
-                    const url = downloadUrl || recordingUrl || await fetchRecording();
-                    if (!url) return;
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `recording-${transcript.call_id}.mp3`;
-                    a.target = '_blank';
-                    a.rel = 'noopener noreferrer';
-                    a.click();
+                    await downloadRecording();
                   }}
+                  disabled={recordingLoading}
                   className="h-7 w-7 flex items-center justify-center rounded-full border border-border/30 text-muted-foreground hover:text-foreground hover:border-border/60 transition-all"
                   title="Download recording"
                 >

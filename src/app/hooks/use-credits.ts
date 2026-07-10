@@ -3,6 +3,12 @@
 import { useState, useEffect, useCallback } from 'react';
 
 import { fetchJson } from '@/lib/http';
+import {
+  createScopedCacheKey,
+  getCurrentOrganizationId,
+  readLocalCache,
+  writeLocalCache,
+} from '@/lib/utils/client-cache';
 import { MONADE_API_CONFIG } from '@/types/monade-api.types';
 
 import { useMonadeUser } from './use-monade-user';
@@ -20,6 +26,9 @@ interface UseCreditsReturn {
     refetch: () => Promise<void>;
 }
 
+const CREDITS_CACHE_RESOURCE = 'user-credits';
+const CREDITS_CACHE_TTL_MS = 60_000;
+
 export function useCredits(): UseCreditsReturn {
   const [credits, setCredits] = useState<UserCredits | null>(null);
   const [loading, setLoading] = useState(true);
@@ -28,7 +37,7 @@ export function useCredits(): UseCreditsReturn {
   // Use dynamic userUid from MonadeUser context
   const { userUid, loading: userLoading } = useMonadeUser();
 
-  const fetchCredits = useCallback(async () => {
+  const fetchCredits = useCallback(async (forceRefresh = false) => {
     if (!userUid) {
       if (!userLoading) {
         setError('User not authenticated');
@@ -36,6 +45,22 @@ export function useCredits(): UseCreditsReturn {
       setLoading(false);
 
       return;
+    }
+
+    const cacheKey = createScopedCacheKey(
+      { userUid, organizationId: getCurrentOrganizationId() },
+      CREDITS_CACHE_RESOURCE,
+      { userUid },
+    );
+    if (!forceRefresh) {
+      const cached = readLocalCache<UserCredits>(cacheKey);
+      if (cached) {
+        setCredits(cached.value);
+        setError(null);
+        setLoading(false);
+
+        return;
+      }
     }
 
     try {
@@ -52,6 +77,7 @@ export function useCredits(): UseCreditsReturn {
         },
       );
       setCredits(data);
+      writeLocalCache(cacheKey, data, CREDITS_CACHE_TTL_MS);
     } catch (err) {
       console.error('Error fetching credits:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch credits');
@@ -70,7 +96,7 @@ export function useCredits(): UseCreditsReturn {
     credits,
     loading: loading || userLoading,
     error,
-    refetch: fetchCredits,
+    refetch: () => fetchCredits(true),
   };
 }
 
