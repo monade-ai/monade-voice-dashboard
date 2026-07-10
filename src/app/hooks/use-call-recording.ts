@@ -69,6 +69,7 @@ const listeners = new Set<() => void>();
 
 const SIGNED_URL_TTL_MS = 29 * 60 * 1000;
 const TOAST_COOLDOWN_MS = 6000;
+const DOWNLOAD_IFRAME_CLEANUP_MS = 60_000;
 const RECORDING_CACHE_RESOURCE = 'recording-signed-url';
 
 function notifyListeners() {
@@ -266,7 +267,7 @@ async function prepareRecordingUntilReady(callId: string, durationMs: number | n
   throw new RecordingPreparationError('Recording preparation timed out. Try again.', 'not_yet_available');
 }
 
-function startRecordingDownload(url: string, callId: string, openInNewTab = false) {
+function startAnchorDownload(url: string, callId: string, openInNewTab = false) {
   const a = document.createElement('a');
   a.href = url;
   a.download = `recording-${callId}.mp3`;
@@ -278,13 +279,22 @@ function startRecordingDownload(url: string, callId: string, openInNewTab = fals
   a.remove();
 }
 
+function startAttachmentDownload(url: string) {
+  const iframe = document.createElement('iframe');
+  iframe.src = url;
+  iframe.style.display = 'none';
+  iframe.setAttribute('aria-hidden', 'true');
+  document.body.appendChild(iframe);
+  window.setTimeout(() => iframe.remove(), DOWNLOAD_IFRAME_CLEANUP_MS);
+}
+
 async function downloadPlaybackUrlAsBlob(url: string, callId: string) {
   const response = await fetch(url);
   if (!response.ok) throw new Error(`Recording download failed with ${response.status}`);
 
   const blob = await response.blob();
   const objectUrl = URL.createObjectURL(blob);
-  startRecordingDownload(objectUrl, callId);
+  startAnchorDownload(objectUrl, callId);
   window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
 }
 
@@ -408,8 +418,8 @@ export function useCallRecording(callId: string, existingRecordingUrl?: string |
     } else if (existingRecordingUrl) {
       showRecordingToast(
         `recording-refresh:${callId}`,
-        'Refreshing recording link',
-        'Secure recording links expire after a while. Fetching a fresh one now.',
+        'Preparing recording',
+        'Creating a fresh secure link. This can take a few seconds.',
       );
     }
 
@@ -490,7 +500,8 @@ export function useCallRecording(callId: string, existingRecordingUrl?: string |
       playbackUrl = prepared?.url || preparedPlaybackUrl;
     }
     if (downloadUrl) {
-      startRecordingDownload(downloadUrl, callId);
+      startAttachmentDownload(downloadUrl);
+      toast.success('Download started');
 
       return true;
     }
@@ -498,9 +509,10 @@ export function useCallRecording(callId: string, existingRecordingUrl?: string |
 
     try {
       await downloadPlaybackUrlAsBlob(playbackUrl, callId);
+      toast.success('Download started');
     } catch (err) {
       console.warn('[useCallRecording] Falling back to opening recording URL:', err);
-      startRecordingDownload(playbackUrl, callId, true);
+      startAnchorDownload(playbackUrl, callId, true);
     }
 
     return true;
