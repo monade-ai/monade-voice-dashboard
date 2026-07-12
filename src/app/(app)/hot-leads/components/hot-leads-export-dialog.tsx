@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useMemo, useRef, useState } from 'react';
-import { Download, FileDown, Loader2, X } from 'lucide-react';
+import { Download, FileDown, Loader2, X, Zap } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { cn } from '@/lib/utils';
@@ -116,7 +116,9 @@ export function HotLeadsExportDialog({ leads, trigger }: HotLeadsExportDialogPro
     });
   }, [leads, fromDateTime, toDateTime]);
 
-  const handleDownload = async () => {
+  // mode 'fast' skips the per-call transcript-text fetch (the only slow step) and the
+  // recording URL, exporting everything else instantly. mode 'full' is the original logic.
+  const handleDownload = async (mode: 'fast' | 'full') => {
     if (filteredLeads.length === 0 || exporting) {
       if (filteredLeads.length === 0) toast.error('No hot leads match the selected range.');
 
@@ -130,45 +132,48 @@ export function HotLeadsExportDialog({ leads, trigger }: HotLeadsExportDialogPro
     try {
       // Fetch transcript text only for the leads being exported, preferring the enhanced
       // transcript. Bounded concurrency so a large range doesn't fire hundreds of requests.
+      // Skipped entirely in 'fast' mode.
       const transcriptByCallId = new Map<string, string>();
-      const jobs = filteredLeads
-        .map((lead) => ({
-          callId: lead.call_id,
-          url: lead.enhanced_transcript_url || lead.transcript_url || '',
-        }))
-        .filter((job) => job.callId && job.url);
+      if (mode === 'full') {
+        const jobs = filteredLeads
+          .map((lead) => ({
+            callId: lead.call_id,
+            url: lead.enhanced_transcript_url || lead.transcript_url || '',
+          }))
+          .filter((job) => job.callId && job.url);
 
-      const queue = [...jobs];
-      const worker = async () => {
-        while (queue.length > 0) {
-          if (signal.aborted) return; // stop pulling new work the moment we're cancelled
-          const job = queue.shift();
-          if (!job) break;
-          try {
-            const res = await fetchJson<{ transcript?: string }>(
-              '/api/transcript-content',
-              {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ url: job.url }),
-                retry: { retries: 0 },
-                signal,
-              },
-            );
-            if (res?.transcript) transcriptByCallId.set(job.callId, res.transcript);
-          } catch (err) {
-            if (signal.aborted) return; // aborted fetches throw — exit quietly
-            // Surface, don't swallow — a blank transcript cell should be explainable.
-            console.warn(`[HotLeadsExport] transcript fetch failed for ${job.callId}:`, err);
+        const queue = [...jobs];
+        const worker = async () => {
+          while (queue.length > 0) {
+            if (signal.aborted) return; // stop pulling new work the moment we're cancelled
+            const job = queue.shift();
+            if (!job) break;
+            try {
+              const res = await fetchJson<{ transcript?: string }>(
+                '/api/transcript-content',
+                {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ url: job.url }),
+                  retry: { retries: 0 },
+                  signal,
+                },
+              );
+              if (res?.transcript) transcriptByCallId.set(job.callId, res.transcript);
+            } catch (err) {
+              if (signal.aborted) return; // aborted fetches throw — exit quietly
+              // Surface, don't swallow — a blank transcript cell should be explainable.
+              console.warn(`[HotLeadsExport] transcript fetch failed for ${job.callId}:`, err);
+            }
           }
+        };
+        await Promise.all(Array.from({ length: Math.min(4, queue.length) }, worker));
+
+        if (signal.aborted) {
+          toast.info('Export cancelled.');
+
+          return;
         }
-      };
-      await Promise.all(Array.from({ length: Math.min(4, queue.length) }, worker));
-
-      if (signal.aborted) {
-        toast.info('Export cancelled.');
-
-        return;
       }
 
       const rows = filteredLeads.map((lead) => {
@@ -196,7 +201,8 @@ export function HotLeadsExportDialog({ leads, trigger }: HotLeadsExportDialogPro
           transcriptByCallId.get(lead.call_id) ?? '',
           lead.transcript_url,
           lead.enhanced_transcript_url,
-          lead.recording_url,
+          // Fast export omits the recording URL (transcript text is already blank above).
+          mode === 'fast' ? '' : lead.recording_url,
         ].map(escapeCsv).join(',');
       });
 
@@ -213,7 +219,10 @@ export function HotLeadsExportDialog({ leads, trigger }: HotLeadsExportDialogPro
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      toast.success(`Exported ${rows.length.toLocaleString()} hot lead${rows.length === 1 ? '' : 's'}.`);
+      toast.success(
+        `Exported ${rows.length.toLocaleString()} hot lead${rows.length === 1 ? '' : 's'}`
+        + (mode === 'fast' ? ' (fast — no transcripts/recordings).' : '.'),
+      );
       setOpen(false);
     } catch (err) {
       if (signal.aborted) {
@@ -268,8 +277,9 @@ export function HotLeadsExportDialog({ leads, trigger }: HotLeadsExportDialogPro
           </DialogTitle>
           <DialogDescription>
             Choose a date &amp; time range so you only download the leads you need — not the
-            entire Deal Room. Transcripts (enhanced when available), call direction, analytics
-            and recording links are all included.
+            entire Deal Room. <strong>Full Export</strong> includes transcripts (enhanced when
+            available) and recording links — slower on large ranges. <strong>Fast Export</strong>
+            skips those and returns instantly with direction, analytics and all other fields.
           </DialogDescription>
         </DialogHeader>
 
@@ -374,15 +384,29 @@ export function HotLeadsExportDialog({ leads, trigger }: HotLeadsExportDialogPro
               </button>
             </div>
           ) : (
-            <Button
-              onClick={handleDownload}
-              disabled={filteredLeads.length === 0}
-              size="sm"
-              className="gap-2 text-[10px] font-bold uppercase tracking-widest bg-foreground text-background hover:bg-foreground/90"
-            >
-              <Download className="w-3 h-3" />
-              Download CSV
-            </Button>
+            <div className="flex flex-col-reverse sm:flex-row gap-2">
+              <Button
+                onClick={() => handleDownload('fast')}
+                disabled={filteredLeads.length === 0}
+                variant="outline"
+                size="sm"
+                title="Skips transcripts & recording URLs — instant"
+                className="gap-2 text-[10px] font-bold uppercase tracking-widest"
+              >
+                <Zap className="w-3 h-3" />
+                Fast Export
+              </Button>
+              <Button
+                onClick={() => handleDownload('full')}
+                disabled={filteredLeads.length === 0}
+                size="sm"
+                title="Includes full transcripts & recording URLs — slower"
+                className="gap-2 text-[10px] font-bold uppercase tracking-widest bg-foreground text-background hover:bg-foreground/90"
+              >
+                <Download className="w-3 h-3" />
+                Full Export
+              </Button>
+            </div>
           )}
         </DialogFooter>
       </DialogContent>

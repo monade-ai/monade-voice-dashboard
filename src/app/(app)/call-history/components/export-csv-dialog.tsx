@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useMemo, useRef, useState } from 'react';
-import { Download, FileDown, Filter, Loader2, X } from 'lucide-react';
+import { Download, FileDown, Filter, Loader2, X, Zap } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { cn } from '@/lib/utils';
@@ -222,7 +222,10 @@ export function ExportCsvDialog({ calls, trigger }: ExportCsvDialogProps) {
     });
   }, [calls, fromDate, toDate, direction, verdict, connectedOnly]);
 
-  const handleDownload = async () => {
+  // mode 'fast' skips the per-call transcript-text fetch (the only slow step) and exports
+  // instantly with every column except the fetched Transcript text (URLs still included).
+  // mode 'full' fetches transcript text for each call — accurate but slow on large ranges.
+  const handleDownload = async (mode: 'fast' | 'full') => {
     if (filteredCalls.length === 0 || exporting) {
       if (filteredCalls.length === 0) toast.error('No records match the selected filters.');
 
@@ -236,50 +239,59 @@ export function ExportCsvDialog({ calls, trigger }: ExportCsvDialogProps) {
     try {
       // Fetch transcript text only for the calls being exported, preferring the enhanced
       // transcript. Bounded concurrency so a large range doesn't fire hundreds of requests.
+      // Skipped entirely in 'fast' mode.
       const transcriptByCallId = new Map<string, string>();
-      const jobs = filteredCalls
-        .map((c) => ({
-          callId: c.call_id,
-          url: enhancedTranscriptUrlOf(c) || transcriptUrlOf(c),
-        }))
-        .filter((job) => job.callId && job.url);
+      if (mode === 'full') {
+        const jobs = filteredCalls
+          .map((c) => ({
+            callId: c.call_id,
+            url: enhancedTranscriptUrlOf(c) || transcriptUrlOf(c),
+          }))
+          .filter((job) => job.callId && job.url);
 
-      const queue = [...jobs];
-      const worker = async () => {
-        while (queue.length > 0) {
-          if (signal.aborted) return; // stop pulling new work the moment we're cancelled
-          const job = queue.shift();
-          if (!job) break;
-          try {
-            const res = await fetchJson<{ transcript?: string }>(
-              '/api/transcript-content',
-              {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ url: job.url }),
-                retry: { retries: 0 },
-                signal,
-              },
-            );
-            if (res?.transcript) transcriptByCallId.set(job.callId, res.transcript);
-          } catch (err) {
-            if (signal.aborted) return; // aborted fetches throw — exit quietly
-            // Surface, don't swallow — a blank transcript cell should be explainable.
-            console.warn(`[CallArchiveExport] transcript fetch failed for ${job.callId}:`, err);
+        const queue = [...jobs];
+        const worker = async () => {
+          while (queue.length > 0) {
+            if (signal.aborted) return; // stop pulling new work the moment we're cancelled
+            const job = queue.shift();
+            if (!job) break;
+            try {
+              const res = await fetchJson<{ transcript?: string }>(
+                '/api/transcript-content',
+                {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ url: job.url }),
+                  retry: { retries: 0 },
+                  signal,
+                },
+              );
+              if (res?.transcript) transcriptByCallId.set(job.callId, res.transcript);
+            } catch (err) {
+              if (signal.aborted) return; // aborted fetches throw — exit quietly
+              // Surface, don't swallow — a blank transcript cell should be explainable.
+              console.warn(`[CallArchiveExport] transcript fetch failed for ${job.callId}:`, err);
+            }
           }
+        };
+        await Promise.all(Array.from({ length: Math.min(4, queue.length) }, worker));
+
+        if (signal.aborted) {
+          toast.info('Export cancelled.');
+
+          return;
         }
-      };
-      await Promise.all(Array.from({ length: Math.min(4, queue.length) }, worker));
-
-      if (signal.aborted) {
-        toast.info('Export cancelled.');
-
-        return;
       }
 
+      // Fast export omits the heavy/fetched columns: the transcript text (already blank,
+      // since we skipped the fetch above) and the recording URL. Same header row either
+      // way so the CSV schema stays stable — the cells are just left empty.
+      const skipKeys = mode === 'fast' ? new Set(['transcript', 'recording_url']) : null;
       const header = CSV_COLUMNS.map(c => escapeCsv(c.label)).join(',');
       const rows = filteredCalls.map(call =>
-        CSV_COLUMNS.map(col => escapeCsv(col.get(call, transcriptByCallId))).join(','),
+        CSV_COLUMNS.map(col =>
+          escapeCsv(skipKeys?.has(col.key) ? '' : col.get(call, transcriptByCallId)),
+        ).join(','),
       );
       // ﻿ = UTF-8 BOM so Excel detects UTF-8 (₹, names, non-ASCII) correctly.
       const csv = '﻿' + [header, ...rows].join('\r\n');
@@ -298,7 +310,10 @@ export function ExportCsvDialog({ calls, trigger }: ExportCsvDialogProps) {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      toast.success(`Exported ${rows.length.toLocaleString()} record${rows.length === 1 ? '' : 's'} to CSV.`);
+      toast.success(
+        `Exported ${rows.length.toLocaleString()} record${rows.length === 1 ? '' : 's'} to CSV`
+        + (mode === 'fast' ? ' (fast — no transcripts/recordings).' : '.'),
+      );
       setOpen(false);
     } catch (err) {
       if (signal.aborted) {
@@ -363,8 +378,10 @@ export function ExportCsvDialog({ calls, trigger }: ExportCsvDialogProps) {
             Export Call Archive to CSV
           </DialogTitle>
           <DialogDescription>
-            Choose a time range and optional filters. Each row includes call IDs, phone numbers,
-            verdicts, analytics, billing and the full transcript (enhanced when available).
+            Choose a time range and optional filters. <strong>Full Export</strong> includes the
+            full transcript (enhanced when available) and recording URL — accurate but slow on
+            large ranges. <strong>Fast Export</strong> skips those and returns instantly with all
+            call IDs, phone numbers, verdicts, analytics and billing.
           </DialogDescription>
         </DialogHeader>
 
@@ -535,15 +552,29 @@ export function ExportCsvDialog({ calls, trigger }: ExportCsvDialogProps) {
               </button>
             </div>
           ) : (
-            <Button
-              onClick={handleDownload}
-              disabled={filteredCalls.length === 0}
-              size="sm"
-              className="gap-2 text-[10px] font-bold uppercase tracking-widest bg-foreground text-background hover:bg-foreground/90"
-            >
-              <Download className="w-3 h-3" />
-              Download CSV
-            </Button>
+            <div className="flex flex-col-reverse sm:flex-row gap-2">
+              <Button
+                onClick={() => handleDownload('fast')}
+                disabled={filteredCalls.length === 0}
+                variant="outline"
+                size="sm"
+                title="Skips transcripts & recording URLs — instant"
+                className="gap-2 text-[10px] font-bold uppercase tracking-widest"
+              >
+                <Zap className="w-3 h-3" />
+                Fast Export
+              </Button>
+              <Button
+                onClick={() => handleDownload('full')}
+                disabled={filteredCalls.length === 0}
+                size="sm"
+                title="Includes full transcripts & recording URLs — slower"
+                className="gap-2 text-[10px] font-bold uppercase tracking-widest bg-foreground text-background hover:bg-foreground/90"
+              >
+                <Download className="w-3 h-3" />
+                Full Export
+              </Button>
+            </div>
           )}
         </DialogFooter>
       </DialogContent>
