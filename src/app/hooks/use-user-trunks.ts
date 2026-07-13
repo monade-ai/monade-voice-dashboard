@@ -46,7 +46,7 @@ export interface UpdateTrunkData {
     krisp_enabled?: boolean;
 }
 
-export function useUserTrunks() {
+export function useUserTrunks(selfHosted: boolean = false) {
     const { userUid } = useMonadeUser();
     const [trunks, setTrunks] = useState<UserTrunk[]>([]);
     const [loading, setLoading] = useState(true);
@@ -72,12 +72,13 @@ export function useUserTrunks() {
 
         try {
             setLoading(true);
+            const base = `${API_BASE}/api/users/${encodeURIComponent(userUid)}${selfHosted ? '/selfhosted-livekit' : ''}`;
             const outboundData = await fetchJson<any>(
-                `${API_BASE}/api/users/${encodeURIComponent(userUid)}/trunks`,
+                `${base}/trunks`,
                 { retry: { retries: 1 } },
             );
             const inboundData = await fetchJson<any>(
-                `${API_BASE}/api/users/${encodeURIComponent(userUid)}/inbound-trunks`,
+                `${base}/inbound-trunks`,
                 { retry: { retries: 1 } },
             );
 
@@ -104,16 +105,17 @@ export function useUserTrunks() {
         } finally {
             setLoading(false);
         }
-    }, [userUid]);
+    }, [userUid, selfHosted]);
 
     const createTrunk = useCallback(async (data: CreateTrunkData): Promise<UserTrunk | null> => {
         if (!userUid) return null;
         setSaving(true);
         try {
             const trunkType = data.trunk_type === 'inbound' ? 'inbound' : 'outbound';
+            const base = `${API_BASE}/api/users/${encodeURIComponent(userUid)}${selfHosted ? '/selfhosted-livekit' : ''}`;
             const endpoint = trunkType === 'inbound'
-                ? `${API_BASE}/api/users/${encodeURIComponent(userUid)}/inbound-trunks`
-                : `${API_BASE}/api/users/${encodeURIComponent(userUid)}/trunks`;
+                ? `${base}/inbound-trunks`
+                : `${base}/trunks`;
             const payload = trunkType === 'inbound'
                 ? {
                     name: data.name,
@@ -145,7 +147,7 @@ export function useUserTrunks() {
         } finally {
             setSaving(false);
         }
-    }, [userUid, fetchTrunks]);
+    }, [userUid, selfHosted, fetchTrunks]);
 
     const updateTrunk = useCallback(async (trunk: UserTrunk, data: UpdateTrunkData): Promise<UserTrunk | null> => {
         if (!userUid) return null;
@@ -153,9 +155,10 @@ export function useUserTrunks() {
         try {
             const isInbound = trunk.trunk_type === 'inbound';
             const trunkRef = encodeURIComponent(trunk.livekit_trunk_id || trunk.id);
+            const base = `${API_BASE}/api/users/${encodeURIComponent(userUid)}${selfHosted ? '/selfhosted-livekit' : ''}`;
             const endpoint = isInbound
-                ? `${API_BASE}/api/users/${encodeURIComponent(userUid)}/inbound-trunks/${trunkRef}`
-                : `${API_BASE}/api/users/${encodeURIComponent(userUid)}/trunks/${trunkRef}`;
+                ? `${base}/inbound-trunks/${trunkRef}`
+                : `${base}/trunks/${trunkRef}`;
             const result = await fetchJson<UserTrunk>(
                 endpoint,
                 {
@@ -173,7 +176,7 @@ export function useUserTrunks() {
         } finally {
             setSaving(false);
         }
-    }, [userUid, fetchTrunks]);
+    }, [userUid, selfHosted, fetchTrunks]);
 
     const unlinkTrunk = useCallback(async (trunk: UserTrunk): Promise<boolean> => {
         if (!userUid) return false;
@@ -181,9 +184,10 @@ export function useUserTrunks() {
         try {
             const isInbound = trunk.trunk_type === 'inbound';
             const trunkRef = encodeURIComponent(trunk.livekit_trunk_id || trunk.id);
+            const base = `${API_BASE}/api/users/${encodeURIComponent(userUid)}${selfHosted ? '/selfhosted-livekit' : ''}`;
             const endpoint = isInbound
-                ? `${API_BASE}/api/users/${encodeURIComponent(userUid)}/inbound-trunks/${trunkRef}/unlink`
-                : `${API_BASE}/api/users/${encodeURIComponent(userUid)}/trunks/${trunkRef}/unlink`;
+                ? `${base}/inbound-trunks/${trunkRef}/unlink`
+                : `${base}/trunks/${trunkRef}/unlink`;
             await fetchJson(
                 endpoint,
                 { method: 'DELETE', retry: { retries: 0 } },
@@ -196,7 +200,7 @@ export function useUserTrunks() {
         } finally {
             setSaving(false);
         }
-    }, [userUid]);
+    }, [userUid, selfHosted]);
 
     useEffect(() => {
         fetchTrunks();

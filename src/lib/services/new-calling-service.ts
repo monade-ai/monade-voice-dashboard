@@ -13,6 +13,7 @@ interface NewCallingParams {
   trunk_name: string; // Selected trunk: 'twilio' or 'vobiz'
   api_key?: string; // Optional override; backend can use server-side key
   user_uid: string; // User UID for trunk ownership validation
+  self_hosted?: boolean; // When true, route the call through the self-hosted LiveKit control plane
   use_case?: string; // Optional use case key, e.g. "sales" | "support"
   prompt_url?: string; // Optional direct prompt URL override
   knowledge_base_url?: string; // Optional direct knowledge base URL override
@@ -21,16 +22,19 @@ interface NewCallingParams {
 }
 
 const DEFAULT_VOICE_AGENTS_BASE = 'https://service.monade.ai/voice_agents';
+const DEFAULT_VOICE_AGENTS_SELFHOST_BASE = 'https://service.monade.ai/voice_agents_selfhost';
 const RAW_VOICE_AGENTS_BASE = process.env.NEXT_PUBLIC_VOICE_AGENTS_URL || DEFAULT_VOICE_AGENTS_BASE;
+const RAW_VOICE_AGENTS_SELFHOST_BASE = process.env.NEXT_PUBLIC_VOICE_AGENTS_SELFHOST_URL || DEFAULT_VOICE_AGENTS_SELFHOST_BASE;
 const TRUNK_NAME_MAP: Record<string, string> = {
   twilio: 'Twilio',
   vobiz: 'Vobiz-SIP',
 };
 
-function normalizeVoiceAgentsBase(rawBase: string): string {
+// Ensures the base ends with the expected service segment ('voice_agents' | 'voice_agents_selfhost').
+function normalizeVoiceAgentsBase(rawBase: string, segment: string): string {
   const normalized = rawBase.trim().replace(/\/+$/, '');
   const typoFixed = normalized.replace('service.moande.ai', 'service.monade.ai');
-  return typoFixed.endsWith('/voice_agents') ? typoFixed : `${typoFixed}/voice_agents`;
+  return typoFixed.endsWith(`/${segment}`) ? typoFixed : `${typoFixed}/${segment}`;
 }
 
 function formatPhoneNumber(phoneNumber: string): string {
@@ -57,7 +61,9 @@ export async function initiateNewCall(params: NewCallingParams): Promise<unknown
     throw new Error('User UID is required to validate trunk ownership.');
   }
 
-  const voiceAgentsBase = normalizeVoiceAgentsBase(RAW_VOICE_AGENTS_BASE);
+  const voiceAgentsBase = params.self_hosted
+    ? normalizeVoiceAgentsBase(RAW_VOICE_AGENTS_SELFHOST_BASE, 'voice_agents_selfhost')
+    : normalizeVoiceAgentsBase(RAW_VOICE_AGENTS_BASE, 'voice_agents');
   const formattedPhone = formatPhoneNumber(params.phone_number);
   const resolvedTrunkName = TRUNK_NAME_MAP[params.trunk_name?.toLowerCase()] || params.trunk_name;
 

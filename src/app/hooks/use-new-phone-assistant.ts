@@ -20,7 +20,7 @@ interface UseNewPhoneAssistantReturn {
   isCallInitiating: boolean;
   callStatus: 'idle' | 'initiating' | 'connecting' | 'connected' | 'failed' | 'completed';
   remainingTime: number;
-  startCall: (phoneNumber: string, calleeInfo: CalleeInfo, trunkName: string) => Promise<void>;
+  startCall: (phoneNumber: string, calleeInfo: CalleeInfo, trunkName: string, selfHosted?: boolean) => Promise<void>;
   endCall: () => void;
   error: Error | null;
   errorMessage?: string | null;
@@ -36,8 +36,8 @@ export function useNewPhoneAssistant({
   const [error, setError] = useState<Error | null>(null);
 
   // Real API call to initiate phone call
-  const startCall = useCallback(async (phoneNumber: string, calleeInfo: CalleeInfo, trunkName: string) => {
-    console.log('[useNewPhoneAssistant] Initiating call to', phoneNumber, 'with assistant', assistantId, `(${assistantName})`, 'trunk:', trunkName);
+  const startCall = useCallback(async (phoneNumber: string, calleeInfo: CalleeInfo, trunkName: string, selfHosted = false) => {
+    console.log('[useNewPhoneAssistant] Initiating call to', phoneNumber, 'with assistant', assistantId, `(${assistantName})`, 'trunk:', trunkName, 'infra:', selfHosted ? 'self-hosted' : 'livekit-cloud');
 
     if (!phoneNumber) {
       setError(new Error('Phone number is required'));
@@ -73,6 +73,7 @@ export function useNewPhoneAssistant({
         assistant_id: assistantId,
         trunk_name: trunkName,
         api_key: 'SERVER_SIDE',
+        self_hosted: selfHosted,
       });
 
       const responseData = await initiateNewCall({
@@ -81,6 +82,7 @@ export function useNewPhoneAssistant({
         assistant_id: assistantId,
         trunk_name: trunkName, // 'twilio' or 'vobiz'
         user_uid: userUid, // User UID for trunk ownership validation
+        self_hosted: selfHosted, // Route through self-hosted LiveKit when enabled
       });
 
       console.log('[useNewPhoneAssistant] initiateNewCall response:', responseData);

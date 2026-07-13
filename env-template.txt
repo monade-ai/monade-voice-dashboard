@@ -20,6 +20,9 @@ LIVEKIT_API_SECRET=
 NEXT_PUBLIC_VOICE_AGENTS_URL=https://service.monade.ai/voice_agents
 #VOICE_AGENTS_API_KEY=monade_d8325992-cf93-4cdd-9c54-34ca18d72441
 
+# Self-hosted LiveKit control plane (used when the "Self-hosted" toggle is on in the phone-call box)
+NEXT_PUBLIC_VOICE_AGENTS_SELFHOST_URL=https://service.monade.ai/voice_agents_selfhost
+
 # Supabase
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=

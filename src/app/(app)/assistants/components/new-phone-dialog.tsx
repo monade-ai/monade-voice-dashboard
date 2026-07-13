@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useTrunks } from '@/app/hooks/use-trunks';
+import { cn } from '@/lib/utils';
 
 const COUNTRY_CODES = [
   { code: '+91', label: 'India' },
@@ -76,7 +77,7 @@ interface NewPhoneDialogProps {
   assistantId: string;
   isOpen: boolean;
   onClose: () => void;
-  onCall: (phoneNumber: string, calleeInfo: CalleeInfo, trunkName: string) => void;
+  onCall: (phoneNumber: string, calleeInfo: CalleeInfo, trunkName: string, selfHosted: boolean) => void;
   isCallInitiating: boolean;
   callStatus: 'idle' | 'initiating' | 'connecting' | 'connected' | 'failed' | 'completed';
   remainingTime: number;
@@ -104,6 +105,7 @@ export function NewPhoneDialog({
   const [newKey, setNewKey] = useState('');
   const [newValue, setNewValue] = useState('');
   const [selectedTrunk, setSelectedTrunk] = useState(callProvider || 'vobiz');
+  const [selfHosted, setSelfHosted] = useState(false);
   const [recentNumbers, setRecentNumbers] = useState<string[]>([]);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -134,7 +136,7 @@ export function NewPhoneDialog({
     const nextRecents = addRecentNumber(recentNumbers, fullNumber);
     setRecentNumbers(nextRecents);
     saveRecentNumbers(nextRecents);
-    onCall(fullNumber, calleeInfo, selectedTrunk);
+    onCall(fullNumber, calleeInfo, selectedTrunk, selfHosted);
   };
 
   const fillFromRecent = (number: string) => {
@@ -235,6 +237,40 @@ export function NewPhoneDialog({
     default:
       return (
         <form onSubmit={handleSubmit} className="space-y-5 py-2">
+
+          {/* Infrastructure toggle: LiveKit Cloud vs Self-hosted */}
+          <div className="flex items-center justify-between rounded-lg border border-border/60 bg-muted/30 px-3 py-2.5">
+            <div className="flex flex-col">
+              <span className="text-sm font-medium">Infrastructure</span>
+              <span className="text-xs text-muted-foreground">
+                {selfHosted ? 'Self-hosted LiveKit' : 'LiveKit Cloud'}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className={cn('text-[11px] font-medium transition-colors', !selfHosted ? 'text-foreground' : 'text-muted-foreground')}>
+                Cloud
+              </span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={selfHosted}
+                aria-label="Toggle self-hosted LiveKit"
+                onClick={() => setSelfHosted((v) => !v)}
+                className={cn(
+                  'relative w-10 h-6 rounded-full transition-colors shrink-0',
+                  selfHosted ? 'bg-amber-500' : 'bg-muted-foreground/30',
+                )}
+              >
+                <span className={cn(
+                  'absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform',
+                  selfHosted ? 'translate-x-[1.125rem] left-0.5' : 'left-0.5',
+                )} />
+              </button>
+              <span className={cn('text-[11px] font-medium transition-colors', selfHosted ? 'text-foreground' : 'text-muted-foreground')}>
+                Self-hosted
+              </span>
+            </div>
+          </div>
 
           {/* Phone Number */}
           <div className="space-y-1.5">
@@ -421,6 +457,7 @@ export function NewPhoneDialog({
       setNewKey('');
       setNewValue('');
       setSelectedTrunk(callProvider || 'vobiz');
+      setSelfHosted(false);
       setRecentNumbers(loadRecentNumbers());
     }
   }, [isOpen, assistantName, callProvider]);

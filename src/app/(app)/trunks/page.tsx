@@ -536,6 +536,7 @@ function ExpandableTrunkCard({
 
 export default function TrunksPage() {
     const router = useRouter();
+    const [selfHosted, setSelfHosted] = useState(false);
     const {
         trunks,
         loading,
@@ -545,7 +546,7 @@ export default function TrunksPage() {
         createTrunk,
         updateTrunk,
         unlinkTrunk,
-    } = useUserTrunks();
+    } = useUserTrunks(selfHosted);
 
     const [isCreating, setIsCreating] = useState(false);
     const [expandedTrunkId, setExpandedTrunkId] = useState<string | null>(null);
@@ -608,14 +609,52 @@ export default function TrunksPage() {
                         <p className="text-muted-foreground text-sm font-medium">Manage your SIP trunk connections.</p>
                     </div>
 
-                    <Button
-                        onClick={() => { setIsCreating(true); setExpandedTrunkId(null); }}
-                        disabled={isCreating}
-                        className="h-10 px-4 gap-2 bg-foreground text-background hover:bg-foreground/90 text-[10px] font-bold uppercase tracking-widest"
-                    >
-                        <Plus size={14} />
-                        Add Trunk
-                    </Button>
+                    <div className="flex flex-col items-start md:items-end gap-3">
+                        {/* Infrastructure toggle: LiveKit Cloud vs Self-hosted */}
+                        <div className="flex items-center gap-2.5">
+                            <span className={cn(
+                                'text-[10px] font-bold uppercase tracking-widest transition-colors',
+                                !selfHosted ? 'text-foreground' : 'text-muted-foreground/50',
+                            )}>
+                                Cloud
+                            </span>
+                            <button
+                                type="button"
+                                role="switch"
+                                aria-checked={selfHosted}
+                                aria-label="Toggle self-hosted LiveKit"
+                                onClick={() => {
+                                    setSelfHosted((v) => !v);
+                                    setIsCreating(false);
+                                    setExpandedTrunkId(null);
+                                }}
+                                className={cn(
+                                    'relative w-10 h-6 rounded-full transition-colors shrink-0',
+                                    selfHosted ? 'bg-primary' : 'bg-muted-foreground/30',
+                                )}
+                            >
+                                <span className={cn(
+                                    'absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform',
+                                    selfHosted ? 'translate-x-[1.125rem] left-0.5' : 'left-0.5',
+                                )} />
+                            </button>
+                            <span className={cn(
+                                'text-[10px] font-bold uppercase tracking-widest transition-colors',
+                                selfHosted ? 'text-foreground' : 'text-muted-foreground/50',
+                            )}>
+                                Self-hosted
+                            </span>
+                        </div>
+
+                        <Button
+                            onClick={() => { setIsCreating(true); setExpandedTrunkId(null); }}
+                            disabled={isCreating}
+                            className="h-10 px-4 gap-2 bg-foreground text-background hover:bg-foreground/90 text-[10px] font-bold uppercase tracking-widest"
+                        >
+                            <Plus size={14} />
+                            Add Trunk
+                        </Button>
+                    </div>
                 </div>
 
                 {/* Content */}
