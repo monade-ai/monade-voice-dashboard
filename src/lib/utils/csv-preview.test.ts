@@ -1,7 +1,11 @@
-import { createDedupedCSV, parseCSV } from '@/lib/utils/csv-preview';
+import {
+  createDedupedCSV,
+  isMissingCountryCode,
+  parseCSV,
+} from '@/lib/utils/csv-preview';
 
 describe('csv-preview', () => {
-  test('parseCSV detects phone column variants and normalizes numbers', async () => {
+  test('parseCSV detects phone columns without guessing a country code', async () => {
     const content = [
       'Name,phone',
       'amol,+917795957544',
@@ -20,8 +24,10 @@ describe('csv-preview', () => {
     expect(result.duplicates.count).toBe(1);
     expect(result.contacts.map((c) => c.phone_number)).toEqual([
       '+917795957544',
-      '+919122833772',
+      '9122833772',
     ]);
+    expect(isMissingCountryCode(result.contacts[0].phone_number)).toBe(false);
+    expect(isMissingCountryCode(result.contacts[1].phone_number)).toBe(true);
   });
 
   test('createDedupedCSV produces a CSV without duplicates', async () => {
@@ -68,6 +74,7 @@ describe('csv-preview', () => {
 
     expect(result.fieldNames).toContain('name');
     expect(result.contacts[0].name).toBe('Alice');
-    expect(result.contacts[0].phone_number).toBe('+919876543210');
+    expect(result.contacts[0].phone_number).toBe('9876543210');
+    expect(isMissingCountryCode(result.contacts[0].phone_number)).toBe(true);
   });
 });

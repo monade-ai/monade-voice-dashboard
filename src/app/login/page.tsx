@@ -433,28 +433,6 @@ function LoginComponent() {
           />
         </div>
 
-        {/* Testimonial Overlay */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 1, duration: 1 }}
-          className="absolute bottom-12 left-12 max-w-lg z-10"
-        >
-          <div className="bg-black/40 backdrop-blur-md p-6 rounded-[4px] border border-white/10">
-            <p className="text-lg text-white/90 font-light leading-relaxed mb-4">
-              &quot;We replaced our entire tier-1 support with Monade. It doesn&apos;t just answer; it understands.&quot;
-            </p>
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-xs font-bold text-white">
-                TF
-              </div>
-              <div>
-                <p className="text-sm font-medium text-white">Director of CX</p>
-                <p className="text-xs text-white/50">TechFin Corp</p>
-              </div>
-            </div>
-          </div>
-        </motion.div>
       </div>
     </div>
   );
