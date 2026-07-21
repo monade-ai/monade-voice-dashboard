@@ -25,6 +25,7 @@ interface ConnectChannelDialogProps {
 
 const EMPTY_FORM = {
   label: '',
+  channel_id: '',
   waba_id: '',
   phone_number_id: '',
   phone_number: '',
@@ -46,10 +47,10 @@ export function ConnectChannelDialog({ open, onOpenChange, onConnect, saving }: 
     setForm((current) => ({ ...current, [key]: event.target.value }));
   };
 
-  const canSubmit = form.waba_id.trim()
+  const canSubmit = form.channel_id.trim()
+    && form.waba_id.trim()
     && form.phone_number_id.trim()
-    && form.phone_number.trim()
-    && form.access_token.trim();
+    && form.phone_number.trim();
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -58,11 +59,12 @@ export function ConnectChannelDialog({ open, onOpenChange, onConnect, saving }: 
     try {
       await onConnect({
         label: form.label.trim() || undefined,
+        channel_id: form.channel_id.trim(),
         waba_id: form.waba_id.trim(),
         phone_number_id: form.phone_number_id.trim(),
         phone_number: form.phone_number.trim(),
         display_name: form.display_name.trim() || undefined,
-        access_token: form.access_token.trim(),
+        access_token: form.access_token.trim() || undefined,
       });
       setForm({ ...EMPTY_FORM });
       onOpenChange(false);
@@ -80,9 +82,9 @@ export function ConnectChannelDialog({ open, onOpenChange, onConnect, saving }: 
             Connect a WhatsApp Business number
           </DialogTitle>
           <DialogDescription className="leading-relaxed">
-            Create or prepare your Meta WhatsApp Business Account first. Then paste the WABA ID,
-            phone number ID, sender phone number, and Meta system-user access token here. Monade
-            connects it to Vobiz and stores only the channel metadata needed to send messages.
+            Connect the WhatsApp number in your Vobiz dashboard first. Then paste the channel ID
+            here, along with the WABA ID, phone number ID, and sender phone number. Monade stores
+            only the channel metadata needed to send messages.
           </DialogDescription>
         </DialogHeader>
 
@@ -94,6 +96,18 @@ export function ConnectChannelDialog({ open, onOpenChange, onConnect, saving }: 
               onChange={setField('label')}
               placeholder="Primary WhatsApp Channel"
             />
+          </div>
+
+          <div className="space-y-1.5">
+            <FieldLabel required>Channel ID</FieldLabel>
+            <Input
+              value={form.channel_id}
+              onChange={setField('channel_id')}
+              placeholder="2f8892e1-59b7-40a2-b518-e7a7c31a754d"
+            />
+            <p className="text-[10px] leading-relaxed text-muted-foreground">
+              Copy this from your Vobiz dashboard after connecting the WhatsApp number there.
+            </p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -123,7 +137,7 @@ export function ConnectChannelDialog({ open, onOpenChange, onConnect, saving }: 
           </div>
 
           <div className="space-y-1.5">
-            <FieldLabel required>Meta system-user access token</FieldLabel>
+            <FieldLabel>Meta system-user access token</FieldLabel>
             <Input
               type="password"
               autoComplete="off"
@@ -134,7 +148,7 @@ export function ConnectChannelDialog({ open, onOpenChange, onConnect, saving }: 
             <div className="flex items-start gap-2 rounded-md border border-amber-500/25 bg-amber-500/10 px-3 py-2">
               <AlertTriangle size={14} className="text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
               <p className="text-[10px] leading-relaxed text-amber-700 dark:text-amber-300">
-                This token is used only for the connection step. We do not store or display the access token after submission.
+                Optional. The connection no longer uses this token &mdash; it is accepted for backward compatibility only, and is never stored or displayed after submission.
               </p>
             </div>
           </div>

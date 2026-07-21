@@ -48,11 +48,12 @@ export interface WhatsappTemplate {
 
 export interface ConnectChannelPayload {
   label?: string;
+  channel_id: string;
   waba_id: string;
   phone_number_id: string;
   phone_number: string;
   display_name?: string;
-  access_token: string;
+  access_token?: string;
 }
 
 export interface ImportChannelPayload {
