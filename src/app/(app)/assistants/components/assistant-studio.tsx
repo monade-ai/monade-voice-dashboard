@@ -124,11 +124,12 @@ type BackendModelVersion = 'v1' | 'v2';
 const AGENT_NAME_OPTIONS = [
   { value: 'voice-agent', label: 'voice-agent' },
   { value: 'monade-test', label: 'monade-test' },
+  { value: 'monade-test-2', label: 'monade-test-2' },
 ] as const;
 type AgentName = typeof AGENT_NAME_OPTIONS[number]['value'];
 
 const isAgentName = (v: unknown): v is AgentName => (
-  v === 'voice-agent' || v === 'monade-test'
+  v === 'voice-agent' || v === 'monade-test' || v === 'monade-test-2'
 );
 
 const readAgentName = (toolsConfig: any): AgentName | null => {
