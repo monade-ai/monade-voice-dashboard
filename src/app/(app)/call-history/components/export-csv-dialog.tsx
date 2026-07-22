@@ -367,7 +367,7 @@ export function ExportCsvDialog({ calls, trigger }: ExportCsvDialogProps) {
             className="gap-2 h-9 text-[10px] font-bold uppercase tracking-widest border-border hover:bg-[#facc15] hover:border-[#facc15] hover:text-black transition-all"
           >
             <Download className="w-3 h-3" />
-            Export Archive
+            Export Page
           </Button>
         )}
       </DialogTrigger>
@@ -375,13 +375,13 @@ export function ExportCsvDialog({ calls, trigger }: ExportCsvDialogProps) {
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileDown className="w-4 h-4" />
-            Export Call Archive to CSV
+            Export Current Page to CSV
           </DialogTitle>
           <DialogDescription>
-            Choose a time range and optional filters. <strong>Full Export</strong> includes the
-            full transcript (enhanced when available) and recording URL — accurate but slow on
-            large ranges. <strong>Fast Export</strong> skips those and returns instantly with all
-            call IDs, phone numbers, verdicts, analytics and billing.
+            This exports records from the currently loaded archive page. Choose a time range and
+            optional filters for those records. <strong>Full Export</strong> includes the full
+            transcript (enhanced when available) and recording URL. <strong>Fast Export</strong>
+            skips those and returns instantly with call IDs, verdicts, analytics and billing.
           </DialogDescription>
         </DialogHeader>
 

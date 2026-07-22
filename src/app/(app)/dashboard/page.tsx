@@ -296,18 +296,18 @@ export default function DashboardPage() {
 
   const { metrics } = useDashboardData();
   const { credits } = useCredits();
-  const { transcripts, loading: transcriptsLoading } = useTranscripts();
-  const { analytics: allAnalytics, fetchAll: fetchAnalytics } = useUserAnalytics();
-  const transcriptCallIds = useMemo(
-    () => transcripts.map((transcript) => transcript.call_id).filter(Boolean),
-    [transcripts],
-  );
-
+  const {
+    transcripts,
+    pagination: transcriptPagination,
+    loading: transcriptsLoading,
+  } = useTranscripts();
+  const {
+    analytics: allAnalytics,
+    fetchPage: fetchAnalyticsPage,
+  } = useUserAnalytics();
   useEffect(() => {
-    if (transcriptCallIds.length > 0) {
-      fetchAnalytics({ expectedCallIds: transcriptCallIds });
-    }
-  }, [transcriptCallIds, fetchAnalytics]);
+    fetchAnalyticsPage({ limit: 20, offset: 0 });
+  }, [fetchAnalyticsPage]);
 
   const mergedTranscripts = useMemo(() => {
     return transcripts.map(t => ({
@@ -425,8 +425,8 @@ export default function DashboardPage() {
               </PaperCardHeader>
               <PaperCardContent className="mt-4">
                 <div className="flex flex-col">
-                  <span className="text-6xl font-medium tracking-tighter leading-none">{transcripts.length}</span>
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mt-4">Calls processed today</span>
+                  <span className="text-6xl font-medium tracking-tighter leading-none">{transcriptPagination.total}</span>
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mt-4">Archived interactions</span>
                 </div>
               </PaperCardContent>
             </PaperCard>

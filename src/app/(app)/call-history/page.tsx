@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useDeferredValue } from 'react';
 import {
   ChevronLeft,
   ChevronRight,
@@ -12,7 +12,7 @@ import { TranscriptViewer } from '@/components/transcript-viewer';
 import { PaperCard, PaperCardContent, PaperCardHeader, PaperCardTitle } from '@/components/ui/paper-card';
 import { Badge } from '@/components/ui/badge';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
-import { useTranscripts, Transcript } from '@/app/hooks/use-transcripts';
+import { Transcript } from '@/app/hooks/use-transcripts';
 import { useUserAnalytics, CallAnalytics } from '@/app/hooks/use-analytics';
 
 import { CallHistoryFilterBar, CallHistoryFilterState } from './components/call-history-filter-bar';
@@ -38,54 +38,78 @@ export default function CallHistoryPage() {
   });
   const callsPerPage = 10;
 
-  const { transcripts, loading: transcriptsLoading } = useTranscripts();
-  const { analytics: allAnalytics, fetchAll: fetchAnalytics } = useUserAnalytics();
-  const transcriptCallIds = useMemo(
-    () => transcripts.map((transcript) => transcript.call_id).filter(Boolean),
-    [transcripts],
-  );
+  const deferredSearch = useDeferredValue(filters.search);
+  const {
+    analytics: allAnalytics,
+    pagination,
+    loading: analyticsLoading,
+    fetchPage: fetchAnalyticsPage,
+  } = useUserAnalytics();
+
+  const dateWindow = useMemo(() => {
+    if (filters.timeRange === 'all') return {};
+
+    const now = new Date();
+    const start = new Date(now);
+    const end = new Date(now);
+    if (filters.timeRange === 'today') {
+      start.setHours(0, 0, 0, 0);
+    } else if (filters.timeRange === 'yesterday') {
+      start.setDate(start.getDate() - 1);
+      start.setHours(0, 0, 0, 0);
+      end.setDate(end.getDate() - 1);
+      end.setHours(23, 59, 59, 999);
+    } else if (filters.timeRange === 'week') {
+      start.setDate(start.getDate() - 7);
+    } else if (filters.timeRange === 'month') {
+      start.setDate(start.getDate() - 30);
+    }
+
+    return { from: start.toISOString(), to: end.toISOString() };
+  }, [filters.timeRange]);
 
   useEffect(() => {
-    if (transcriptCallIds.length > 0) {
-      fetchAnalytics({ expectedCallIds: transcriptCallIds });
-    }
-  }, [transcriptCallIds, fetchAnalytics]);
+    fetchAnalyticsPage({
+      limit: callsPerPage,
+      offset: (currentPage - 1) * callsPerPage,
+      filters: {
+        search: deferredSearch,
+        verdicts: filters.verdicts,
+        qualities: filters.qualities,
+        campaignIds: filters.campaigns,
+        direction: filters.direction,
+        durationRange: filters.durationRange,
+        ...dateWindow,
+      },
+    });
+  }, [
+    callsPerPage,
+    currentPage,
+    dateWindow,
+    deferredSearch,
+    fetchAnalyticsPage,
+    filters.campaigns,
+    filters.direction,
+    filters.durationRange,
+    filters.qualities,
+    filters.verdicts,
+  ]);
 
-  // Union transcripts and analytics by call_id so calls that have analytics but no
-  // transcript file (common for inbound/missed/failed calls) still show up. Source of
-  // truth for "all calls happened" is the union, not the transcript list alone.
+  // The call archive is backed by call_analytics. Each row already carries the
+  // transcript URL, so the browser only needs the current bounded page.
   const mergedTranscripts = useMemo(() => {
-    const byCallId = new Map<string, MergedTranscript>();
-
-    transcripts.forEach((t) => {
-      byCallId.set(t.call_id, { ...t });
-    });
-
-    allAnalytics.forEach((a) => {
-      if (!a.call_id) return;
-      const existing = byCallId.get(a.call_id);
-      if (existing) {
-        existing.analytics = a;
-      } else {
-        // Synthesize a Transcript-shaped record for analytics-only calls.
-        byCallId.set(a.call_id, {
-          id: a.id ?? a.call_id,
-          user_uid: a.user_uid ?? '',
-          call_id: a.call_id,
-          phone_number: a.phone_number ?? '',
-          transcript_url: a.transcript_url ?? '',
-          created_at: a.created_at ?? new Date().toISOString(),
-          updated_at: a.updated_at ?? a.created_at ?? new Date().toISOString(),
-          has_conversation: !!(a.summary || a.transcript_url),
-          analytics: a,
-        });
-      }
-    });
-
-    return Array.from(byCallId.values()).sort((x, y) => (
-      new Date(y.created_at).getTime() - new Date(x.created_at).getTime()
-    ));
-  }, [transcripts, allAnalytics]);
+    return allAnalytics.map((analytics): MergedTranscript => ({
+      id: analytics.id ?? analytics.call_id,
+      user_uid: analytics.user_uid ?? '',
+      call_id: analytics.call_id,
+      phone_number: analytics.phone_number ?? '',
+      transcript_url: analytics.transcript_url ?? '',
+      created_at: analytics.created_at ?? new Date().toISOString(),
+      updated_at: analytics.updated_at ?? analytics.created_at ?? new Date().toISOString(),
+      has_conversation: Boolean(analytics.summary || analytics.transcript_url),
+      analytics,
+    }));
+  }, [allAnalytics]);
 
   // Get unique campaigns for filter from analytics-linked records.
   const availableCampaigns: string[] = useMemo(() => {
@@ -102,7 +126,8 @@ export default function CallHistoryPage() {
 
   // Calculate insights
   const insights = useMemo(() => {
-    const total = mergedTranscripts.length;
+    const total = pagination.total;
+    const pageTotal = mergedTranscripts.length;
     const connected = mergedTranscripts.filter(t => t.has_conversation || t.analytics?.verdict !== 'no_answer').length;
     const avgDuration = mergedTranscripts.reduce((acc, t) => {
       const duration = typeof t.analytics?.key_discoveries?.duration_seconds === 'number' 
@@ -110,7 +135,7 @@ export default function CallHistoryPage() {
         : 0;
 
       return acc + duration;
-    }, 0) / (total || 1);
+    }, 0) / (pageTotal || 1);
     
     const successCount = mergedTranscripts.filter(t => {
       const verdict = t.analytics?.verdict?.toLowerCase() || '';
@@ -121,97 +146,16 @@ export default function CallHistoryPage() {
     return {
       total,
       connected,
-      connectionRate: total > 0 ? Math.round((connected / total) * 100) : 0,
+      connectionRate: pageTotal > 0 ? Math.round((connected / pageTotal) * 100) : 0,
       avgDuration: Math.round(avgDuration),
-      successRate: total > 0 ? Math.round((successCount / total) * 100) : 0,
+      successRate: pageTotal > 0 ? Math.round((successCount / pageTotal) * 100) : 0,
     };
-  }, [mergedTranscripts]);
+  }, [mergedTranscripts, pagination.total]);
 
-  // Filter logic
-  const filteredTranscripts = useMemo(() => {
-    return mergedTranscripts.filter(t => {
-      // 1. Connected Only
-      if (filters.hasConversation && !(t.has_conversation || t.analytics)) return false;
-
-      // 2. Verdicts
-      if (filters.verdicts.length > 0) {
-        const verdict = t.analytics?.verdict || (t.has_conversation ? 'conversation' : 'no_answer');
-        if (!filters.verdicts.includes(verdict)) return false;
-      }
-
-      // 3. Qualities
-      if (filters.qualities.length > 0) {
-        const quality = t.analytics?.call_quality;
-        if (!quality || !filters.qualities.includes(quality)) return false;
-      }
-
-      // 4. Duration Range
-      if (filters.durationRange !== 'all') {
-        const duration = typeof t.analytics?.key_discoveries?.duration_seconds === 'number' 
-          ? t.analytics.key_discoveries.duration_seconds 
-          : 0;
-        if (filters.durationRange === 'short' && duration >= 60) return false;
-        if (filters.durationRange === 'medium' && (duration < 60 || duration > 300)) return false;
-        if (filters.durationRange === 'long' && duration <= 300) return false;
-      }
-
-      // 5. Search
-      if (filters.search) {
-        const searchLower = filters.search.toLowerCase();
-        const matchesPhone = t.phone_number.toLowerCase().includes(searchLower);
-        const matchesId = t.call_id.toLowerCase().includes(searchLower);
-        const matchesSummary = t.analytics?.summary?.toLowerCase().includes(searchLower);
-        if (!matchesPhone && !matchesId && !matchesSummary) return false;
-      }
-
-      // 6. Campaigns
-      if (filters.campaigns.length > 0) {
-        const campaignId = t.analytics?.campaign_id;
-        if (!campaignId || !filters.campaigns.includes(campaignId)) return false;
-      }
-
-      // 6b. Direction (billing → provider fallback per backend guide)
-      if (filters.direction !== 'all') {
-        const dir = (t.analytics?.billing_data?.call_direction
-          || t.analytics?.provider_call_status?.direction
-          || '').toLowerCase();
-        if (dir !== filters.direction) return false;
-      }
-
-      // 7. Time Range
-      if (filters.timeRange !== 'all') {
-        const createdAt = new Date(t.created_at);
-        const now = new Date();
-        if (filters.timeRange === 'today') {
-          if (createdAt.toDateString() !== now.toDateString()) return false;
-        } else if (filters.timeRange === 'yesterday') {
-          const yesterday = new Date(now);
-          yesterday.setDate(now.getDate() - 1);
-          if (createdAt.toDateString() !== yesterday.toDateString()) return false;
-        } else if (filters.timeRange === 'week') {
-          const weekAgo = new Date(now);
-          weekAgo.setDate(now.getDate() - 7);
-          if (createdAt < weekAgo) return false;
-        } else if (filters.timeRange === 'month') {
-          const monthAgo = new Date(now);
-          monthAgo.setDate(now.getDate() - 30);
-          if (createdAt < monthAgo) return false;
-        }
-      }
-
-      return true;
-    });
-  }, [mergedTranscripts, filters]);
-
-  const indexOfLastCall = currentPage * callsPerPage;
-  const indexOfFirstCall = indexOfLastCall - callsPerPage;
-  const currentTranscripts = filteredTranscripts.slice(indexOfFirstCall, indexOfLastCall);
-  const totalPages = Math.ceil(filteredTranscripts.length / callsPerPage);
-
-  // Reset pagination when filters change
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [filters]);
+  const currentTranscripts = mergedTranscripts;
+  const totalPages = Math.max(1, Math.ceil(pagination.total / callsPerPage));
+  const firstRecord = pagination.total === 0 ? 0 : pagination.offset + 1;
+  const lastRecord = pagination.offset + pagination.count;
 
   const formatDuration = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -259,7 +203,7 @@ export default function CallHistoryPage() {
               <PaperCardContent className="mt-4">
                 <div className="flex flex-col">
                   <span className="text-6xl font-medium tracking-tighter leading-none">{insights.total}</span>
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-[#d4af37] dark:text-[#facc15] mt-4">All time records</span>
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-[#d4af37] dark:text-[#facc15] mt-4">Matching records</span>
                 </div>
               </PaperCardContent>
             </PaperCard>
@@ -282,7 +226,7 @@ export default function CallHistoryPage() {
                     <span className="text-6xl font-medium tracking-tighter leading-none">{insights.connectionRate}</span>
                     <span className="text-2xl text-muted-foreground">%</span>
                   </div>
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-green-500 mt-4">{insights.connected} Connected</span>
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-green-500 mt-4">{insights.connected} on this page</span>
                 </div>
               </PaperCardContent>
             </PaperCard>
@@ -302,7 +246,7 @@ export default function CallHistoryPage() {
               <PaperCardContent className="mt-4">
                 <div className="flex flex-col">
                   <span className="text-6xl font-medium tracking-tighter leading-none">{formatDuration(insights.avgDuration)}</span>
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-blue-500 mt-4">Minutes per call</span>
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-blue-500 mt-4">Current page average</span>
                 </div>
               </PaperCardContent>
             </PaperCard>
@@ -325,7 +269,7 @@ export default function CallHistoryPage() {
                     <span className="text-6xl font-medium tracking-tighter leading-none">{insights.successRate}</span>
                     <span className="text-2xl text-muted-foreground">%</span>
                   </div>
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mt-4">Positive outcomes</span>
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mt-4">Current page outcomes</span>
                 </div>
               </PaperCardContent>
             </PaperCard>
@@ -338,7 +282,7 @@ export default function CallHistoryPage() {
                 <div className="flex items-center gap-4">
                   <h3 className="text-2xl font-medium tracking-tight">Call Ledger</h3>
                   <Badge variant="outline" className="text-[10px] font-bold px-2 py-0.5 rounded-[2px] border-border text-muted-foreground uppercase tracking-widest font-mono">
-                    {filteredTranscripts.length} Records
+                    {pagination.total} Records
                   </Badge>
                 </div>
               </div>
@@ -346,6 +290,7 @@ export default function CallHistoryPage() {
               <CallHistoryFilterBar
                 filters={filters}
                 onFilterChange={(newFilters) => {
+                  setCurrentPage(1);
                   setFilters(newFilters);
                 }}
                 availableCampaigns={availableCampaigns}
@@ -358,50 +303,50 @@ export default function CallHistoryPage() {
                   Desktop container is wide enough that no scrollbar appears. */}
               <div className="overflow-x-auto">
                 <table className="w-full text-left min-w-[760px]">
-                <thead>
-                  <tr className="border-b border-border/40">
-                    <th className="py-4 px-6 text-[10px] font-bold uppercase tracking-[0.2em] text-foreground/70 w-[25%]">Lead Identity</th>
-                    <th className="py-4 px-6 text-[10px] font-bold uppercase tracking-[0.2em] text-foreground/70 w-[20%]">Interaction</th>
-                    <th className="py-4 px-6 text-[10px] font-bold uppercase tracking-[0.2em] text-foreground/70 w-[30%]">AI Analysis</th>
-                    <th className="py-4 px-6 text-right text-[10px] font-bold uppercase tracking-[0.2em] text-foreground/70 w-[25%]">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border/10">
-                  {transcriptsLoading ? (
-                    <tr>
-                      <td colSpan={4} className="py-24 text-center text-[11px] font-bold uppercase tracking-[0.6em] text-muted-foreground/20 animate-pulse">
+                  <thead>
+                    <tr className="border-b border-border/40">
+                      <th className="py-4 px-6 text-[10px] font-bold uppercase tracking-[0.2em] text-foreground/70 w-[25%]">Lead Identity</th>
+                      <th className="py-4 px-6 text-[10px] font-bold uppercase tracking-[0.2em] text-foreground/70 w-[20%]">Interaction</th>
+                      <th className="py-4 px-6 text-[10px] font-bold uppercase tracking-[0.2em] text-foreground/70 w-[30%]">AI Analysis</th>
+                      <th className="py-4 px-6 text-right text-[10px] font-bold uppercase tracking-[0.2em] text-foreground/70 w-[25%]">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/10">
+                    {analyticsLoading ? (
+                      <tr>
+                        <td colSpan={4} className="py-24 text-center text-[11px] font-bold uppercase tracking-[0.6em] text-muted-foreground/20 animate-pulse">
                         Synchronizing Data...
-                      </td>
-                    </tr>
-                  ) : currentTranscripts.length === 0 ? (
-                    <tr>
-                      <td colSpan={4} className="py-24 text-center">
-                        <div className="flex flex-col items-center gap-4">
-                          <Phone className="w-12 h-12 text-muted-foreground/20" />
-                          <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-muted-foreground/40">
+                        </td>
+                      </tr>
+                    ) : currentTranscripts.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="py-24 text-center">
+                          <div className="flex flex-col items-center gap-4">
+                            <Phone className="w-12 h-12 text-muted-foreground/20" />
+                            <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-muted-foreground/40">
                             No calls match your filters
-                          </span>
-                        </div>
-                      </td>
-                    </tr>
-                  ) : (
-                    currentTranscripts.map((item) => (
-                      <CallHistoryRow
-                        key={item.id}
-                        transcript={item}
-                        analytics={item.analytics}
-                        onView={() => setSelectedTranscript(item)}
-                      />
-                    ))
-                  )}
-                </tbody>
+                            </span>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : (
+                      currentTranscripts.map((item) => (
+                        <CallHistoryRow
+                          key={item.id}
+                          transcript={item}
+                          analytics={item.analytics}
+                          onView={() => setSelectedTranscript(item)}
+                        />
+                      ))
+                    )}
+                  </tbody>
                 </table>
               </div>
 
               {totalPages > 1 && (
                 <div className="px-6 py-8 flex items-center justify-between border-t border-border/20">
                   <span className="text-[10px] font-bold font-mono text-muted-foreground uppercase tracking-widest">
-                    Records {indexOfFirstCall + 1} to {Math.min(indexOfLastCall, filteredTranscripts.length)} of {filteredTranscripts.length}
+                    Records {firstRecord} to {lastRecord} of {pagination.total}
                   </span>
                   <div className="flex items-center gap-10">
                     <button

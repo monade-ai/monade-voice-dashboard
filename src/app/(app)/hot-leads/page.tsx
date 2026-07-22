@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useDeferredValue } from 'react';
 import dynamic from 'next/dynamic';
 import { motion } from 'framer-motion';
 import {
@@ -245,7 +245,12 @@ DealRow.displayName = 'DealRow';
 // --- Main Page ---
 
 export default function HotLeadsPage() {
-  const { analytics: allAnalytics, loading, fetchAll } = useUserAnalytics();
+  const {
+    analytics: allAnalytics,
+    pagination,
+    loading,
+    fetchPage,
+  } = useUserAnalytics();
   const { templates, fetchTemplates, fetchTemplate } = usePostProcessingTemplates();
   const [search, setSearch] = useState('');
   const [selectedLead, setSelectedLead] = useState<CallAnalytics | null>(null);
@@ -256,12 +261,54 @@ export default function HotLeadsPage() {
   const [dateFilter, setDateFilter] = useState<'today' | 'yesterday' | '7d' | '30d' | 'all'>('all');
   const [confidenceFilter, setConfidenceFilter] = useState<'all' | 'high'>('all');
   const [templateDetails, setTemplateDetails] = useState<Record<string, PostProcessingTemplate>>({});
+  const deferredSearch = useDeferredValue(search);
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
-  useEffect(() => { fetchAll(); }, [fetchAll]);
+  const dateWindow = useMemo(() => {
+    if (dateFilter === 'all') return {};
+
+    const now = new Date();
+    const start = startOfLocalDay(now);
+    const end = new Date(now);
+    if (dateFilter === 'yesterday') {
+      start.setDate(start.getDate() - 1);
+      end.setDate(end.getDate() - 1);
+      end.setHours(23, 59, 59, 999);
+    } else if (dateFilter === '7d') {
+      start.setDate(start.getDate() - 6);
+    } else if (dateFilter === '30d') {
+      start.setDate(start.getDate() - 29);
+    }
+
+    return { from: start.toISOString(), to: end.toISOString() };
+  }, [dateFilter]);
+
+  useEffect(() => {
+    fetchPage({
+      limit: itemsPerPage,
+      offset: (currentPage - 1) * itemsPerPage,
+      filters: {
+        search: deferredSearch,
+        templateId: templateFilter,
+        verdict: intentFilter,
+        minConfidence: confidenceFilter === 'high' ? 80 : 50,
+        excludeNegative: true,
+        ...dateWindow,
+      },
+    });
+  }, [
+    confidenceFilter,
+    currentPage,
+    dateWindow,
+    deferredSearch,
+    fetchPage,
+    intentFilter,
+    itemsPerPage,
+    templateFilter,
+  ]);
 
   useEffect(() => {
     fetchTemplates().catch(() => undefined);
@@ -413,11 +460,7 @@ export default function HotLeadsPage() {
       return accumulator;
     }, []);
   }, [baseHotLeads, bucketIndexByTemplateId, templateDetails, templateFilter, templates]);
-  const effectiveIntentFilter = useMemo(() => {
-    if (intentFilter === 'all') return 'all';
-
-    return verdictOptions.some((option) => option.key === intentFilter) ? intentFilter : 'all';
-  }, [intentFilter, verdictOptions]);
+  const effectiveIntentFilter = intentFilter;
 
   const hotLeads = useMemo(() => {
     return baseHotLeads.filter((lead) => {
@@ -429,13 +472,9 @@ export default function HotLeadsPage() {
   }, [baseHotLeads, effectiveIntentFilter]);
 
   // Pagination Logic
-  const totalPages = Math.max(1, Math.ceil(hotLeads.length / itemsPerPage));
+  const totalPages = Math.max(1, Math.ceil(pagination.total / itemsPerPage));
   const effectiveCurrentPage = Math.min(currentPage, totalPages);
-  const paginatedLeads = useMemo(() => {
-    const start = (effectiveCurrentPage - 1) * itemsPerPage;
-
-    return hotLeads.slice(start, start + itemsPerPage);
-  }, [hotLeads, effectiveCurrentPage]);
+  const paginatedLeads = hotLeads;
 
   // Stats Logic — dynamic per-bucket count for the active template's positive buckets
   const bucketStats = useMemo(() => {
@@ -467,6 +506,31 @@ export default function HotLeadsPage() {
     setCurrentPage(Math.min(Math.max(1, newPage), totalPages));
   }, [totalPages]);
 
+  const handleSearchChange = useCallback((value: string) => {
+    setCurrentPage(1);
+    setSearch(value);
+  }, []);
+
+  const handleDateFilterChange = useCallback((value: typeof dateFilter) => {
+    setCurrentPage(1);
+    setDateFilter(value);
+  }, []);
+
+  const handleTemplateFilterChange = useCallback((value: string) => {
+    setCurrentPage(1);
+    setTemplateFilter(value);
+  }, []);
+
+  const handleIntentFilterChange = useCallback((value: string) => {
+    setCurrentPage(1);
+    setIntentFilter(value);
+  }, []);
+
+  const handleConfidenceFilterChange = useCallback(() => {
+    setCurrentPage(1);
+    setConfidenceFilter((value) => value === 'all' ? 'high' : 'all');
+  }, []);
+
   const handleSelectLead = useCallback((lead: CallAnalytics) => {
     setSelectedLead(lead);
   }, []);
@@ -491,7 +555,7 @@ export default function HotLeadsPage() {
               <Input 
                 placeholder="Search leads..." 
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(e) => handleSearchChange(e.target.value)}
                 className="pl-9 h-10 w-64 bg-muted/10 border-border/40 text-xs focus:ring-primary transition-all rounded-md"
               />
             </div>
@@ -504,15 +568,15 @@ export default function HotLeadsPage() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => setDateFilter('today')}>Today</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setDateFilter('yesterday')}>Yesterday</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setDateFilter('7d')}>Last 7 Days</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setDateFilter('30d')}>Last 30 Days</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setDateFilter('all')}>All Time</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleDateFilterChange('today')}>Today</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleDateFilterChange('yesterday')}>Yesterday</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleDateFilterChange('7d')}>Last 7 Days</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleDateFilterChange('30d')}>Last 30 Days</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleDateFilterChange('all')}>All Time</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
 
-            <Select value={templateFilter} onValueChange={setTemplateFilter}>
+            <Select value={templateFilter} onValueChange={handleTemplateFilterChange}>
               <SelectTrigger className="h-10 w-52 bg-muted/10 border-border/40 text-xs">
                 <SelectValue placeholder="All templates" />
               </SelectTrigger>
@@ -535,7 +599,7 @@ export default function HotLeadsPage() {
           <div className="flex gap-2">
             <button
               key="all"
-              onClick={() => setIntentFilter('all')}
+              onClick={() => handleIntentFilterChange('all')}
               className={cn(
                 'px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all border',
                 effectiveIntentFilter === 'all' ? 'bg-foreground text-background border-foreground' : 'bg-transparent text-muted-foreground border-transparent hover:bg-muted/50',
@@ -546,7 +610,7 @@ export default function HotLeadsPage() {
             {verdictOptions.map((bucket) => (
               <button
                 key={bucket.key}
-                onClick={() => setIntentFilter(bucket.key)}
+                onClick={() => handleIntentFilterChange(bucket.key)}
                 className={cn(
                   'px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all border whitespace-nowrap',
                   effectiveIntentFilter === bucket.key ? 'bg-foreground text-background border-foreground' : 'bg-transparent text-muted-foreground border-transparent hover:bg-muted/50',
@@ -559,7 +623,7 @@ export default function HotLeadsPage() {
           <div className="h-4 w-px bg-border/40 mx-2" />
           <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">Confidence:</span>
           <button 
-            onClick={() => setConfidenceFilter(confidenceFilter === 'all' ? 'high' : 'all')}
+            onClick={handleConfidenceFilterChange}
             className={cn(
               'px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all border flex items-center gap-2',
               confidenceFilter === 'high' ? 'bg-green-500/10 text-green-600 border-green-500/20' : 'bg-transparent text-muted-foreground border-transparent hover:bg-muted/50',
@@ -657,7 +721,7 @@ export default function HotLeadsPage() {
             {hotLeads.length > 0 && (
               <div className="p-4 border-t border-border/10 flex items-center justify-between bg-muted/5 mt-auto">
                 <span className="text-[9px] font-bold font-mono text-muted-foreground uppercase tracking-widest">
-                            Page {effectiveCurrentPage} of {totalPages} ({hotLeads.length} Total)
+                            Page {effectiveCurrentPage} of {totalPages} ({pagination.total} Total)
                 </span>
                 <div className="flex items-center gap-4">
                   <button 

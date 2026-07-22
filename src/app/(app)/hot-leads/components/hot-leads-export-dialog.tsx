@@ -265,7 +265,7 @@ export function HotLeadsExportDialog({ leads, trigger }: HotLeadsExportDialogPro
             className="h-10 px-4 gap-2 border-border text-[10px] font-bold uppercase tracking-widest hover:bg-primary hover:text-black transition-all"
           >
             <Download size={14} />
-            Export CSV
+            Export Page
           </Button>
         )}
       </DialogTrigger>
@@ -273,13 +273,13 @@ export function HotLeadsExportDialog({ leads, trigger }: HotLeadsExportDialogPro
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileDown className="w-4 h-4" />
-            Export Hot Leads to CSV
+            Export Current Hot Leads Page
           </DialogTitle>
           <DialogDescription>
-            Choose a date &amp; time range so you only download the leads you need — not the
-            entire Deal Room. <strong>Full Export</strong> includes transcripts (enhanced when
-            available) and recording links — slower on large ranges. <strong>Fast Export</strong>
-            skips those and returns instantly with direction, analytics and all other fields.
+            This exports leads from the currently loaded Deal Room page. Choose a date &amp; time
+            range for those records. <strong>Full Export</strong> includes transcripts (enhanced
+            when available) and recording links. <strong>Fast Export</strong> skips those and
+            returns instantly with direction, analytics and all other fields.
           </DialogDescription>
         </DialogHeader>
 

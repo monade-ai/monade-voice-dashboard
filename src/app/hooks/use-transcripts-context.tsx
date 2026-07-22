@@ -26,15 +26,29 @@ export interface Transcript {
 
 interface TranscriptsContextType {
     transcripts: Transcript[];
+    pagination: TranscriptPagination;
     loading: boolean;
     error: string | null;
     refetch: () => Promise<void>;
     lastFetched: number | null;
 }
 
+interface TranscriptPagination {
+    limit: number;
+    offset: number;
+    count: number;
+    total: number;
+    hasMore: boolean;
+}
+
+interface CachedTranscriptPage {
+    transcripts: Transcript[];
+    pagination: TranscriptPagination;
+}
+
 const TranscriptsContext = createContext<TranscriptsContextType | null>(null);
 
-const CACHE_KEY = 'transcripts';
+const CACHE_KEY = 'transcripts-page-v2';
 const CONVERSATION_CACHE_KEY = 'transcript-conversation';
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 const CONVERSATION_TRUE_CACHE_DURATION = 60 * 60 * 1000; // transcript files with content are immutable by URL
@@ -75,6 +89,13 @@ async function checkHasConversation(userUid: string, transcriptUrl: string): Pro
 
 export function TranscriptsProvider({ children }: { children: React.ReactNode }) {
   const [transcripts, setTranscripts] = useState<Transcript[]>([]);
+  const [pagination, setPagination] = useState<TranscriptPagination>({
+    limit: 20,
+    offset: 0,
+    count: 0,
+    total: 0,
+    hasMore: false,
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastFetched, setLastFetched] = useState<number | null>(null);
@@ -91,9 +112,10 @@ export function TranscriptsProvider({ children }: { children: React.ReactNode })
       CACHE_KEY,
       { userUid },
     );
-    const cached = readLocalCache<Transcript[]>(cacheKey);
-    if (cached && Array.isArray(cached.value)) {
-      setTranscripts(cached.value);
+    const cached = readLocalCache<CachedTranscriptPage>(cacheKey);
+    if (cached && Array.isArray(cached.value?.transcripts)) {
+      setTranscripts(cached.value.transcripts);
+      setPagination(cached.value.pagination);
       setLastFetched(cached.cachedAt);
       setLoading(false);
     }
@@ -120,7 +142,7 @@ export function TranscriptsProvider({ children }: { children: React.ReactNode })
       setError(null);
 
       const data = await fetchJson<any>(
-        `${MONADE_API_CONFIG.BASE_URL}/api/users/${userUid}/transcripts`,
+        `${MONADE_API_CONFIG.BASE_URL}/api/users/${userUid}/transcripts?limit=20&offset=0`,
         {
           method: 'GET',
           headers: {
@@ -129,6 +151,14 @@ export function TranscriptsProvider({ children }: { children: React.ReactNode })
         },
       );
       const transcriptList: Transcript[] = Array.isArray(data) ? data : data.transcripts || [];
+      const responsePagination = data.pagination || {};
+      const nextPagination: TranscriptPagination = {
+        limit: Number(responsePagination.limit ?? data.limit ?? 20),
+        offset: Number(responsePagination.offset ?? data.offset ?? 0),
+        count: Number(responsePagination.count ?? data.count ?? transcriptList.length),
+        total: Number(responsePagination.total ?? data.total ?? transcriptList.length),
+        hasMore: Boolean(responsePagination.has_more ?? data.has_more ?? false),
+      };
 
       // Check conversation status for first 50 transcripts
       const transcriptsWithStatus = await Promise.all(
@@ -145,6 +175,7 @@ export function TranscriptsProvider({ children }: { children: React.ReactNode })
       const allTranscripts = [...transcriptsWithStatus, ...remaining];
 
       setTranscripts(allTranscripts);
+      setPagination(nextPagination);
       const fetchedAt = Date.now();
       setLastFetched(fetchedAt);
 
@@ -154,7 +185,10 @@ export function TranscriptsProvider({ children }: { children: React.ReactNode })
         CACHE_KEY,
         { userUid },
       );
-      writeLocalCache(cacheKey, allTranscripts, CACHE_DURATION);
+      writeLocalCache(cacheKey, {
+        transcripts: allTranscripts,
+        pagination: nextPagination,
+      }, CACHE_DURATION);
     } catch (err) {
       console.error('Error fetching transcripts:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch transcripts');
@@ -178,6 +212,7 @@ export function TranscriptsProvider({ children }: { children: React.ReactNode })
   return (
     <TranscriptsContext.Provider value={{
       transcripts,
+      pagination,
       loading: loading || userLoading,
       error,
       refetch,
