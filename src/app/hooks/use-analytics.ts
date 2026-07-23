@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 
 import { ApiError, fetchJson } from '@/lib/http';
 import { MONADE_API_BASE } from '@/config';
@@ -298,16 +298,28 @@ export function useUserAnalytics() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Page and filter changes each start a request, so several can be in flight at
+  // once (page forward twice quickly, or a debounced search landing while a page
+  // change is still resolving). Responses are not guaranteed to arrive in the
+  // order they were sent, and a slow earlier response would otherwise overwrite
+  // state with the wrong page. Only the newest request is allowed to publish.
+  const requestSeq = useRef(0);
+
   const fetchPage = useCallback(async (options: FetchAnalyticsPageOptions = false): Promise<AnalyticsPage> => {
     const { forceRefresh, limit, offset, filters } = normalizeFetchPageOptions(options);
+    requestSeq.current += 1;
+    const seq = requestSeq.current;
+    const isCurrent = () => seq === requestSeq.current;
 
     if (!userUid) {
       const emptyPage = {
         analytics: [],
         pagination: { ...EMPTY_ANALYTICS_PAGINATION, limit, offset },
       };
-      setAnalytics([]);
-      setPagination(emptyPage.pagination);
+      if (isCurrent()) {
+        setAnalytics([]);
+        setPagination(emptyPage.pagination);
+      }
 
       return emptyPage;
     }
@@ -322,10 +334,12 @@ export function useUserAnalytics() {
     if (!forceRefresh) {
       const cached = userAnalyticsCache.get(scopedUserKey);
       if (cached && Date.now() - cached.cachedAt < USER_ANALYTICS_CACHE_TTL_MS) {
-        setAnalytics(cached.data.analytics);
-        setPagination(cached.data.pagination);
-        setError(null);
-        setLoading(false);
+        if (isCurrent()) {
+          setAnalytics(cached.data.analytics);
+          setPagination(cached.data.pagination);
+          setError(null);
+          setLoading(false);
+        }
 
         return cached.data;
       }
@@ -333,10 +347,12 @@ export function useUserAnalytics() {
       const persisted = readLocalCache<AnalyticsPage>(scopedUserKey);
       if (persisted) {
         userAnalyticsCache.set(scopedUserKey, { data: persisted.value, cachedAt: persisted.cachedAt });
-        setAnalytics(persisted.value.analytics);
-        setPagination(persisted.value.pagination);
-        setError(null);
-        setLoading(false);
+        if (isCurrent()) {
+          setAnalytics(persisted.value.analytics);
+          setPagination(persisted.value.pagination);
+          setError(null);
+          setLoading(false);
+        }
 
         return persisted.value;
       }
@@ -346,10 +362,12 @@ export function useUserAnalytics() {
       const inFlight = userAnalyticsInFlight.get(scopedUserKey);
       if (inFlight) {
         const result = await inFlight;
-        setAnalytics(result.analytics);
-        setPagination(result.pagination);
-        setError(null);
-        setLoading(false);
+        if (isCurrent()) {
+          setAnalytics(result.analytics);
+          setPagination(result.pagination);
+          setError(null);
+          setLoading(false);
+        }
 
         return result;
       }
@@ -450,22 +468,26 @@ export function useUserAnalytics() {
       setLoading(true);
       setError(null);
       const page = await request;
-      setAnalytics(page.analytics);
-      setPagination(page.pagination);
+      if (isCurrent()) {
+        setAnalytics(page.analytics);
+        setPagination(page.pagination);
+      }
 
       return page;
     } catch (err) {
       console.warn('[useUserAnalytics] Failed to fetch user analytics:', err);
-      setError(err instanceof Error ? err.message : 'Failed to fetch analytics');
-      setAnalytics([]);
-      setPagination({ ...EMPTY_ANALYTICS_PAGINATION, limit, offset });
+      if (isCurrent()) {
+        setError(err instanceof Error ? err.message : 'Failed to fetch analytics');
+        setAnalytics([]);
+        setPagination({ ...EMPTY_ANALYTICS_PAGINATION, limit, offset });
+      }
 
       return {
         analytics: [],
         pagination: { ...EMPTY_ANALYTICS_PAGINATION, limit, offset },
       };
     } finally {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
   }, [userUid]);
 

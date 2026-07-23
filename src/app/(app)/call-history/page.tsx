@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useDeferredValue } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
+  AlertTriangle,
   ChevronLeft,
   ChevronRight,
   Phone,
@@ -14,8 +15,10 @@ import { Badge } from '@/components/ui/badge';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
 import { Transcript } from '@/app/hooks/use-transcripts';
 import { useUserAnalytics, CallAnalytics } from '@/app/hooks/use-analytics';
+import { useDebouncedValue } from '@/app/hooks/use-debounced-value';
+import { useCampaignApi } from '@/app/hooks/use-campaign-api';
 
-import { CallHistoryFilterBar, CallHistoryFilterState } from './components/call-history-filter-bar';
+import { CallHistoryFilterBar, CallHistoryFilterState, CampaignFilterOption } from './components/call-history-filter-bar';
 import { CallHistoryRow } from './components/call-history-row';
 import { ExportCsvDialog } from './components/export-csv-dialog';
 
@@ -29,7 +32,6 @@ export default function CallHistoryPage() {
   const [filters, setFilters] = useState<CallHistoryFilterState>({
     verdicts: [],
     qualities: [],
-    hasConversation: false,
     search: '',
     timeRange: 'all',
     durationRange: 'all',
@@ -38,13 +40,19 @@ export default function CallHistoryPage() {
   });
   const callsPerPage = 10;
 
-  const deferredSearch = useDeferredValue(filters.search);
+  const debouncedSearch = useDebouncedValue(filters.search);
   const {
     analytics: allAnalytics,
     pagination,
     loading: analyticsLoading,
+    error: analyticsError,
     fetchPage: fetchAnalyticsPage,
   } = useUserAnalytics();
+  const { campaigns, listCampaigns } = useCampaignApi();
+
+  useEffect(() => {
+    listCampaigns().catch(() => undefined);
+  }, [listCampaigns]);
 
   const dateWindow = useMemo(() => {
     if (filters.timeRange === 'all') return {};
@@ -73,7 +81,7 @@ export default function CallHistoryPage() {
       limit: callsPerPage,
       offset: (currentPage - 1) * callsPerPage,
       filters: {
-        search: deferredSearch,
+        search: debouncedSearch,
         verdicts: filters.verdicts,
         qualities: filters.qualities,
         campaignIds: filters.campaigns,
@@ -86,7 +94,7 @@ export default function CallHistoryPage() {
     callsPerPage,
     currentPage,
     dateWindow,
-    deferredSearch,
+    debouncedSearch,
     fetchAnalyticsPage,
     filters.campaigns,
     filters.direction,
@@ -111,18 +119,14 @@ export default function CallHistoryPage() {
     }));
   }, [allAnalytics]);
 
-  // Get unique campaigns for filter from analytics-linked records.
-  const availableCampaigns: string[] = useMemo(() => {
-    const uniqueCampaigns = new Set<string>();
-    mergedTranscripts.forEach((item) => {
-      const campaignId = item.analytics?.campaign_id;
-      if (typeof campaignId === 'string' && campaignId.trim()) {
-        uniqueCampaigns.add(campaignId);
-      }
-    });
-
-    return Array.from(uniqueCampaigns).sort();
-  }, [mergedTranscripts]);
+  // Campaign options come from the campaign list endpoint, not from the loaded
+  // page. Deriving them from the page would show only the campaigns that happen
+  // to appear in the current 10 rows and would change on every page turn.
+  const availableCampaigns: CampaignFilterOption[] = useMemo(() => {
+    return campaigns
+      .map((campaign) => ({ id: campaign.id, name: campaign.name || campaign.id }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [campaigns]);
 
   // Calculate insights
   const insights = useMemo(() => {
@@ -316,6 +320,22 @@ export default function CallHistoryPage() {
                       <tr>
                         <td colSpan={4} className="py-24 text-center text-[11px] font-bold uppercase tracking-[0.6em] text-muted-foreground/20 animate-pulse">
                         Synchronizing Data...
+                        </td>
+                      </tr>
+                    ) : analyticsError ? (
+                      /* The archive endpoints reject malformed limit/offset/date
+                         params with a 400 rather than clamping them. Rendering
+                         that as "no matches" would hide a real failure behind a
+                         plausible-looking empty state. */
+                      <tr>
+                        <td colSpan={4} className="py-24 text-center">
+                          <div className="flex flex-col items-center gap-4">
+                            <AlertTriangle className="w-12 h-12 text-destructive/40" />
+                            <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-destructive/70">
+                              Could not load call archive
+                            </span>
+                            <span className="text-xs text-muted-foreground max-w-md">{analyticsError}</span>
+                          </div>
                         </td>
                       </tr>
                     ) : currentTranscripts.length === 0 ? (

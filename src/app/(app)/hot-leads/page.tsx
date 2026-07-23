@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useCallback, useDeferredValue } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import { motion } from 'framer-motion';
 import {
@@ -19,6 +19,7 @@ import {
 
 import { useUserAnalytics, CallAnalytics } from '@/app/hooks/use-analytics';
 import { useCallRecording } from '@/app/hooks/use-call-recording';
+import { useDebouncedValue } from '@/app/hooks/use-debounced-value';
 import { PostProcessingTemplate, QualificationBucket, usePostProcessingTemplates } from '@/app/hooks/use-post-processing-templates';
 import { DashboardHeader } from '@/components/dashboard-header';
 import { Input } from '@/components/ui/input';
@@ -85,12 +86,6 @@ const formatLeadDate = (lead: CallAnalytics) => (
 );
 
 const startOfLocalDay = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate());
-
-const isSameLocalDay = (a: Date, b: Date) => (
-  a.getFullYear() === b.getFullYear()
-  && a.getMonth() === b.getMonth()
-  && a.getDate() === b.getDate()
-);
 
 const normalizeOutcomeKeyForMatch = (value: string | undefined | null) => (
   String(value || '').trim().toLowerCase()
@@ -261,7 +256,7 @@ export default function HotLeadsPage() {
   const [dateFilter, setDateFilter] = useState<'today' | 'yesterday' | '7d' | '30d' | 'all'>('all');
   const [confidenceFilter, setConfidenceFilter] = useState<'all' | 'high'>('all');
   const [templateDetails, setTemplateDetails] = useState<Record<string, PostProcessingTemplate>>({});
-  const deferredSearch = useDeferredValue(search);
+  const debouncedSearch = useDebouncedValue(search);
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
@@ -291,7 +286,7 @@ export default function HotLeadsPage() {
       limit: itemsPerPage,
       offset: (currentPage - 1) * itemsPerPage,
       filters: {
-        search: deferredSearch,
+        search: debouncedSearch,
         templateId: templateFilter,
         verdict: intentFilter,
         minConfidence: confidenceFilter === 'high' ? 80 : 50,
@@ -303,7 +298,7 @@ export default function HotLeadsPage() {
     confidenceFilter,
     currentPage,
     dateWindow,
-    deferredSearch,
+    debouncedSearch,
     fetchPage,
     intentFilter,
     itemsPerPage,
@@ -378,48 +373,60 @@ export default function HotLeadsPage() {
     return indexMap;
   }, [templateDetails]);
 
-  // Heuristic: hide buckets that look explicitly negative from the "hot leads" curation
-  const isNegativeKey = useCallback((key: string) => {
-    const k = key.toLowerCase();
-
-    return k.includes('not_') || k.startsWith('not')
-      || k.includes('failed') || k.includes('dnc') || k.includes('wrong')
-      || k.includes('disconnect') || k.includes('declined') || k.includes('reject');
-  }, []);
-
+  // Search, template, date, confidence and negative-verdict exclusion are all
+  // applied server-side now (see fetchPage above). Re-applying them here would
+  // filter the already-filtered page a second time, so a 10-row page could
+  // render 3 rows while `pagination.total` still claimed hundreds of matches.
+  //
+  // The client rules were also stricter than the server's in one place: this
+  // page's `isNegativeKey` treats `not_` as a substring, which drops legitimate
+  // verdicts like `cannot_reach`. The backend fixed that to a prefix match, so
+  // deferring to the server is the correct behaviour, not just the cheaper one.
+  //
+  // Ordering comes from the server too (`created_at DESC, id DESC`) — re-sorting
+  // per page would not change anything and would mask an ordering regression.
   const baseHotLeads = useMemo(() => {
-    return allAnalytics.filter(a => {
-      if ((a.confidence_score || 0) < 50) return false;
-      const v = normalizeOutcomeKeyForMatch(a.verdict);
-      if (!v) return false;
-      if (isNegativeKey(v)) return false;
+    return allAnalytics.filter((a) => Boolean(normalizeOutcomeKeyForMatch(a.verdict)));
+  }, [allAnalytics]);
 
-      // Search
-      if (search && !a.phone_number?.includes(search) && !a.summary?.toLowerCase().includes(search.toLowerCase())) return false;
-      if (templateFilter === 'legacy' && a.post_processing_template_id) return false;
-      if (templateFilter !== 'all' && templateFilter !== 'legacy' && a.post_processing_template_id !== templateFilter) return false;
+  // When no template is selected there is no bucket list to read chips from, so
+  // they are derived from the verdicts actually present in the data. With a
+  // server-paginated archive one page rarely contains every verdict, so
+  // accumulate across pages instead of rebuilding from the current page — that
+  // would make chips appear and vanish as the user pages, including the chip
+  // they currently have selected.
+  const [discoveredVerdicts, setDiscoveredVerdicts] = useState<Array<{ key: string; label: string }>>([]);
 
-      // Confidence
-      if (confidenceFilter === 'high' && (a.confidence_score || 0) < 80) return false;
+  // A new filter set describes a different result set, so previously seen
+  // verdicts no longer apply.
+  useEffect(() => {
+    setDiscoveredVerdicts([]);
+  }, [confidenceFilter, dateWindow, debouncedSearch, templateFilter]);
 
-      // Date
-      const leadDate = getLeadDate(a);
-      const now = new Date();
-      const today = startOfLocalDay(now);
-      const yesterday = new Date(today);
-      yesterday.setDate(today.getDate() - 1);
-      const sevenDaysAgo = new Date(today);
-      sevenDaysAgo.setDate(today.getDate() - 6);
-      const thirtyDaysAgo = new Date(today);
-      thirtyDaysAgo.setDate(today.getDate() - 29);
-      if (dateFilter === 'today' && !isSameLocalDay(leadDate, now)) return false;
-      if (dateFilter === 'yesterday' && !isSameLocalDay(leadDate, yesterday)) return false;
-      if (dateFilter === '7d' && leadDate < sevenDaysAgo) return false;
-      if (dateFilter === '30d' && leadDate < thirtyDaysAgo) return false;
+  useEffect(() => {
+    if (templateFilter !== 'all' && templateFilter !== 'legacy') return;
 
-      return true;
-    }).sort((a, b) => getLeadDate(b).getTime() - getLeadDate(a).getTime());
-  }, [allAnalytics, search, templateFilter, dateFilter, confidenceFilter, isNegativeKey]);
+    setDiscoveredVerdicts((previous) => {
+      const byKey = new Map(previous.map((option) => [option.key, option]));
+      let changed = false;
+
+      baseHotLeads.forEach((lead) => {
+        const verdict = normalizeOutcomeKeyForMatch(lead.verdict);
+        if (!verdict || byKey.has(verdict)) return;
+
+        const bucketIndex = lead.post_processing_template_id
+          ? bucketIndexByTemplateId.get(lead.post_processing_template_id)
+          : undefined;
+        byKey.set(verdict, {
+          key: verdict,
+          label: bucketIndex?.get(verdict)?.bucket.label || humanizeOutcomeKey(verdict),
+        });
+        changed = true;
+      });
+
+      return changed ? Array.from(byKey.values()) : previous;
+    });
+  }, [baseHotLeads, bucketIndexByTemplateId, templateFilter]);
 
   const verdictOptions = useMemo(() => {
     if (templateFilter !== 'all' && templateFilter !== 'legacy') {
@@ -444,39 +451,23 @@ export default function HotLeadsPage() {
       }
     }
 
-    const seen = new Set<string>();
-
-    return baseHotLeads.reduce<Array<{ key: string; label: string }>>((accumulator, lead) => {
-      const verdict = normalizeOutcomeKeyForMatch(lead.verdict);
-      if (!verdict || seen.has(verdict)) return accumulator;
-      seen.add(verdict);
-
-      const bucketIndex = lead.post_processing_template_id
-        ? bucketIndexByTemplateId.get(lead.post_processing_template_id)
-        : undefined;
-      const label = bucketIndex?.get(verdict)?.bucket.label || humanizeOutcomeKey(verdict);
-      accumulator.push({ key: verdict, label });
-
-      return accumulator;
-    }, []);
-  }, [baseHotLeads, bucketIndexByTemplateId, templateDetails, templateFilter, templates]);
+    return discoveredVerdicts;
+  }, [discoveredVerdicts, templateDetails, templateFilter, templates]);
   const effectiveIntentFilter = intentFilter;
 
-  const hotLeads = useMemo(() => {
-    return baseHotLeads.filter((lead) => {
-      const verdict = normalizeOutcomeKeyForMatch(lead.verdict);
-      if (effectiveIntentFilter !== 'all' && verdict !== normalizeOutcomeKeyForMatch(effectiveIntentFilter)) return false;
-
-      return true;
-    });
-  }, [baseHotLeads, effectiveIntentFilter]);
+  // The verdict filter is applied server-side via the `verdict` query param, so
+  // the page we were handed is already scoped to the selected chip.
+  const hotLeads = baseHotLeads;
 
   // Pagination Logic
   const totalPages = Math.max(1, Math.ceil(pagination.total / itemsPerPage));
   const effectiveCurrentPage = Math.min(currentPage, totalPages);
   const paginatedLeads = hotLeads;
 
-  // Stats Logic — dynamic per-bucket count for the active template's positive buckets
+  // Per-bucket counts. These describe the loaded page only — a whole-archive
+  // breakdown would need a server-side aggregate, and the stats endpoint
+  // documented alongside pagination does not accept filters. Labelled as such
+  // in the UI so the numbers are not read as archive totals.
   const bucketStats = useMemo(() => {
     return verdictOptions.map((option) => ({
       key: option.key,
@@ -519,6 +510,10 @@ export default function HotLeadsPage() {
   const handleTemplateFilterChange = useCallback((value: string) => {
     setCurrentPage(1);
     setTemplateFilter(value);
+    // Verdict chips belong to the selected template's bucket list. Keeping the
+    // previous selection would send a verdict the new template never emits,
+    // returning an empty page against a non-zero total.
+    setIntentFilter('all');
   }, []);
 
   const handleIntentFilterChange = useCallback((value: string) => {
@@ -655,7 +650,7 @@ export default function HotLeadsPage() {
                       </span>
                       <div className="flex items-center gap-2">
                         <span className="text-3xl font-bold font-mono text-foreground">{count}</span>
-                        <span className="text-xs text-muted-foreground">Leads</span>
+                        <span className="text-xs text-muted-foreground">On This Page</span>
                       </div>
                     </div>
                     <Target size={24} className={cn(palette.color, 'opacity-20')} />
@@ -671,7 +666,7 @@ export default function HotLeadsPage() {
                 <div className="space-y-1">
                   <span className="text-[9px] font-bold uppercase tracking-widest text-primary">Qualified Leads</span>
                   <div className="flex items-center gap-2">
-                    <span className="text-3xl font-bold font-mono text-foreground">{hotLeads.length}</span>
+                    <span className="text-3xl font-bold font-mono text-foreground">{pagination.total}</span>
                     <span className="text-xs text-muted-foreground">Total</span>
                   </div>
                 </div>

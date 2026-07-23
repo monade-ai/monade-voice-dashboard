@@ -11,9 +11,11 @@ import {
   RefreshCw,
   Wand2,
   GitCompare,
+  FlaskConical,
 } from 'lucide-react';
 
 import { invalidateAnalyticsCaches, useCallAnalytics } from '@/app/hooks/use-analytics';
+import { useHaikuShadowForCall, type ShadowStatus } from '@/app/hooks/use-haiku-shadow';
 import { usePostProcessingTemplates } from '@/app/hooks/use-post-processing-templates';
 import { PaperCard, PaperCardContent, PaperCardHeader, PaperCardTitle } from '@/components/ui/paper-card';
 import { Badge } from '@/components/ui/badge';
@@ -80,13 +82,24 @@ interface ReanalyzeResponse {
 
 // --- Helper Components ---
 
-const FactItem = ({ label, value }: { label: string, value: any }) => {
+const FactItem = ({ label, value, mismatched = false }: { label: string, value: any, mismatched?: boolean }) => {
   if (!value || (Array.isArray(value) && value.length === 0)) return null;
 
   return (
     <div className="space-y-1">
-      <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60">{label.replace('_', ' ')}</p>
-      <p className="text-xs font-medium text-foreground">{Array.isArray(value) ? value.join(', ') : String(value)}</p>
+      <p className={cn(
+        'text-[9px] font-bold uppercase tracking-[0.2em]',
+        mismatched ? 'text-orange-500/80' : 'text-muted-foreground/60',
+      )}>
+        {label.replace('_', ' ')}
+        {mismatched ? ' • differs' : ''}
+      </p>
+      <p className={cn(
+        'text-xs font-medium',
+        mismatched ? 'text-orange-500' : 'text-foreground',
+      )}>
+        {Array.isArray(value) ? value.join(', ') : String(value)}
+      </p>
     </div>
   );
 };
@@ -104,6 +117,82 @@ const getFallbackTemplateLabel = (verdict?: string) => {
   if (!verdict) return 'Processing';
 
   return verdict.replace(/_/g, ' ');
+};
+
+/**
+ * TEMPORARY — A/B toggle between the live Gemini analysis and the Haiku shadow.
+ *
+ * Remove this together with `use-haiku-shadow.ts` once the evaluation concludes.
+ * Everything it controls is presentational: billing, the qualification sandbox
+ * and template resolution stay bound to the live analysis regardless of position,
+ * because the shadow is QA-only data that must never look authoritative.
+ */
+const ShadowModelToggle = ({
+  source,
+  onChange,
+  shadowStatus,
+  loading,
+  errorDetail,
+}: {
+  source: 'gemini' | 'haiku';
+  onChange: (next: 'gemini' | 'haiku') => void;
+  shadowStatus: ShadowStatus;
+  loading: boolean;
+  errorDetail?: string | null;
+}) => {
+  // `missing` is the normal state while the shadow is disabled server-side and
+  // for every call processed before it existed, so the control stays visible but
+  // inert rather than vanishing or looking broken.
+  const unavailable = shadowStatus === 'missing';
+
+  return (
+    <div className="space-y-2">
+      <div className="inline-flex rounded-full border border-border/50 bg-background/70 p-1">
+        <button
+          type="button"
+          onClick={() => onChange('gemini')}
+          className={cn(
+            'rounded-full px-3 py-1 text-[9px] font-bold uppercase tracking-[0.2em] transition-colors',
+            source === 'gemini' ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground',
+          )}
+        >
+          Gemini
+        </button>
+        <button
+          type="button"
+          onClick={() => onChange('haiku')}
+          className={cn(
+            'rounded-full px-3 py-1 text-[9px] font-bold uppercase tracking-[0.2em] transition-colors flex items-center gap-1.5',
+            source === 'haiku' ? 'bg-primary text-black' : 'text-muted-foreground hover:text-foreground',
+          )}
+        >
+          {loading ? <Loader2 size={9} className="animate-spin" /> : <FlaskConical size={9} />}
+          Haiku
+        </button>
+      </div>
+
+      {source === 'haiku' && !loading && unavailable && (
+        <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-muted-foreground/60">
+          Not compared — showing live analysis
+        </p>
+      )}
+      {source === 'haiku' && !loading && shadowStatus === 'error' && (
+        <div className="space-y-0.5">
+          <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-orange-500/80">
+            Shadow run failed — showing live analysis
+          </p>
+          {errorDetail && (
+            <p className="text-[9px] text-muted-foreground/70 font-mono">{errorDetail}</p>
+          )}
+        </div>
+      )}
+      {source === 'haiku' && !loading && shadowStatus === 'ok' && (
+        <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-primary/80">
+          Shadow result — QA only, not authoritative
+        </p>
+      )}
+    </div>
+  );
 };
 
 // --- Main Component ---
@@ -148,6 +237,32 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
 
   // Prefer pre-fetched analytics (has billing_data from batch endpoint), fall back to single-call fetch
   const analytics = fetchedAnalytics ?? initialAnalytics ?? null;
+
+  // --- TEMPORARY: Haiku shadow A/B comparison ---------------------------------
+  // The shadow is fetched lazily, only once the toggle is flipped to Haiku.
+  // `analytics` deliberately stays the live Gemini result: billing, the
+  // qualification sandbox and template resolution all read from it and must not
+  // follow the toggle. Only `displayedAnalytics` switches, and it falls back to
+  // the live result whenever there is no usable shadow — which is the expected
+  // case while the feature is disabled server-side.
+  const [shadowSource, setShadowSource] = useState<'gemini' | 'haiku'>('gemini');
+  const { shadow, loading: shadowLoading } = useHaikuShadowForCall(callId, shadowSource === 'haiku');
+  const shadowStatus: ShadowStatus = shadow?.shadow_status ?? 'missing';
+  const haikuAnalysis = shadow?.haiku?.analysis ?? null;
+  const showingHaiku = shadowSource === 'haiku' && shadowStatus === 'ok' && Boolean(haikuAnalysis);
+  const displayedAnalytics = showingHaiku ? haikuAnalysis : analytics;
+  const shadowComparison = shadow?.comparison ?? shadow?.haiku?.comparison ?? null;
+  const shadowErrorDetail = useMemo(() => {
+    const shadowError = shadow?.haiku?.error;
+    if (!shadowError) return null;
+
+    return [shadowError.stage, shadowError.type, shadowError.message].filter(Boolean).join(' · ');
+  }, [shadow?.haiku?.error]);
+  const mismatchedFactKeys = useMemo(
+    () => new Set(showingHaiku ? shadowComparison?.mismatched_fields ?? [] : []),
+    [shadowComparison, showingHaiku],
+  );
+  // ---------------------------------------------------------------------------
 
   // Get real customer name or fallback
   const customerName = analytics?.key_discoveries?.customer_name || 'Lead';
@@ -468,14 +583,17 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
 
   const currentTemplateContent = templateForAnalytics?.content ?? null;
   const currentTemplateName = templateForAnalytics?.name ?? 'Default Monade Rules';
+  // Facts carry their source key so mismatched ones can be highlighted from the
+  // server-computed `comparison.mismatched_fields` rather than diffed here.
   const renderedFacts = useMemo(() => {
-    if (!analytics) return [];
+    if (!displayedAnalytics) return [];
 
     const dynamicFacts = currentTemplateContent?.data_points?.length
       ? currentTemplateContent.data_points
         .map((dataPoint: any) => ({
+          key: dataPoint.key,
           label: dataPoint.label,
-          value: analytics.key_discoveries?.[dataPoint.key],
+          value: displayedAnalytics.key_discoveries?.[dataPoint.key],
         }))
         .filter((item: { label: string; value: unknown }) => (
           item.value !== undefined && item.value !== null && (!Array.isArray(item.value) || item.value.length > 0)
@@ -488,19 +606,33 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
 
     return FALLBACK_FACT_KEYS
       .map((fact) => ({
+        key: fact.key,
         label: fact.label,
-        value: analytics.key_discoveries?.[fact.key],
+        value: displayedAnalytics.key_discoveries?.[fact.key],
       }))
       .filter((item) => item.value !== undefined && item.value !== null && (!Array.isArray(item.value) || item.value.length > 0));
-  }, [analytics, currentTemplateContent]);
+  }, [currentTemplateContent, displayedAnalytics]);
 
-  const currentVerdictLabel = useMemo(() => {
+  const resolveVerdictLabel = useCallback((verdict?: string) => {
     const matchingBucket = currentTemplateContent?.qualification_buckets?.find(
-      (bucket: any) => bucket.key === analytics?.verdict,
+      (bucket: any) => bucket.key === verdict,
     );
 
-    return matchingBucket?.label || getFallbackTemplateLabel(analytics?.verdict);
-  }, [analytics?.verdict, currentTemplateContent]);
+    return matchingBucket?.label || getFallbackTemplateLabel(verdict);
+  }, [currentTemplateContent]);
+
+  // The live verdict. The qualification sandbox compares against this, so it
+  // must not follow the shadow toggle.
+  const currentVerdictLabel = useMemo(
+    () => resolveVerdictLabel(analytics?.verdict),
+    [analytics?.verdict, resolveVerdictLabel],
+  );
+
+  // What the pane headline shows — live or shadow, depending on the toggle.
+  const displayedVerdictLabel = useMemo(
+    () => resolveVerdictLabel(displayedAnalytics?.verdict),
+    [displayedAnalytics?.verdict, resolveVerdictLabel],
+  );
 
   const previewVerdictLabel = useMemo(() => {
     const previewTemplateContent = templateForPreview?.content ?? currentTemplateContent;
@@ -571,8 +703,8 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
         <div className="w-full md:w-[38%] border-r border-border bg-muted/5 h-[40vh] md:h-full relative overflow-hidden">
           <div className={cn(
             'absolute top-0 left-0 w-full h-1 z-10',
-            analytics?.verdict === 'interested' ? 'bg-green-500' :
-              analytics?.verdict === 'callback' ? 'bg-primary' : 'bg-muted-foreground/20',
+            displayedAnalytics?.verdict === 'interested' ? 'bg-green-500' :
+              displayedAnalytics?.verdict === 'callback' ? 'bg-primary' : 'bg-muted-foreground/20',
           )} />
 
           <div className="absolute inset-0 p-8 overflow-y-auto custom-scrollbar space-y-8">
@@ -580,11 +712,23 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
               <div className="flex items-center justify-between mb-2">
                 <h2 className="text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground">AI Intelligence</h2>
                 <Badge variant="outline" className="text-[9px] font-bold uppercase tracking-widest border-border/60 bg-background">
-                  {analytics?.call_quality || 'Unknown'}
+                  {displayedAnalytics?.call_quality || 'Unknown'}
                 </Badge>
               </div>
+
+              {/* TEMPORARY — Haiku shadow A/B toggle. Remove with the experiment. */}
+              <div className="mt-3">
+                <ShadowModelToggle
+                  source={shadowSource}
+                  onChange={setShadowSource}
+                  shadowStatus={shadowStatus}
+                  loading={shadowLoading}
+                  errorDetail={shadowErrorDetail}
+                />
+              </div>
+
               <h1 className="text-3xl font-medium tracking-tight mt-4 capitalize">
-                {currentVerdictLabel || 'Processing...'}
+                {displayedVerdictLabel || 'Processing...'}
               </h1>
               <div className="mt-4 flex flex-wrap items-center gap-2">
                 <Badge variant="outline" className="text-[9px] font-bold uppercase tracking-widest border-border/60 bg-background">
@@ -603,13 +747,13 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
                 <PaperCardTitle className="text-[9px]"> Summary</PaperCardTitle>
               </PaperCardHeader>
               <PaperCardContent className="p-5 pt-2">
-                {analyticsLoading ? (
+                {analyticsLoading || shadowLoading ? (
                   <div className="h-20 flex items-center justify-center"><Loader2 className="w-4 h-4 animate-spin text-muted-foreground" /></div>
                 ) : (
                   <div className="space-y-4">
                     <div className="max-h-[40vh] overflow-y-auto custom-scrollbar pr-1">
                       <p className="text-sm leading-relaxed text-foreground/90 italic">
-                        &quot;{analytics?.summary || 'Analyzing conversation context...'}&quot;
+                        &quot;{displayedAnalytics?.summary || 'Analyzing conversation context...'}&quot;
                       </p>
                     </div>
                     <button onClick={handleCopy} className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground hover:text-primary transition-colors">
@@ -621,11 +765,76 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
               </PaperCardContent>
             </PaperCard>
 
+            {/* TEMPORARY — shadow agreement strip. Only rendered when a usable
+                shadow exists, so it stays invisible in normal operation. */}
+            {showingHaiku && shadowComparison && (
+              <div className="rounded-md border border-primary/20 bg-primary/[0.04] p-4 space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-[9px] font-bold uppercase tracking-[0.22em] text-primary/80">
+                    Model Agreement
+                  </span>
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      'text-[9px] font-bold uppercase tracking-widest',
+                      shadowComparison.verdict_match
+                        ? 'border-green-500/30 text-green-500 bg-green-500/5'
+                        : 'border-orange-500/30 text-orange-500 bg-orange-500/5',
+                    )}
+                  >
+                    {shadowComparison.verdict_match ? 'Verdict Match' : 'Verdict Differs'}
+                  </Badge>
+                </div>
+
+                {!shadowComparison.verdict_match && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="rounded-md border border-border/20 bg-background/60 p-3">
+                      <span className="text-[8px] font-bold uppercase tracking-[0.18em] text-muted-foreground/60">Gemini (live)</span>
+                      <p className="mt-1 text-xs font-semibold capitalize">{resolveVerdictLabel(shadowComparison.gemini_verdict)}</p>
+                    </div>
+                    <div className="rounded-md border border-primary/20 bg-primary/[0.05] p-3">
+                      <span className="text-[8px] font-bold uppercase tracking-[0.18em] text-primary/80">Haiku (shadow)</span>
+                      <p className="mt-1 text-xs font-semibold capitalize">{resolveVerdictLabel(shadowComparison.haiku_verdict)}</p>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex flex-wrap gap-x-5 gap-y-1 text-[10px] text-muted-foreground">
+                  {typeof shadowComparison.confidence_delta === 'number' && (
+                    <span>
+                      Confidence Δ{' '}
+                      <span className="font-mono font-bold text-foreground">
+                        {shadowComparison.confidence_delta > 0 ? '+' : ''}{shadowComparison.confidence_delta}
+                      </span>
+                    </span>
+                  )}
+                  {typeof shadowComparison.key_discoveries_total === 'number' && (
+                    <span>
+                      Facts matched{' '}
+                      <span className="font-mono font-bold text-foreground">
+                        {shadowComparison.key_discoveries_matched ?? 0}/{shadowComparison.key_discoveries_total}
+                      </span>
+                    </span>
+                  )}
+                  {typeof shadow?.haiku?.latency_ms === 'number' && (
+                    <span>
+                      Latency <span className="font-mono font-bold text-foreground">{shadow.haiku.latency_ms}ms</span>
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+
             <div className="space-y-6 pt-4">
               <h3 className="text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground">Extracted Facts</h3>
               <div className="grid grid-cols-2 gap-x-8 gap-y-6">
-                {renderedFacts.map((fact) => (
-                  <FactItem key={fact.label} label={fact.label} value={fact.value} />
+                {renderedFacts.map((fact: { key?: string; label: string; value: any }) => (
+                  <FactItem
+                    key={fact.label}
+                    label={fact.label}
+                    value={fact.value}
+                    mismatched={Boolean(fact.key && mismatchedFactKeys.has(fact.key))}
+                  />
                 ))}
               </div>
             </div>
