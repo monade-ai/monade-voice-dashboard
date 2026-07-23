@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 
 import { ApiError, fetchJson } from '@/lib/http';
 import { MONADE_API_BASE } from '@/config';
@@ -26,18 +26,48 @@ interface CachedCallAnalytics {
 }
 
 interface CachedUserAnalytics {
-  data: CallAnalytics[];
+  data: AnalyticsPage;
   cachedAt: number;
 }
 
 const callAnalyticsCache = new Map<string, CachedCallAnalytics>();
 const callAnalyticsInFlight = new Map<string, Promise<CallAnalytics | null>>();
 const userAnalyticsCache = new Map<string, CachedUserAnalytics>();
-const userAnalyticsInFlight = new Map<string, Promise<CallAnalytics[]>>();
+const userAnalyticsInFlight = new Map<string, Promise<AnalyticsPage>>();
 
-type FetchAllOptions = boolean | {
+export interface AnalyticsPagination {
+  limit: number;
+  offset: number;
+  count: number;
+  total: number;
+  hasMore: boolean;
+}
+
+export interface AnalyticsPage {
+  analytics: CallAnalytics[];
+  pagination: AnalyticsPagination;
+}
+
+export interface AnalyticsPageFilters {
+  search?: string;
+  verdicts?: string[];
+  qualities?: string[];
+  campaignIds?: string[];
+  templateId?: string;
+  verdict?: string;
+  minConfidence?: number;
+  excludeNegative?: boolean;
+  direction?: 'all' | 'inbound' | 'outbound';
+  durationRange?: 'all' | 'short' | 'medium' | 'long' | string;
+  from?: string;
+  to?: string;
+}
+
+export type FetchAnalyticsPageOptions = boolean | {
   forceRefresh?: boolean;
-  expectedCallIds?: string[];
+  limit?: number;
+  offset?: number;
+  filters?: AnalyticsPageFilters;
 };
 
 function analyticsCacheKey(userUid: string, resource: string, params?: unknown) {
@@ -52,23 +82,17 @@ function callCacheTtl(data: CallAnalytics | null) {
   return data ? CALL_ANALYTICS_CACHE_TTL_MS : CALL_ANALYTICS_MISS_CACHE_TTL_MS;
 }
 
-function normalizeFetchAllOptions(options: FetchAllOptions = false) {
+function normalizeFetchPageOptions(options: FetchAnalyticsPageOptions = false) {
   if (typeof options === 'boolean') {
-    return { forceRefresh: options, expectedCallIds: undefined };
+    return { forceRefresh: options, limit: 20, offset: 0, filters: undefined };
   }
 
   return {
     forceRefresh: options.forceRefresh ?? false,
-    expectedCallIds: options.expectedCallIds,
+    limit: Math.min(Math.max(Math.trunc(options.limit ?? 20), 1), 100),
+    offset: Math.max(Math.trunc(options.offset ?? 0), 0),
+    filters: options.filters,
   };
-}
-
-function cacheCoversExpectedCalls(data: CallAnalytics[], expectedCallIds?: string[]) {
-  if (!expectedCallIds?.length) return true;
-
-  const cachedCallIds = new Set(data.map((item) => item.call_id).filter(Boolean));
-
-  return expectedCallIds.every((callId) => cachedCallIds.has(callId));
 }
 
 export function invalidateAnalyticsCaches(callId?: string) {
@@ -258,42 +282,77 @@ export function useCallAnalytics() {
   };
 }
 
-// Hook to fetch all analytics for the user
+const EMPTY_ANALYTICS_PAGINATION: AnalyticsPagination = {
+  limit: 20,
+  offset: 0,
+  count: 0,
+  total: 0,
+  hasMore: false,
+};
+
+// Hook to fetch one bounded analytics page for the user.
 export function useUserAnalytics() {
-  const { userUid } = useMonadeUser(); // Get logged-in user's ID
+  const { userUid } = useMonadeUser();
   const [analytics, setAnalytics] = useState<CallAnalytics[]>([]);
+  const [pagination, setPagination] = useState<AnalyticsPagination>(EMPTY_ANALYTICS_PAGINATION);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchAll = useCallback(async (options: FetchAllOptions = false) => {
-    if (!userUid) {
-      setAnalytics([]);
+  // Page and filter changes each start a request, so several can be in flight at
+  // once (page forward twice quickly, or a debounced search landing while a page
+  // change is still resolving). Responses are not guaranteed to arrive in the
+  // order they were sent, and a slow earlier response would otherwise overwrite
+  // state with the wrong page. Only the newest request is allowed to publish.
+  const requestSeq = useRef(0);
 
-      return [];
+  const fetchPage = useCallback(async (options: FetchAnalyticsPageOptions = false): Promise<AnalyticsPage> => {
+    const { forceRefresh, limit, offset, filters } = normalizeFetchPageOptions(options);
+    requestSeq.current += 1;
+    const seq = requestSeq.current;
+    const isCurrent = () => seq === requestSeq.current;
+
+    if (!userUid) {
+      const emptyPage = {
+        analytics: [],
+        pagination: { ...EMPTY_ANALYTICS_PAGINATION, limit, offset },
+      };
+      if (isCurrent()) {
+        setAnalytics([]);
+        setPagination(emptyPage.pagination);
+      }
+
+      return emptyPage;
     }
-    const { forceRefresh, expectedCallIds } = normalizeFetchAllOptions(options);
-    const scopedUserKey = analyticsCacheKey(userUid, USER_ANALYTICS_RESOURCE, { userUid });
+
+    const scopedUserKey = analyticsCacheKey(userUid, USER_ANALYTICS_RESOURCE, {
+      userUid,
+      limit,
+      offset,
+      filters,
+    });
 
     if (!forceRefresh) {
       const cached = userAnalyticsCache.get(scopedUserKey);
-      if (
-        cached
-        && Date.now() - cached.cachedAt < USER_ANALYTICS_CACHE_TTL_MS
-        && cacheCoversExpectedCalls(cached.data, expectedCallIds)
-      ) {
-        setAnalytics(cached.data);
-        setError(null);
-        setLoading(false);
+      if (cached && Date.now() - cached.cachedAt < USER_ANALYTICS_CACHE_TTL_MS) {
+        if (isCurrent()) {
+          setAnalytics(cached.data.analytics);
+          setPagination(cached.data.pagination);
+          setError(null);
+          setLoading(false);
+        }
 
         return cached.data;
       }
 
-      const persisted = readLocalCache<CallAnalytics[]>(scopedUserKey);
-      if (persisted && cacheCoversExpectedCalls(persisted.value, expectedCallIds)) {
+      const persisted = readLocalCache<AnalyticsPage>(scopedUserKey);
+      if (persisted) {
         userAnalyticsCache.set(scopedUserKey, { data: persisted.value, cachedAt: persisted.cachedAt });
-        setAnalytics(persisted.value);
-        setError(null);
-        setLoading(false);
+        if (isCurrent()) {
+          setAnalytics(persisted.value.analytics);
+          setPagination(persisted.value.pagination);
+          setError(null);
+          setLoading(false);
+        }
 
         return persisted.value;
       }
@@ -303,9 +362,12 @@ export function useUserAnalytics() {
       const inFlight = userAnalyticsInFlight.get(scopedUserKey);
       if (inFlight) {
         const result = await inFlight;
-        setAnalytics(result);
-        setError(null);
-        setLoading(false);
+        if (isCurrent()) {
+          setAnalytics(result.analytics);
+          setPagination(result.pagination);
+          setError(null);
+          setLoading(false);
+        }
 
         return result;
       }
@@ -313,7 +375,28 @@ export function useUserAnalytics() {
 
     const request = (async () => {
       try {
-        const data = await fetchJson<any>(`${MONADE_API_BASE}/api/analytics?user_uid=${userUid}`);
+        const query = new URLSearchParams({
+          user_uid: userUid,
+          limit: String(limit),
+          offset: String(offset),
+        });
+        if (filters?.search?.trim()) query.set('search', filters.search.trim());
+        if (filters?.verdicts?.length) query.set('verdicts', filters.verdicts.join(','));
+        if (filters?.qualities?.length) query.set('qualities', filters.qualities.join(','));
+        if (filters?.campaignIds?.length) query.set('campaign_ids', filters.campaignIds.join(','));
+        if (filters?.templateId && filters.templateId !== 'all') query.set('template_id', filters.templateId);
+        if (filters?.verdict && filters.verdict !== 'all') query.set('verdict', filters.verdict);
+        if (typeof filters?.minConfidence === 'number') {
+          query.set('min_confidence', String(filters.minConfidence));
+        }
+        if (filters?.excludeNegative) query.set('exclude_negative', 'true');
+        if (filters?.direction && filters.direction !== 'all') query.set('direction', filters.direction);
+        if (filters?.durationRange && filters.durationRange !== 'all') {
+          query.set('duration_range', filters.durationRange);
+        }
+        if (filters?.from) query.set('from', filters.from);
+        if (filters?.to) query.set('to', filters.to);
+        const data = await fetchJson<any>(`${MONADE_API_BASE}/api/analytics?${query.toString()}`);
 
         // Merge the inner analytics object with top-level call metadata.
         // IMPORTANT: keep this allowlist in sync with the backend doc
@@ -358,10 +441,22 @@ export function useUserAnalytics() {
             : [data.analytics];
         }
 
-        userAnalyticsCache.set(scopedUserKey, { data: analyticsArray, cachedAt: Date.now() });
-        writeLocalCache(scopedUserKey, analyticsArray, USER_ANALYTICS_CACHE_TTL_MS);
+        const responsePagination = data.pagination || {};
+        const page: AnalyticsPage = {
+          analytics: analyticsArray,
+          pagination: {
+            limit: Number(responsePagination.limit ?? data.limit ?? limit),
+            offset: Number(responsePagination.offset ?? data.offset ?? offset),
+            count: Number(responsePagination.count ?? data.count ?? analyticsArray.length),
+            total: Number(responsePagination.total ?? data.total ?? analyticsArray.length),
+            hasMore: Boolean(responsePagination.has_more ?? data.has_more ?? false),
+          },
+        };
 
-        return analyticsArray;
+        userAnalyticsCache.set(scopedUserKey, { data: page, cachedAt: Date.now() });
+        writeLocalCache(scopedUserKey, page, USER_ANALYTICS_CACHE_TTL_MS);
+
+        return page;
       } finally {
         userAnalyticsInFlight.delete(scopedUserKey);
       }
@@ -372,25 +467,44 @@ export function useUserAnalytics() {
     try {
       setLoading(true);
       setError(null);
-      const analyticsArray = await request;
-      setAnalytics(analyticsArray);
+      const page = await request;
+      if (isCurrent()) {
+        setAnalytics(page.analytics);
+        setPagination(page.pagination);
+      }
 
-      return analyticsArray;
+      return page;
     } catch (err) {
       console.warn('[useUserAnalytics] Failed to fetch user analytics:', err);
-      setError(err instanceof Error ? err.message : 'Failed to fetch analytics');
-      setAnalytics([]);
+      if (isCurrent()) {
+        setError(err instanceof Error ? err.message : 'Failed to fetch analytics');
+        setAnalytics([]);
+        setPagination({ ...EMPTY_ANALYTICS_PAGINATION, limit, offset });
+      }
 
-      return [];
+      return {
+        analytics: [],
+        pagination: { ...EMPTY_ANALYTICS_PAGINATION, limit, offset },
+      };
     } finally {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
   }, [userUid]);
 
+  // Compatibility alias for older consumers. It now returns only the requested
+  // page and never walks every page behind the caller's back.
+  const fetchAll = useCallback(async (options: FetchAnalyticsPageOptions = false) => {
+    const page = await fetchPage(options);
+
+    return page.analytics;
+  }, [fetchPage]);
+
   return {
     analytics,
+    pagination,
     loading,
     error,
+    fetchPage,
     fetchAll,
   };
 }

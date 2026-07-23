@@ -22,6 +22,7 @@ jest.mock('@/app/hooks/use-credits', () => ({
 jest.mock('@/app/hooks/use-transcripts', () => ({
   useTranscripts: () => ({
     transcripts: [],
+    pagination: { limit: 20, offset: 0, count: 0, total: 0, hasMore: false },
     loading: false,
     error: null,
   }),
@@ -30,6 +31,8 @@ jest.mock('@/app/hooks/use-transcripts', () => ({
 jest.mock('@/app/hooks/use-analytics', () => ({
   useUserAnalytics: () => ({
     analytics: [],
+    pagination: { limit: 20, offset: 0, count: 0, total: 0, hasMore: false },
+    fetchPage: jest.fn(),
     fetchAll: jest.fn(),
     loading: false,
     error: null,

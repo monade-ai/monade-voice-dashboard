@@ -19,6 +19,7 @@ import {
 
 import { useUserAnalytics, CallAnalytics } from '@/app/hooks/use-analytics';
 import { useCallRecording } from '@/app/hooks/use-call-recording';
+import { useDebouncedValue } from '@/app/hooks/use-debounced-value';
 import { PostProcessingTemplate, QualificationBucket, usePostProcessingTemplates } from '@/app/hooks/use-post-processing-templates';
 import { DashboardHeader } from '@/components/dashboard-header';
 import { Input } from '@/components/ui/input';
@@ -85,12 +86,6 @@ const formatLeadDate = (lead: CallAnalytics) => (
 );
 
 const startOfLocalDay = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate());
-
-const isSameLocalDay = (a: Date, b: Date) => (
-  a.getFullYear() === b.getFullYear()
-  && a.getMonth() === b.getMonth()
-  && a.getDate() === b.getDate()
-);
 
 const normalizeOutcomeKeyForMatch = (value: string | undefined | null) => (
   String(value || '').trim().toLowerCase()
@@ -245,7 +240,12 @@ DealRow.displayName = 'DealRow';
 // --- Main Page ---
 
 export default function HotLeadsPage() {
-  const { analytics: allAnalytics, loading, fetchAll } = useUserAnalytics();
+  const {
+    analytics: allAnalytics,
+    pagination,
+    loading,
+    fetchPage,
+  } = useUserAnalytics();
   const { templates, fetchTemplates, fetchTemplate } = usePostProcessingTemplates();
   const [search, setSearch] = useState('');
   const [selectedLead, setSelectedLead] = useState<CallAnalytics | null>(null);
@@ -256,12 +256,54 @@ export default function HotLeadsPage() {
   const [dateFilter, setDateFilter] = useState<'today' | 'yesterday' | '7d' | '30d' | 'all'>('all');
   const [confidenceFilter, setConfidenceFilter] = useState<'all' | 'high'>('all');
   const [templateDetails, setTemplateDetails] = useState<Record<string, PostProcessingTemplate>>({});
+  const debouncedSearch = useDebouncedValue(search);
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
-  useEffect(() => { fetchAll(); }, [fetchAll]);
+  const dateWindow = useMemo(() => {
+    if (dateFilter === 'all') return {};
+
+    const now = new Date();
+    const start = startOfLocalDay(now);
+    const end = new Date(now);
+    if (dateFilter === 'yesterday') {
+      start.setDate(start.getDate() - 1);
+      end.setDate(end.getDate() - 1);
+      end.setHours(23, 59, 59, 999);
+    } else if (dateFilter === '7d') {
+      start.setDate(start.getDate() - 6);
+    } else if (dateFilter === '30d') {
+      start.setDate(start.getDate() - 29);
+    }
+
+    return { from: start.toISOString(), to: end.toISOString() };
+  }, [dateFilter]);
+
+  useEffect(() => {
+    fetchPage({
+      limit: itemsPerPage,
+      offset: (currentPage - 1) * itemsPerPage,
+      filters: {
+        search: debouncedSearch,
+        templateId: templateFilter,
+        verdict: intentFilter,
+        minConfidence: confidenceFilter === 'high' ? 80 : 50,
+        excludeNegative: true,
+        ...dateWindow,
+      },
+    });
+  }, [
+    confidenceFilter,
+    currentPage,
+    dateWindow,
+    debouncedSearch,
+    fetchPage,
+    intentFilter,
+    itemsPerPage,
+    templateFilter,
+  ]);
 
   useEffect(() => {
     fetchTemplates().catch(() => undefined);
@@ -331,48 +373,60 @@ export default function HotLeadsPage() {
     return indexMap;
   }, [templateDetails]);
 
-  // Heuristic: hide buckets that look explicitly negative from the "hot leads" curation
-  const isNegativeKey = useCallback((key: string) => {
-    const k = key.toLowerCase();
-
-    return k.includes('not_') || k.startsWith('not')
-      || k.includes('failed') || k.includes('dnc') || k.includes('wrong')
-      || k.includes('disconnect') || k.includes('declined') || k.includes('reject');
-  }, []);
-
+  // Search, template, date, confidence and negative-verdict exclusion are all
+  // applied server-side now (see fetchPage above). Re-applying them here would
+  // filter the already-filtered page a second time, so a 10-row page could
+  // render 3 rows while `pagination.total` still claimed hundreds of matches.
+  //
+  // The client rules were also stricter than the server's in one place: this
+  // page's `isNegativeKey` treats `not_` as a substring, which drops legitimate
+  // verdicts like `cannot_reach`. The backend fixed that to a prefix match, so
+  // deferring to the server is the correct behaviour, not just the cheaper one.
+  //
+  // Ordering comes from the server too (`created_at DESC, id DESC`) — re-sorting
+  // per page would not change anything and would mask an ordering regression.
   const baseHotLeads = useMemo(() => {
-    return allAnalytics.filter(a => {
-      if ((a.confidence_score || 0) < 50) return false;
-      const v = normalizeOutcomeKeyForMatch(a.verdict);
-      if (!v) return false;
-      if (isNegativeKey(v)) return false;
+    return allAnalytics.filter((a) => Boolean(normalizeOutcomeKeyForMatch(a.verdict)));
+  }, [allAnalytics]);
 
-      // Search
-      if (search && !a.phone_number?.includes(search) && !a.summary?.toLowerCase().includes(search.toLowerCase())) return false;
-      if (templateFilter === 'legacy' && a.post_processing_template_id) return false;
-      if (templateFilter !== 'all' && templateFilter !== 'legacy' && a.post_processing_template_id !== templateFilter) return false;
+  // When no template is selected there is no bucket list to read chips from, so
+  // they are derived from the verdicts actually present in the data. With a
+  // server-paginated archive one page rarely contains every verdict, so
+  // accumulate across pages instead of rebuilding from the current page — that
+  // would make chips appear and vanish as the user pages, including the chip
+  // they currently have selected.
+  const [discoveredVerdicts, setDiscoveredVerdicts] = useState<Array<{ key: string; label: string }>>([]);
 
-      // Confidence
-      if (confidenceFilter === 'high' && (a.confidence_score || 0) < 80) return false;
+  // A new filter set describes a different result set, so previously seen
+  // verdicts no longer apply.
+  useEffect(() => {
+    setDiscoveredVerdicts([]);
+  }, [confidenceFilter, dateWindow, debouncedSearch, templateFilter]);
 
-      // Date
-      const leadDate = getLeadDate(a);
-      const now = new Date();
-      const today = startOfLocalDay(now);
-      const yesterday = new Date(today);
-      yesterday.setDate(today.getDate() - 1);
-      const sevenDaysAgo = new Date(today);
-      sevenDaysAgo.setDate(today.getDate() - 6);
-      const thirtyDaysAgo = new Date(today);
-      thirtyDaysAgo.setDate(today.getDate() - 29);
-      if (dateFilter === 'today' && !isSameLocalDay(leadDate, now)) return false;
-      if (dateFilter === 'yesterday' && !isSameLocalDay(leadDate, yesterday)) return false;
-      if (dateFilter === '7d' && leadDate < sevenDaysAgo) return false;
-      if (dateFilter === '30d' && leadDate < thirtyDaysAgo) return false;
+  useEffect(() => {
+    if (templateFilter !== 'all' && templateFilter !== 'legacy') return;
 
-      return true;
-    }).sort((a, b) => getLeadDate(b).getTime() - getLeadDate(a).getTime());
-  }, [allAnalytics, search, templateFilter, dateFilter, confidenceFilter, isNegativeKey]);
+    setDiscoveredVerdicts((previous) => {
+      const byKey = new Map(previous.map((option) => [option.key, option]));
+      let changed = false;
+
+      baseHotLeads.forEach((lead) => {
+        const verdict = normalizeOutcomeKeyForMatch(lead.verdict);
+        if (!verdict || byKey.has(verdict)) return;
+
+        const bucketIndex = lead.post_processing_template_id
+          ? bucketIndexByTemplateId.get(lead.post_processing_template_id)
+          : undefined;
+        byKey.set(verdict, {
+          key: verdict,
+          label: bucketIndex?.get(verdict)?.bucket.label || humanizeOutcomeKey(verdict),
+        });
+        changed = true;
+      });
+
+      return changed ? Array.from(byKey.values()) : previous;
+    });
+  }, [baseHotLeads, bucketIndexByTemplateId, templateFilter]);
 
   const verdictOptions = useMemo(() => {
     if (templateFilter !== 'all' && templateFilter !== 'legacy') {
@@ -397,47 +451,23 @@ export default function HotLeadsPage() {
       }
     }
 
-    const seen = new Set<string>();
+    return discoveredVerdicts;
+  }, [discoveredVerdicts, templateDetails, templateFilter, templates]);
+  const effectiveIntentFilter = intentFilter;
 
-    return baseHotLeads.reduce<Array<{ key: string; label: string }>>((accumulator, lead) => {
-      const verdict = normalizeOutcomeKeyForMatch(lead.verdict);
-      if (!verdict || seen.has(verdict)) return accumulator;
-      seen.add(verdict);
-
-      const bucketIndex = lead.post_processing_template_id
-        ? bucketIndexByTemplateId.get(lead.post_processing_template_id)
-        : undefined;
-      const label = bucketIndex?.get(verdict)?.bucket.label || humanizeOutcomeKey(verdict);
-      accumulator.push({ key: verdict, label });
-
-      return accumulator;
-    }, []);
-  }, [baseHotLeads, bucketIndexByTemplateId, templateDetails, templateFilter, templates]);
-  const effectiveIntentFilter = useMemo(() => {
-    if (intentFilter === 'all') return 'all';
-
-    return verdictOptions.some((option) => option.key === intentFilter) ? intentFilter : 'all';
-  }, [intentFilter, verdictOptions]);
-
-  const hotLeads = useMemo(() => {
-    return baseHotLeads.filter((lead) => {
-      const verdict = normalizeOutcomeKeyForMatch(lead.verdict);
-      if (effectiveIntentFilter !== 'all' && verdict !== normalizeOutcomeKeyForMatch(effectiveIntentFilter)) return false;
-
-      return true;
-    });
-  }, [baseHotLeads, effectiveIntentFilter]);
+  // The verdict filter is applied server-side via the `verdict` query param, so
+  // the page we were handed is already scoped to the selected chip.
+  const hotLeads = baseHotLeads;
 
   // Pagination Logic
-  const totalPages = Math.max(1, Math.ceil(hotLeads.length / itemsPerPage));
+  const totalPages = Math.max(1, Math.ceil(pagination.total / itemsPerPage));
   const effectiveCurrentPage = Math.min(currentPage, totalPages);
-  const paginatedLeads = useMemo(() => {
-    const start = (effectiveCurrentPage - 1) * itemsPerPage;
+  const paginatedLeads = hotLeads;
 
-    return hotLeads.slice(start, start + itemsPerPage);
-  }, [hotLeads, effectiveCurrentPage]);
-
-  // Stats Logic — dynamic per-bucket count for the active template's positive buckets
+  // Per-bucket counts. These describe the loaded page only — a whole-archive
+  // breakdown would need a server-side aggregate, and the stats endpoint
+  // documented alongside pagination does not accept filters. Labelled as such
+  // in the UI so the numbers are not read as archive totals.
   const bucketStats = useMemo(() => {
     return verdictOptions.map((option) => ({
       key: option.key,
@@ -467,6 +497,35 @@ export default function HotLeadsPage() {
     setCurrentPage(Math.min(Math.max(1, newPage), totalPages));
   }, [totalPages]);
 
+  const handleSearchChange = useCallback((value: string) => {
+    setCurrentPage(1);
+    setSearch(value);
+  }, []);
+
+  const handleDateFilterChange = useCallback((value: typeof dateFilter) => {
+    setCurrentPage(1);
+    setDateFilter(value);
+  }, []);
+
+  const handleTemplateFilterChange = useCallback((value: string) => {
+    setCurrentPage(1);
+    setTemplateFilter(value);
+    // Verdict chips belong to the selected template's bucket list. Keeping the
+    // previous selection would send a verdict the new template never emits,
+    // returning an empty page against a non-zero total.
+    setIntentFilter('all');
+  }, []);
+
+  const handleIntentFilterChange = useCallback((value: string) => {
+    setCurrentPage(1);
+    setIntentFilter(value);
+  }, []);
+
+  const handleConfidenceFilterChange = useCallback(() => {
+    setCurrentPage(1);
+    setConfidenceFilter((value) => value === 'all' ? 'high' : 'all');
+  }, []);
+
   const handleSelectLead = useCallback((lead: CallAnalytics) => {
     setSelectedLead(lead);
   }, []);
@@ -491,7 +550,7 @@ export default function HotLeadsPage() {
               <Input 
                 placeholder="Search leads..." 
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(e) => handleSearchChange(e.target.value)}
                 className="pl-9 h-10 w-64 bg-muted/10 border-border/40 text-xs focus:ring-primary transition-all rounded-md"
               />
             </div>
@@ -504,15 +563,15 @@ export default function HotLeadsPage() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => setDateFilter('today')}>Today</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setDateFilter('yesterday')}>Yesterday</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setDateFilter('7d')}>Last 7 Days</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setDateFilter('30d')}>Last 30 Days</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setDateFilter('all')}>All Time</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleDateFilterChange('today')}>Today</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleDateFilterChange('yesterday')}>Yesterday</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleDateFilterChange('7d')}>Last 7 Days</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleDateFilterChange('30d')}>Last 30 Days</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleDateFilterChange('all')}>All Time</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
 
-            <Select value={templateFilter} onValueChange={setTemplateFilter}>
+            <Select value={templateFilter} onValueChange={handleTemplateFilterChange}>
               <SelectTrigger className="h-10 w-52 bg-muted/10 border-border/40 text-xs">
                 <SelectValue placeholder="All templates" />
               </SelectTrigger>
@@ -535,7 +594,7 @@ export default function HotLeadsPage() {
           <div className="flex gap-2">
             <button
               key="all"
-              onClick={() => setIntentFilter('all')}
+              onClick={() => handleIntentFilterChange('all')}
               className={cn(
                 'px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all border',
                 effectiveIntentFilter === 'all' ? 'bg-foreground text-background border-foreground' : 'bg-transparent text-muted-foreground border-transparent hover:bg-muted/50',
@@ -546,7 +605,7 @@ export default function HotLeadsPage() {
             {verdictOptions.map((bucket) => (
               <button
                 key={bucket.key}
-                onClick={() => setIntentFilter(bucket.key)}
+                onClick={() => handleIntentFilterChange(bucket.key)}
                 className={cn(
                   'px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all border whitespace-nowrap',
                   effectiveIntentFilter === bucket.key ? 'bg-foreground text-background border-foreground' : 'bg-transparent text-muted-foreground border-transparent hover:bg-muted/50',
@@ -559,7 +618,7 @@ export default function HotLeadsPage() {
           <div className="h-4 w-px bg-border/40 mx-2" />
           <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">Confidence:</span>
           <button 
-            onClick={() => setConfidenceFilter(confidenceFilter === 'all' ? 'high' : 'all')}
+            onClick={handleConfidenceFilterChange}
             className={cn(
               'px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all border flex items-center gap-2',
               confidenceFilter === 'high' ? 'bg-green-500/10 text-green-600 border-green-500/20' : 'bg-transparent text-muted-foreground border-transparent hover:bg-muted/50',
@@ -591,7 +650,7 @@ export default function HotLeadsPage() {
                       </span>
                       <div className="flex items-center gap-2">
                         <span className="text-3xl font-bold font-mono text-foreground">{count}</span>
-                        <span className="text-xs text-muted-foreground">Leads</span>
+                        <span className="text-xs text-muted-foreground">On This Page</span>
                       </div>
                     </div>
                     <Target size={24} className={cn(palette.color, 'opacity-20')} />
@@ -607,7 +666,7 @@ export default function HotLeadsPage() {
                 <div className="space-y-1">
                   <span className="text-[9px] font-bold uppercase tracking-widest text-primary">Qualified Leads</span>
                   <div className="flex items-center gap-2">
-                    <span className="text-3xl font-bold font-mono text-foreground">{hotLeads.length}</span>
+                    <span className="text-3xl font-bold font-mono text-foreground">{pagination.total}</span>
                     <span className="text-xs text-muted-foreground">Total</span>
                   </div>
                 </div>
@@ -657,7 +716,7 @@ export default function HotLeadsPage() {
             {hotLeads.length > 0 && (
               <div className="p-4 border-t border-border/10 flex items-center justify-between bg-muted/5 mt-auto">
                 <span className="text-[9px] font-bold font-mono text-muted-foreground uppercase tracking-widest">
-                            Page {effectiveCurrentPage} of {totalPages} ({hotLeads.length} Total)
+                            Page {effectiveCurrentPage} of {totalPages} ({pagination.total} Total)
                 </span>
                 <div className="flex items-center gap-4">
                   <button 

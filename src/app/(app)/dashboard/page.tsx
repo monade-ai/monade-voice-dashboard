@@ -296,18 +296,18 @@ export default function DashboardPage() {
 
   const { metrics } = useDashboardData();
   const { credits } = useCredits();
-  const { transcripts, loading: transcriptsLoading } = useTranscripts();
-  const { analytics: allAnalytics, fetchAll: fetchAnalytics } = useUserAnalytics();
-  const transcriptCallIds = useMemo(
-    () => transcripts.map((transcript) => transcript.call_id).filter(Boolean),
-    [transcripts],
-  );
-
+  const {
+    transcripts,
+    pagination: transcriptPagination,
+    loading: transcriptsLoading,
+  } = useTranscripts();
+  const {
+    analytics: allAnalytics,
+    fetchPage: fetchAnalyticsPage,
+  } = useUserAnalytics();
   useEffect(() => {
-    if (transcriptCallIds.length > 0) {
-      fetchAnalytics({ expectedCallIds: transcriptCallIds });
-    }
-  }, [transcriptCallIds, fetchAnalytics]);
+    fetchAnalyticsPage({ limit: 20, offset: 0 });
+  }, [fetchAnalyticsPage]);
 
   const mergedTranscripts = useMemo(() => {
     return transcripts.map(t => ({
@@ -425,8 +425,8 @@ export default function DashboardPage() {
               </PaperCardHeader>
               <PaperCardContent className="mt-4">
                 <div className="flex flex-col">
-                  <span className="text-6xl font-medium tracking-tighter leading-none">{transcripts.length}</span>
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mt-4">Calls processed today</span>
+                  <span className="text-6xl font-medium tracking-tighter leading-none">{transcriptPagination.total}</span>
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mt-4">Archived interactions</span>
                 </div>
               </PaperCardContent>
             </PaperCard>
@@ -460,9 +460,20 @@ export default function DashboardPage() {
                 <div className="flex items-center gap-4">
                   <h3 className="text-2xl font-medium tracking-tight">Lead Ledger</h3>
                   <Badge variant="outline" className="text-[10px] font-bold px-2 py-0.5 rounded-[2px] border-border text-muted-foreground uppercase tracking-widest font-mono">
-                    {filteredTranscripts.length} Active Signals
+                    {filteredTranscripts.length} of {transcripts.length} Recent
                   </Badge>
                 </div>
+                {/* The dashboard intentionally loads only the most recent page.
+                    The filters below refine that window, they do not search the
+                    archive — Call Archive filters server-side and is the surface
+                    for that. Saying so beats a filter bar that looks archive-wide
+                    and silently returns nothing for older calls. */}
+                <a
+                  href="/call-history"
+                  className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground hover:text-primary transition-colors"
+                >
+                  Search full archive →
+                </a>
               </div>
 
               <FilterBar
@@ -503,7 +514,7 @@ export default function DashboardPage() {
               {totalPages > 1 && (
                 <div className="px-6 py-8 flex items-center justify-between border-t border-border/20">
                   <span className="text-[10px] font-bold font-mono text-muted-foreground uppercase tracking-widest">
-                    Records {indexOfFirstCall + 1} to {Math.min(indexOfLastCall, transcripts.length)}
+                    Recent {indexOfFirstCall + 1} to {Math.min(indexOfLastCall, filteredTranscripts.length)} of {filteredTranscripts.length}
                   </span>
                   <div className="flex items-center gap-10">
                     <button onClick={() => setCurrentPage((p) => p - 1)} disabled={currentPage === 1} className="text-muted-foreground hover:text-primary disabled:opacity-10 transition-colors">

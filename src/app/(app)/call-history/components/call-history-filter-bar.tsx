@@ -31,7 +31,6 @@ import {
 export interface CallHistoryFilterState {
   verdicts: string[];
   qualities: string[];
-  hasConversation: boolean;
   search: string;
   timeRange: string;
   durationRange: string;
@@ -39,10 +38,21 @@ export interface CallHistoryFilterState {
   direction: 'all' | 'inbound' | 'outbound';
 }
 
+export interface CampaignFilterOption {
+  id: string;
+  name: string;
+}
+
 interface CallHistoryFilterBarProps {
   filters: CallHistoryFilterState;
   onFilterChange: (filters: CallHistoryFilterState) => void;
-  availableCampaigns?: string[];
+  /**
+   * The user's full campaign list. This must not be derived from the loaded
+   * archive page — with server-side pagination a page holds at most a handful
+   * of campaigns, so a page-derived list silently hides most of the options and
+   * changes as the user pages.
+   */
+  availableCampaigns?: CampaignFilterOption[];
 }
 
 const VERDICT_OPTIONS = [
@@ -105,7 +115,6 @@ export function CallHistoryFilterBar({
     onFilterChange({
       verdicts: [],
       qualities: [],
-      hasConversation: false,
       search: '',
       timeRange: 'all',
       durationRange: 'all',
@@ -117,7 +126,6 @@ export function CallHistoryFilterBar({
   const activeCount =
     filters.verdicts.length +
     filters.qualities.length +
-    (filters.hasConversation ? 1 : 0) +
     (filters.timeRange !== 'all' ? 1 : 0) +
     (filters.durationRange !== 'all' ? 1 : 0) +
     (filters.direction !== 'all' ? 1 : 0) +
@@ -285,12 +293,12 @@ export function CallHistoryFilterBar({
               <DropdownMenuSeparator className="bg-border/10" />
               {availableCampaigns.map((campaign) => (
                 <DropdownMenuCheckboxItem
-                  key={campaign}
-                  checked={filters.campaigns.includes(campaign)}
-                  onCheckedChange={() => toggleCampaign(campaign)}
+                  key={campaign.id}
+                  checked={filters.campaigns.includes(campaign.id)}
+                  onCheckedChange={() => toggleCampaign(campaign.id)}
                   className="text-xs px-3 py-2 cursor-pointer focus:bg-muted/50"
                 >
-                  {campaign}
+                  {campaign.name}
                 </DropdownMenuCheckboxItem>
               ))}
             </DropdownMenuContent>
@@ -322,19 +330,11 @@ export function CallHistoryFilterBar({
           {filters.direction === 'all' ? 'Direction' : filters.direction === 'inbound' ? 'Inbound' : 'Outbound'}
         </Button>
 
-        {/* Connected Filter */}
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => onFilterChange({ ...filters, hasConversation: !filters.hasConversation })}
-          className={cn(
-            'h-7 gap-1.5 hover:bg-white/[0.05] rounded-full text-[10px] font-bold uppercase tracking-wider px-3 transition-all',
-            filters.hasConversation ? 'text-primary hover:text-primary hover:bg-primary/5' : 'text-foreground/80',
-          )}
-        >
-          <Activity className="w-3 h-3 transition-colors" />
-          Connected
-        </Button>
+        {/* No "Connected" toggle: the archive is now filtered server-side and the
+            backend exposes no equivalent parameter. Its old client rule
+            (`has_conversation || analytics`) is also trivially true for every
+            archive row now that each row *is* an analytics record, so the
+            control would filter nothing even if it were reinstated. */}
 
         {activeCount > 0 && (
           <Button

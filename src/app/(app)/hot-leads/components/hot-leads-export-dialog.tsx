@@ -1,13 +1,10 @@
 'use client';
 
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Download, FileDown, Loader2, X, Zap } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
   Dialog,
   DialogClose,
@@ -21,8 +18,6 @@ import {
 import { fetchJson } from '@/lib/http';
 import { resolveCallDirection } from '@/lib/utils/call-outcome';
 import type { CallAnalytics } from '@/app/hooks/use-analytics';
-
-type RangePreset = 'all' | 'today' | 'yesterday' | 'week' | 'month' | 'custom';
 
 interface HotLeadsExportDialogProps {
   /** The curated hot-leads list (already filtered by the page's search/intent/confidence). */
@@ -40,12 +35,6 @@ function escapeCsv(value: unknown): string {
   return str;
 }
 
-// datetime-local string (no tz) ⇄ Date in the browser's local time.
-function toDateTimeLocalInput(d: Date): string {
-  const pad = (n: number) => String(n).padStart(2, '0');
-
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
 
 const CSV_FIELDS = [
   'phone_number',
@@ -70,57 +59,19 @@ const CSV_FIELDS = [
 
 export function HotLeadsExportDialog({ leads, trigger }: HotLeadsExportDialogProps) {
   const [open, setOpen] = useState(false);
-  const [preset, setPreset] = useState<RangePreset>('all');
-  const [fromDateTime, setFromDateTime] = useState<string>('');
-  const [toDateTime, setToDateTime] = useState<string>('');
   const [exporting, setExporting] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
 
-  const applyPreset = (p: RangePreset) => {
-    setPreset(p);
-    const now = new Date();
-    if (p === 'all') {
-      setFromDateTime('');
-      setToDateTime('');
-    } else if (p === 'today') {
-      const start = new Date(now); start.setHours(0, 0, 0, 0);
-      setFromDateTime(toDateTimeLocalInput(start));
-      setToDateTime(toDateTimeLocalInput(now));
-    } else if (p === 'yesterday') {
-      const start = new Date(now); start.setDate(now.getDate() - 1); start.setHours(0, 0, 0, 0);
-      const end = new Date(now); end.setDate(now.getDate() - 1); end.setHours(23, 59, 0, 0);
-      setFromDateTime(toDateTimeLocalInput(start));
-      setToDateTime(toDateTimeLocalInput(end));
-    } else if (p === 'week') {
-      const start = new Date(now); start.setDate(now.getDate() - 7);
-      setFromDateTime(toDateTimeLocalInput(start));
-      setToDateTime(toDateTimeLocalInput(now));
-    } else if (p === 'month') {
-      const start = new Date(now); start.setDate(now.getDate() - 30);
-      setFromDateTime(toDateTimeLocalInput(start));
-      setToDateTime(toDateTimeLocalInput(now));
-    }
-    // 'custom' leaves the existing from/to as-is.
-  };
+  // The Deal Room is filtered and paginated server-side now, so this dialog's
+  // own date range could only subtract from the page already on screen — the
+  // same filter applied twice, reading as the export dropping records. Export
+  // means "the leads currently on screen"; an archive-wide export needs a
+  // streamed server-side job rather than the browser walking every page.
+  const exportLeads = leads;
 
-  const filteredLeads = useMemo(() => {
-    const fromTs = fromDateTime ? new Date(fromDateTime).getTime() : null;
-    const toTs = toDateTime ? new Date(toDateTime).getTime() : null;
-
-    return leads.filter((lead) => {
-      const ms = leadDate(lead).getTime();
-      if (fromTs !== null && !Number.isNaN(fromTs) && ms < fromTs) return false;
-      if (toTs !== null && !Number.isNaN(toTs) && ms > toTs) return false;
-
-      return true;
-    });
-  }, [leads, fromDateTime, toDateTime]);
-
-  // mode 'fast' skips the per-call transcript-text fetch (the only slow step) and the
-  // recording URL, exporting everything else instantly. mode 'full' is the original logic.
   const handleDownload = async (mode: 'fast' | 'full') => {
-    if (filteredLeads.length === 0 || exporting) {
-      if (filteredLeads.length === 0) toast.error('No hot leads match the selected range.');
+    if (exportLeads.length === 0 || exporting) {
+      if (exportLeads.length === 0) toast.error('There are no hot leads on this page to export.');
 
       return;
     }
@@ -135,7 +86,7 @@ export function HotLeadsExportDialog({ leads, trigger }: HotLeadsExportDialogPro
       // Skipped entirely in 'fast' mode.
       const transcriptByCallId = new Map<string, string>();
       if (mode === 'full') {
-        const jobs = filteredLeads
+        const jobs = exportLeads
           .map((lead) => ({
             callId: lead.call_id,
             url: lead.enhanced_transcript_url || lead.transcript_url || '',
@@ -176,7 +127,7 @@ export function HotLeadsExportDialog({ leads, trigger }: HotLeadsExportDialogPro
         }
       }
 
-      const rows = filteredLeads.map((lead) => {
+      const rows = exportLeads.map((lead) => {
         const discoveries = lead.key_discoveries || {};
         const durationSeconds = typeof discoveries.duration_seconds === 'number'
           ? discoveries.duration_seconds
@@ -241,21 +192,6 @@ export function HotLeadsExportDialog({ leads, trigger }: HotLeadsExportDialogPro
     abortRef.current?.abort();
   };
 
-  const resetFilters = () => {
-    setPreset('all');
-    setFromDateTime('');
-    setToDateTime('');
-  };
-
-  const presetOptions: { label: string; value: RangePreset }[] = [
-    { label: 'All Time', value: 'all' },
-    { label: 'Today', value: 'today' },
-    { label: 'Yesterday', value: 'yesterday' },
-    { label: 'Last 7 Days', value: 'week' },
-    { label: 'Last 30 Days', value: 'month' },
-    { label: 'Custom', value: 'custom' },
-  ];
-
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -265,7 +201,7 @@ export function HotLeadsExportDialog({ leads, trigger }: HotLeadsExportDialogPro
             className="h-10 px-4 gap-2 border-border text-[10px] font-bold uppercase tracking-widest hover:bg-primary hover:text-black transition-all"
           >
             <Download size={14} />
-            Export CSV
+            Export Page
           </Button>
         )}
       </DialogTrigger>
@@ -273,90 +209,29 @@ export function HotLeadsExportDialog({ leads, trigger }: HotLeadsExportDialogPro
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileDown className="w-4 h-4" />
-            Export Hot Leads to CSV
+            Export Current Hot Leads Page
           </DialogTitle>
           <DialogDescription>
-            Choose a date &amp; time range so you only download the leads you need — not the
-            entire Deal Room. <strong>Full Export</strong> includes transcripts (enhanced when
-            available) and recording links — slower on large ranges. <strong>Fast Export</strong>
-            skips those and returns instantly with direction, analytics and all other fields.
+            Exports the Deal Room page you are currently viewing, with whatever filters the page
+            has applied. <strong>Full Export</strong> includes transcripts (enhanced when
+            available) and recording links. <strong>Fast Export</strong> skips those and returns
+            instantly with direction, analytics and all other fields.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-5 py-2">
-          <section className="space-y-2">
-            <Label className="text-[10px] font-bold uppercase tracking-widest text-foreground/70">
-              Time Range
-            </Label>
-            <div className="flex flex-wrap gap-1.5">
-              {presetOptions.map((opt) => (
-                <Button
-                  key={opt.value}
-                  variant="outline"
-                  size="sm"
-                  onClick={() => applyPreset(opt.value)}
-                  className={cn(
-                    'h-7 text-[10px] font-bold uppercase tracking-wider px-3 transition-all',
-                    preset === opt.value
-                      ? 'bg-foreground text-background border-foreground hover:bg-foreground/90 hover:text-background'
-                      : 'hover:bg-muted',
-                  )}
-                >
-                  {opt.label}
-                </Button>
-              ))}
-            </div>
-            <div className="grid grid-cols-2 gap-3 pt-2">
-              <div className="space-y-1">
-                <Label htmlFor="hl-export-from" className="text-[10px] uppercase tracking-widest text-muted-foreground">
-                  From
-                </Label>
-                <Input
-                  id="hl-export-from"
-                  type="datetime-local"
-                  value={fromDateTime}
-                  max={toDateTime || undefined}
-                  onChange={(e) => { setFromDateTime(e.target.value); setPreset('custom'); }}
-                  className="h-9 text-xs"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="hl-export-to" className="text-[10px] uppercase tracking-widest text-muted-foreground">
-                  To
-                </Label>
-                <Input
-                  id="hl-export-to"
-                  type="datetime-local"
-                  value={toDateTime}
-                  min={fromDateTime || undefined}
-                  onChange={(e) => { setToDateTime(e.target.value); setPreset('custom'); }}
-                  className="h-9 text-xs"
-                />
-              </div>
-            </div>
-          </section>
-
-          <section className="rounded-md border border-border/40 bg-muted/20 px-4 py-3 flex items-center justify-between">
+          <section className="rounded-md border border-border/40 bg-muted/20 px-4 py-3">
             <div className="space-y-0.5">
               <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                 Ready to export
               </div>
               <div className="text-xl font-medium tracking-tight">
-                {filteredLeads.length.toLocaleString()}
+                {exportLeads.length.toLocaleString()}
                 <span className="text-xs text-muted-foreground ml-2">
-                  of {leads.length.toLocaleString()} hot leads
+                  hot leads on this page
                 </span>
               </div>
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={resetFilters}
-              className="h-7 text-[10px] font-bold uppercase tracking-widest text-muted-foreground hover:text-foreground"
-            >
-              <X className="w-3 h-3 mr-1" />
-              Reset
-            </Button>
           </section>
         </div>
 
@@ -387,7 +262,7 @@ export function HotLeadsExportDialog({ leads, trigger }: HotLeadsExportDialogPro
             <div className="flex flex-col-reverse sm:flex-row gap-2">
               <Button
                 onClick={() => handleDownload('fast')}
-                disabled={filteredLeads.length === 0}
+                disabled={exportLeads.length === 0}
                 variant="outline"
                 size="sm"
                 title="Skips transcripts & recording URLs — instant"
@@ -398,7 +273,7 @@ export function HotLeadsExportDialog({ leads, trigger }: HotLeadsExportDialogPro
               </Button>
               <Button
                 onClick={() => handleDownload('full')}
-                disabled={filteredLeads.length === 0}
+                disabled={exportLeads.length === 0}
                 size="sm"
                 title="Includes full transcripts & recording URLs — slower"
                 className="gap-2 text-[10px] font-bold uppercase tracking-widest bg-foreground text-background hover:bg-foreground/90"
