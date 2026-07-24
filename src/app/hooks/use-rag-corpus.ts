@@ -185,21 +185,13 @@ export function useRagCorpus() {
           : [];
         const toolsWithoutEndCall = existingTools.filter((tool: any) => tool?.type !== 'end_call');
         const endCallTool = { type: 'end_call', enabled };
+        // Send only the block this toggle owns. The endpoint shallow-merges into the stored
+        // document, so every sibling key (model_config, noise_cancellation, realtime_input,
+        // background_audio, agent_name) survives untouched — and unsaved Voice Lab edits
+        // sitting in local state don't get pushed early as a side effect of a toggle.
         const toolsConfig = {
-          ...(currentToolsConfig?.model_config
-            ? { model_config: currentToolsConfig.model_config }
-            : {}),
-          ...(currentToolsConfig?.realtime_input
-            ? { realtime_input: currentToolsConfig.realtime_input }
-            : {}),
-          ...(currentToolsConfig?.noise_cancellation
-            ? { noise_cancellation: currentToolsConfig.noise_cancellation }
-            : {}),
           tools: [...toolsWithoutEndCall, endCallTool],
           max_tool_steps: currentToolsConfig?.max_tool_steps ?? 1,
-          ...(currentToolsConfig?.background_audio
-            ? { background_audio: currentToolsConfig.background_audio }
-            : {}),
         };
 
         const result = await fetchJson<any>(
@@ -246,21 +238,10 @@ export function useRagCorpus() {
             vector_distance_threshold: existingVertexRag?.config?.vector_distance_threshold ?? 0.3,
           },
         };
+        // Same as above — only the `tools` block travels; siblings are merged server-side.
         const toolsConfig = {
-          ...(currentToolsConfig?.model_config
-            ? { model_config: currentToolsConfig.model_config }
-            : {}),
-          ...(currentToolsConfig?.realtime_input
-            ? { realtime_input: currentToolsConfig.realtime_input }
-            : {}),
-          ...(currentToolsConfig?.noise_cancellation
-            ? { noise_cancellation: currentToolsConfig.noise_cancellation }
-            : {}),
           tools: [...toolsWithoutVertexRag, vertexRagTool],
           max_tool_steps: currentToolsConfig?.max_tool_steps ?? 1,
-          ...(currentToolsConfig?.background_audio
-            ? { background_audio: currentToolsConfig.background_audio }
-            : {}),
         };
 
         const result = await fetchJson<any>(

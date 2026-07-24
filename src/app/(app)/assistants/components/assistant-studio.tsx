@@ -172,17 +172,27 @@ const mapVoiceModelToBackendVersion = (value: VoiceModelId): BackendModelVersion
   value === 'monade-v2' ? 'v2' : 'v1'
 );
 
-const inferVoiceModel = (toolsConfig: any): VoiceModelId => {
+const mapBackendVersionToVoiceModel = (version: BackendModelVersion): VoiceModelId => (
+  version === 'v2' ? 'monade-v2' : 'monade-v1'
+);
+
+// Reads model_config.model_version as-is. Returns null when the assistant has no model
+// pinned — never guesses a version, so the UI can stay silent instead of claiming V1.
+// The one inference kept is thinking_level, which only exists on V2.
+const readModelVersion = (toolsConfig: any): BackendModelVersion | null => {
   const modelVersion = String(toolsConfig?.model_config?.model_version ?? '').toLowerCase();
-  if (modelVersion === 'v2') return 'monade-v2';
-  if (modelVersion === 'v1') return 'monade-v1';
+  if (modelVersion === 'v2') return 'v2';
+  if (modelVersion === 'v1') return 'v1';
 
   const hasThinkingLevel = !!toolsConfig?.model_config && 'thinking_level' in toolsConfig.model_config;
-  const hasNoiseCancellation = !!toolsConfig?.noise_cancellation;
-  if (hasThinkingLevel || hasNoiseCancellation) return 'monade-v2';
+  if (hasThinkingLevel) return 'v2';
 
-  return 'monade-v1';
+  return null;
 };
+
+const modelVersionLabel = (version: BackendModelVersion | null): string | null => (
+  version ? VOICE_MODEL_OPTIONS.find(o => o.value === mapBackendVersionToVoiceModel(version))?.label ?? null : null
+);
 
 const budgetToLevel = (budget: number): ThinkingLevel => {
   if (!Number.isFinite(budget) || budget <= 0) return 'minimal';
@@ -259,6 +269,34 @@ const buildRealtimeInputPayload = (config: RealtimeInputConfig) => ({
   silence_duration_ms: config.silence_duration_ms ?? DEFAULT_REALTIME_INPUT.silence_duration_ms,
 });
 
+// Makes a toolsConfig safe for the backend validator before it goes out on Save.
+// Returns null when there is nothing worth sending, so the caller can omit the key
+// entirely rather than posting a null that would wipe the stored document.
+const buildToolsConfigPayload = (toolsConfig: any): Record<string, any> | null => {
+  if (!toolsConfig || typeof toolsConfig !== 'object' || Array.isArray(toolsConfig)) return null;
+
+  const payload: Record<string, any> = { ...toolsConfig };
+  delete payload.vad; // legacy alias; realtime_input is the canonical key
+
+  // The validator rejects a null start/end sensitivity outright, and the UI writes null
+  // to mean "use the default". Resolve those to real defaults before sending.
+  if (toolsConfig.realtime_input || toolsConfig.vad) {
+    payload.realtime_input = buildRealtimeInputPayload(readRealtimeInput(toolsConfig));
+  }
+
+  // An enabled vertex_rag entry with no corpus is a 400. That state is reachable by
+  // detaching a corpus without disabling the tool, and it would block every later save.
+  if (Array.isArray(payload.tools)) {
+    payload.tools = payload.tools.map((tool: any) => (
+      tool?.type === 'vertex_rag' && tool?.enabled && !tool?.config?.rag_corpus
+        ? { ...tool, enabled: false }
+        : tool
+    ));
+  }
+
+  return Object.keys(payload).length > 0 ? payload : null;
+};
+
 interface AssistantGreetingConfig {
   initialGreetingUrl: string | null;
   initialGreetingSystemPromptUrl: string | null;
@@ -315,7 +353,8 @@ export default function AssistantStudio() {
     || GEMINI_VOICE_OPTIONS.find((voice) => voice.value === 'Kore');
   const hasUnsavedVoiceChange = (selectedVoiceValue || null) !== savedVoiceValue;
 
-  const selectedVoiceModel = inferVoiceModel(currentAssistant?.toolsConfig);
+  const selectedModelVersion = readModelVersion(currentAssistant?.toolsConfig);
+  const selectedVoiceModel = selectedModelVersion ? mapBackendVersionToVoiceModel(selectedModelVersion) : null;
   const thinkingLevel = readThinkingLevel(currentAssistant?.toolsConfig);
   const noiseCancellationModel = readNoiseCancellation(currentAssistant?.toolsConfig);
   const agentName = readAgentName(currentAssistant?.toolsConfig);
@@ -462,33 +501,31 @@ export default function AssistantStudio() {
     setSaveStatus('idle');
     try {
       const { id, createdAt: _createdAt, knowledgeBase, dispatch_rule_id: _dispatchRuleId, ...updates } = currentAssistant;
+      // PATCH /api/assistants/:id validates toolsConfig and shallow-merges it into the stored
+      // JSONB column, so the main Save is the single writer for the whole Voice Lab block.
+      // It must be sanitized first — the backend rejects null VAD sensitivities with a 400
+      // that would fail the entire save, not just the VAD part.
+      const toolsConfigPayload = buildToolsConfigPayload(currentAssistant.toolsConfig);
       const savedAssistant = await saveAssistantUpdates(id, {
         ...updates,
+        ...(toolsConfigPayload
+          ? { toolsConfig: toolsConfigPayload }
+          // Never send `toolsConfig: null` — the backend reads that as "wipe the column".
+          : { toolsConfig: undefined }),
         knowledgeBaseId: knowledgeBase,
       }, { silentSuccess: true });
-      await saveGreetingConfig(id);
-      const nextRealtimeInput = readRealtimeInput(currentAssistant.toolsConfig);
-      const hasRealtimeInputConfig = !!currentAssistant.toolsConfig?.realtime_input || !!currentAssistant.toolsConfig?.vad;
-      if (hasRealtimeInputConfig) {
-        const data = await fetchJson<any>(`${MONADE_API_BASE}/api/assistants/${encodeURIComponent(id)}/realtime-input`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(buildRealtimeInputPayload(nextRealtimeInput)),
-          retry: { retries: 0 },
-        });
-        const latestAssistant = currentAssistantRef.current;
-        if (latestAssistant?.id === id) {
-          updateAssistantLocally(id, {
-            toolsConfig: data?.toolsConfig ?? {
-              ...(savedAssistant?.toolsConfig || latestAssistant.toolsConfig || {}),
-              realtime_input: buildRealtimeInputPayload(nextRealtimeInput),
-            },
-          });
-        }
+      // saveAssistantUpdates swallows its own errors and returns undefined, so without this
+      // a rejected PATCH (e.g. a toolsConfig validation 400) still reported a green "Saved".
+      if (!savedAssistant) {
+        throw new Error('Assistant update was not persisted');
       }
+      await saveGreetingConfig(id);
       if ((currentAssistant.call_direction === 'inbound' || currentAssistant.call_direction === 'both') && currentAssistant.inbound_trunk_id) {
         await rebakeInboundDispatchRules(savedAssistant ?? currentAssistant, { silentSuccess: true });
       }
+      // Re-read the stored document so what's on screen is what the backend actually kept,
+      // rather than the optimistic local copy. A dropped key shows up immediately.
+      await syncToolsFromBackend(id);
       setSavedVoiceValue(currentAssistant.voice || null);
       setIsDirty(false);
       setSaveStatus('saved');
@@ -694,6 +731,9 @@ export default function AssistantStudio() {
     handleUpdate('toolsConfig' as keyof Assistant, nextToolsConfig);
   };
 
+  // Note: model_config is rewritten as a whole object rather than patched key-by-key.
+  // The backend shallow-merges toolsConfig at the top level, so replacing the block is
+  // what actually removes a stale key — deleting one from a partial payload is ignored.
   const updateVoiceModel = (next: VoiceModelId) => {
     if (!currentAssistant) return;
     const existing = { ...(currentAssistant.toolsConfig?.model_config || {}) };
@@ -707,7 +747,9 @@ export default function AssistantStudio() {
         existing.thinking_level = 'minimal';
       }
     } else {
+      // V1 has no thinking controls — drop both the current and the legacy key.
       delete existing.thinking_level;
+      delete existing.thinking_budget;
     }
     nextToolsConfig.model_config = existing;
     handleUpdate('toolsConfig' as keyof Assistant, nextToolsConfig);
@@ -736,7 +778,10 @@ export default function AssistantStudio() {
     setTemperatureInput(String(clamped));
     const nextModelConfig = { ...(currentAssistant.toolsConfig?.model_config || {}) };
     nextModelConfig.temperature = clamped;
-    nextModelConfig.model_version = selectedVoiceModel === 'monade-v2' ? 'v2' : 'v1';
+    // Temperature is shared by V1 and V2 — never let it pin a version the user didn't pick.
+    if (selectedModelVersion) {
+      nextModelConfig.model_version = selectedModelVersion;
+    }
     const nextToolsConfig = {
       ...(currentAssistant.toolsConfig || {}),
       model_config: nextModelConfig,
@@ -1755,11 +1800,14 @@ export default function AssistantStudio() {
                     Model
                   </label>
                   <Select
-                    value={selectedVoiceModel}
+                    value={selectedVoiceModel || ''}
                     onValueChange={(value) => updateVoiceModel(value as VoiceModelId)}
                   >
                     <SelectTrigger className="w-full h-10 border-border/40 bg-muted/20 text-sm">
-                      <SelectValue />
+                      {/* Unpinned assistants show the placeholder rather than a guessed version.
+                          There is deliberately no "Not set" option — a model must stay pinned
+                          once chosen, and picking one is the only way out of the blank state. */}
+                      <SelectValue placeholder="Not set" />
                     </SelectTrigger>
                     <SelectContent>
                       {VOICE_MODEL_OPTIONS.map((option) => (
@@ -1772,6 +1820,9 @@ export default function AssistantStudio() {
                       ))}
                     </SelectContent>
                   </Select>
+                  <p className="text-[10px] text-muted-foreground/60 px-1 italic leading-relaxed">
+                    Sent on save as <span className="font-mono">model_config.model_version</span>. Blank means this assistant has never been pinned to a version.
+                  </p>
                 </div>
 
                 {/* Thinking Level — Monade V2 only */}
@@ -2010,7 +2061,10 @@ export default function AssistantStudio() {
               <div className="space-y-4">
                 {[
                   { label: 'Direction', value: isInbound ? 'Inbound' : 'Outbound' },
-                  { label: 'Model', value: currentAssistant.model || 'Muvel' },
+                  // Mirrors model_config.model_version exactly — omitted when no version is pinned.
+                  ...(modelVersionLabel(selectedModelVersion)
+                    ? [{ label: 'Model', value: modelVersionLabel(selectedModelVersion) as string }]
+                    : []),
                   { label: 'Agent', value: agentName || 'Not set' },
                   { label: 'Accent', value: currentAssistant.speakingAccent || 'Default' },
                   { label: 'Full Prompt', value: selectedKnowledgeItem?.displayName || selectedKnowledgeItem?.filename || 'None' },
