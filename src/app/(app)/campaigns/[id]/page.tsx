@@ -20,6 +20,7 @@ import {
   PhoneForwarded,
   PhoneOff,
   Download,
+  Zap,
   Bot,
   Brain,
   Pencil,
@@ -59,7 +60,6 @@ import { formatInTimeZone, getNextOccurrenceUtcIso, parseApiTimestamp } from '@/
 import { useAssistants } from '@/app/hooks/use-assistants-context';
 import { useLibrary } from '@/app/hooks/use-knowledge-base';
 import { resolveCallDirection } from '@/lib/utils/call-outcome';
-
 import {
   Dialog,
   DialogClose,
@@ -70,7 +70,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { ExportDateRangeField, type ExportDateRange } from '@/components/export-date-range-field';
 
 import { CSVUpload } from '../components/csv-upload';
 
@@ -620,7 +619,6 @@ export default function CampaignDetailPage() {
   const [isDownloadingLogs, setIsDownloadingLogs] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState<CsvDownloadProgress | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
-  const [exportDateRange, setExportDateRange] = useState<ExportDateRange>({});
   const [recordingStatus, setRecordingStatus] = useState<CampaignRecordingStatus | null>(null);
   const [isRefreshingRecordingStatus, setIsRefreshingRecordingStatus] = useState(false);
   const [retryDraftValue, setRetryDraftValue] = useState<number>(CAMPAIGN_API_CONFIG.DEFAULTS.MAX_RETRIES);
@@ -986,7 +984,9 @@ export default function CampaignDetailPage() {
     }
   };
 
-  const handleDownloadCallLogs = async (dateRange?: ExportDateRange) => {
+  // 'fast' skips the per-call transcript-text fetch (the only slow step); the
+  // transcript column comes out blank. 'full' fetches transcript text too.
+  const handleDownloadCallLogs = async (mode: 'fast' | 'full') => {
     if (!campaign) return;
     setIsDownloadingLogs(true);
     setDownloadProgress({
@@ -1022,32 +1022,11 @@ export default function CampaignDetailPage() {
       }
 
       const exportedAtUtc = new Date().toISOString();
-      let rows = buildCampaignCallLogRows(campaign.id, allContacts, exportedAtUtc);
+      const rows = buildCampaignCallLogRows(campaign.id, allContacts, exportedAtUtc);
       if (rows.length === 0) {
         toast.info('No call attempts recorded yet for this campaign.');
 
         return;
-      }
-
-      // Optional date/time window (local zone, converted to UTC by the picker).
-      // Filters on the attempt timestamp; rows with no attempt time can't fall
-      // inside a window, so they drop out when a range is set.
-      if (dateRange && (dateRange.from || dateRange.to)) {
-        const fromMs = dateRange.from ? Date.parse(dateRange.from) : null;
-        const toMs = dateRange.to ? Date.parse(dateRange.to) : null;
-        rows = rows.filter((row) => {
-          const ts = row.attempt_timestamp_utc ? Date.parse(row.attempt_timestamp_utc) : NaN;
-          if (Number.isNaN(ts)) return false;
-          if (fromMs !== null && ts < fromMs) return false;
-          if (toMs !== null && ts > toMs) return false;
-
-          return true;
-        });
-        if (rows.length === 0) {
-          toast.info('No call attempts fall within the selected date range.');
-
-          return;
-        }
       }
 
       setDownloadProgress({
@@ -1232,7 +1211,7 @@ export default function CampaignDetailPage() {
         ),
       );
 
-      if (transcriptUrls.length > 0) {
+      if (mode === 'full' && transcriptUrls.length > 0) {
         setDownloadProgress({
           phase: 'transcripts',
           done: 0,
@@ -1322,7 +1301,10 @@ export default function CampaignDetailPage() {
       const timestamp = format(new Date(), 'yyyyMMdd_HHmmss');
       const safeCampaignName = campaign.name.replace(/[^a-zA-Z0-9_-]+/g, '_');
       downloadCSV(csvContent, `${safeCampaignName}_${campaign.id}_client_export_${timestamp}.csv`);
-      toast.success(`Downloaded ${exportResult.rows.length} lead rows.`);
+      toast.success(
+        `Downloaded ${exportResult.rows.length} lead rows`
+        + (mode === 'fast' ? ' (fast — no transcript text).' : '.'),
+      );
     } catch (error) {
       console.error('Failed to download campaign call logs:', error);
       toast.error('Failed to download campaign call logs.');
@@ -1487,15 +1469,12 @@ export default function CampaignDetailPage() {
                     Export Campaign Call Log
                   </DialogTitle>
                   <DialogDescription>
-                    Exports every call attempt for this campaign — contacts, analytics, transcripts
-                    and recordings. Optionally limit it to a date &amp; time window; leave the range
-                    on <strong>All Time</strong> to export the whole campaign.
+                    Exports every call attempt for this campaign — contacts, analytics and
+                    recordings. <strong>Full Export</strong> also fetches the transcript text for
+                    each call (slower). <strong>Fast Export</strong> skips transcript text and
+                    returns quickly with everything else.
                   </DialogDescription>
                 </DialogHeader>
-
-                <div className="py-2">
-                  <ExportDateRangeField onChange={setExportDateRange} disabled={isDownloadingLogs} />
-                </div>
 
                 <DialogFooter>
                   <DialogClose asChild>
@@ -1507,17 +1486,33 @@ export default function CampaignDetailPage() {
                       Cancel
                     </Button>
                   </DialogClose>
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      setExportOpen(false);
-                      void handleDownloadCallLogs(exportDateRange);
-                    }}
-                    className="gap-2 text-[10px] font-bold uppercase tracking-widest bg-foreground text-background hover:bg-foreground/90"
-                  >
-                    <Download className="w-3 h-3" />
-                    Download CSV
-                  </Button>
+                  <div className="flex flex-col-reverse sm:flex-row gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setExportOpen(false);
+                        void handleDownloadCallLogs('fast');
+                      }}
+                      title="Skips transcript text — quick"
+                      className="gap-2 text-[10px] font-bold uppercase tracking-widest"
+                    >
+                      <Zap className="w-3 h-3" />
+                      Fast Export
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        setExportOpen(false);
+                        void handleDownloadCallLogs('full');
+                      }}
+                      title="Includes transcript text — slower"
+                      className="gap-2 text-[10px] font-bold uppercase tracking-widest bg-foreground text-background hover:bg-foreground/90"
+                    >
+                      <Download className="w-3 h-3" />
+                      Full Export
+                    </Button>
+                  </div>
                 </DialogFooter>
               </DialogContent>
             </Dialog>

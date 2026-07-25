@@ -18,7 +18,6 @@ import {
   CampaignAnalyticsJobStatus,
   CampaignEnhanceTranscriptsResponse,
   UserAnalyticsStats,
-  CampaignAnalyticsDetail,
   CampaignRecordingStatus,
   CampaignContact,
   CampaignReanalyzeResponse,
@@ -405,25 +404,82 @@ export async function getUserAnalyticsStats(
   );
 }
 
+/** Analytics list payload, after walking every page. */
+export interface CampaignAnalyticsRecords {
+  analytics: unknown[];
+  total: number;
+}
+
+// Safety ceiling on rows pulled into the browser for a campaign export.
+const CAMPAIGN_ANALYTICS_MAX_ROWS = 100_000;
+
 /**
- * Get detailed campaign analytics (from DB Services)
+ * Walk every page of a DB-Services analytics list endpoint and concatenate the
+ * records.
+ *
+ * These endpoints are paginated now (default 20, max 100 per page). The campaign
+ * export links analytics to contacts by phone/call_id, so a single 20-row page
+ * left all but the first ~20 contacts with empty analytics columns. Paging at
+ * the max size until `has_more` is false restores the full set.
+ */
+async function fetchAllDbAnalyticsRecords(basePath: string): Promise<CampaignAnalyticsRecords> {
+  const pageSize = 100;
+  const analytics: unknown[] = [];
+  let offset = 0;
+  let total = 0;
+
+  for (;;) {
+    const separator = basePath.includes('?') ? '&' : '?';
+    const data = await fetchDbServicesApi<any>(
+      `${basePath}${separator}limit=${pageSize}&offset=${offset}`,
+    );
+
+    const records: unknown[] = Array.isArray(data?.analytics)
+      ? data.analytics
+      : Array.isArray(data?.calls)
+        ? data.calls
+        : Array.isArray(data)
+          ? data
+          : [];
+
+    analytics.push(...records);
+
+    const pagination = data?.pagination ?? {};
+    total = Number(pagination.total ?? data?.total ?? analytics.length);
+    // Trust has_more when present; if the endpoint omits it, a full page is
+    // treated as "there may be more" and the empty-page guard below stops us.
+    const hasMore = Boolean(pagination.has_more ?? data?.has_more ?? (records.length >= pageSize));
+
+    // Stop on has_more=false, on an empty page (guards a stuck cursor), or at the
+    // safety ceiling.
+    if (!hasMore || records.length === 0 || analytics.length >= CAMPAIGN_ANALYTICS_MAX_ROWS) break;
+
+    offset += pageSize;
+  }
+
+  return { analytics, total };
+}
+
+/**
+ * Get detailed campaign analytics (from DB Services), across all pages.
  */
 export async function getCampaignAnalyticsDetail(
   userUid: string,
   campaignId: string,
-): Promise<CampaignAnalyticsDetail> {
-  return fetchDbServicesApi<CampaignAnalyticsDetail>(
+): Promise<CampaignAnalyticsRecords> {
+  return fetchAllDbAnalyticsRecords(
     `/analytics/user/${encodeURIComponent(userUid)}/campaign/${encodeURIComponent(campaignId)}`,
   );
 }
 
 /**
- * Get all analytics records for a user (fallback when campaign_id is missing).
+ * Get all analytics records for a user (fallback when campaign_id is missing),
+ * across all pages.
  */
 export async function getUserAnalyticsDetail(
   userUid: string,
-): Promise<CampaignAnalyticsDetail> {
-  return fetchDbServicesApi<CampaignAnalyticsDetail>(
+): Promise<CampaignAnalyticsRecords> {
+  return fetchAllDbAnalyticsRecords(
     `/analytics/user/${encodeURIComponent(userUid)}`,
   );
 }
