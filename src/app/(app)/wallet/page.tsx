@@ -17,10 +17,13 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { useCredits } from '@/app/hooks/use-credits';
 import { useLedger, LedgerEntry } from '@/app/hooks/use-billing';
+import { useMonadeUser } from '@/app/hooks/use-monade-user';
 import { PaperCard, PaperCardContent, PaperCardHeader, PaperCardTitle } from '@/components/ui/paper-card';
 import { DashboardHeader } from '@/components/dashboard-header';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+
+import { CreditUsageChart } from './components/credit-usage-chart';
 
 // --- Helpers ---
 
@@ -31,6 +34,7 @@ const formatCurrency = (num: number) => `₹${Math.round(num).toLocaleString()}`
 
 export default function WalletPage() {
   const router = useRouter();
+  const { userUid } = useMonadeUser();
   const { credits, loading, error } = useCredits();
   const { entries: ledgerEntries, total: ledgerTotal, page: ledgerPage, totalPages: ledgerTotalPages, loading: ledgerLoading, fetchLedger } = useLedger();
 
@@ -149,6 +153,9 @@ export default function WalletPage() {
                 ))}
               </div>
             </section>
+
+            {/* Daily Credit Spend — inbound vs outbound, day-wise */}
+            <CreditUsageChart userUid={userUid} />
 
             {/* Audit Ledger */}
             <section className="space-y-4">
