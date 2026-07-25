@@ -14,14 +14,15 @@ import { PaperCard, PaperCardContent, PaperCardHeader, PaperCardTitle } from '@/
 import { Badge } from '@/components/ui/badge';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
 import { Transcript } from '@/app/hooks/use-transcripts';
-import { useUserAnalytics, fetchAllUserAnalytics, CallAnalytics } from '@/app/hooks/use-analytics';
+import { useUserAnalytics, fetchAllUserAnalytics, fetchUserAnalyticsCount, CallAnalytics } from '@/app/hooks/use-analytics';
 import { useMonadeUser } from '@/app/hooks/use-monade-user';
 import { useDebouncedValue } from '@/app/hooks/use-debounced-value';
 import { useCampaignApi } from '@/app/hooks/use-campaign-api';
+import type { ExportDateRange } from '@/components/export-date-range-field';
 
 import { CallHistoryFilterBar, CallHistoryFilterState, CampaignFilterOption } from './components/call-history-filter-bar';
 import { CallHistoryRow } from './components/call-history-row';
-import { ExportCsvDialog, ExportableCall, ExportFetchAllRows } from './components/export-csv-dialog';
+import { ExportCsvDialog, ExportableCall, ExportFetchAllRows, ExportCountRows } from './components/export-csv-dialog';
 
 interface MergedTranscript extends Transcript {
   analytics?: CallAnalytics;
@@ -129,20 +130,34 @@ export default function CallHistoryPage() {
     [allAnalytics],
   );
 
+  // The export can layer its own date/time window over the page filters. When
+  // set, it overrides the page's coarser time range for the export request only.
+  const exportFilters = useCallback((dateRange?: ExportDateRange) => (
+    dateRange && (dateRange.from || dateRange.to)
+      ? { ...analyticsFilters, from: dateRange.from, to: dateRange.to }
+      : analyticsFilters
+  ), [analyticsFilters]);
+
   // Pull every matching call for a CSV export, paged off the server. Scoped to
   // the active filters and mapped into the same shape the table rows use.
-  const fetchAllCallsForExport = useCallback<ExportFetchAllRows>(async ({ signal, onProgress }) => {
+  const fetchAllCallsForExport = useCallback<ExportFetchAllRows>(async ({ signal, onProgress, dateRange }) => {
     if (!userUid) return { rows: [], truncated: false };
 
     const { rows, truncated } = await fetchAllUserAnalytics({
       userUid,
-      filters: analyticsFilters,
+      filters: exportFilters(dateRange),
       signal,
       onProgress: (loaded, total) => onProgress({ loaded, total }),
     });
 
     return { rows: rows.map(analyticsToMergedTranscript), truncated };
-  }, [analyticsFilters, userUid]);
+  }, [exportFilters, userUid]);
+
+  const countCallsForExport = useCallback<ExportCountRows>(async ({ signal, dateRange }) => {
+    if (!userUid) return 0;
+
+    return fetchUserAnalyticsCount(userUid, exportFilters(dateRange), signal);
+  }, [exportFilters, userUid]);
 
   // Campaign options come from the campaign list endpoint, not from the loaded
   // page. Deriving them from the page would show only the campaigns that happen
@@ -215,6 +230,7 @@ export default function CallHistoryPage() {
                 calls={mergedTranscripts}
                 totalCount={pagination.total}
                 fetchAllRows={fetchAllCallsForExport}
+                countRows={countCallsForExport}
               />
             </div>
           </div>

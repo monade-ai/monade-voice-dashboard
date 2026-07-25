@@ -60,6 +60,18 @@ import { useAssistants } from '@/app/hooks/use-assistants-context';
 import { useLibrary } from '@/app/hooks/use-knowledge-base';
 import { resolveCallDirection } from '@/lib/utils/call-outcome';
 
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import { ExportDateRangeField, type ExportDateRange } from '@/components/export-date-range-field';
+
 import { CSVUpload } from '../components/csv-upload';
 
 const CONTACT_STATUS_ORDER: CampaignContactStatus[] = ['pending', 'in-progress', 'completed', 'failed'];
@@ -607,6 +619,8 @@ export default function CampaignDetailPage() {
   const [isUploading, setIsUploading] = useState(false);
   const [isDownloadingLogs, setIsDownloadingLogs] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState<CsvDownloadProgress | null>(null);
+  const [exportOpen, setExportOpen] = useState(false);
+  const [exportDateRange, setExportDateRange] = useState<ExportDateRange>({});
   const [recordingStatus, setRecordingStatus] = useState<CampaignRecordingStatus | null>(null);
   const [isRefreshingRecordingStatus, setIsRefreshingRecordingStatus] = useState(false);
   const [retryDraftValue, setRetryDraftValue] = useState<number>(CAMPAIGN_API_CONFIG.DEFAULTS.MAX_RETRIES);
@@ -972,7 +986,7 @@ export default function CampaignDetailPage() {
     }
   };
 
-  const handleDownloadCallLogs = async () => {
+  const handleDownloadCallLogs = async (dateRange?: ExportDateRange) => {
     if (!campaign) return;
     setIsDownloadingLogs(true);
     setDownloadProgress({
@@ -1008,11 +1022,32 @@ export default function CampaignDetailPage() {
       }
 
       const exportedAtUtc = new Date().toISOString();
-      const rows = buildCampaignCallLogRows(campaign.id, allContacts, exportedAtUtc);
+      let rows = buildCampaignCallLogRows(campaign.id, allContacts, exportedAtUtc);
       if (rows.length === 0) {
         toast.info('No call attempts recorded yet for this campaign.');
 
         return;
+      }
+
+      // Optional date/time window (local zone, converted to UTC by the picker).
+      // Filters on the attempt timestamp; rows with no attempt time can't fall
+      // inside a window, so they drop out when a range is set.
+      if (dateRange && (dateRange.from || dateRange.to)) {
+        const fromMs = dateRange.from ? Date.parse(dateRange.from) : null;
+        const toMs = dateRange.to ? Date.parse(dateRange.to) : null;
+        rows = rows.filter((row) => {
+          const ts = row.attempt_timestamp_utc ? Date.parse(row.attempt_timestamp_utc) : NaN;
+          if (Number.isNaN(ts)) return false;
+          if (fromMs !== null && ts < fromMs) return false;
+          if (toMs !== null && ts > toMs) return false;
+
+          return true;
+        });
+        if (rows.length === 0) {
+          toast.info('No call attempts fall within the selected date range.');
+
+          return;
+        }
       }
 
       setDownloadProgress({
@@ -1424,18 +1459,68 @@ export default function CampaignDetailPage() {
             >
               <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => { void handleDownloadCallLogs(); }}
-              disabled={isDownloadingLogs}
-              className="h-10 max-w-[320px] border-border text-[10px] font-bold uppercase tracking-widest gap-2 truncate"
-              aria-label="Download campaign call logs"
-              title={downloadProgress?.message ?? `Download client export. ${recordingReadinessLabel}`}
+            <Dialog
+              open={exportOpen}
+              onOpenChange={(next) => {
+                // Don't close mid-export — the download is still running below.
+                if (!next && isDownloadingLogs) return;
+                setExportOpen(next);
+              }}
             >
-              {isDownloadingLogs ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
-              {isDownloadingLogs ? (downloadProgress?.message ?? 'Preparing CSV...') : `Download CSV · ${recordingReadinessLabel}`}
-            </Button>
+              <DialogTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={isDownloadingLogs}
+                  className="h-10 max-w-[320px] border-border text-[10px] font-bold uppercase tracking-widest gap-2 truncate"
+                  aria-label="Download campaign call logs"
+                  title={downloadProgress?.message ?? `Download client export. ${recordingReadinessLabel}`}
+                >
+                  {isDownloadingLogs ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+                  {isDownloadingLogs ? (downloadProgress?.message ?? 'Preparing CSV...') : `Download CSV · ${recordingReadinessLabel}`}
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[560px]">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <Download className="w-4 h-4" />
+                    Export Campaign Call Log
+                  </DialogTitle>
+                  <DialogDescription>
+                    Exports every call attempt for this campaign — contacts, analytics, transcripts
+                    and recordings. Optionally limit it to a date &amp; time window; leave the range
+                    on <strong>All Time</strong> to export the whole campaign.
+                  </DialogDescription>
+                </DialogHeader>
+
+                <div className="py-2">
+                  <ExportDateRangeField onChange={setExportDateRange} disabled={isDownloadingLogs} />
+                </div>
+
+                <DialogFooter>
+                  <DialogClose asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-[10px] font-bold uppercase tracking-widest"
+                    >
+                      Cancel
+                    </Button>
+                  </DialogClose>
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      setExportOpen(false);
+                      void handleDownloadCallLogs(exportDateRange);
+                    }}
+                    className="gap-2 text-[10px] font-bold uppercase tracking-widest bg-foreground text-background hover:bg-foreground/90"
+                  >
+                    <Download className="w-3 h-3" />
+                    Download CSV
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
             {canStartCampaign(campaign.status) && (
               <Button
                 onClick={handleStart}

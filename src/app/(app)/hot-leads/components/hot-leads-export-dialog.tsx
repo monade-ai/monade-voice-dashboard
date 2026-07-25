@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Download, FileDown, Loader2, X, Zap } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -18,6 +18,8 @@ import {
 import { fetchJson } from '@/lib/http';
 import { resolveCallDirection } from '@/lib/utils/call-outcome';
 import { EXPORT_MAX_ROWS, type CallAnalytics } from '@/app/hooks/use-analytics';
+import { useDebouncedValue } from '@/app/hooks/use-debounced-value';
+import { ExportDateRangeField, type ExportDateRange } from '@/components/export-date-range-field';
 
 export interface HotLeadsExportProgress {
   loaded: number;
@@ -27,7 +29,14 @@ export interface HotLeadsExportProgress {
 export type HotLeadsFetchAllRows = (opts: {
   signal: AbortSignal;
   onProgress: (progress: HotLeadsExportProgress) => void;
+  /** Extra date/time window layered on the page's filters for this export. */
+  dateRange?: ExportDateRange;
 }) => Promise<{ rows: CallAnalytics[]; truncated: boolean }>;
+
+export type HotLeadsCountRows = (opts: {
+  signal: AbortSignal;
+  dateRange?: ExportDateRange;
+}) => Promise<number>;
 
 interface HotLeadsExportDialogProps {
   /** The curated hot-leads list (already filtered by the page's search/intent/confidence). */
@@ -37,6 +46,8 @@ interface HotLeadsExportDialogProps {
   totalCount?: number;
   /** Pulls every matching lead from the server, paged. Present ⇒ archive-wide export. */
   fetchAllRows?: HotLeadsFetchAllRows;
+  /** Counts matching leads for the active filters + the dialog's date range. */
+  countRows?: HotLeadsCountRows;
 }
 
 const leadDate = (lead: CallAnalytics): Date => new Date(lead.call_started_at || lead.created_at || 0);
@@ -71,17 +82,57 @@ const CSV_FIELDS = [
   'recording_url',
 ];
 
-export function HotLeadsExportDialog({ leads, trigger, totalCount, fetchAllRows }: HotLeadsExportDialogProps) {
+export function HotLeadsExportDialog({ leads, trigger, totalCount, fetchAllRows, countRows }: HotLeadsExportDialogProps) {
   const [open, setOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [phase, setPhase] = useState<'records' | 'transcripts' | null>(null);
   const [progress, setProgress] = useState<HotLeadsExportProgress>({ loaded: 0, total: 0 });
+  const [dateRange, setDateRange] = useState<ExportDateRange>({});
+  const [rangeCount, setRangeCount] = useState<number | null>(null);
+  const [counting, setCounting] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+
+  const hasDateRange = Boolean(dateRange.from || dateRange.to);
+  const debouncedRange = useDebouncedValue(dateRange, 400);
 
   // Export covers every lead matching the page's filters when a server pager is
   // supplied; otherwise it falls back to the loaded page.
   const canExportAll = Boolean(fetchAllRows);
-  const previewCount = canExportAll ? (totalCount ?? leads.length) : leads.length;
+
+  // Exact count for the chosen date range (the page total already reflects the
+  // other filters, so we only need to ask when a range narrows things further).
+  useEffect(() => {
+    if (!open || !canExportAll || !countRows) return;
+    const active = Boolean(debouncedRange.from || debouncedRange.to);
+    if (!active) {
+      setRangeCount(null);
+      setCounting(false);
+
+      return;
+    }
+
+    const controller = new AbortController();
+    setCounting(true);
+    countRows({ signal: controller.signal, dateRange: debouncedRange })
+      .then((n) => setRangeCount(n))
+      .catch((err) => {
+        if (!controller.signal.aborted) {
+          console.warn('[HotLeadsExport] count failed:', err);
+          setRangeCount(null);
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setCounting(false);
+      });
+
+    return () => controller.abort();
+  }, [open, canExportAll, countRows, debouncedRange]);
+
+  const previewCount = !canExportAll
+    ? leads.length
+    : hasDateRange
+      ? (rangeCount ?? 0)
+      : (totalCount ?? leads.length);
 
   const handleDownload = async (mode: 'fast' | 'full') => {
     if (previewCount === 0 || exporting) {
@@ -102,7 +153,11 @@ export function HotLeadsExportDialog({ leads, trigger, totalCount, fetchAllRows 
       let exportLeads = leads;
       let truncated = false;
       if (fetchAllRows) {
-        const result = await fetchAllRows({ signal, onProgress: (p) => setProgress(p) });
+        const result = await fetchAllRows({
+          signal,
+          onProgress: (p) => setProgress(p),
+          dateRange: hasDateRange ? dateRange : undefined,
+        });
         exportLeads = result.rows;
         truncated = result.truncated;
       }
@@ -280,21 +335,36 @@ export function HotLeadsExportDialog({ leads, trigger, totalCount, fetchAllRows 
         </DialogHeader>
 
         <div className="space-y-5 py-2">
+          {canExportAll && countRows && (
+            <ExportDateRangeField onChange={setDateRange} disabled={exporting} />
+          )}
+
           <section className="rounded-md border border-border/40 bg-muted/20 px-4 py-3">
             <div className="space-y-0.5">
               <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                 Ready to export
               </div>
               <div className="text-xl font-medium tracking-tight">
-                {previewCount.toLocaleString()}
-                <span className="text-xs text-muted-foreground ml-2">
-                  {canExportAll ? 'matching hot leads' : 'hot leads on this page'}
-                </span>
+                {counting ? (
+                  <span className="inline-flex items-center gap-2 text-muted-foreground">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span className="text-sm">Counting…</span>
+                  </span>
+                ) : (
+                  <>
+                    {previewCount.toLocaleString()}
+                    <span className="text-xs text-muted-foreground ml-2">
+                      {!canExportAll
+                        ? 'hot leads on this page'
+                        : hasDateRange ? 'hot leads in range' : 'matching hot leads'}
+                    </span>
+                  </>
+                )}
               </div>
-              {canExportAll && previewCount > EXPORT_MAX_ROWS && (
+              {canExportAll && !counting && previewCount > EXPORT_MAX_ROWS && (
                 <p className="text-[11px] text-orange-500 pt-1">
                   Only the first {EXPORT_MAX_ROWS.toLocaleString()} will be exported. Narrow the
-                  filters to export a specific slice.
+                  date range to export a specific slice.
                 </p>
               )}
             </div>
