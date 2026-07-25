@@ -17,15 +17,37 @@ import {
 } from '@/components/ui/dialog';
 import { fetchJson } from '@/lib/http';
 import type { Transcript } from '@/app/hooks/use-transcripts';
-import type { CallAnalytics } from '@/app/hooks/use-analytics';
+import { EXPORT_MAX_ROWS, type CallAnalytics } from '@/app/hooks/use-analytics';
 
 export interface ExportableCall extends Transcript {
   analytics?: CallAnalytics;
 }
 
+export interface ExportFetchProgress {
+  loaded: number;
+  total: number;
+}
+
+export type ExportFetchAllRows = (opts: {
+  signal: AbortSignal;
+  onProgress: (progress: ExportFetchProgress) => void;
+}) => Promise<{ rows: ExportableCall[]; truncated: boolean }>;
+
 interface ExportCsvDialogProps {
+  /** Rows currently loaded on the page — the fallback set when no server pager is supplied. */
   calls: ExportableCall[];
   trigger?: React.ReactNode;
+  /**
+   * Total number of records matching the page's active filters. When provided
+   * (alongside fetchAllRows) the export covers all of them, not just `calls`.
+   */
+  totalCount?: number;
+  /**
+   * Pulls every matching record from the server, paged. When present the export
+   * is archive-wide (scoped to the active filters); when absent the dialog falls
+   * back to exporting the loaded page only.
+   */
+  fetchAllRows?: ExportFetchAllRows;
 }
 
 // The two transcript URLs live on either the Transcript record or its analytics.
@@ -128,43 +150,72 @@ function escapeCsv(value: unknown): string {
 
 
 
-export function ExportCsvDialog({ calls, trigger }: ExportCsvDialogProps) {
+export function ExportCsvDialog({ calls, trigger, totalCount, fetchAllRows }: ExportCsvDialogProps) {
   const [open, setOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
+  // Two-phase progress: first paging records off the server, then (full mode)
+  // fetching transcript text. Null between phases / when idle.
+  const [phase, setPhase] = useState<'records' | 'transcripts' | null>(null);
+  const [progress, setProgress] = useState<ExportFetchProgress>({ loaded: 0, total: 0 });
   const abortRef = useRef<AbortController | null>(null);
 
-  // The dialog used to carry its own date/direction/verdict filters. Those made
-  // sense when the page held the whole archive and the dialog was the only place
-  // to narrow an export. The archive is now filtered and paginated server-side,
-  // so the filter bar on the page has already produced this exact set of rows —
-  // re-offering the same controls here could only subtract from the page the
-  // user is looking at, which reads as the export silently dropping records.
-  //
-  // Export therefore means "the rows currently on screen". A genuine
-  // archive-wide export needs a streamed server-side job; walking every API page
-  // in the browser is the pattern the pagination work exists to remove.
-  const exportCalls = calls;
+  // Export covers every record matching the page's filters when the page gives
+  // us a server pager; otherwise it falls back to the loaded page. The count
+  // shown reflects whichever it is.
+  const canExportAll = Boolean(fetchAllRows);
+  const previewCount = canExportAll ? (totalCount ?? calls.length) : calls.length;
 
   // mode 'fast' skips the per-call transcript-text fetch (the only slow step) and exports
   // instantly with every column except the fetched Transcript text (URLs still included).
   // mode 'full' fetches transcript text for each call — accurate but slow on large ranges.
   const handleDownload = async (mode: 'fast' | 'full') => {
-    if (exportCalls.length === 0 || exporting) {
-      if (exportCalls.length === 0) toast.error('There are no records on this page to export.');
+    if (previewCount === 0 || exporting) {
+      if (previewCount === 0) toast.error('There are no records to export.');
 
       return;
     }
     setExporting(true);
+    setPhase(canExportAll ? 'records' : null);
+    setProgress({ loaded: 0, total: previewCount });
     const controller = new AbortController();
     abortRef.current = controller;
     const { signal } = controller;
 
     try {
+      // Resolve the dataset. With a server pager, walk every matching page (this
+      // is the one place allowed to — it's a deliberate user action, not a
+      // render). Without one, export the rows already on the page.
+      let exportCalls = calls;
+      let truncated = false;
+      if (fetchAllRows) {
+        const result = await fetchAllRows({
+          signal,
+          onProgress: (p) => setProgress(p),
+        });
+        exportCalls = result.rows;
+        truncated = result.truncated;
+      }
+
+      if (signal.aborted) {
+        toast.info('Export cancelled.');
+
+        return;
+      }
+
+      if (exportCalls.length === 0) {
+        toast.error('There are no records to export.');
+
+        return;
+      }
+
       // Fetch transcript text only for the calls being exported, preferring the enhanced
       // transcript. Bounded concurrency so a large range doesn't fire hundreds of requests.
       // Skipped entirely in 'fast' mode.
       const transcriptByCallId = new Map<string, string>();
       if (mode === 'full') {
+        setPhase('transcripts');
+        setProgress({ loaded: 0, total: exportCalls.length });
+
         const jobs = exportCalls
           .map((c) => ({
             callId: c.call_id,
@@ -172,6 +223,7 @@ export function ExportCsvDialog({ calls, trigger }: ExportCsvDialogProps) {
           }))
           .filter((job) => job.callId && job.url);
 
+        let done = 0;
         const queue = [...jobs];
         const worker = async () => {
           while (queue.length > 0) {
@@ -194,6 +246,9 @@ export function ExportCsvDialog({ calls, trigger }: ExportCsvDialogProps) {
               if (signal.aborted) return; // aborted fetches throw — exit quietly
               // Surface, don't swallow — a blank transcript cell should be explainable.
               console.warn(`[CallArchiveExport] transcript fetch failed for ${job.callId}:`, err);
+            } finally {
+              done += 1;
+              setProgress({ loaded: done, total: jobs.length });
             }
           }
         };
@@ -224,7 +279,7 @@ export function ExportCsvDialog({ calls, trigger }: ExportCsvDialogProps) {
       const a = document.createElement('a');
       const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
       a.href = url;
-      a.download = `call-archive-page_${stamp}.csv`;
+      a.download = `call-archive_${stamp}.csv`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -234,9 +289,14 @@ export function ExportCsvDialog({ calls, trigger }: ExportCsvDialogProps) {
         `Exported ${rows.length.toLocaleString()} record${rows.length === 1 ? '' : 's'} to CSV`
         + (mode === 'fast' ? ' (fast — no transcripts/recordings).' : '.'),
       );
+      if (truncated) {
+        toast.warning(
+          `Export capped at ${rows.length.toLocaleString()} rows. Narrow the filters to export the rest.`,
+        );
+      }
       setOpen(false);
     } catch (err) {
-      if (signal.aborted) {
+      if (signal.aborted || (err instanceof DOMException && err.name === 'AbortError')) {
         toast.info('Export cancelled.');
       } else {
         console.error('[CallArchiveExport] Failed:', err);
@@ -244,6 +304,7 @@ export function ExportCsvDialog({ calls, trigger }: ExportCsvDialogProps) {
       }
     } finally {
       abortRef.current = null;
+      setPhase(null);
       setExporting(false);
     }
   };
@@ -269,7 +330,7 @@ export function ExportCsvDialog({ calls, trigger }: ExportCsvDialogProps) {
             className="gap-2 h-9 text-[10px] font-bold uppercase tracking-widest border-border hover:bg-[#facc15] hover:border-[#facc15] hover:text-black transition-all"
           >
             <Download className="w-3 h-3" />
-            Export Page
+            Export CSV
           </Button>
         )}
       </DialogTrigger>
@@ -277,13 +338,16 @@ export function ExportCsvDialog({ calls, trigger }: ExportCsvDialogProps) {
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileDown className="w-4 h-4" />
-            Export Current Page to CSV
+            Export Call Archive to CSV
           </DialogTitle>
           <DialogDescription>
-            Exports the archive page you are currently viewing, with whatever filters the page
-            has applied. <strong>Full Export</strong> includes the full transcript (enhanced when
-            available) and recording URL. <strong>Fast Export</strong> skips those and returns
-            instantly with call IDs, verdicts, analytics and billing.
+            {canExportAll
+              ? <>Exports every call matching the filters currently applied on the page, across all
+                pages — not just the page on screen.</>
+              : <>Exports the calls currently loaded on the page.</>}
+            {' '}<strong>Full Export</strong> includes the full transcript (enhanced when available)
+            and recording URL — slower on large ranges. <strong>Fast Export</strong> skips those and
+            returns quickly with call IDs, verdicts, analytics and billing.
           </DialogDescription>
         </DialogHeader>
 
@@ -295,11 +359,17 @@ export function ExportCsvDialog({ calls, trigger }: ExportCsvDialogProps) {
                 Ready to export
               </div>
               <div className="text-xl font-medium tracking-tight">
-                {exportCalls.length.toLocaleString()}
+                {previewCount.toLocaleString()}
                 <span className="text-xs text-muted-foreground ml-2">
-                  records on this page
+                  {canExportAll ? 'matching records' : 'records on this page'}
                 </span>
               </div>
+              {canExportAll && previewCount > EXPORT_MAX_ROWS && (
+                <p className="text-[11px] text-orange-500 pt-1">
+                  Only the first {EXPORT_MAX_ROWS.toLocaleString()} will be exported. Narrow the
+                  filters to export a specific slice.
+                </p>
+              )}
             </div>
           </section>
         </div>
@@ -320,7 +390,11 @@ export function ExportCsvDialog({ calls, trigger }: ExportCsvDialogProps) {
             <div className="flex items-stretch rounded-md overflow-hidden bg-foreground text-background">
               <div className="flex items-center gap-2 pl-3 pr-2 text-[10px] font-bold uppercase tracking-widest">
                 <Loader2 className="w-3 h-3 animate-spin" />
-                Fetching transcripts…
+                {phase === 'records'
+                  ? `Loading records… ${progress.loaded.toLocaleString()}${progress.total ? ` / ${progress.total.toLocaleString()}` : ''}`
+                  : phase === 'transcripts'
+                    ? `Fetching transcripts… ${progress.loaded.toLocaleString()} / ${progress.total.toLocaleString()}`
+                    : 'Exporting…'}
               </div>
               <button
                 type="button"
@@ -336,7 +410,7 @@ export function ExportCsvDialog({ calls, trigger }: ExportCsvDialogProps) {
             <div className="flex flex-col-reverse sm:flex-row gap-2">
               <Button
                 onClick={() => handleDownload('fast')}
-                disabled={exportCalls.length === 0}
+                disabled={previewCount === 0}
                 variant="outline"
                 size="sm"
                 title="Skips transcripts & recording URLs — instant"
@@ -347,7 +421,7 @@ export function ExportCsvDialog({ calls, trigger }: ExportCsvDialogProps) {
               </Button>
               <Button
                 onClick={() => handleDownload('full')}
-                disabled={exportCalls.length === 0}
+                disabled={previewCount === 0}
                 size="sm"
                 title="Includes full transcripts & recording URLs — slower"
                 className="gap-2 text-[10px] font-bold uppercase tracking-widest bg-foreground text-background hover:bg-foreground/90"

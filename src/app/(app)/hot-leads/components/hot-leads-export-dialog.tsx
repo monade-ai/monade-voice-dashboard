@@ -17,12 +17,26 @@ import {
 } from '@/components/ui/dialog';
 import { fetchJson } from '@/lib/http';
 import { resolveCallDirection } from '@/lib/utils/call-outcome';
-import type { CallAnalytics } from '@/app/hooks/use-analytics';
+import { EXPORT_MAX_ROWS, type CallAnalytics } from '@/app/hooks/use-analytics';
+
+export interface HotLeadsExportProgress {
+  loaded: number;
+  total: number;
+}
+
+export type HotLeadsFetchAllRows = (opts: {
+  signal: AbortSignal;
+  onProgress: (progress: HotLeadsExportProgress) => void;
+}) => Promise<{ rows: CallAnalytics[]; truncated: boolean }>;
 
 interface HotLeadsExportDialogProps {
   /** The curated hot-leads list (already filtered by the page's search/intent/confidence). */
   leads: CallAnalytics[];
   trigger?: React.ReactNode;
+  /** Total leads matching the page's active filters, across all pages. */
+  totalCount?: number;
+  /** Pulls every matching lead from the server, paged. Present ⇒ archive-wide export. */
+  fetchAllRows?: HotLeadsFetchAllRows;
 }
 
 const leadDate = (lead: CallAnalytics): Date => new Date(lead.call_started_at || lead.created_at || 0);
@@ -57,35 +71,61 @@ const CSV_FIELDS = [
   'recording_url',
 ];
 
-export function HotLeadsExportDialog({ leads, trigger }: HotLeadsExportDialogProps) {
+export function HotLeadsExportDialog({ leads, trigger, totalCount, fetchAllRows }: HotLeadsExportDialogProps) {
   const [open, setOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [phase, setPhase] = useState<'records' | 'transcripts' | null>(null);
+  const [progress, setProgress] = useState<HotLeadsExportProgress>({ loaded: 0, total: 0 });
   const abortRef = useRef<AbortController | null>(null);
 
-  // The Deal Room is filtered and paginated server-side now, so this dialog's
-  // own date range could only subtract from the page already on screen — the
-  // same filter applied twice, reading as the export dropping records. Export
-  // means "the leads currently on screen"; an archive-wide export needs a
-  // streamed server-side job rather than the browser walking every page.
-  const exportLeads = leads;
+  // Export covers every lead matching the page's filters when a server pager is
+  // supplied; otherwise it falls back to the loaded page.
+  const canExportAll = Boolean(fetchAllRows);
+  const previewCount = canExportAll ? (totalCount ?? leads.length) : leads.length;
 
   const handleDownload = async (mode: 'fast' | 'full') => {
-    if (exportLeads.length === 0 || exporting) {
-      if (exportLeads.length === 0) toast.error('There are no hot leads on this page to export.');
+    if (previewCount === 0 || exporting) {
+      if (previewCount === 0) toast.error('There are no hot leads to export.');
 
       return;
     }
     setExporting(true);
+    setPhase(canExportAll ? 'records' : null);
+    setProgress({ loaded: 0, total: previewCount });
     const controller = new AbortController();
     abortRef.current = controller;
     const { signal } = controller;
 
     try {
+      // Resolve the dataset: walk every matching page off the server when we can,
+      // else export the leads already on the page.
+      let exportLeads = leads;
+      let truncated = false;
+      if (fetchAllRows) {
+        const result = await fetchAllRows({ signal, onProgress: (p) => setProgress(p) });
+        exportLeads = result.rows;
+        truncated = result.truncated;
+      }
+
+      if (signal.aborted) {
+        toast.info('Export cancelled.');
+
+        return;
+      }
+      if (exportLeads.length === 0) {
+        toast.error('There are no hot leads to export.');
+
+        return;
+      }
+
       // Fetch transcript text only for the leads being exported, preferring the enhanced
       // transcript. Bounded concurrency so a large range doesn't fire hundreds of requests.
       // Skipped entirely in 'fast' mode.
       const transcriptByCallId = new Map<string, string>();
       if (mode === 'full') {
+        setPhase('transcripts');
+        setProgress({ loaded: 0, total: exportLeads.length });
+
         const jobs = exportLeads
           .map((lead) => ({
             callId: lead.call_id,
@@ -93,6 +133,7 @@ export function HotLeadsExportDialog({ leads, trigger }: HotLeadsExportDialogPro
           }))
           .filter((job) => job.callId && job.url);
 
+        let done = 0;
         const queue = [...jobs];
         const worker = async () => {
           while (queue.length > 0) {
@@ -115,6 +156,9 @@ export function HotLeadsExportDialog({ leads, trigger }: HotLeadsExportDialogPro
               if (signal.aborted) return; // aborted fetches throw — exit quietly
               // Surface, don't swallow — a blank transcript cell should be explainable.
               console.warn(`[HotLeadsExport] transcript fetch failed for ${job.callId}:`, err);
+            } finally {
+              done += 1;
+              setProgress({ loaded: done, total: jobs.length });
             }
           }
         };
@@ -174,9 +218,14 @@ export function HotLeadsExportDialog({ leads, trigger }: HotLeadsExportDialogPro
         `Exported ${rows.length.toLocaleString()} hot lead${rows.length === 1 ? '' : 's'}`
         + (mode === 'fast' ? ' (fast — no transcripts/recordings).' : '.'),
       );
+      if (truncated) {
+        toast.warning(
+          `Export capped at ${rows.length.toLocaleString()} leads. Narrow the filters to export the rest.`,
+        );
+      }
       setOpen(false);
     } catch (err) {
-      if (signal.aborted) {
+      if (signal.aborted || (err instanceof DOMException && err.name === 'AbortError')) {
         toast.info('Export cancelled.');
       } else {
         console.error('[HotLeadsExport] Failed:', err);
@@ -184,6 +233,7 @@ export function HotLeadsExportDialog({ leads, trigger }: HotLeadsExportDialogPro
       }
     } finally {
       abortRef.current = null;
+      setPhase(null);
       setExporting(false);
     }
   };
@@ -193,7 +243,14 @@ export function HotLeadsExportDialog({ leads, trigger }: HotLeadsExportDialogPro
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        // Don't let the dialog close mid-export — that would orphan in-flight fetches.
+        if (!next && exporting) return;
+        setOpen(next);
+      }}
+    >
       <DialogTrigger asChild>
         {trigger ?? (
           <Button
@@ -201,7 +258,7 @@ export function HotLeadsExportDialog({ leads, trigger }: HotLeadsExportDialogPro
             className="h-10 px-4 gap-2 border-border text-[10px] font-bold uppercase tracking-widest hover:bg-primary hover:text-black transition-all"
           >
             <Download size={14} />
-            Export Page
+            Export CSV
           </Button>
         )}
       </DialogTrigger>
@@ -209,13 +266,16 @@ export function HotLeadsExportDialog({ leads, trigger }: HotLeadsExportDialogPro
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileDown className="w-4 h-4" />
-            Export Current Hot Leads Page
+            Export Hot Leads to CSV
           </DialogTitle>
           <DialogDescription>
-            Exports the Deal Room page you are currently viewing, with whatever filters the page
-            has applied. <strong>Full Export</strong> includes transcripts (enhanced when
-            available) and recording links. <strong>Fast Export</strong> skips those and returns
-            instantly with direction, analytics and all other fields.
+            {canExportAll
+              ? <>Exports every hot lead matching the filters currently applied on the page, across
+                all pages — not just the page on screen.</>
+              : <>Exports the hot leads currently loaded on the page.</>}
+            {' '}<strong>Full Export</strong> includes transcripts (enhanced when available) and
+            recording links — slower on large ranges. <strong>Fast Export</strong> skips those and
+            returns quickly with direction, analytics and all other fields.
           </DialogDescription>
         </DialogHeader>
 
@@ -226,18 +286,24 @@ export function HotLeadsExportDialog({ leads, trigger }: HotLeadsExportDialogPro
                 Ready to export
               </div>
               <div className="text-xl font-medium tracking-tight">
-                {exportLeads.length.toLocaleString()}
+                {previewCount.toLocaleString()}
                 <span className="text-xs text-muted-foreground ml-2">
-                  hot leads on this page
+                  {canExportAll ? 'matching hot leads' : 'hot leads on this page'}
                 </span>
               </div>
+              {canExportAll && previewCount > EXPORT_MAX_ROWS && (
+                <p className="text-[11px] text-orange-500 pt-1">
+                  Only the first {EXPORT_MAX_ROWS.toLocaleString()} will be exported. Narrow the
+                  filters to export a specific slice.
+                </p>
+              )}
             </div>
           </section>
         </div>
 
         <DialogFooter>
           <DialogClose asChild>
-            <Button variant="outline" size="sm" className="text-[10px] font-bold uppercase tracking-widest">
+            <Button variant="outline" size="sm" disabled={exporting} className="text-[10px] font-bold uppercase tracking-widest">
               Cancel
             </Button>
           </DialogClose>
@@ -246,7 +312,11 @@ export function HotLeadsExportDialog({ leads, trigger }: HotLeadsExportDialogPro
             <div className="flex items-stretch rounded-md overflow-hidden bg-foreground text-background">
               <div className="flex items-center gap-2 pl-3 pr-2 text-[10px] font-bold uppercase tracking-widest">
                 <Loader2 className="w-3 h-3 animate-spin" />
-                Exporting…
+                {phase === 'records'
+                  ? `Loading leads… ${progress.loaded.toLocaleString()}${progress.total ? ` / ${progress.total.toLocaleString()}` : ''}`
+                  : phase === 'transcripts'
+                    ? `Fetching transcripts… ${progress.loaded.toLocaleString()} / ${progress.total.toLocaleString()}`
+                    : 'Exporting…'}
               </div>
               <button
                 type="button"
@@ -262,7 +332,7 @@ export function HotLeadsExportDialog({ leads, trigger }: HotLeadsExportDialogPro
             <div className="flex flex-col-reverse sm:flex-row gap-2">
               <Button
                 onClick={() => handleDownload('fast')}
-                disabled={exportLeads.length === 0}
+                disabled={previewCount === 0}
                 variant="outline"
                 size="sm"
                 title="Skips transcripts & recording URLs — instant"
@@ -273,7 +343,7 @@ export function HotLeadsExportDialog({ leads, trigger }: HotLeadsExportDialogPro
               </Button>
               <Button
                 onClick={() => handleDownload('full')}
-                disabled={exportLeads.length === 0}
+                disabled={previewCount === 0}
                 size="sm"
                 title="Includes full transcripts & recording URLs — slower"
                 className="gap-2 text-[10px] font-bold uppercase tracking-widest bg-foreground text-background hover:bg-foreground/90"
