@@ -634,6 +634,23 @@ export default function WhatsappBotPage() {
   const noChannels = !loadingChannels && channels.length === 0;
   const canSave = Boolean(effectiveSelectedChannelId && form.whatsapp_bot_prompt_id && invalidOutcomeMappings.length === 0) && !savingConfig;
 
+  // Human-readable version of exactly why `canSave` is false, in the order the user
+  // should fix them. Kept in lockstep with the `canSave` conditions above so the
+  // greyed-out button always has a matching explanation. `savingConfig` is omitted
+  // on purpose — that's a transient state shown by the button's own spinner.
+  const saveBlockReasons: string[] = [];
+  if (noChannels) {
+    saveBlockReasons.push('Connect a WhatsApp channel first — no sender numbers are available.');
+  } else if (!effectiveSelectedChannelId) {
+    saveBlockReasons.push('Select a connected number at the top of the page.');
+  }
+  if (!form.whatsapp_bot_prompt_id) {
+    saveBlockReasons.push('Choose a Fallback Prompt (the base prompt used when no outcome matches).');
+  }
+  invalidOutcomeMappings.forEach((bucket) => {
+    saveBlockReasons.push(`Outcome “${bucket.key}” is enabled but has no prompt selected — pick one or disable it.`);
+  });
+
   return (
     <div className="min-h-screen bg-background flex flex-col font-sans">
       <DashboardHeader />
@@ -665,15 +682,32 @@ export default function WhatsappBotPage() {
               <RefreshCw size={14} className={cn((loadingPrompts || loadingConfigs) && 'animate-spin')} />
               Reload
             </Button>
-            <Button
-              type="button"
-              onClick={handleSave}
-              disabled={!canSave}
-              className="h-10 px-4 text-[10px] font-bold uppercase tracking-[0.2em] bg-foreground text-background hover:bg-foreground/90"
-            >
-              {savingConfig ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-              Save Bot Config
-            </Button>
+            <div className="flex flex-col items-stretch gap-1.5">
+              <Button
+                type="button"
+                onClick={handleSave}
+                disabled={!canSave}
+                title={saveBlockReasons.length > 0 ? `Can't save yet:\n• ${saveBlockReasons.join('\n• ')}` : undefined}
+                className="h-10 px-4 text-[10px] font-bold uppercase tracking-[0.2em] bg-foreground text-background hover:bg-foreground/90"
+              >
+                {savingConfig ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                Save Bot Config
+              </Button>
+              {saveBlockReasons.length > 0 && (
+                <div className="max-w-[280px] rounded-md border border-orange-500/25 bg-orange-500/10 p-2.5 space-y-1">
+                  <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-orange-500">
+                    Can&apos;t save yet
+                  </p>
+                  <ul className="space-y-0.5">
+                    {saveBlockReasons.map((reason) => (
+                      <li key={reason} className="text-[11px] leading-snug text-orange-600 dark:text-orange-400">
+                        • {reason}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -1057,12 +1091,14 @@ export default function WhatsappBotPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Fallback Prompt</Label>
+                  <Label className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                    Fallback Prompt <span className="text-destructive">*</span>
+                  </Label>
                   <Select
                     value={form.whatsapp_bot_prompt_id || '__none__'}
                     onValueChange={(value) => setForm((current) => ({ ...current, whatsapp_bot_prompt_id: value === '__none__' ? '' : value }))}
                   >
-                    <SelectTrigger className="h-10 text-xs">
+                    <SelectTrigger className={cn('h-10 text-xs', !form.whatsapp_bot_prompt_id && 'border-orange-500/50')}>
                       <SelectValue placeholder={prompts.length === 0 ? 'Create a prompt first' : 'Select a prompt file'} />
                     </SelectTrigger>
                     <SelectContent>
@@ -1072,9 +1108,13 @@ export default function WhatsappBotPage() {
                       ))}
                     </SelectContent>
                   </Select>
-                  {selectedPrompt && (
+                  {selectedPrompt ? (
                     <p className="text-[11px] text-muted-foreground">
                       Fallback file: <span className="font-mono">{selectedPrompt.filename}</span>
+                    </p>
+                  ) : (
+                    <p className="text-[11px] font-medium text-orange-600 dark:text-orange-400">
+                      No fallback prompt selected — required before you can save. This is the base prompt used when no enabled outcome matches.
                     </p>
                   )}
                 </div>
