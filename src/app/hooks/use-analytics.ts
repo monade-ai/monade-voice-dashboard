@@ -342,6 +342,24 @@ export async function fetchAllUserAnalytics(
   return { rows, total, truncated };
 }
 
+/**
+ * Count matching analytics rows without pulling them.
+ *
+ * Requests a single row and reads `pagination.total`, so an export preview can
+ * show exactly how many records a set of filters (e.g. a date/time window) would
+ * export before the user commits to the full walk.
+ */
+export async function fetchUserAnalyticsCount(
+  userUid: string,
+  filters?: AnalyticsPageFilters,
+  signal?: AbortSignal,
+): Promise<number> {
+  const query = buildUserAnalyticsQuery(userUid, 1, 0, filters);
+  const data = await fetchJson<any>(`${MONADE_API_BASE}/api/analytics?${query}`, { signal });
+
+  return parseUserAnalyticsResponse(data, 1, 0).pagination.total;
+}
+
 // Hook to fetch analytics for a specific call
 export function useCallAnalytics() {
   const { userUid } = useMonadeUser();

@@ -17,10 +17,11 @@ import {
   Download,
 } from 'lucide-react';
 
-import { useUserAnalytics, fetchAllUserAnalytics, CallAnalytics } from '@/app/hooks/use-analytics';
+import { useUserAnalytics, fetchAllUserAnalytics, fetchUserAnalyticsCount, CallAnalytics } from '@/app/hooks/use-analytics';
 import { useCallRecording } from '@/app/hooks/use-call-recording';
 import { useDebouncedValue } from '@/app/hooks/use-debounced-value';
 import { useMonadeUser } from '@/app/hooks/use-monade-user';
+import type { ExportDateRange } from '@/components/export-date-range-field';
 import { PostProcessingTemplate, QualificationBucket, usePostProcessingTemplates } from '@/app/hooks/use-post-processing-templates';
 import { DashboardHeader } from '@/components/dashboard-header';
 import { Input } from '@/components/ui/input';
@@ -38,7 +39,7 @@ import {
 import { humanizeOutcomeKey } from '@/lib/post-processing-outcomes';
 
 import { HotLeadsGuide } from './components/hot-leads-guide';
-import { HotLeadsExportDialog, HotLeadsFetchAllRows } from './components/hot-leads-export-dialog';
+import { HotLeadsExportDialog, HotLeadsFetchAllRows, HotLeadsCountRows } from './components/hot-leads-export-dialog';
 
 const TranscriptViewer = dynamic(
   () => import('@/components/transcript-viewer'),
@@ -302,20 +303,34 @@ export default function HotLeadsPage() {
     });
   }, [analyticsFilters, currentPage, fetchPage, itemsPerPage]);
 
+  // The export can layer its own date/time window over the page filters. When
+  // set, it overrides the page's date filter for the export request only.
+  const exportFilters = useCallback((dateRange?: ExportDateRange) => (
+    dateRange && (dateRange.from || dateRange.to)
+      ? { ...analyticsFilters, from: dateRange.from, to: dateRange.to }
+      : analyticsFilters
+  ), [analyticsFilters]);
+
   // Pull every matching lead for a CSV export, paged off the server, scoped to
   // the active filters.
-  const fetchAllLeadsForExport = useCallback<HotLeadsFetchAllRows>(async ({ signal, onProgress }) => {
+  const fetchAllLeadsForExport = useCallback<HotLeadsFetchAllRows>(async ({ signal, onProgress, dateRange }) => {
     if (!userUid) return { rows: [], truncated: false };
 
     const { rows, truncated } = await fetchAllUserAnalytics({
       userUid,
-      filters: analyticsFilters,
+      filters: exportFilters(dateRange),
       signal,
       onProgress: (loaded, total) => onProgress({ loaded, total }),
     });
 
     return { rows, truncated };
-  }, [analyticsFilters, userUid]);
+  }, [exportFilters, userUid]);
+
+  const countLeadsForExport = useCallback<HotLeadsCountRows>(async ({ signal, dateRange }) => {
+    if (!userUid) return 0;
+
+    return fetchUserAnalyticsCount(userUid, exportFilters(dateRange), signal);
+  }, [exportFilters, userUid]);
 
   useEffect(() => {
     fetchTemplates().catch(() => undefined);
@@ -600,6 +615,7 @@ export default function HotLeadsPage() {
               leads={hotLeads}
               totalCount={pagination.total}
               fetchAllRows={fetchAllLeadsForExport}
+              countRows={countLeadsForExport}
             />
           </div>
         </div>

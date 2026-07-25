@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Download, FileDown, Loader2, X, Zap } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -18,6 +18,8 @@ import {
 import { fetchJson } from '@/lib/http';
 import type { Transcript } from '@/app/hooks/use-transcripts';
 import { EXPORT_MAX_ROWS, type CallAnalytics } from '@/app/hooks/use-analytics';
+import { useDebouncedValue } from '@/app/hooks/use-debounced-value';
+import { ExportDateRangeField, type ExportDateRange } from '@/components/export-date-range-field';
 
 export interface ExportableCall extends Transcript {
   analytics?: CallAnalytics;
@@ -31,7 +33,14 @@ export interface ExportFetchProgress {
 export type ExportFetchAllRows = (opts: {
   signal: AbortSignal;
   onProgress: (progress: ExportFetchProgress) => void;
+  /** Extra date/time window layered on the page's filters for this export. */
+  dateRange?: ExportDateRange;
 }) => Promise<{ rows: ExportableCall[]; truncated: boolean }>;
+
+export type ExportCountRows = (opts: {
+  signal: AbortSignal;
+  dateRange?: ExportDateRange;
+}) => Promise<number>;
 
 interface ExportCsvDialogProps {
   /** Rows currently loaded on the page — the fallback set when no server pager is supplied. */
@@ -48,6 +57,8 @@ interface ExportCsvDialogProps {
    * back to exporting the loaded page only.
    */
   fetchAllRows?: ExportFetchAllRows;
+  /** Counts matching records for the active filters + the dialog's date range. */
+  countRows?: ExportCountRows;
 }
 
 // The two transcript URLs live on either the Transcript record or its analytics.
@@ -150,20 +161,61 @@ function escapeCsv(value: unknown): string {
 
 
 
-export function ExportCsvDialog({ calls, trigger, totalCount, fetchAllRows }: ExportCsvDialogProps) {
+export function ExportCsvDialog({ calls, trigger, totalCount, fetchAllRows, countRows }: ExportCsvDialogProps) {
   const [open, setOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
   // Two-phase progress: first paging records off the server, then (full mode)
   // fetching transcript text. Null between phases / when idle.
   const [phase, setPhase] = useState<'records' | 'transcripts' | null>(null);
   const [progress, setProgress] = useState<ExportFetchProgress>({ loaded: 0, total: 0 });
+  const [dateRange, setDateRange] = useState<ExportDateRange>({});
+  const [rangeCount, setRangeCount] = useState<number | null>(null);
+  const [counting, setCounting] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
 
+  const hasDateRange = Boolean(dateRange.from || dateRange.to);
+  // Debounce so dragging through datetime spinners doesn't fire a count per tick.
+  const debouncedRange = useDebouncedValue(dateRange, 400);
+
   // Export covers every record matching the page's filters when the page gives
-  // us a server pager; otherwise it falls back to the loaded page. The count
-  // shown reflects whichever it is.
+  // us a server pager; otherwise it falls back to the loaded page.
   const canExportAll = Boolean(fetchAllRows);
-  const previewCount = canExportAll ? (totalCount ?? calls.length) : calls.length;
+
+  // When a date range is set we don't know the narrowed total without asking, so
+  // fetch an exact count for the range. Without a range, the page's total already
+  // reflects the active filters.
+  useEffect(() => {
+    if (!open || !canExportAll || !countRows) return;
+    const active = Boolean(debouncedRange.from || debouncedRange.to);
+    if (!active) {
+      setRangeCount(null);
+      setCounting(false);
+
+      return;
+    }
+
+    const controller = new AbortController();
+    setCounting(true);
+    countRows({ signal: controller.signal, dateRange: debouncedRange })
+      .then((n) => setRangeCount(n))
+      .catch((err) => {
+        if (!controller.signal.aborted) {
+          console.warn('[CallArchiveExport] count failed:', err);
+          setRangeCount(null);
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setCounting(false);
+      });
+
+    return () => controller.abort();
+  }, [open, canExportAll, countRows, debouncedRange]);
+
+  const previewCount = !canExportAll
+    ? calls.length
+    : hasDateRange
+      ? (rangeCount ?? 0)
+      : (totalCount ?? calls.length);
 
   // mode 'fast' skips the per-call transcript-text fetch (the only slow step) and exports
   // instantly with every column except the fetched Transcript text (URLs still included).
@@ -191,6 +243,7 @@ export function ExportCsvDialog({ calls, trigger, totalCount, fetchAllRows }: Ex
         const result = await fetchAllRows({
           signal,
           onProgress: (p) => setProgress(p),
+          dateRange: hasDateRange ? dateRange : undefined,
         });
         exportCalls = result.rows;
         truncated = result.truncated;
@@ -352,6 +405,10 @@ export function ExportCsvDialog({ calls, trigger, totalCount, fetchAllRows }: Ex
         </DialogHeader>
 
         <div className="space-y-5 py-2">
+          {canExportAll && countRows && (
+            <ExportDateRangeField onChange={setDateRange} disabled={exporting} />
+          )}
+
           {/* Preview */}
           <section className="rounded-md border border-border/40 bg-muted/20 px-4 py-3">
             <div className="space-y-0.5">
@@ -359,15 +416,26 @@ export function ExportCsvDialog({ calls, trigger, totalCount, fetchAllRows }: Ex
                 Ready to export
               </div>
               <div className="text-xl font-medium tracking-tight">
-                {previewCount.toLocaleString()}
-                <span className="text-xs text-muted-foreground ml-2">
-                  {canExportAll ? 'matching records' : 'records on this page'}
-                </span>
+                {counting ? (
+                  <span className="inline-flex items-center gap-2 text-muted-foreground">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span className="text-sm">Counting…</span>
+                  </span>
+                ) : (
+                  <>
+                    {previewCount.toLocaleString()}
+                    <span className="text-xs text-muted-foreground ml-2">
+                      {!canExportAll
+                        ? 'records on this page'
+                        : hasDateRange ? 'records in range' : 'matching records'}
+                    </span>
+                  </>
+                )}
               </div>
-              {canExportAll && previewCount > EXPORT_MAX_ROWS && (
+              {canExportAll && !counting && previewCount > EXPORT_MAX_ROWS && (
                 <p className="text-[11px] text-orange-500 pt-1">
                   Only the first {EXPORT_MAX_ROWS.toLocaleString()} will be exported. Narrow the
-                  filters to export a specific slice.
+                  date range to export a specific slice.
                 </p>
               )}
             </div>
