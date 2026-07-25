@@ -181,6 +181,167 @@ export interface CallAnalytics {
   analytics_history?: Array<Record<string, unknown>>;
 }
 
+// Serialise the user-analytics query. Kept as a standalone function so the page
+// hook and the export pager below build byte-identical requests — the export
+// must be scoped to exactly what the user is looking at.
+function buildUserAnalyticsQuery(
+  userUid: string,
+  limit: number,
+  offset: number,
+  filters?: AnalyticsPageFilters,
+): string {
+  const query = new URLSearchParams({
+    user_uid: userUid,
+    limit: String(limit),
+    offset: String(offset),
+  });
+  if (filters?.search?.trim()) query.set('search', filters.search.trim());
+  if (filters?.verdicts?.length) query.set('verdicts', filters.verdicts.join(','));
+  if (filters?.qualities?.length) query.set('qualities', filters.qualities.join(','));
+  if (filters?.campaignIds?.length) query.set('campaign_ids', filters.campaignIds.join(','));
+  if (filters?.templateId && filters.templateId !== 'all') query.set('template_id', filters.templateId);
+  if (filters?.verdict && filters.verdict !== 'all') query.set('verdict', filters.verdict);
+  if (typeof filters?.minConfidence === 'number') {
+    query.set('min_confidence', String(filters.minConfidence));
+  }
+  if (filters?.excludeNegative) query.set('exclude_negative', 'true');
+  if (filters?.direction && filters.direction !== 'all') query.set('direction', filters.direction);
+  if (filters?.durationRange && filters.durationRange !== 'all') {
+    query.set('duration_range', filters.durationRange);
+  }
+  if (filters?.from) query.set('from', filters.from);
+  if (filters?.to) query.set('to', filters.to);
+
+  return query.toString();
+}
+
+// Merge the inner analytics object with top-level call metadata.
+// IMPORTANT: keep this allowlist in sync with the backend doc
+// (docs/FRONTEND_CALL_DIRECTION_AND_BILLING_FIELDS.md).
+// Anything NOT listed here gets dropped — that's how billing_data /
+// provider_call_status / recording_metadata silently disappeared before.
+function mergeAnalyticsRecord(item: any): CallAnalytics {
+  return {
+    ...item.analytics,
+    id: item.id,
+    call_id: item.call_id,
+    user_uid: item.user_uid,
+    post_processing_template_id: item.post_processing_template_id
+      ?? item.analytics?.post_processing_template_id
+      ?? item.analytics?.template_id
+      ?? null,
+    phone_number: item.phone_number,
+    transcript_url: item.transcript_url,
+    enhanced_transcript_url: item.enhanced_transcript_url,
+    campaign_id: item.campaign_id,
+    created_at: item.created_at,
+    updated_at: item.updated_at,
+    sip_call_id: item.sip_call_id,
+    recording_url: item.recording_url,
+    recording_duration_ms: item.recording_duration_ms,
+    // Billing audit + CDR fields (per backend doc)
+    call_started_at: item.call_started_at,
+    call_ended_at: item.call_ended_at,
+    duration_seconds: item.duration_seconds,
+    billing_data: item.billing_data,
+    provider_call_status: item.provider_call_status,
+    call_status: item.call_status ?? item.analytics?.call_status ?? null,
+    voicemail: item.voicemail ?? item.analytics?.voicemail ?? null,
+    recording_metadata: item.recording_metadata,
+  };
+}
+
+function parseUserAnalyticsResponse(data: any, limit: number, offset: number): AnalyticsPage {
+  let analyticsArray: CallAnalytics[] = [];
+  if (Array.isArray(data)) {
+    analyticsArray = data.map(item => (item.analytics ? mergeAnalyticsRecord(item) : item));
+  } else if (data.analytics) {
+    analyticsArray = Array.isArray(data.analytics)
+      ? data.analytics.map((item: any) => (item.analytics ? mergeAnalyticsRecord(item) : item))
+      : [data.analytics];
+  }
+
+  const responsePagination = data.pagination || {};
+
+  return {
+    analytics: analyticsArray,
+    pagination: {
+      limit: Number(responsePagination.limit ?? data.limit ?? limit),
+      offset: Number(responsePagination.offset ?? data.offset ?? offset),
+      count: Number(responsePagination.count ?? data.count ?? analyticsArray.length),
+      total: Number(responsePagination.total ?? data.total ?? analyticsArray.length),
+      hasMore: Boolean(responsePagination.has_more ?? data.has_more ?? false),
+    },
+  };
+}
+
+export interface FetchAllUserAnalyticsOptions {
+  userUid: string;
+  filters?: AnalyticsPageFilters;
+  signal?: AbortSignal;
+  /** Server page size to walk with. Clamped to the backend max of 100. */
+  pageSize?: number;
+  /** Hard safety cap on rows pulled into the browser. */
+  maxRows?: number;
+  /** Called after each page with running totals, for a progress indicator. */
+  onProgress?: (loaded: number, total: number) => void;
+}
+
+export const EXPORT_MAX_ROWS = 50_000;
+
+/**
+ * Walk every matching analytics page for an export.
+ *
+ * This deliberately breaks the "never fetch all pages" rule that the list hook
+ * enforces — but only on an explicit user action (clicking Export), never on
+ * render, and at the largest page size the backend allows so it is as few round
+ * trips as possible. The list UI stays bounded; this is the one path allowed to
+ * pull the whole result set, and only because there is no server-side export
+ * job yet. It bypasses the page cache so a huge export never evicts it.
+ *
+ * Bounded by `maxRows` so a pathological archive can't exhaust browser memory;
+ * the caller is told when the cap is hit so it can warn the user.
+ */
+export async function fetchAllUserAnalytics(
+  options: FetchAllUserAnalyticsOptions,
+): Promise<{ rows: CallAnalytics[]; total: number; truncated: boolean }> {
+  const { userUid, filters, signal, onProgress } = options;
+  const pageSize = Math.min(Math.max(Math.trunc(options.pageSize ?? 100), 1), 100);
+  const maxRows = Math.max(options.maxRows ?? EXPORT_MAX_ROWS, pageSize);
+
+  const rows: CallAnalytics[] = [];
+  let offset = 0;
+  let total = 0;
+  let truncated = false;
+
+  for (;;) {
+    if (signal?.aborted) throw new DOMException('Export aborted', 'AbortError');
+
+    const query = buildUserAnalyticsQuery(userUid, pageSize, offset, filters);
+    const data = await fetchJson<any>(`${MONADE_API_BASE}/api/analytics?${query}`, { signal });
+    const page = parseUserAnalyticsResponse(data, pageSize, offset);
+
+    total = page.pagination.total || rows.length + page.analytics.length;
+    rows.push(...page.analytics);
+    onProgress?.(rows.length, total);
+
+    if (rows.length >= maxRows) {
+      // Truncated if we're about to drop rows we already hold, or the server
+      // says there are still more pages beyond this one.
+      truncated = rows.length > maxRows || page.pagination.hasMore;
+      rows.length = maxRows;
+      break;
+    }
+    // Stop on has_more=false, and also on an empty page as a guard against an
+    // endpoint that never flips has_more — otherwise this could loop forever.
+    if (!page.pagination.hasMore || page.analytics.length === 0) break;
+
+    offset += pageSize;
+  }
+
+  return { rows, total, truncated };
+}
+
 // Hook to fetch analytics for a specific call
 export function useCallAnalytics() {
   const { userUid } = useMonadeUser();
@@ -375,83 +536,9 @@ export function useUserAnalytics() {
 
     const request = (async () => {
       try {
-        const query = new URLSearchParams({
-          user_uid: userUid,
-          limit: String(limit),
-          offset: String(offset),
-        });
-        if (filters?.search?.trim()) query.set('search', filters.search.trim());
-        if (filters?.verdicts?.length) query.set('verdicts', filters.verdicts.join(','));
-        if (filters?.qualities?.length) query.set('qualities', filters.qualities.join(','));
-        if (filters?.campaignIds?.length) query.set('campaign_ids', filters.campaignIds.join(','));
-        if (filters?.templateId && filters.templateId !== 'all') query.set('template_id', filters.templateId);
-        if (filters?.verdict && filters.verdict !== 'all') query.set('verdict', filters.verdict);
-        if (typeof filters?.minConfidence === 'number') {
-          query.set('min_confidence', String(filters.minConfidence));
-        }
-        if (filters?.excludeNegative) query.set('exclude_negative', 'true');
-        if (filters?.direction && filters.direction !== 'all') query.set('direction', filters.direction);
-        if (filters?.durationRange && filters.durationRange !== 'all') {
-          query.set('duration_range', filters.durationRange);
-        }
-        if (filters?.from) query.set('from', filters.from);
-        if (filters?.to) query.set('to', filters.to);
-        const data = await fetchJson<any>(`${MONADE_API_BASE}/api/analytics?${query.toString()}`);
-
-        // Merge the inner analytics object with top-level call metadata.
-        // IMPORTANT: keep this allowlist in sync with the backend doc
-        // (docs/FRONTEND_CALL_DIRECTION_AND_BILLING_FIELDS.md).
-        // Anything NOT listed here gets dropped — that's how billing_data /
-        // provider_call_status / recording_metadata silently disappeared before.
-        const mergeRecord = (item: any): CallAnalytics => ({
-          ...item.analytics,
-          id: item.id,
-          call_id: item.call_id,
-          user_uid: item.user_uid,
-          post_processing_template_id: item.post_processing_template_id
-            ?? item.analytics?.post_processing_template_id
-            ?? item.analytics?.template_id
-            ?? null,
-          phone_number: item.phone_number,
-          transcript_url: item.transcript_url,
-          enhanced_transcript_url: item.enhanced_transcript_url,
-          campaign_id: item.campaign_id,
-          created_at: item.created_at,
-          updated_at: item.updated_at,
-          sip_call_id: item.sip_call_id,
-          recording_url: item.recording_url,
-          recording_duration_ms: item.recording_duration_ms,
-          // Billing audit + CDR fields (per backend doc)
-          call_started_at: item.call_started_at,
-          call_ended_at: item.call_ended_at,
-          duration_seconds: item.duration_seconds,
-          billing_data: item.billing_data,
-          provider_call_status: item.provider_call_status,
-          call_status: item.call_status ?? item.analytics?.call_status ?? null,
-          voicemail: item.voicemail ?? item.analytics?.voicemail ?? null,
-          recording_metadata: item.recording_metadata,
-        });
-
-        let analyticsArray: CallAnalytics[] = [];
-        if (Array.isArray(data)) {
-          analyticsArray = data.map(item => (item.analytics ? mergeRecord(item) : item));
-        } else if (data.analytics) {
-          analyticsArray = Array.isArray(data.analytics)
-            ? data.analytics.map((item: any) => (item.analytics ? mergeRecord(item) : item))
-            : [data.analytics];
-        }
-
-        const responsePagination = data.pagination || {};
-        const page: AnalyticsPage = {
-          analytics: analyticsArray,
-          pagination: {
-            limit: Number(responsePagination.limit ?? data.limit ?? limit),
-            offset: Number(responsePagination.offset ?? data.offset ?? offset),
-            count: Number(responsePagination.count ?? data.count ?? analyticsArray.length),
-            total: Number(responsePagination.total ?? data.total ?? analyticsArray.length),
-            hasMore: Boolean(responsePagination.has_more ?? data.has_more ?? false),
-          },
-        };
+        const query = buildUserAnalyticsQuery(userUid, limit, offset, filters);
+        const data = await fetchJson<any>(`${MONADE_API_BASE}/api/analytics?${query}`);
+        const page = parseUserAnalyticsResponse(data, limit, offset);
 
         userAnalyticsCache.set(scopedUserKey, { data: page, cachedAt: Date.now() });
         writeLocalCache(scopedUserKey, page, USER_ANALYTICS_CACHE_TTL_MS);

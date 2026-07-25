@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   AlertTriangle,
   ChevronLeft,
@@ -14,16 +14,33 @@ import { PaperCard, PaperCardContent, PaperCardHeader, PaperCardTitle } from '@/
 import { Badge } from '@/components/ui/badge';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
 import { Transcript } from '@/app/hooks/use-transcripts';
-import { useUserAnalytics, CallAnalytics } from '@/app/hooks/use-analytics';
+import { useUserAnalytics, fetchAllUserAnalytics, CallAnalytics } from '@/app/hooks/use-analytics';
+import { useMonadeUser } from '@/app/hooks/use-monade-user';
 import { useDebouncedValue } from '@/app/hooks/use-debounced-value';
 import { useCampaignApi } from '@/app/hooks/use-campaign-api';
 
 import { CallHistoryFilterBar, CallHistoryFilterState, CampaignFilterOption } from './components/call-history-filter-bar';
 import { CallHistoryRow } from './components/call-history-row';
-import { ExportCsvDialog } from './components/export-csv-dialog';
+import { ExportCsvDialog, ExportableCall, ExportFetchAllRows } from './components/export-csv-dialog';
 
 interface MergedTranscript extends Transcript {
   analytics?: CallAnalytics;
+}
+
+// Map an analytics record into the table/export row shape. Each call_analytics
+// row already carries the transcript URL, so no second transcript request.
+function analyticsToMergedTranscript(analytics: CallAnalytics): ExportableCall {
+  return {
+    id: analytics.id ?? analytics.call_id,
+    user_uid: analytics.user_uid ?? '',
+    call_id: analytics.call_id,
+    phone_number: analytics.phone_number ?? '',
+    transcript_url: analytics.transcript_url ?? '',
+    created_at: analytics.created_at ?? new Date().toISOString(),
+    updated_at: analytics.updated_at ?? analytics.created_at ?? new Date().toISOString(),
+    has_conversation: Boolean(analytics.summary || analytics.transcript_url),
+    analytics,
+  };
 }
 
 export default function CallHistoryPage() {
@@ -41,6 +58,7 @@ export default function CallHistoryPage() {
   const callsPerPage = 10;
 
   const debouncedSearch = useDebouncedValue(filters.search);
+  const { userUid } = useMonadeUser();
   const {
     analytics: allAnalytics,
     pagination,
@@ -76,26 +94,19 @@ export default function CallHistoryPage() {
     return { from: start.toISOString(), to: end.toISOString() };
   }, [filters.timeRange]);
 
-  useEffect(() => {
-    fetchAnalyticsPage({
-      limit: callsPerPage,
-      offset: (currentPage - 1) * callsPerPage,
-      filters: {
-        search: debouncedSearch,
-        verdicts: filters.verdicts,
-        qualities: filters.qualities,
-        campaignIds: filters.campaigns,
-        direction: filters.direction,
-        durationRange: filters.durationRange,
-        ...dateWindow,
-      },
-    });
-  }, [
-    callsPerPage,
-    currentPage,
+  // Single source of truth for the active server filters, shared by the page
+  // fetch and the CSV export so both request exactly the same result set.
+  const analyticsFilters = useMemo(() => ({
+    search: debouncedSearch,
+    verdicts: filters.verdicts,
+    qualities: filters.qualities,
+    campaignIds: filters.campaigns,
+    direction: filters.direction,
+    durationRange: filters.durationRange,
+    ...dateWindow,
+  }), [
     dateWindow,
     debouncedSearch,
-    fetchAnalyticsPage,
     filters.campaigns,
     filters.direction,
     filters.durationRange,
@@ -103,21 +114,35 @@ export default function CallHistoryPage() {
     filters.verdicts,
   ]);
 
+  useEffect(() => {
+    fetchAnalyticsPage({
+      limit: callsPerPage,
+      offset: (currentPage - 1) * callsPerPage,
+      filters: analyticsFilters,
+    });
+  }, [analyticsFilters, callsPerPage, currentPage, fetchAnalyticsPage]);
+
   // The call archive is backed by call_analytics. Each row already carries the
   // transcript URL, so the browser only needs the current bounded page.
-  const mergedTranscripts = useMemo(() => {
-    return allAnalytics.map((analytics): MergedTranscript => ({
-      id: analytics.id ?? analytics.call_id,
-      user_uid: analytics.user_uid ?? '',
-      call_id: analytics.call_id,
-      phone_number: analytics.phone_number ?? '',
-      transcript_url: analytics.transcript_url ?? '',
-      created_at: analytics.created_at ?? new Date().toISOString(),
-      updated_at: analytics.updated_at ?? analytics.created_at ?? new Date().toISOString(),
-      has_conversation: Boolean(analytics.summary || analytics.transcript_url),
-      analytics,
-    }));
-  }, [allAnalytics]);
+  const mergedTranscripts = useMemo(
+    () => allAnalytics.map(analyticsToMergedTranscript),
+    [allAnalytics],
+  );
+
+  // Pull every matching call for a CSV export, paged off the server. Scoped to
+  // the active filters and mapped into the same shape the table rows use.
+  const fetchAllCallsForExport = useCallback<ExportFetchAllRows>(async ({ signal, onProgress }) => {
+    if (!userUid) return { rows: [], truncated: false };
+
+    const { rows, truncated } = await fetchAllUserAnalytics({
+      userUid,
+      filters: analyticsFilters,
+      signal,
+      onProgress: (loaded, total) => onProgress({ loaded, total }),
+    });
+
+    return { rows: rows.map(analyticsToMergedTranscript), truncated };
+  }, [analyticsFilters, userUid]);
 
   // Campaign options come from the campaign list endpoint, not from the loaded
   // page. Deriving them from the page would show only the campaigns that happen
@@ -186,7 +211,11 @@ export default function CallHistoryPage() {
               </p>
             </div>
             <div className="flex gap-3">
-              <ExportCsvDialog calls={mergedTranscripts} />
+              <ExportCsvDialog
+                calls={mergedTranscripts}
+                totalCount={pagination.total}
+                fetchAllRows={fetchAllCallsForExport}
+              />
             </div>
           </div>
 

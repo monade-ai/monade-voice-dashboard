@@ -17,9 +17,10 @@ import {
   Download,
 } from 'lucide-react';
 
-import { useUserAnalytics, CallAnalytics } from '@/app/hooks/use-analytics';
+import { useUserAnalytics, fetchAllUserAnalytics, CallAnalytics } from '@/app/hooks/use-analytics';
 import { useCallRecording } from '@/app/hooks/use-call-recording';
 import { useDebouncedValue } from '@/app/hooks/use-debounced-value';
+import { useMonadeUser } from '@/app/hooks/use-monade-user';
 import { PostProcessingTemplate, QualificationBucket, usePostProcessingTemplates } from '@/app/hooks/use-post-processing-templates';
 import { DashboardHeader } from '@/components/dashboard-header';
 import { Input } from '@/components/ui/input';
@@ -37,7 +38,7 @@ import {
 import { humanizeOutcomeKey } from '@/lib/post-processing-outcomes';
 
 import { HotLeadsGuide } from './components/hot-leads-guide';
-import { HotLeadsExportDialog } from './components/hot-leads-export-dialog';
+import { HotLeadsExportDialog, HotLeadsFetchAllRows } from './components/hot-leads-export-dialog';
 
 const TranscriptViewer = dynamic(
   () => import('@/components/transcript-viewer'),
@@ -246,6 +247,7 @@ export default function HotLeadsPage() {
     loading,
     fetchPage,
   } = useUserAnalytics();
+  const { userUid } = useMonadeUser();
   const { templates, fetchTemplates, fetchTemplate } = usePostProcessingTemplates();
   const [search, setSearch] = useState('');
   const [selectedLead, setSelectedLead] = useState<CallAnalytics | null>(null);
@@ -281,29 +283,39 @@ export default function HotLeadsPage() {
     return { from: start.toISOString(), to: end.toISOString() };
   }, [dateFilter]);
 
+  // Single source of truth for the active server filters, shared by the page
+  // fetch and the CSV export so both request exactly the same result set.
+  const analyticsFilters = useMemo(() => ({
+    search: debouncedSearch,
+    templateId: templateFilter,
+    verdict: intentFilter,
+    minConfidence: confidenceFilter === 'high' ? 80 : 50,
+    excludeNegative: true,
+    ...dateWindow,
+  }), [confidenceFilter, dateWindow, debouncedSearch, intentFilter, templateFilter]);
+
   useEffect(() => {
     fetchPage({
       limit: itemsPerPage,
       offset: (currentPage - 1) * itemsPerPage,
-      filters: {
-        search: debouncedSearch,
-        templateId: templateFilter,
-        verdict: intentFilter,
-        minConfidence: confidenceFilter === 'high' ? 80 : 50,
-        excludeNegative: true,
-        ...dateWindow,
-      },
+      filters: analyticsFilters,
     });
-  }, [
-    confidenceFilter,
-    currentPage,
-    dateWindow,
-    debouncedSearch,
-    fetchPage,
-    intentFilter,
-    itemsPerPage,
-    templateFilter,
-  ]);
+  }, [analyticsFilters, currentPage, fetchPage, itemsPerPage]);
+
+  // Pull every matching lead for a CSV export, paged off the server, scoped to
+  // the active filters.
+  const fetchAllLeadsForExport = useCallback<HotLeadsFetchAllRows>(async ({ signal, onProgress }) => {
+    if (!userUid) return { rows: [], truncated: false };
+
+    const { rows, truncated } = await fetchAllUserAnalytics({
+      userUid,
+      filters: analyticsFilters,
+      signal,
+      onProgress: (loaded, total) => onProgress({ loaded, total }),
+    });
+
+    return { rows, truncated };
+  }, [analyticsFilters, userUid]);
 
   useEffect(() => {
     fetchTemplates().catch(() => undefined);
@@ -584,7 +596,11 @@ export default function HotLeadsPage() {
               </SelectContent>
             </Select>
 
-            <HotLeadsExportDialog leads={hotLeads} />
+            <HotLeadsExportDialog
+              leads={hotLeads}
+              totalCount={pagination.total}
+              fetchAllRows={fetchAllLeadsForExport}
+            />
           </div>
         </div>
 
