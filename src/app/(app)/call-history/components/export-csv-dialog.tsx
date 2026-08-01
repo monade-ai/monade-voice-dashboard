@@ -17,7 +17,12 @@ import {
 } from '@/components/ui/dialog';
 import { fetchJson } from '@/lib/http';
 import type { Transcript } from '@/app/hooks/use-transcripts';
-import { EXPORT_MAX_ROWS, type CallAnalytics } from '@/app/hooks/use-analytics';
+import {
+  FULL_EXPORT_MAX_ROWS,
+  FAST_EXPORT_MAX_ROWS,
+  EXPORT_FILE_CHUNK_ROWS,
+  type CallAnalytics,
+} from '@/app/hooks/use-analytics';
 import { useDebouncedValue } from '@/app/hooks/use-debounced-value';
 import { ExportDateRangeField, type ExportDateRange } from '@/components/export-date-range-field';
 
@@ -36,6 +41,13 @@ export type ExportFetchAllRows = (opts: {
   /** Extra date/time window layered on the page's filters for this export. */
   dateRange?: ExportDateRange;
 }) => Promise<{ rows: ExportableCall[]; truncated: boolean }>;
+
+// Streams matching rows in page-batches for a large Fast export, so the dialog
+// can flush files as it goes instead of holding the whole set in memory.
+export type ExportStreamRows = (opts: {
+  signal: AbortSignal;
+  dateRange?: ExportDateRange;
+}) => AsyncIterable<ExportableCall[]>;
 
 export type ExportCountRows = (opts: {
   signal: AbortSignal;
@@ -57,6 +69,8 @@ interface ExportCsvDialogProps {
    * back to exporting the loaded page only.
    */
   fetchAllRows?: ExportFetchAllRows;
+  /** Streams matching records for a large Fast export (chunked to multiple files). */
+  streamAllRows?: ExportStreamRows;
   /** Counts matching records for the active filters + the dialog's date range. */
   countRows?: ExportCountRows;
 }
@@ -158,15 +172,46 @@ function escapeCsv(value: unknown): string {
   return str;
 }
 
+const CSV_HEADER = CSV_COLUMNS.map((c) => escapeCsv(c.label)).join(',');
+
+// Build a CSV string for a batch of calls. Fast mode leaves the fetched
+// transcript text and recording URL blank (the header stays identical so every
+// chunk file shares one schema).
+function buildCallCsv(
+  rows: ExportableCall[],
+  mode: 'fast' | 'full',
+  transcriptByCallId: Map<string, string>,
+): string {
+  const skipKeys = mode === 'fast' ? new Set(['transcript', 'recording_url']) : null;
+  const body = rows.map((call) =>
+    CSV_COLUMNS.map((col) => escapeCsv(skipKeys?.has(col.key) ? '' : col.get(call, transcriptByCallId))).join(','),
+  );
+
+  // ﻿ = UTF-8 BOM so Excel detects UTF-8 (₹, names, non-ASCII) correctly.
+  return '﻿' + [CSV_HEADER, ...body].join('\r\n');
+}
+
+function triggerCsvDownload(csv: string, filename: string): void {
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
 
 
 
-export function ExportCsvDialog({ calls, trigger, totalCount, fetchAllRows, countRows }: ExportCsvDialogProps) {
+
+export function ExportCsvDialog({ calls, trigger, totalCount, fetchAllRows, streamAllRows, countRows }: ExportCsvDialogProps) {
   const [open, setOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
-  // Two-phase progress: first paging records off the server, then (full mode)
-  // fetching transcript text. Null between phases / when idle.
-  const [phase, setPhase] = useState<'records' | 'transcripts' | null>(null);
+  // Progress phases: paging records off the server, writing chunk files (large
+  // fast export), or fetching transcript text (full mode). Null when idle.
+  const [phase, setPhase] = useState<'records' | 'writing' | 'transcripts' | null>(null);
   const [progress, setProgress] = useState<ExportFetchProgress>({ loaded: 0, total: 0 });
   const [dateRange, setDateRange] = useState<ExportDateRange>({});
   const [rangeCount, setRangeCount] = useState<number | null>(null);
@@ -217,15 +262,166 @@ export function ExportCsvDialog({ calls, trigger, totalCount, fetchAllRows, coun
       ? (rangeCount ?? 0)
       : (totalCount ?? calls.length);
 
-  // mode 'fast' skips the per-call transcript-text fetch (the only slow step) and exports
-  // instantly with every column except the fetched Transcript text (URLs still included).
-  // mode 'full' fetches transcript text for each call — accurate but slow on large ranges.
+  // Full export can only cover a bounded set — it fetches a transcript per row,
+  // so tens of thousands is the ceiling. Fast export skips that and streams to
+  // multiple files, so it can go far larger.
+  const fullTooLarge = canExportAll && previewCount > FULL_EXPORT_MAX_ROWS;
+
+  // Fetch enhanced/plain transcript text for a batch, with bounded concurrency.
+  const fetchTranscripts = async (rows: ExportableCall[], signal: AbortSignal): Promise<Map<string, string>> => {
+    const transcriptByCallId = new Map<string, string>();
+    const jobs = rows
+      .map((c) => ({ callId: c.call_id, url: enhancedTranscriptUrlOf(c) || transcriptUrlOf(c) }))
+      .filter((job) => job.callId && job.url);
+
+    let done = 0;
+    const queue = [...jobs];
+    const worker = async () => {
+      while (queue.length > 0) {
+        if (signal.aborted) return;
+        const job = queue.shift();
+        if (!job) break;
+        try {
+          const res = await fetchJson<{ transcript?: string }>('/api/transcript-content', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url: job.url }),
+            retry: { retries: 0 },
+            signal,
+          });
+          if (res?.transcript) transcriptByCallId.set(job.callId, res.transcript);
+        } catch (err) {
+          if (signal.aborted) return;
+          console.warn(`[CallArchiveExport] transcript fetch failed for ${job.callId}:`, err);
+        } finally {
+          done += 1;
+          setProgress({ loaded: done, total: jobs.length });
+        }
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(4, queue.length) }, worker));
+
+    return transcriptByCallId;
+  };
+
+  const stamp = () => new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+
+  // Large Fast export: stream rows off the server (keyset paging) and flush one
+  // CSV file every EXPORT_FILE_CHUNK_ROWS so browser memory stays bounded and an
+  // early failure still leaves completed files on disk.
+  const runFastStreamedExport = async (stream: ExportStreamRows, signal: AbortSignal) => {
+    const when = stamp();
+    // Multi-file is decided from the known matching count so a single file never
+    // gets a misleading "_part1" suffix (and the exact-boundary case is clean).
+    const multiFile = previewCount > EXPORT_FILE_CHUNK_ROWS;
+    let buffer: ExportableCall[] = [];
+    let fileIndex = 0;
+    let exported = 0;
+
+    const flush = (rows: ExportableCall[]) => {
+      const part = multiFile ? `_part${fileIndex + 1}` : '';
+      triggerCsvDownload(buildCallCsv(rows, 'fast', new Map()), `call-archive${part}_${when}.csv`);
+      fileIndex += 1;
+    };
+
+    for await (const batch of stream({ signal, dateRange: hasDateRange ? dateRange : undefined })) {
+      if (signal.aborted) break;
+      buffer.push(...batch);
+      exported += batch.length;
+      setProgress({ loaded: exported, total: previewCount });
+
+      while (buffer.length >= EXPORT_FILE_CHUNK_ROWS) {
+        setPhase('writing');
+        flush(buffer.slice(0, EXPORT_FILE_CHUNK_ROWS));
+        buffer = buffer.slice(EXPORT_FILE_CHUNK_ROWS);
+        setPhase('records');
+      }
+    }
+
+    if (signal.aborted) {
+      if (fileIndex > 0) toast.info(`Export cancelled — ${fileIndex} file(s) already saved.`);
+      else toast.info('Export cancelled.');
+
+      return;
+    }
+
+    if (buffer.length > 0 || fileIndex === 0) flush(buffer);
+
+    const truncated = exported >= FAST_EXPORT_MAX_ROWS;
+    toast.success(
+      `Exported ${exported.toLocaleString()} record${exported === 1 ? '' : 's'}`
+      + (fileIndex > 1 ? ` across ${fileIndex} files` : '')
+      + ' (fast — no transcripts/recordings).',
+    );
+    if (truncated) {
+      toast.warning(
+        `Reached the ${FAST_EXPORT_MAX_ROWS.toLocaleString()}-row export ceiling. Narrow the date range to get the rest.`,
+      );
+    }
+  };
+
+  // Bounded single-file export: the loaded page (no pager), or a Full export up
+  // to its row ceiling.
+  const runBufferedExport = async (mode: 'fast' | 'full', signal: AbortSignal) => {
+    let exportCalls = calls;
+    let truncated = false;
+    if (fetchAllRows) {
+      const result = await fetchAllRows({
+        signal,
+        onProgress: (p) => setProgress(p),
+        dateRange: hasDateRange ? dateRange : undefined,
+      });
+      exportCalls = result.rows;
+      truncated = result.truncated;
+    }
+    if (signal.aborted) {
+      toast.info('Export cancelled.');
+
+      return;
+    }
+    if (exportCalls.length === 0) {
+      toast.error('There are no records to export.');
+
+      return;
+    }
+
+    let transcriptByCallId = new Map<string, string>();
+    if (mode === 'full') {
+      setPhase('transcripts');
+      setProgress({ loaded: 0, total: exportCalls.length });
+      transcriptByCallId = await fetchTranscripts(exportCalls, signal);
+      if (signal.aborted) {
+        toast.info('Export cancelled.');
+
+        return;
+      }
+    }
+
+    triggerCsvDownload(buildCallCsv(exportCalls, mode, transcriptByCallId), `call-archive_${stamp()}.csv`);
+    toast.success(
+      `Exported ${exportCalls.length.toLocaleString()} record${exportCalls.length === 1 ? '' : 's'} to CSV`
+      + (mode === 'fast' ? ' (fast — no transcripts/recordings).' : '.'),
+    );
+    if (truncated) {
+      toast.warning(`Export capped at ${exportCalls.length.toLocaleString()} rows. Narrow the filters to export the rest.`);
+    }
+  };
+
   const handleDownload = async (mode: 'fast' | 'full') => {
     if (previewCount === 0 || exporting) {
       if (previewCount === 0) toast.error('There are no records to export.');
 
       return;
     }
+    if (mode === 'full' && fullTooLarge) {
+      toast.error(
+        `Full export is limited to ${FULL_EXPORT_MAX_ROWS.toLocaleString()} rows because it fetches a transcript per call. `
+        + 'Use Fast export for a set this large.',
+      );
+
+      return;
+    }
+
     setExporting(true);
     setPhase(canExportAll ? 'records' : null);
     setProgress({ loaded: 0, total: previewCount });
@@ -234,120 +430,12 @@ export function ExportCsvDialog({ calls, trigger, totalCount, fetchAllRows, coun
     const { signal } = controller;
 
     try {
-      // Resolve the dataset. With a server pager, walk every matching page (this
-      // is the one place allowed to — it's a deliberate user action, not a
-      // render). Without one, export the rows already on the page.
-      let exportCalls = calls;
-      let truncated = false;
-      if (fetchAllRows) {
-        const result = await fetchAllRows({
-          signal,
-          onProgress: (p) => setProgress(p),
-          dateRange: hasDateRange ? dateRange : undefined,
-        });
-        exportCalls = result.rows;
-        truncated = result.truncated;
+      if (mode === 'fast' && streamAllRows) {
+        await runFastStreamedExport(streamAllRows, signal);
+      } else {
+        await runBufferedExport(mode, signal);
       }
-
-      if (signal.aborted) {
-        toast.info('Export cancelled.');
-
-        return;
-      }
-
-      if (exportCalls.length === 0) {
-        toast.error('There are no records to export.');
-
-        return;
-      }
-
-      // Fetch transcript text only for the calls being exported, preferring the enhanced
-      // transcript. Bounded concurrency so a large range doesn't fire hundreds of requests.
-      // Skipped entirely in 'fast' mode.
-      const transcriptByCallId = new Map<string, string>();
-      if (mode === 'full') {
-        setPhase('transcripts');
-        setProgress({ loaded: 0, total: exportCalls.length });
-
-        const jobs = exportCalls
-          .map((c) => ({
-            callId: c.call_id,
-            url: enhancedTranscriptUrlOf(c) || transcriptUrlOf(c),
-          }))
-          .filter((job) => job.callId && job.url);
-
-        let done = 0;
-        const queue = [...jobs];
-        const worker = async () => {
-          while (queue.length > 0) {
-            if (signal.aborted) return; // stop pulling new work the moment we're cancelled
-            const job = queue.shift();
-            if (!job) break;
-            try {
-              const res = await fetchJson<{ transcript?: string }>(
-                '/api/transcript-content',
-                {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ url: job.url }),
-                  retry: { retries: 0 },
-                  signal,
-                },
-              );
-              if (res?.transcript) transcriptByCallId.set(job.callId, res.transcript);
-            } catch (err) {
-              if (signal.aborted) return; // aborted fetches throw — exit quietly
-              // Surface, don't swallow — a blank transcript cell should be explainable.
-              console.warn(`[CallArchiveExport] transcript fetch failed for ${job.callId}:`, err);
-            } finally {
-              done += 1;
-              setProgress({ loaded: done, total: jobs.length });
-            }
-          }
-        };
-        await Promise.all(Array.from({ length: Math.min(4, queue.length) }, worker));
-
-        if (signal.aborted) {
-          toast.info('Export cancelled.');
-
-          return;
-        }
-      }
-
-      // Fast export omits the heavy/fetched columns: the transcript text (already blank,
-      // since we skipped the fetch above) and the recording URL. Same header row either
-      // way so the CSV schema stays stable — the cells are just left empty.
-      const skipKeys = mode === 'fast' ? new Set(['transcript', 'recording_url']) : null;
-      const header = CSV_COLUMNS.map(c => escapeCsv(c.label)).join(',');
-      const rows = exportCalls.map(call =>
-        CSV_COLUMNS.map(col =>
-          escapeCsv(skipKeys?.has(col.key) ? '' : col.get(call, transcriptByCallId)),
-        ).join(','),
-      );
-      // ﻿ = UTF-8 BOM so Excel detects UTF-8 (₹, names, non-ASCII) correctly.
-      const csv = '﻿' + [header, ...rows].join('\r\n');
-
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-      a.href = url;
-      a.download = `call-archive_${stamp}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-
-      toast.success(
-        `Exported ${rows.length.toLocaleString()} record${rows.length === 1 ? '' : 's'} to CSV`
-        + (mode === 'fast' ? ' (fast — no transcripts/recordings).' : '.'),
-      );
-      if (truncated) {
-        toast.warning(
-          `Export capped at ${rows.length.toLocaleString()} rows. Narrow the filters to export the rest.`,
-        );
-      }
-      setOpen(false);
+      if (!signal.aborted) setOpen(false);
     } catch (err) {
       if (signal.aborted || (err instanceof DOMException && err.name === 'AbortError')) {
         toast.info('Export cancelled.');
@@ -399,8 +487,9 @@ export function ExportCsvDialog({ calls, trigger, totalCount, fetchAllRows, coun
                 pages — not just the page on screen.</>
               : <>Exports the calls currently loaded on the page.</>}
             {' '}<strong>Full Export</strong> includes the full transcript (enhanced when available)
-            and recording URL — slower on large ranges. <strong>Fast Export</strong> skips those and
-            returns quickly with call IDs, verdicts, analytics and billing.
+            and recording URL — best for smaller sets. <strong>Fast Export</strong> skips those and
+            handles large archives, splitting into multiple files past
+            {' '}{EXPORT_FILE_CHUNK_ROWS.toLocaleString()} rows.
           </DialogDescription>
         </DialogHeader>
 
@@ -432,10 +521,23 @@ export function ExportCsvDialog({ calls, trigger, totalCount, fetchAllRows, coun
                   </>
                 )}
               </div>
-              {canExportAll && !counting && previewCount > EXPORT_MAX_ROWS && (
+              {canExportAll && !counting && previewCount > EXPORT_FILE_CHUNK_ROWS && previewCount <= FAST_EXPORT_MAX_ROWS && (
+                <p className="text-[11px] text-muted-foreground pt-1">
+                  Fast export will arrive as {Math.ceil(previewCount / EXPORT_FILE_CHUNK_ROWS)} CSV files
+                  of up to {EXPORT_FILE_CHUNK_ROWS.toLocaleString()} rows each (your browser may ask to
+                  allow multiple downloads).
+                </p>
+              )}
+              {canExportAll && !counting && previewCount > FAST_EXPORT_MAX_ROWS && (
                 <p className="text-[11px] text-orange-500 pt-1">
-                  Only the first {EXPORT_MAX_ROWS.toLocaleString()} will be exported. Narrow the
-                  date range to export a specific slice.
+                  Fast export covers the first {FAST_EXPORT_MAX_ROWS.toLocaleString()} rows. Narrow the
+                  date range to export the rest.
+                </p>
+              )}
+              {fullTooLarge && !counting && (
+                <p className="text-[11px] text-orange-500 pt-1">
+                  Full export (with transcripts) is limited to {FULL_EXPORT_MAX_ROWS.toLocaleString()} rows —
+                  use Fast export for this set.
                 </p>
               )}
             </div>
@@ -460,9 +562,11 @@ export function ExportCsvDialog({ calls, trigger, totalCount, fetchAllRows, coun
                 <Loader2 className="w-3 h-3 animate-spin" />
                 {phase === 'records'
                   ? `Loading records… ${progress.loaded.toLocaleString()}${progress.total ? ` / ${progress.total.toLocaleString()}` : ''}`
-                  : phase === 'transcripts'
-                    ? `Fetching transcripts… ${progress.loaded.toLocaleString()} / ${progress.total.toLocaleString()}`
-                    : 'Exporting…'}
+                  : phase === 'writing'
+                    ? 'Writing file…'
+                    : phase === 'transcripts'
+                      ? `Fetching transcripts… ${progress.loaded.toLocaleString()} / ${progress.total.toLocaleString()}`
+                      : 'Exporting…'}
               </div>
               <button
                 type="button"
@@ -489,9 +593,11 @@ export function ExportCsvDialog({ calls, trigger, totalCount, fetchAllRows, coun
               </Button>
               <Button
                 onClick={() => handleDownload('full')}
-                disabled={previewCount === 0}
+                disabled={previewCount === 0 || fullTooLarge}
                 size="sm"
-                title="Includes full transcripts & recording URLs — slower"
+                title={fullTooLarge
+                  ? `Too many rows for Full export (limit ${FULL_EXPORT_MAX_ROWS.toLocaleString()}). Use Fast export.`
+                  : 'Includes full transcripts & recording URLs — slower'}
                 className="gap-2 text-[10px] font-bold uppercase tracking-widest bg-foreground text-background hover:bg-foreground/90"
               >
                 <Download className="w-3 h-3" />

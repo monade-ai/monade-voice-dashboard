@@ -14,7 +14,15 @@ import { PaperCard, PaperCardContent, PaperCardHeader, PaperCardTitle } from '@/
 import { Badge } from '@/components/ui/badge';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
 import { Transcript } from '@/app/hooks/use-transcripts';
-import { useUserAnalytics, fetchAllUserAnalytics, fetchUserAnalyticsCount, CallAnalytics } from '@/app/hooks/use-analytics';
+import {
+  useUserAnalytics,
+  fetchAllUserAnalytics,
+  streamAllUserAnalytics,
+  fetchUserAnalyticsCount,
+  FULL_EXPORT_MAX_ROWS,
+  FAST_EXPORT_MAX_ROWS,
+  CallAnalytics,
+} from '@/app/hooks/use-analytics';
 import { useMonadeUser } from '@/app/hooks/use-monade-user';
 import { useDebouncedValue } from '@/app/hooks/use-debounced-value';
 import { useCampaignApi } from '@/app/hooks/use-campaign-api';
@@ -22,7 +30,7 @@ import type { ExportDateRange } from '@/components/export-date-range-field';
 
 import { CallHistoryFilterBar, CallHistoryFilterState, CampaignFilterOption } from './components/call-history-filter-bar';
 import { CallHistoryRow } from './components/call-history-row';
-import { ExportCsvDialog, ExportableCall, ExportFetchAllRows, ExportCountRows } from './components/export-csv-dialog';
+import { ExportCsvDialog, ExportableCall, ExportFetchAllRows, ExportStreamRows, ExportCountRows } from './components/export-csv-dialog';
 
 interface MergedTranscript extends Transcript {
   analytics?: CallAnalytics;
@@ -138,8 +146,7 @@ export default function CallHistoryPage() {
       : analyticsFilters
   ), [analyticsFilters]);
 
-  // Pull every matching call for a CSV export, paged off the server. Scoped to
-  // the active filters and mapped into the same shape the table rows use.
+  // Full (bounded) export: pull every matching call, mapped to the table shape.
   const fetchAllCallsForExport = useCallback<ExportFetchAllRows>(async ({ signal, onProgress, dateRange }) => {
     if (!userUid) return { rows: [], truncated: false };
 
@@ -147,10 +154,26 @@ export default function CallHistoryPage() {
       userUid,
       filters: exportFilters(dateRange),
       signal,
+      maxRows: FULL_EXPORT_MAX_ROWS,
       onProgress: (loaded, total) => onProgress({ loaded, total }),
     });
 
     return { rows: rows.map(analyticsToMergedTranscript), truncated };
+  }, [exportFilters, userUid]);
+
+  // Large Fast export: stream matching calls in batches (keyset paging) so the
+  // dialog can flush files as it goes rather than buffering the whole archive.
+  const streamCallsForExport = useCallback<ExportStreamRows>(async function* ({ signal, dateRange }) {
+    if (!userUid) return;
+
+    for await (const batch of streamAllUserAnalytics({
+      userUid,
+      filters: exportFilters(dateRange),
+      signal,
+      maxRows: FAST_EXPORT_MAX_ROWS,
+    })) {
+      yield batch.map(analyticsToMergedTranscript);
+    }
   }, [exportFilters, userUid]);
 
   const countCallsForExport = useCallback<ExportCountRows>(async ({ signal, dateRange }) => {
@@ -230,6 +253,7 @@ export default function CallHistoryPage() {
                 calls={mergedTranscripts}
                 totalCount={pagination.total}
                 fetchAllRows={fetchAllCallsForExport}
+                streamAllRows={streamCallsForExport}
                 countRows={countCallsForExport}
               />
             </div>

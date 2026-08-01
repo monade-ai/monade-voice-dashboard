@@ -287,59 +287,119 @@ export interface FetchAllUserAnalyticsOptions {
   onProgress?: (loaded: number, total: number) => void;
 }
 
-export const EXPORT_MAX_ROWS = 50_000;
+// Row ceiling for a Full export (fetches a transcript per row, so it cannot
+// scale) and for a Fast export (data-only, safe to go much larger).
+export const FULL_EXPORT_MAX_ROWS = 50_000;
+export const FAST_EXPORT_MAX_ROWS = 500_000;
+// Fast exports flush one CSV file per this many rows so browser memory stays
+// bounded regardless of total size, and a failure late in a long export still
+// leaves the earlier files on disk.
+export const EXPORT_FILE_CHUNK_ROWS = 100_000;
+// Back-compat: existing callers (and the credit chart) import this as the
+// generic default ceiling.
+export const EXPORT_MAX_ROWS = FULL_EXPORT_MAX_ROWS;
 
 /**
- * Walk every matching analytics page for an export.
+ * Stream every matching analytics row for an export, yielding one page-batch at
+ * a time so the caller never has to hold the whole result set in memory.
  *
- * This deliberately breaks the "never fetch all pages" rule that the list hook
- * enforces — but only on an explicit user action (clicking Export), never on
- * render, and at the largest page size the backend allows so it is as few round
- * trips as possible. The list UI stays bounded; this is the one path allowed to
- * pull the whole result set, and only because there is no server-side export
- * job yet. It bypasses the page cache so a huge export never evicts it.
+ * **Keyset pagination, not offset.** Offset pagination is linear on the server
+ * — `offset=250000` makes it walk 250k index entries per request, and it gets
+ * slower the deeper you go (the backend guide explicitly warns against paging an
+ * export to the end of a large archive). Instead this carries a `created_at`
+ * cursor: each batch asks for the next page *older than the last row seen*, so
+ * every request stays at offset ~0 and cheap no matter how deep the walk goes.
  *
- * Bounded by `maxRows` so a pathological archive can't exhaust browser memory;
- * the caller is told when the cap is hit so it can warn the user.
+ * `created_at` collides (a bulk campaign writes many rows in the same
+ * millisecond) and the list API exposes no id-cursor, so rows are de-duplicated
+ * by `call_id` across the boundary re-fetch, and the offset is advanced *within*
+ * a single stuck timestamp cluster to page through ties. This keeps the walk
+ * correct without any backend change.
+ *
+ * This runs only on an explicit user action (Export), never on render.
+ */
+export async function* streamAllUserAnalytics(
+  options: FetchAllUserAnalyticsOptions,
+): AsyncGenerator<CallAnalytics[]> {
+  const { userUid, filters, signal } = options;
+  const pageSize = Math.min(Math.max(Math.trunc(options.pageSize ?? 100), 1), 100);
+  const maxRows = Math.max(options.maxRows ?? FAST_EXPORT_MAX_ROWS, pageSize);
+
+  const seen = new Set<string>();
+  let cursorTo = filters?.to; // inclusive created_at upper bound; undefined = newest
+  let offsetInWindow = 0;
+  let emitted = 0;
+  let guard = 0;
+
+  for (;;) {
+    if (signal?.aborted) throw new DOMException('Export aborted', 'AbortError');
+    // Absolute backstop against a pathological loop (e.g. an endpoint that never
+    // advances). Far above any real archive size at this page size.
+    if ((guard += 1) > 5_000_000) break;
+
+    const query = buildUserAnalyticsQuery(userUid, pageSize, offsetInWindow, { ...filters, to: cursorTo });
+    const data = await fetchJson<any>(`${MONADE_API_BASE}/api/analytics?${query}`, { signal });
+    const pageRows = parseUserAnalyticsResponse(data, pageSize, offsetInWindow).analytics;
+    if (pageRows.length === 0) break;
+
+    const fresh: CallAnalytics[] = [];
+    for (const row of pageRows) {
+      const id = row.call_id || row.id;
+      if (id) {
+        if (seen.has(id)) continue;
+        seen.add(id);
+      }
+      fresh.push(row);
+    }
+
+    if (fresh.length > 0) {
+      const remaining = maxRows - emitted;
+      const slice = fresh.length > remaining ? fresh.slice(0, remaining) : fresh;
+      emitted += slice.length;
+      yield slice;
+      if (emitted >= maxRows) return;
+    }
+
+    // A short page means this cursor window is exhausted — and since the window
+    // runs from the newest row down to the oldest, that means the whole set is done.
+    if (pageRows.length < pageSize) break;
+
+    const lastTs = pageRows[pageRows.length - 1]?.created_at;
+    if (lastTs && lastTs === cursorTo) {
+      // Every row in this page shares the cursor timestamp — a tie cluster larger
+      // than one page. Go deeper into it by offset rather than moving the cursor.
+      offsetInWindow += pageSize;
+    } else {
+      // Move the cursor down to the oldest row seen; the boundary rows at exactly
+      // this timestamp get re-fetched next round and dropped by the seen-set.
+      cursorTo = lastTs;
+      offsetInWindow = 0;
+    }
+  }
+}
+
+/**
+ * Collect every matching analytics row into one array (bounded by `maxRows`).
+ *
+ * A thin wrapper over {@link streamAllUserAnalytics} for callers that want the
+ * whole set at once — small/medium exports and the credit-usage chart. Large
+ * exports should consume the generator directly and flush as they go.
  */
 export async function fetchAllUserAnalytics(
   options: FetchAllUserAnalyticsOptions,
 ): Promise<{ rows: CallAnalytics[]; total: number; truncated: boolean }> {
-  const { userUid, filters, signal, onProgress } = options;
-  const pageSize = Math.min(Math.max(Math.trunc(options.pageSize ?? 100), 1), 100);
-  const maxRows = Math.max(options.maxRows ?? EXPORT_MAX_ROWS, pageSize);
-
+  const maxRows = Math.max(options.maxRows ?? EXPORT_MAX_ROWS, 1);
   const rows: CallAnalytics[] = [];
-  let offset = 0;
-  let total = 0;
-  let truncated = false;
 
-  for (;;) {
-    if (signal?.aborted) throw new DOMException('Export aborted', 'AbortError');
-
-    const query = buildUserAnalyticsQuery(userUid, pageSize, offset, filters);
-    const data = await fetchJson<any>(`${MONADE_API_BASE}/api/analytics?${query}`, { signal });
-    const page = parseUserAnalyticsResponse(data, pageSize, offset);
-
-    total = page.pagination.total || rows.length + page.analytics.length;
-    rows.push(...page.analytics);
-    onProgress?.(rows.length, total);
-
-    if (rows.length >= maxRows) {
-      // Truncated if we're about to drop rows we already hold, or the server
-      // says there are still more pages beyond this one.
-      truncated = rows.length > maxRows || page.pagination.hasMore;
-      rows.length = maxRows;
-      break;
-    }
-    // Stop on has_more=false, and also on an empty page as a guard against an
-    // endpoint that never flips has_more — otherwise this could loop forever.
-    if (!page.pagination.hasMore || page.analytics.length === 0) break;
-
-    offset += pageSize;
+  for await (const batch of streamAllUserAnalytics({ ...options, maxRows })) {
+    rows.push(...batch);
+    options.onProgress?.(rows.length, rows.length);
   }
 
-  return { rows, total, truncated };
+  // The stream stops exactly at maxRows when more remain, so hitting it is the
+  // truncation signal. (A set of exactly maxRows reads as truncated too — a
+  // harmless over-warning at a boundary that large archives won't sit on.)
+  return { rows, total: rows.length, truncated: rows.length >= maxRows };
 }
 
 /**

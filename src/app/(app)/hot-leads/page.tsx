@@ -17,7 +17,15 @@ import {
   Download,
 } from 'lucide-react';
 
-import { useUserAnalytics, fetchAllUserAnalytics, fetchUserAnalyticsCount, CallAnalytics } from '@/app/hooks/use-analytics';
+import {
+  useUserAnalytics,
+  fetchAllUserAnalytics,
+  streamAllUserAnalytics,
+  fetchUserAnalyticsCount,
+  FULL_EXPORT_MAX_ROWS,
+  FAST_EXPORT_MAX_ROWS,
+  CallAnalytics,
+} from '@/app/hooks/use-analytics';
 import { useCallRecording } from '@/app/hooks/use-call-recording';
 import { useDebouncedValue } from '@/app/hooks/use-debounced-value';
 import { useMonadeUser } from '@/app/hooks/use-monade-user';
@@ -39,7 +47,7 @@ import {
 import { humanizeOutcomeKey } from '@/lib/post-processing-outcomes';
 
 import { HotLeadsGuide } from './components/hot-leads-guide';
-import { HotLeadsExportDialog, HotLeadsFetchAllRows, HotLeadsCountRows } from './components/hot-leads-export-dialog';
+import { HotLeadsExportDialog, HotLeadsFetchAllRows, HotLeadsStreamRows, HotLeadsCountRows } from './components/hot-leads-export-dialog';
 
 const TranscriptViewer = dynamic(
   () => import('@/components/transcript-viewer'),
@@ -311,8 +319,7 @@ export default function HotLeadsPage() {
       : analyticsFilters
   ), [analyticsFilters]);
 
-  // Pull every matching lead for a CSV export, paged off the server, scoped to
-  // the active filters.
+  // Full (bounded) export: pull every matching lead.
   const fetchAllLeadsForExport = useCallback<HotLeadsFetchAllRows>(async ({ signal, onProgress, dateRange }) => {
     if (!userUid) return { rows: [], truncated: false };
 
@@ -320,10 +327,23 @@ export default function HotLeadsPage() {
       userUid,
       filters: exportFilters(dateRange),
       signal,
+      maxRows: FULL_EXPORT_MAX_ROWS,
       onProgress: (loaded, total) => onProgress({ loaded, total }),
     });
 
     return { rows, truncated };
+  }, [exportFilters, userUid]);
+
+  // Large Fast export: stream matching leads in batches (keyset paging).
+  const streamLeadsForExport = useCallback<HotLeadsStreamRows>(async function* ({ signal, dateRange }) {
+    if (!userUid) return;
+
+    yield* streamAllUserAnalytics({
+      userUid,
+      filters: exportFilters(dateRange),
+      signal,
+      maxRows: FAST_EXPORT_MAX_ROWS,
+    });
   }, [exportFilters, userUid]);
 
   const countLeadsForExport = useCallback<HotLeadsCountRows>(async ({ signal, dateRange }) => {
@@ -615,6 +635,7 @@ export default function HotLeadsPage() {
               leads={hotLeads}
               totalCount={pagination.total}
               fetchAllRows={fetchAllLeadsForExport}
+              streamAllRows={streamLeadsForExport}
               countRows={countLeadsForExport}
             />
           </div>
