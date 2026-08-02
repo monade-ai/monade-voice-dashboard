@@ -81,6 +81,11 @@ type AuthUser = {
   user_metadata: {
     full_name?: string;
   };
+  /**
+   * Per-user feature flags, granted from Control Tower and returned by
+   * /api/me. Only enabled flags are present, so a missing key means off.
+   */
+  features: Record<string, boolean>;
 };
 
 interface AuthContextType {
@@ -104,6 +109,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         user_metadata: {
           full_name: me.name || me.email?.split('@')[0],
         },
+        // Absent on older backends; treat as no flags rather than crashing.
+        features: (me.features ?? {}) as Record<string, boolean>,
       });
     } catch {
       setUser(null);
