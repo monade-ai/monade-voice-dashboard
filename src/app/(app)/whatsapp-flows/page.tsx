@@ -38,6 +38,7 @@ import { areOutcomeKeysSynced, INVALID_OUTCOME_KEYS_MESSAGE } from '@/lib/post-p
 import { cn } from '@/lib/utils';
 import { cadenceSlotsForBucket } from '@/lib/whatsapp-cadence';
 
+import { BucketDescription } from './components/bucket-description';
 import { BucketSequenceEditor } from './components/bucket-sequence-editor';
 
 type DirectionFilter = 'all' | 'outbound' | 'inbound';
@@ -464,7 +465,13 @@ export default function WhatsAppFlowsPage() {
                 >
                   <span
                     className={cn(
-                      'absolute top-0.5 h-5 w-5 rounded-full bg-background shadow transition-transform',
+                      // left-0 is load-bearing. Without it the knob is an
+                      // abspos box with no inline offset, so its static
+                      // position comes from the button's UA text-align:center
+                      // and left resolves to 22px — then translate adds 22
+                      // more and the knob lands outside the track. The sibling
+                      // switches in trunks/ and new-phone-dialog both set left.
+                      'absolute left-0 top-0.5 h-5 w-5 rounded-full bg-background shadow transition-transform',
                       enabled ? 'translate-x-[22px]' : 'translate-x-0.5',
                     )}
                   />
@@ -565,9 +572,9 @@ export default function WhatsAppFlowsPage() {
                 <Table>
                   <TableHeader>
                     <TableRow className="hover:bg-transparent border-border/30">
-                      <TableHead className={HEAD_CLASS}>Outcome key</TableHead>
-                      <TableHead className={HEAD_CLASS}>Outcome label</TableHead>
-                      <TableHead className={HEAD_CLASS}>Template sequence</TableHead>
+                      <TableHead className={cn(HEAD_CLASS, 'px-6')} scope="col">Outcome key</TableHead>
+                      <TableHead className={cn(HEAD_CLASS, 'px-6')} scope="col">Outcome label</TableHead>
+                      <TableHead className={cn(HEAD_CLASS, 'px-6')} scope="col">Template sequence</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -575,26 +582,26 @@ export default function WhatsAppFlowsPage() {
                       const steps = mappings[bucket.key] ?? [];
 
                       return (
-                        <TableRow key={bucket.key} className="border-border/20 hover:bg-muted/30 align-top">
-                          <TableCell className="font-mono text-xs text-foreground">{bucket.key}</TableCell>
-                          <TableCell>
-                            <div>
+                        <TableRow key={bucket.key} className="border-border/20 hover:bg-muted/30">
+                          <TableCell className="px-6 align-top font-mono text-xs break-all text-foreground">
+                            {bucket.key}
+                          </TableCell>
+                          <TableCell className="px-6 align-top">
+                            <div className="max-w-[320px]">
                               <div className="flex flex-wrap items-center gap-2">
                                 <p className="text-sm font-medium">{bucket.label}</p>
                                 {bucket.system ? (
-                                  <span className="rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.16em] text-primary">
+                                  <span className="rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.16em] text-primary">
                                     System
                                   </span>
                                 ) : null}
                               </div>
                               {bucket.description ? (
-                                <p className="mt-1 text-[11px] text-muted-foreground max-w-[320px]">
-                                  {bucket.description}
-                                </p>
+                                <BucketDescription description={bucket.description} />
                               ) : null}
                             </div>
                           </TableCell>
-                          <TableCell>
+                          <TableCell className="px-6 align-top">
                             {connectionId ? (
                               <BucketSequenceEditor
                                 steps={steps}

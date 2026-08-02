@@ -44,28 +44,58 @@ export const MARKETING_SLOTS: CadenceSlot[] = [
   { key: 'M2', label: 'Final message', hint: '+1 week after M1, then removed permanently' },
 ];
 
+/**
+ * Bucket keys are author-defined in the post-processing template, so they vary
+ * in case and wording — real data has `Qualified` and `not_interested`, not the
+ * `certain` / `interested` this originally matched on. Matching is therefore
+ * normalised and aliased rather than exact.
+ */
 const BUCKET_TRACKS: Record<string, CadenceSlot[]> = {
   did_not_pick_up: N_TRACK,
+  no_answer: N_TRACK,
+  not_picked_up: N_TRACK,
   uncertain: U_TRACK,
+  call_disconnected: U_TRACK,
+  incomplete: U_TRACK,
   certain: QUALIFIED_TRACK,
   interested: QUALIFIED_TRACK,
+  qualified: QUALIFIED_TRACK,
+  likely_to_book: QUALIFIED_TRACK,
 };
 
-/** Suggested slots for a bucket, plus the marketing tail. */
-export const cadenceSlotsForBucket = (bucketKey: string): CadenceSlot[] => [
-  ...(BUCKET_TRACKS[bucketKey] ?? []),
-  ...MARKETING_SLOTS,
-];
+/**
+ * Outcomes that terminate the ladder. The cadence is explicit that qualified
+ * and not-interested leads never enter the marketing tail, so offering M1/M2
+ * on those buckets was the UI recommending a spec violation — messaging a
+ * student three days after they converted, or after they declined.
+ */
+const TERMINAL_BUCKETS = new Set([
+  'not_interested',
+  'certain',
+  'interested',
+  'qualified',
+  'likely_to_book',
+]);
 
-export const cadenceSlot = (bucketKey: string, stepKey: string): CadenceSlot | null =>
-  cadenceSlotsForBucket(bucketKey).find((slot) => slot.key === stepKey) ?? null;
+const normaliseBucketKey = (bucketKey: string) => String(bucketKey || '').trim().toLowerCase();
 
-/** The next preset slot not already used in this bucket. */
-export const nextCadenceSlot = (bucketKey: string, usedKeys: string[]): CadenceSlot | null => {
-  const used = new Set(usedKeys);
+/** Suggested slots for a bucket. The marketing tail is only offered where it is allowed. */
+export const cadenceSlotsForBucket = (bucketKey: string): CadenceSlot[] => {
+  const key = normaliseBucketKey(bucketKey);
+  const track = BUCKET_TRACKS[key];
 
-  return cadenceSlotsForBucket(bucketKey).find((slot) => !used.has(slot.key)) ?? null;
+  // No recognised track means we do not know where this bucket sits in the
+  // ladder. Suggesting the marketing tail anyway is how a converted lead ended
+  // up being offered a re-engagement message — better to suggest nothing and
+  // let the editor fall back to generic steps.
+  if (!track) return [];
+
+  return TERMINAL_BUCKETS.has(key) ? track : [...track, ...MARKETING_SLOTS];
 };
+
+/** True when this bucket has no cadence track at all, so the editor can say so. */
+export const hasCadenceTrack = (bucketKey: string): boolean =>
+  (BUCKET_TRACKS[normaliseBucketKey(bucketKey)] ?? []).length > 0;
 
 const NAME_PLACEHOLDER = /\{\{\s*(name|first_name|student_name|lead_name|customer_name)\s*\}\}/i;
 
