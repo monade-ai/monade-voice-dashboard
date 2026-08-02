@@ -464,7 +464,13 @@ export default function WhatsAppFlowsPage() {
                 >
                   <span
                     className={cn(
-                      'absolute top-0.5 h-5 w-5 rounded-full bg-background shadow transition-transform',
+                      // left-0 is load-bearing. Without it the knob is an
+                      // abspos box with no inline offset, so its static
+                      // position comes from the button's UA text-align:center
+                      // and left resolves to 22px — then translate adds 22
+                      // more and the knob lands outside the track. The sibling
+                      // switches in trunks/ and new-phone-dialog both set left.
+                      'absolute left-0 top-0.5 h-5 w-5 rounded-full bg-background shadow transition-transform',
                       enabled ? 'translate-x-[22px]' : 'translate-x-0.5',
                     )}
                   />
