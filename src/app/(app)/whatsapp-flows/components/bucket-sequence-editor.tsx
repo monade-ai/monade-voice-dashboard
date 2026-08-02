@@ -14,9 +14,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
-  cadenceSlot,
-  cadenceSlotsForBucket,
-  nextCadenceSlot,
+  type CadenceSlot,
   templateBodyText,
   templateUsesName,
 } from '@/lib/whatsapp-cadence';
@@ -42,12 +40,20 @@ const CONDITION_LABELS: Record<WhatsappFlowStepCondition, string> = {
 };
 
 interface Props {
-  bucketKey: string;
   steps: WhatsappFlowStep[];
   templates: WhatsappTemplate[];
   approvedTemplates: WhatsappTemplate[];
   disabled: boolean;
   onChange: (steps: WhatsappFlowStep[]) => void;
+  /**
+   * Named follow-up slots for this bucket, injected rather than imported.
+   *
+   * The slot vocabulary (N1, U2a, T1, the marketing tail) is CollegeVidya's
+   * cadence, not a platform concept. Passing it in keeps this editor generic:
+   * with no slots it is an ordered list of templates, which is what every other
+   * tenant needs.
+   */
+  slots?: CadenceSlot[];
 }
 
 /**
@@ -58,16 +64,19 @@ interface Props {
  * impossible to configure.
  */
 export function BucketSequenceEditor({
-  bucketKey,
   steps,
   templates,
   approvedTemplates,
   disabled,
   onChange,
+  slots,
 }: Props) {
   const usedKeys = useMemo(() => steps.map((step) => step.key), [steps]);
-  const nextSlot = useMemo(() => nextCadenceSlot(bucketKey, usedKeys), [bucketKey, usedKeys]);
-  const slotOptions = useMemo(() => cadenceSlotsForBucket(bucketKey), [bucketKey]);
+  const slotOptions = useMemo(() => slots ?? [], [slots]);
+  const nextSlot = useMemo(
+    () => slotOptions.find((slot) => !usedKeys.includes(slot.key)) ?? null,
+    [slotOptions, usedKeys],
+  );
   /**
    * One template should look like one template. The ordering chrome — position
    * chip, step-key picker, reorder arrows — only earns its place once there is
@@ -141,7 +150,7 @@ export function BucketSequenceEditor({
             (template) => template.name === step.template_name && template.language === step.language,
           ),
         );
-        const slot = cadenceSlot(bucketKey, step.key);
+        const slot = slotOptions.find((option) => option.key === step.key) ?? null;
         const usesName = templateUsesName(templateBodyText(matched?.components));
         const needsNoNameVariant = usesName && !step.template_name_no_name;
         // A no-name variant is only useful if it does NOT itself greet by name.

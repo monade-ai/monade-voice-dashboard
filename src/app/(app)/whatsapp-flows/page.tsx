@@ -33,8 +33,10 @@ import {
   useWhatsappFlows,
   type WhatsappFlowStep,
 } from '@/app/hooks/use-whatsapp-flows';
+import { FEATURE_FLAGS, useFeatureFlag } from '@/app/hooks/use-feature-flag';
 import { areOutcomeKeysSynced, INVALID_OUTCOME_KEYS_MESSAGE } from '@/lib/post-processing-outcomes';
 import { cn } from '@/lib/utils';
+import { cadenceSlotsForBucket } from '@/lib/whatsapp-cadence';
 
 import { BucketSequenceEditor } from './components/bucket-sequence-editor';
 
@@ -56,6 +58,9 @@ export default function WhatsAppFlowsPage() {
   const { templates, fetchTemplate } = usePostProcessingTemplates();
   const { channels, fetchTemplates } = useVobizWhatsapp();
   const { fetchAssistantFlow, fetchFlows, saveFlow, savingFlow } = useWhatsappFlows();
+  // CollegeVidya's first-24h ladder. Off for everyone else, who get a plain
+  // ordered list of templates.
+  const cadenceEnabled = useFeatureFlag(FEATURE_FLAGS.whatsappCadenceLadder);
 
   const [direction, setDirection] = useState<DirectionFilter>('all');
   const [assistantId, setAssistantId] = useState('');
@@ -592,12 +597,15 @@ export default function WhatsAppFlowsPage() {
                           <TableCell>
                             {connectionId ? (
                               <BucketSequenceEditor
-                                bucketKey={bucket.key}
                                 steps={steps}
                                 templates={waTemplates}
                                 approvedTemplates={approvedTemplates}
                                 disabled={loadingWaTemplates}
                                 onChange={(next) => updateBucketSteps(bucket.key, next)}
+                                // Without the flag this is a plain ordered list
+                                // of templates: no ladder vocabulary, no
+                                // marketing tail, no branch conditions.
+                                slots={cadenceEnabled ? cadenceSlotsForBucket(bucket.key) : undefined}
                               />
                             ) : (
                               <p className="text-[11px] text-muted-foreground">
