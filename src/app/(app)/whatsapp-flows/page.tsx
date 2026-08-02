@@ -440,12 +440,16 @@ export default function WhatsAppFlowsPage() {
               </div>
 
               <div className="space-y-2">
-                <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
+                {/* block, not inline: the sibling here is a bare button rather
+                    than a full-width Select, so an inline label shares its line
+                    and pushes the switch out of the grid cell. */}
+                <span className="block text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
                   Enabled
                 </span>
                 <button
                   type="button"
                   role="switch"
+                  aria-label="Enable this WhatsApp flow"
                   aria-checked={enabled}
                   onClick={() => setEnabled((value) => !value)}
                   className={cn(

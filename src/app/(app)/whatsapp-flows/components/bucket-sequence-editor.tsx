@@ -68,6 +68,12 @@ export function BucketSequenceEditor({
   const usedKeys = useMemo(() => steps.map((step) => step.key), [steps]);
   const nextSlot = useMemo(() => nextCadenceSlot(bucketKey, usedKeys), [bucketKey, usedKeys]);
   const slotOptions = useMemo(() => cadenceSlotsForBucket(bucketKey), [bucketKey]);
+  /**
+   * One template should look like one template. The ordering chrome — position
+   * chip, step-key picker, reorder arrows — only earns its place once there is
+   * an actual sequence to order.
+   */
+  const isSequence = steps.length > 1;
 
   const findTemplate = (name: string, language: string) =>
     templates.find((template) => template.name === name && template.language === language) ?? null;
@@ -136,8 +142,8 @@ export function BucketSequenceEditor({
           ),
         );
         const slot = cadenceSlot(bucketKey, step.key);
-        const needsNoNameVariant = templateUsesName(templateBodyText(matched?.components))
-          && !step.template_name_no_name;
+        const usesName = templateUsesName(templateBodyText(matched?.components));
+        const needsNoNameVariant = usesName && !step.template_name_no_name;
         // A no-name variant is only useful if it does NOT itself greet by name.
         const noNameCandidates = approvedTemplates.filter(
           (template) => !templateUsesName(templateBodyText(template.components)),
@@ -149,56 +155,76 @@ export function BucketSequenceEditor({
             className="rounded-md border border-border/30 bg-muted/20 p-3 space-y-2"
           >
             <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded bg-foreground/10 px-1.5 py-0.5 font-mono text-[10px] font-bold text-foreground">
-                {index + 1}
-              </span>
-              <Select
-                value={step.key}
-                onValueChange={(next) => {
-                  const picked = slotOptions.find((option) => option.key === next);
-                  updateStep(index, { key: next, condition: picked?.condition ?? 'always' });
-                }}
-                disabled={disabled}
-              >
-                <SelectTrigger className="h-7 w-[150px] text-[11px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {slotOptions.map((option) => (
-                    <SelectItem key={option.key} value={option.key} disabled={
-                      option.key !== step.key && usedKeys.includes(option.key)
-                    }>
-                      {option.key} — {option.label}
-                    </SelectItem>
-                  ))}
-                  {!slotOptions.some((option) => option.key === step.key) ? (
-                    <SelectItem value={step.key}>{step.key}</SelectItem>
-                  ) : null}
-                </SelectContent>
-              </Select>
+              {isSequence ? (
+                <>
+                  <span className="rounded bg-foreground/10 px-1.5 py-0.5 font-mono text-[10px] font-bold text-foreground">
+                    {index + 1}
+                  </span>
+                  <Select
+                    value={step.key}
+                    onValueChange={(next) => {
+                      const picked = slotOptions.find((option) => option.key === next);
+                      updateStep(index, { key: next, condition: picked?.condition ?? 'always' });
+                    }}
+                    disabled={disabled}
+                  >
+                    <SelectTrigger className="h-7 w-[190px] text-[11px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {slotOptions.map((option) => (
+                        <SelectItem key={option.key} value={option.key} disabled={
+                          option.key !== step.key && usedKeys.includes(option.key)
+                        }>
+                          {option.label} ({option.key})
+                        </SelectItem>
+                      ))}
+                      {!slotOptions.some((option) => option.key === step.key) ? (
+                        <SelectItem value={step.key}>{step.key}</SelectItem>
+                      ) : null}
+                    </SelectContent>
+                  </Select>
+                </>
+              ) : null}
               {step.condition && step.condition !== 'always' ? (
                 <span className="rounded-full border border-border/40 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
                   {CONDITION_LABELS[step.condition]}
                 </span>
               ) : null}
-              <TemplateStatusBadge status={matched?.status ?? (step.template_name ? 'MISSING' : undefined)} />
+              {/* No status while the provider list is still loading — every row
+                  would read MISSING for reasons that have nothing to do with
+                  the template. */}
+              {disabled ? null : (
+                <span title={isStale
+                  ? 'This template is not in the approved list from WhatsApp. It may have been renamed, rejected, or not yet approved.'
+                  : undefined}>
+                  <TemplateStatusBadge status={matched?.status ?? (step.template_name ? 'MISSING' : undefined)} />
+                </span>
+              )}
               <div className="ml-auto flex items-center gap-1">
-                <Button type="button" variant="ghost" size="sm" disabled={disabled || index === 0}
-                  onClick={() => moveStep(index, -1)} className="h-7 w-7 p-0">
-                  <ArrowUp size={12} />
-                </Button>
-                <Button type="button" variant="ghost" size="sm" disabled={disabled || index === steps.length - 1}
-                  onClick={() => moveStep(index, 1)} className="h-7 w-7 p-0">
-                  <ArrowDown size={12} />
-                </Button>
+                {isSequence ? (
+                  <>
+                    <Button type="button" variant="ghost" size="sm" disabled={disabled || index === 0}
+                      aria-label="Move earlier"
+                      onClick={() => moveStep(index, -1)} className="h-7 w-7 p-0">
+                      <ArrowUp size={12} />
+                    </Button>
+                    <Button type="button" variant="ghost" size="sm" disabled={disabled || index === steps.length - 1}
+                      aria-label="Move later"
+                      onClick={() => moveStep(index, 1)} className="h-7 w-7 p-0">
+                      <ArrowDown size={12} />
+                    </Button>
+                  </>
+                ) : null}
                 <Button type="button" variant="ghost" size="sm" disabled={disabled}
+                  aria-label="Remove this template"
                   onClick={() => removeStep(index)} className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground">
                   <X size={12} />
                 </Button>
               </div>
             </div>
 
-            {slot ? <p className="text-[10px] text-muted-foreground">{slot.hint}</p> : null}
+            {isSequence && slot ? <p className="text-[10px] text-muted-foreground">{slot.hint}</p> : null}
 
             <div className="grid gap-2 sm:grid-cols-2">
               <div className="space-y-1">
@@ -239,39 +265,44 @@ export function BucketSequenceEditor({
                 </Select>
               </div>
 
-              <div className="space-y-1">
-                <label className="text-[9px] font-bold uppercase tracking-[0.16em] text-muted-foreground/70">
-                  No-name variant
-                </label>
-                <Select
-                  value={step.template_name_no_name || NONE}
-                  onValueChange={(next) =>
-                    updateStep(index, { template_name_no_name: next === NONE ? null : next })
-                  }
-                  disabled={disabled}
-                >
-                  <SelectTrigger className="h-8 text-xs">
-                    <SelectValue placeholder="Not needed" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={NONE}>— None —</SelectItem>
-                    {noNameCandidates.map((template) => (
-                      <SelectItem key={`nn-${template.name}-${template.language}`} value={template.name}>
-                        {template.name} ({template.language})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {/* Only meaningful for a template that greets by name. Showing it
+                  on every row made the common case look unfinished. */}
+              {usesName ? (
+                <div className="space-y-1">
+                  <label className="text-[9px] font-bold uppercase tracking-[0.16em] text-muted-foreground/70">
+                    Version without a name
+                  </label>
+                  <Select
+                    value={step.template_name_no_name || NONE}
+                    onValueChange={(next) =>
+                      updateStep(index, { template_name_no_name: next === NONE ? null : next })
+                    }
+                    disabled={disabled}
+                  >
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue placeholder="Pick one" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={NONE}>— None —</SelectItem>
+                      {noNameCandidates.map((template) => (
+                        <SelectItem key={`nn-${template.name}-${template.language}`} value={template.name}>
+                          {template.name} ({template.language})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : null}
             </div>
 
             {needsNoNameVariant ? (
               <p className="flex items-start gap-1.5 text-[10px] text-amber-600 dark:text-amber-500">
                 <AlertTriangle size={12} className="mt-0.5 shrink-0" />
                 <span>
-                  This template greets by name. Leads with no usable name will be skipped
-                  entirely unless you pick a no-name variant — WhatsApp rejects an empty name,
-                  and we never substitute &quot;there&quot; or &quot;Student&quot;.
+                  This template greets the student by name. Anyone whose name we do not have
+                  will get nothing at all, because WhatsApp rejects a blank name and we never
+                  fall back to &quot;there&quot; or &quot;Student&quot;. Pick a version without
+                  a name to cover them.
                 </span>
               </p>
             ) : null}
@@ -279,17 +310,25 @@ export function BucketSequenceEditor({
         );
       })}
 
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        onClick={addStep}
-        disabled={disabled}
-        className="h-8 px-2 text-[10px] font-bold uppercase tracking-[0.16em]"
-      >
-        <Plus size={12} />
-        {nextSlot ? `Add ${nextSlot.key}` : 'Add template'}
-      </Button>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={addStep}
+          disabled={disabled}
+          className="h-8 px-2 text-[10px] font-bold uppercase tracking-[0.16em]"
+        >
+          <Plus size={12} />
+          Add follow-up
+        </Button>
+        {/* The slot key is a detail, not a call to action. */}
+        {nextSlot ? (
+          <span className="text-[10px] text-muted-foreground">
+            Next: {nextSlot.label.toLowerCase()} — {nextSlot.hint.toLowerCase()}
+          </span>
+        ) : null}
+      </div>
     </div>
   );
 }
