@@ -12,13 +12,86 @@ const API_BASE = MONADE_API_BASE;
 
 export type CallDirection = 'inbound' | 'outbound' | 'both' | null;
 
-export interface WhatsappFlowMappingEntry {
+/**
+ * Which follow-up call this step answers to. Only the uncertain track branches:
+ * the second touch differs depending on whether the follow-up call was missed
+ * (U2a) or connected again and stayed vague (U2b).
+ */
+export type WhatsappFlowStepCondition = 'always' | 'missed' | 'connected';
+
+export interface WhatsappFlowStep {
+  /** Cadence key the scheduler selects on: N1, N2, N3, U1, U2a, U2b, U3, T1, M1, M2. */
+  key: string;
   template_name: string;
   language: string;
+  /**
+   * Approved variant with no {{name}} placeholder. Required whenever the main
+   * template greets by name: Meta rejects empty template parameters, so a lead
+   * with no usable name can only be messaged through a separate template.
+   * Without one, the send is skipped rather than greeting them "Hi there".
+   */
+  template_name_no_name?: string | null;
+  condition?: WhatsappFlowStepCondition;
+  enabled?: boolean;
   parameters?: unknown[];
 }
 
+/**
+ * A bucket maps to an ordered sequence of templates.
+ *
+ * Step 1 is the post-call follow-up that has always been sent. Steps 2+ are the
+ * first-24h ladder touches sent by the cadence scheduler. The legacy shape
+ * (a bare template_name/language on the entry) is still accepted by the API and
+ * reads as a one-step sequence.
+ */
+export interface WhatsappFlowMappingEntry {
+  template_name?: string;
+  language?: string;
+  parameters?: unknown[];
+  steps?: WhatsappFlowStep[];
+  enabled?: boolean;
+}
+
 export type WhatsappFlowMappings = Record<string, WhatsappFlowMappingEntry>;
+
+/** Read either mapping shape as a step list. */
+export const mappingToSteps = (entry?: WhatsappFlowMappingEntry | null): WhatsappFlowStep[] => {
+  if (!entry || typeof entry !== 'object') return [];
+  if (Array.isArray(entry.steps)) {
+    return entry.steps
+      .filter((step) => step && typeof step === 'object' && step.template_name)
+      .map((step, index) => ({
+        key: String(step.key || '').trim() || `step_${index + 1}`,
+        template_name: String(step.template_name),
+        language: String(step.language ?? ''),
+        template_name_no_name: step.template_name_no_name ?? null,
+        condition: step.condition ?? 'always',
+        enabled: step.enabled !== false,
+      }));
+  }
+  if (!entry.template_name) return [];
+
+  return [{
+    key: 'step_1',
+    template_name: String(entry.template_name),
+    language: String(entry.language ?? ''),
+    template_name_no_name: null,
+    condition: 'always',
+    enabled: true,
+  }];
+};
+
+/** Write the sequence shape the API expects. */
+export const stepsToMapping = (steps: WhatsappFlowStep[]): WhatsappFlowMappingEntry => ({
+  steps: steps.map((step) => ({
+    key: step.key,
+    template_name: step.template_name,
+    language: step.language,
+    ...(step.template_name_no_name ? { template_name_no_name: step.template_name_no_name } : {}),
+    ...(step.condition && step.condition !== 'always' ? { condition: step.condition } : {}),
+    parameters: [],
+  })),
+});
 
 export interface WhatsappFlow {
   id?: string;
