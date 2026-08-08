@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
+import { toast } from 'sonner';
 
 import { DashboardHeader } from '@/components/dashboard-header';
 import { PaperCard } from '@/components/ui/paper-card';
@@ -23,6 +24,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useUserTrunks, UserTrunk, CreateTrunkData, UpdateTrunkData } from '@/app/hooks/use-user-trunks';
+
+const getTrunkKey = (trunk: UserTrunk) => `${trunk.trunk_type}:${trunk.id}`;
 
 // --- Inline Form / Edit Component ---
 
@@ -56,7 +59,7 @@ function TrunkEditForm({
         if (isInbound) {
             const allowedNumbers = allowedNumbersStr.split(',').map(n => n.trim()).filter(Boolean);
             const data: UpdateTrunkData = {
-                name,
+                name: name.trim(),
                 numbers,
                 allowed_numbers: allowedNumbers,
                 krisp_enabled: krispEnabled,
@@ -64,8 +67,8 @@ function TrunkEditForm({
             onSave(data);
         } else {
             const data: UpdateTrunkData = {
-                name,
-                address,
+                name: name.trim(),
+                address: address.trim(),
                 numbers,
                 auth_username: authUsername,
                 ...(authPassword ? { auth_password: authPassword } : {}),
@@ -98,8 +101,8 @@ function TrunkEditForm({
     }
 
     const canSubmit = isInbound
-        ? !saving && !!name
-        : !saving && !!name && !!address;
+        ? !saving && !!name.trim() && !!numbersStr.trim()
+        : !saving && !!name.trim() && !!address.trim();
 
     return (
         <form onSubmit={handleSubmit} className="p-6 bg-muted/20 border-t border-border/20 rounded-b-[4px]">
@@ -204,6 +207,7 @@ function TrunkEditForm({
                 <button
                     type="button"
                     onClick={() => setShowUnlinkConfirm(true)}
+                    disabled={saving}
                     className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-widest text-red-500 hover:text-red-600 transition-colors"
                 >
                     <Unlink size={12} />
@@ -256,8 +260,8 @@ function TrunkCreateForm({
         if (isOutbound) {
             const data: CreateTrunkData = {
                 trunk_type: 'outbound',
-                name,
-                address,
+                name: name.trim(),
+                address: address.trim(),
                 numbers,
                 ...(authUsername ? { auth_username: authUsername } : {}),
                 ...(authPassword ? { auth_password: authPassword } : {}),
@@ -267,7 +271,7 @@ function TrunkCreateForm({
             const allowedNumbers = allowedNumbersStr.split(',').map(n => n.trim()).filter(Boolean);
             const data: CreateTrunkData = {
                 trunk_type: 'inbound',
-                name,
+                name: name.trim(),
                 numbers,
                 allowed_numbers: allowedNumbers,
                 krisp_enabled: krispEnabled,
@@ -449,7 +453,8 @@ function ExpandableTrunkCard({
     expandedTrunkId: string | null;
     setExpandedTrunkId: (id: string | null) => void;
 }) {
-    const isExpanded = expandedTrunkId === trunk.id;
+    const trunkKey = getTrunkKey(trunk);
+    const isExpanded = expandedTrunkId === trunkKey;
 
     return (
         <PaperCard
@@ -462,7 +467,7 @@ function ExpandableTrunkCard({
             {/* Header (Always Visible) */}
             <div
                 className="p-4 md:p-6 flex items-center justify-between group select-none"
-                onClick={() => setExpandedTrunkId(isExpanded ? null : trunk.id)}
+                onClick={() => setExpandedTrunkId(isExpanded ? null : trunkKey)}
             >
                 <div className="flex items-center gap-4">
                     <div className={cn(
@@ -519,9 +524,9 @@ function ExpandableTrunkCard({
                         <TrunkEditForm
                             trunk={trunk}
                             onSave={(data) => {
-                                onSave(trunk.id, data);
+                                onSave(trunkKey, data);
                             }}
-                            onUnlink={() => onUnlink(trunk.id)}
+                            onUnlink={() => onUnlink(trunkKey)}
                             onCancel={() => setExpandedTrunkId(null)}
                             saving={saving}
                         />
@@ -553,32 +558,38 @@ export default function TrunksPage() {
 
     const handleCreate = async (data: CreateTrunkData) => {
         try {
-            await createTrunk(data);
+            const created = await createTrunk(data);
+            if (!created) throw new Error('Unable to create the trunk before your user account finished loading. Please try again.');
             setIsCreating(false);
+            toast.success(`${data.trunk_type === 'inbound' ? 'Inbound' : 'Outbound'} trunk created.`);
         } catch (err) {
-            // Hook handles logging/toast ideally
+            toast.error(err instanceof Error ? err.message : 'Failed to create trunk.');
         }
     };
 
-    const handleUpdate = async (id: string, data: UpdateTrunkData) => {
-        const trunk = trunks.find(t => t.id === id);
+    const handleUpdate = async (trunkKey: string, data: UpdateTrunkData) => {
+        const trunk = trunks.find(t => getTrunkKey(t) === trunkKey);
         if (!trunk) return;
         try {
-            await updateTrunk(trunk, data);
+            const updated = await updateTrunk(trunk, data);
+            if (!updated) throw new Error('Unable to update the trunk before your user account finished loading. Please try again.');
             setExpandedTrunkId(null);
+            toast.success(`${trunk.trunk_type === 'inbound' ? 'Inbound' : 'Outbound'} trunk updated.`);
         } catch (err) {
-            // Hook handles
+            toast.error(err instanceof Error ? err.message : 'Failed to update trunk.');
         }
     };
 
-    const handleUnlink = async (id: string) => {
-        const trunk = trunks.find(t => t.id === id);
+    const handleUnlink = async (trunkKey: string) => {
+        const trunk = trunks.find(t => getTrunkKey(t) === trunkKey);
         if (!trunk) return;
         try {
-            await unlinkTrunk(trunk);
+            const unlinked = await unlinkTrunk(trunk);
+            if (!unlinked) throw new Error('Unable to unlink the trunk before your user account finished loading. Please try again.');
             setExpandedTrunkId(null);
+            toast.success('Trunk unlinked. The LiveKit trunk remains active.');
         } catch (err) {
-            // Hook handles
+            toast.error(err instanceof Error ? err.message : 'Failed to unlink trunk.');
         }
     };
 
@@ -707,11 +718,11 @@ export default function TrunksPage() {
                                     <h2 className="text-sm font-semibold text-foreground uppercase tracking-wider">Outbound Trunks</h2>
                                     <span className="w-full h-px bg-border/20 flex-1" />
                                 </div>
-                                {trunks.filter(t => t.trunk_type !== 'inbound').length === 0 ? (
+                                {trunks.filter(t => t.trunk_type === 'outbound').length === 0 ? (
                                     <p className="text-xs text-muted-foreground italic py-4 text-center">No outbound trunks configured.</p>
                                 ) : (
                                     <div className="space-y-3">
-                                        {trunks.filter(t => t.trunk_type !== 'inbound').map((trunk) => (
+                                        {trunks.filter(t => t.trunk_type === 'outbound').map((trunk) => (
                                             <ExpandableTrunkCard
                                                 key={`${trunk.id}:outbound`}
                                                 trunk={trunk}

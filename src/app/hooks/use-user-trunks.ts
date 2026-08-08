@@ -9,6 +9,20 @@ import { MONADE_API_BASE } from '@/config';
 
 const API_BASE = MONADE_API_BASE;
 
+const getTrunkList = (data: any): any[] => {
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data?.trunks)) return data.trunks;
+    if (Array.isArray(data?.inbound_trunks)) return data.inbound_trunks;
+    if (Array.isArray(data?.outbound_trunks)) return data.outbound_trunks;
+    if (Array.isArray(data?.data)) return data.data;
+
+    return [];
+};
+
+const sameStringArray = (left: string[] = [], right: string[] = []) => (
+    left.length === right.length && left.every((value, index) => value === right[index])
+);
+
 export interface UserTrunk {
     id: string;
     user_uid?: string;
@@ -82,12 +96,10 @@ export function useUserTrunks(selfHosted: boolean = false) {
                 { retry: { retries: 1 } },
             );
 
-            const outboundList = Array.isArray(outboundData) ? outboundData
-                : (outboundData.trunks && Array.isArray(outboundData.trunks)) ? outboundData.trunks
-                    : [];
-            const inboundList = Array.isArray(inboundData) ? inboundData
-                : (inboundData.trunks && Array.isArray(inboundData.trunks)) ? inboundData.trunks
-                    : [];
+            // Direction comes from the endpoint, not a possibly stale/missing payload field.
+            // This keeps inbound and outbound records separate even when their DB ids match.
+            const outboundList = getTrunkList(outboundData);
+            const inboundList = getTrunkList(inboundData);
 
             const mergedByKey = new Map<string, UserTrunk>();
             outboundList.map(normalizeOutboundTrunk).forEach((trunk) => {
@@ -154,17 +166,32 @@ export function useUserTrunks(selfHosted: boolean = false) {
         setSaving(true);
         try {
             const isInbound = trunk.trunk_type === 'inbound';
-            const trunkRef = encodeURIComponent(trunk.livekit_trunk_id || trunk.id);
+            if (isInbound && !trunk.livekit_trunk_id) {
+                throw new Error('This inbound trunk is missing its LiveKit trunk ID and cannot be updated. Refresh the page and try again.');
+            }
+            const trunkRef = encodeURIComponent(isInbound ? trunk.livekit_trunk_id! : trunk.livekit_trunk_id || trunk.id);
             const base = `${API_BASE}/api/users/${encodeURIComponent(userUid)}${selfHosted ? '/selfhosted-livekit' : ''}`;
             const endpoint = isInbound
                 ? `${base}/inbound-trunks/${trunkRef}`
                 : `${base}/trunks/${trunkRef}`;
+
+            // The inbound API is a partial update. Only send fields that actually changed.
+            const payload = isInbound
+                ? {
+                    ...(data.name !== undefined && data.name !== trunk.name ? { name: data.name } : {}),
+                    ...(data.numbers !== undefined && !sameStringArray(data.numbers, trunk.numbers) ? { numbers: data.numbers } : {}),
+                    ...(data.allowed_numbers !== undefined && !sameStringArray(data.allowed_numbers, trunk.allowed_numbers) ? { allowed_numbers: data.allowed_numbers } : {}),
+                    ...(data.krisp_enabled !== undefined && data.krisp_enabled !== trunk.krisp_enabled ? { krisp_enabled: data.krisp_enabled } : {}),
+                }
+                : data;
+
+            if (Object.keys(payload).length === 0) return trunk;
             const result = await fetchJson<UserTrunk>(
                 endpoint,
                 {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(data),
+                    body: JSON.stringify(payload),
                     retry: { retries: 0 },
                 },
             );
@@ -183,7 +210,10 @@ export function useUserTrunks(selfHosted: boolean = false) {
         setSaving(true);
         try {
             const isInbound = trunk.trunk_type === 'inbound';
-            const trunkRef = encodeURIComponent(trunk.livekit_trunk_id || trunk.id);
+            if (isInbound && !trunk.livekit_trunk_id) {
+                throw new Error('This inbound trunk is missing its LiveKit trunk ID and cannot be unlinked. Refresh the page and try again.');
+            }
+            const trunkRef = encodeURIComponent(isInbound ? trunk.livekit_trunk_id! : trunk.livekit_trunk_id || trunk.id);
             const base = `${API_BASE}/api/users/${encodeURIComponent(userUid)}${selfHosted ? '/selfhosted-livekit' : ''}`;
             const endpoint = isInbound
                 ? `${base}/inbound-trunks/${trunkRef}/unlink`

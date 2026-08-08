@@ -104,7 +104,17 @@ function getServerMessage(errorData: any) {
     return detail.message || detail.reason || undefined;
   }
 
-  return errorData?.message || errorData?.error;
+  const primary = errorData?.message || errorData?.error;
+  const details = errorData?.details;
+  const formattedDetails = typeof details === 'string'
+    ? details
+    : details && typeof details === 'object'
+      ? details.message || details.reason || JSON.stringify(details)
+      : undefined;
+
+  return primary && formattedDetails
+    ? `${primary}: ${formattedDetails}`
+    : primary || formattedDetails;
 }
 
 export async function fetchJson<T = unknown>(url: string, options: FetchJsonOptions = {}): Promise<T> {

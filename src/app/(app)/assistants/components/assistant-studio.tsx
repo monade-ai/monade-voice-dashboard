@@ -25,6 +25,7 @@ import { useLibrary, type LibraryCategory } from '@/app/hooks/use-knowledge-base
 import { useRagCorpus } from '@/app/hooks/use-rag-corpus';
 import { useTrunks } from '@/app/hooks/use-trunks';
 import { useUserTrunks } from '@/app/hooks/use-user-trunks';
+import { useMonadeUser } from '@/app/hooks/use-monade-user';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -79,15 +80,6 @@ const readBackgroundAudio = (toolsConfig: any) => ({
   ...(toolsConfig?.background_audio || {}),
   ambient_volume: clampBackgroundVolume(Number(toolsConfig?.background_audio?.ambient_volume ?? DEFAULT_BACKGROUND_AUDIO.ambient_volume) || 0),
 });
-
-const getDispatchRuleIds = (assistant: Assistant) => {
-  const rawIds = [
-    assistant.dispatch_rule_id,
-    ...(((assistant as any).dispatch_rule_ids || []) as unknown[]),
-  ];
-
-  return Array.from(new Set(rawIds.filter((id): id is string => typeof id === 'string' && id.length > 0)));
-};
 
 const readRebakedDispatchRuleId = (response: any) => (
   response?.dispatch_rule_id
@@ -321,7 +313,8 @@ export default function AssistantStudio() {
   const initialGreetingSystemPromptItems = libraryItems.filter(item => item.category === 'initial_greeting_system_prompt');
   const { trunks, phoneNumbers } = useTrunks({ checkAssignments: false });
   const { trunks: userTrunks } = useUserTrunks();
-  const inboundTrunks = userTrunks.filter(t => t.trunk_type === 'inbound');
+  const { userUid } = useMonadeUser();
+  const inboundTrunks = userTrunks.filter(t => t.trunk_type === 'inbound' && !!t.livekit_trunk_id);
   const { corpora, attachToAssistant, detachFromAssistant, toggleTools, toggleEndCallTool, toggleVertexRagTool, updateBackgroundAudio } = useRagCorpus();
 
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -334,6 +327,8 @@ export default function AssistantStudio() {
   const [isTogglingRag, setIsTogglingRag] = useState(false);
   const [isTogglingCallCompletion, setIsTogglingCallCompletion] = useState(false);
   const [isUpdatingBackgroundAudio, setIsUpdatingBackgroundAudio] = useState(false);
+  const [isRebakingDispatch, setIsRebakingDispatch] = useState(false);
+  const rebakingDispatchRef = useRef(false);
   const [backgroundVolumeInput, setBackgroundVolumeInput] = useState(String(DEFAULT_BACKGROUND_AUDIO.ambient_volume));
   const [isSyncingTools, setIsSyncingTools] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
@@ -520,9 +515,6 @@ export default function AssistantStudio() {
         throw new Error('Assistant update was not persisted');
       }
       await saveGreetingConfig(id);
-      if ((currentAssistant.call_direction === 'inbound' || currentAssistant.call_direction === 'both') && currentAssistant.inbound_trunk_id) {
-        await rebakeInboundDispatchRules(savedAssistant ?? currentAssistant, { silentSuccess: true });
-      }
       // Re-read the stored document so what's on screen is what the backend actually kept,
       // rather than the optimistic local copy. A dropped key shows up immediately.
       await syncToolsFromBackend(id);
@@ -560,57 +552,49 @@ export default function AssistantStudio() {
     }
   };
 
-  const rebakeInboundDispatchRules = useCallback(async (
-    assistant: Assistant,
-    options?: { silentSuccess?: boolean },
-  ) => {
-    const dispatchRuleIds = getDispatchRuleIds(assistant);
-    if (dispatchRuleIds.length === 0) {
-      if (assistant.inbound_trunk_id) {
-        toast.error('Assistant saved, but no inbound dispatch rule exists yet. Save the inbound routing first.');
-      }
+  const rebakeInboundDispatchRules = useCallback(async (assistant: Assistant) => {
+    if (!userUid) {
+      toast.error('Your user account is still loading. Please try again.');
 
-      return null;
+      return;
     }
+    if (!assistant.inbound_trunk_id) {
+      toast.error('Select and save an inbound trunk before rebuilding dispatch.');
 
-    let latestDispatchRuleId = assistant.dispatch_rule_id ?? null;
-    const rebakedDispatchRuleIds: string[] = [];
-    for (const ruleId of dispatchRuleIds) {
+      return;
+    }
+    if (rebakingDispatchRef.current) return;
+
+    rebakingDispatchRef.current = true;
+    setIsRebakingDispatch(true);
+    try {
       const response = await fetchJson<any>(
-        `${MONADE_API_BASE}/dispatch-rules/${encodeURIComponent(ruleId)}/rebake`,
+        `${MONADE_API_BASE}/api/users/${encodeURIComponent(userUid)}/inbound-trunks/rebake-assistant`,
         {
-          method: 'PUT',
+          method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ assistant_id: assistant.id }),
           retry: { retries: 0 },
         },
       );
-      const nextRuleId = readRebakedDispatchRuleId(response) ?? ruleId;
-      latestDispatchRuleId = nextRuleId;
-      rebakedDispatchRuleIds.push(nextRuleId);
+      const latestDispatchRuleId = readRebakedDispatchRuleId(response);
+      if (latestDispatchRuleId) {
+        updateAssistantLocally(assistant.id, { dispatch_rule_id: latestDispatchRuleId });
+      }
+      toast.success(response?.message || 'Inbound dispatch synchronized.');
+    } catch (err) {
+      console.error('[AssistantStudio] Failed to rebuild inbound dispatch:', err);
+      toast.error(err instanceof Error ? err.message : 'Failed to synchronize inbound dispatch.');
+    } finally {
+      rebakingDispatchRef.current = false;
+      setIsRebakingDispatch(false);
     }
-
-    if (latestDispatchRuleId !== assistant.dispatch_rule_id) {
-      updateAssistantLocally(assistant.id, {
-        dispatch_rule_id: latestDispatchRuleId,
-        ...(rebakedDispatchRuleIds.length > 1 ? { dispatch_rule_ids: rebakedDispatchRuleIds } : {}),
-      } as Partial<Assistant>);
-    }
-
-    if (!options?.silentSuccess) {
-      toast.success('Inbound dispatch rebaked with the latest assistant settings');
-    }
-
-    return {
-      latestDispatchRuleId,
-      rebakedDispatchRuleIds,
-    };
-  }, [toast, updateAssistantLocally]);
+  }, [updateAssistantLocally, userUid]);
 
   if (!currentAssistant) return null;
 
-  const isInbound = currentAssistant.call_direction === 'inbound';
   const isInboundBound = currentAssistant.call_direction === 'inbound' || currentAssistant.call_direction === 'both';
+  const isOutboundBound = currentAssistant.call_direction !== 'inbound';
   const ragTool = currentAssistant.toolsConfig?.tools?.find((t: any) => t.type === 'vertex_rag');
   const hasAttachedRagCorpus = !!ragTool?.config?.rag_corpus;
 
@@ -669,8 +653,6 @@ export default function AssistantStudio() {
     const parsedVolume = Number.parseFloat(backgroundVolumeInput);
     const nextVolume = clampBackgroundVolume(Number.isFinite(parsedVolume) ? parsedVolume : DEFAULT_BACKGROUND_AUDIO.ambient_volume);
     const nextConfig = buildBackgroundAudioConfig({ ambient_volume: nextVolume });
-    const dispatchRuleIds = getDispatchRuleIds(currentAssistant);
-    const needsInboundRebake = isInboundBound && !!currentAssistant.inbound_trunk_id;
 
     setBackgroundVolumeInput(String(nextVolume));
     setIsUpdatingBackgroundAudio(true);
@@ -681,30 +663,9 @@ export default function AssistantStudio() {
         ambient_volume: nextConfig.ambient_volume,
       }, { silent: true, throwOnError: true });
 
-      if (needsInboundRebake && dispatchRuleIds.length === 0) {
-        applyBackgroundAudioLocally(nextConfig);
-        toast.error('Background audio saved, but this inbound assistant has no dispatch rule to rebake yet. Save the inbound routing first.');
-
-        return;
-      }
-
-      let latestDispatchRuleId = currentAssistant.dispatch_rule_id ?? null;
-      const rebakedDispatchRuleIds: string[] = [];
-      const rebakeResult = await rebakeInboundDispatchRules(currentAssistant, { silentSuccess: true });
-      latestDispatchRuleId = rebakeResult?.latestDispatchRuleId ?? latestDispatchRuleId;
-      if (rebakeResult?.rebakedDispatchRuleIds?.length) {
-        rebakedDispatchRuleIds.push(...rebakeResult.rebakedDispatchRuleIds);
-      }
-
       await syncToolsFromBackend(currentAssistant.id);
       applyBackgroundAudioLocally(nextConfig);
-      if (latestDispatchRuleId !== currentAssistant.dispatch_rule_id) {
-        updateAssistantLocally(currentAssistant.id, {
-          dispatch_rule_id: latestDispatchRuleId,
-          ...(rebakedDispatchRuleIds.length > 1 ? { dispatch_rule_ids: rebakedDispatchRuleIds } : {}),
-        } as Partial<Assistant>);
-      }
-      toast.success(dispatchRuleIds.length > 0 ? 'Background audio saved and applied to inbound calls' : 'Background audio saved');
+      toast.success('Background audio saved.');
     } catch (err) {
       console.error('[AssistantStudio] Failed to save/apply inbound background audio:', err);
       toast.error(err instanceof Error ? err.message : 'Failed to save background audio');
@@ -926,8 +887,10 @@ export default function AssistantStudio() {
                       onValueChange={(value) => {
                         if (value === 'outbound') {
                           handleBatchUpdate({ call_direction: 'outbound', inbound_trunk_id: null });
-                        } else {
+                        } else if (value === 'inbound') {
                           handleBatchUpdate({ call_direction: 'inbound', callProvider: '', phoneNumber: '' });
+                        } else {
+                          handleBatchUpdate({ call_direction: 'both' });
                         }
                       }}
                     >
@@ -937,16 +900,17 @@ export default function AssistantStudio() {
                       <SelectContent>
                         <SelectItem value="outbound">Outbound</SelectItem>
                         <SelectItem value="inbound">Inbound</SelectItem>
+                        <SelectItem value="both">Both</SelectItem>
                       </SelectContent>
                     </Select>
                     <p className="text-[10px] text-muted-foreground/60 px-1 italic">
-                      Outbound for dialing out, Inbound for receiving calls.
+                      Choose outbound, inbound, or both call directions.
                     </p>
                   </div>
                 </div>
 
                 {/* --- OUTBOUND CONFIG --- */}
-                {!isInbound && (
+                {isOutboundBound && (
                   <div className="grid grid-cols-2 gap-8">
                     <div className="space-y-2">
                       <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 px-1">Trunk / Provider</label>
@@ -996,7 +960,7 @@ export default function AssistantStudio() {
                 )}
 
                 {/* --- INBOUND CONFIG --- */}
-                {isInbound && (
+                {isInboundBound && (
                   <div className="space-y-4">
                     <div className="grid grid-cols-2 gap-8">
                       <div className="space-y-2">
@@ -1013,7 +977,7 @@ export default function AssistantStudio() {
                               <span className="text-muted-foreground">None</span>
                             </SelectItem>
                             {inboundTrunks.map((trunk) => (
-                              <SelectItem key={trunk.id} value={trunk.livekit_trunk_id || trunk.id}>
+                              <SelectItem key={trunk.id} value={trunk.livekit_trunk_id!}>
                                 <div className="flex flex-col">
                                   <span className="font-medium">{trunk.name}</span>
                                   <span className="text-[10px] text-muted-foreground">{trunk.numbers?.join(', ')}</span>
@@ -1026,13 +990,30 @@ export default function AssistantStudio() {
                           <p className="text-[10px] text-orange-500 px-1">No inbound trunks found. Create one in the Trunks page.</p>
                         )}
                         {/* Dispatch rule status */}
-                        <div className="flex items-center gap-2 px-1 mt-1">
-                          <div className={cn('w-2 h-2 rounded-full', currentAssistant.dispatch_rule_id ? 'bg-green-500' : 'bg-muted-foreground/30')} />
-                          <span className="text-[10px] text-muted-foreground/60">
-                            {currentAssistant.dispatch_rule_id
-                              ? 'Dispatch rule active'
-                              : 'Dispatch rule will be created on save'}
-                          </span>
+                        <div className="flex items-center justify-between gap-3 px-1 mt-1">
+                          <div className="flex items-center gap-2">
+                            <div className={cn('w-2 h-2 rounded-full', currentAssistant.dispatch_rule_id ? 'bg-green-500' : 'bg-muted-foreground/30')} />
+                            <span className="text-[10px] text-muted-foreground/60">
+                              {isRebakingDispatch
+                                ? 'Synchronizing inbound assistant...'
+                                : currentAssistant.dispatch_rule_id
+                                  ? 'Dispatch rule active'
+                                  : 'Dispatch rule will be created on save'}
+                            </span>
+                          </div>
+                          {currentAssistant.inbound_trunk_id && !isDraft && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => void rebakeInboundDispatchRules(currentAssistant)}
+                              disabled={isRebakingDispatch || isSaving}
+                              className="h-7 px-2 text-[9px] font-bold uppercase tracking-widest"
+                            >
+                              {isRebakingDispatch && <Loader2 size={11} className="animate-spin" />}
+                              Retry sync
+                            </Button>
+                          )}
                         </div>
                       </div>
 
@@ -1490,13 +1471,13 @@ export default function AssistantStudio() {
                                   </button>
                                 </TooltipTrigger>
                                 <TooltipContent side="top" className="max-w-[270px] text-[11px] leading-relaxed">
-                                  Ambient call audio is independent of the Tool Usage master switch. Inbound changes are applied when you save and rebake the dispatch rule.
+                                  Ambient call audio is independent of the Tool Usage master switch. The backend synchronizes inbound dispatch when you save.
                                 </TooltipContent>
                               </Tooltip>
                             </div>
                             <p className="text-[10px] text-muted-foreground/70">
                               Add a subtle office bed behind the agent voice.
-                              {isInboundBound ? ' Save & apply when you are ready to update inbound routing.' : ''}
+                              {isInboundBound ? ' Save when you are ready to update inbound routing.' : ''}
                             </p>
                           </div>
                         </div>
@@ -2060,7 +2041,12 @@ export default function AssistantStudio() {
               </div>
               <div className="space-y-4">
                 {[
-                  { label: 'Direction', value: isInbound ? 'Inbound' : 'Outbound' },
+                  {
+                    label: 'Direction',
+                    value: currentAssistant.call_direction === 'both'
+                      ? 'Both'
+                      : currentAssistant.call_direction === 'inbound' ? 'Inbound' : 'Outbound',
+                  },
                   // Mirrors model_config.model_version exactly — omitted when no version is pinned.
                   ...(modelVersionLabel(selectedModelVersion)
                     ? [{ label: 'Model', value: modelVersionLabel(selectedModelVersion) as string }]
