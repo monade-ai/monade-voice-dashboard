@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, ChevronRight, Loader2, Save, Workflow } from 'lucide-react';
+import { AlertTriangle, ChevronRight, Loader2, Play, Save, Square, Workflow } from 'lucide-react';
 
 import { DashboardHeader } from '@/components/dashboard-header';
 import { Button } from '@/components/ui/button';
@@ -31,15 +31,19 @@ import {
   mappingToSteps,
   stepsToMapping,
   useWhatsappFlows,
+  type WhatsappCadenceConfig,
+  type WhatsappCadenceSchedule,
+  type WhatsappFlow,
+  type WhatsappFlowMode,
   type WhatsappFlowStep,
 } from '@/app/hooks/use-whatsapp-flows';
-import { FEATURE_FLAGS, useFeatureFlag } from '@/app/hooks/use-feature-flag';
+import { ApiError } from '@/lib/http';
 import { areOutcomeKeysSynced, INVALID_OUTCOME_KEYS_MESSAGE } from '@/lib/post-processing-outcomes';
 import { cn } from '@/lib/utils';
-import { cadenceSlotsForBucket } from '@/lib/whatsapp-cadence';
 
 import { BucketDescription } from './components/bucket-description';
 import { BucketSequenceEditor } from './components/bucket-sequence-editor';
+import { CadenceEditor } from './components/cadence-editor';
 
 type DirectionFilter = 'all' | 'outbound' | 'inbound';
 /** One bucket now holds an ordered sequence of templates, not a single one. */
@@ -54,28 +58,56 @@ const DID_NOT_PICK_UP_BUCKET: FlowBucket = {
   system: true,
 };
 
+const DEFAULT_CADENCE_SCHEDULE: WhatsappCadenceSchedule = {
+  timezone: 'Asia/Kolkata', call_window_start: '09:00', call_window_end: '21:00',
+  c2_delay_minutes: 120, evening_window_start: '19:00', evening_window_end: '21:00',
+  c4_delay_minutes_min: 45, c4_delay_minutes_max: 60,
+  late_lead_morning_start: '09:00', late_lead_morning_end: '11:00',
+  whatsapp_window_start: '09:00', whatsapp_window_end: '20:00', max_touches_24h: 3,
+  m1_delay_days: 3, m2_delay_days: 7,
+};
+
+const emptyCadenceConfig = (schedule?: WhatsappCadenceSchedule | null): WhatsappCadenceConfig => ({
+  schedule: { ...DEFAULT_CADENCE_SCHEDULE, ...(schedule ?? {}) },
+  templates: {},
+});
+
+const apiValidationErrors = (error: unknown): string[] => {
+  const data = error instanceof ApiError ? error.data as any : null;
+  const value = data?.cadence_draft_errors ?? data?.details ?? data?.detail;
+  if (!value) return error instanceof Error ? [error.message] : ['Unable to save the cadence.'];
+  if (typeof value === 'string') return [value];
+  if (Array.isArray(value)) return value.map((item) => typeof item === 'string' ? item : JSON.stringify(item));
+  return Object.entries(value).map(([key, item]) => `${key}: ${typeof item === 'string' ? item : JSON.stringify(item)}`);
+};
+
 export default function WhatsAppFlowsPage() {
   const { assistants } = useAssistants();
   const { templates, fetchTemplate } = usePostProcessingTemplates();
   const { channels, fetchTemplates } = useVobizWhatsapp();
-  const { fetchAssistantFlow, fetchFlows, saveFlow, savingFlow } = useWhatsappFlows();
-  // CollegeVidya's first-24h ladder. Off for everyone else, who get a plain
-  // ordered list of templates.
-  const cadenceEnabled = useFeatureFlag(FEATURE_FLAGS.whatsappCadenceLadder);
+  const { fetchAssistantFlow, fetchFlowCapabilities, fetchFlows, saveFlow, savingFlow } = useWhatsappFlows();
 
   const [direction, setDirection] = useState<DirectionFilter>('all');
   const [assistantId, setAssistantId] = useState('');
   const [templateId, setTemplateId] = useState('');
   const [connectionId, setConnectionId] = useState('');
   const [enabled, setEnabled] = useState(false);
+  const [flowMode, setFlowMode] = useState<WhatsappFlowMode>('standard');
+  const [cadenceConfig, setCadenceConfig] = useState<WhatsappCadenceConfig>(emptyCadenceConfig());
+  const [cadenceErrors, setCadenceErrors] = useState<string[]>([]);
+  const [cadenceAvailable, setCadenceAvailable] = useState(false);
+  const [cadenceScheduleDefaults, setCadenceScheduleDefaults] = useState<WhatsappCadenceSchedule>(DEFAULT_CADENCE_SCHEDULE);
+  const [cadenceRequirements, setCadenceRequirements] = useState<Awaited<ReturnType<typeof fetchFlowCapabilities>>['cv_24h_cadence']['templates']>([]);
+  const [loadingCapabilities, setLoadingCapabilities] = useState(true);
   const [mappings, setMappings] = useState<MappingState>({});
+  const [rawMappings, setRawMappings] = useState<WhatsappFlow['mappings']>({});
   const [buckets, setBuckets] = useState<QualificationBucket[]>([]);
   const [waTemplates, setWaTemplates] = useState<WhatsappTemplate[]>([]);
   const [loadingFlow, setLoadingFlow] = useState(false);
   const [loadingBuckets, setLoadingBuckets] = useState(false);
   const [loadingWaTemplates, setLoadingWaTemplates] = useState(false);
   const [storedOutcomeKeys, setStoredOutcomeKeys] = useState<string[] | null>(null);
-  const [existingFlows, setExistingFlows] = useState<ReturnType<typeof useWhatsappFlows> extends any ? any[] : never>([]);
+  const [existingFlows, setExistingFlows] = useState<WhatsappFlow[]>([]);
   const [loadingExistingFlows, setLoadingExistingFlows] = useState(false);
 
   const publishedAssistants = useMemo(
@@ -105,8 +137,34 @@ export default function WhatsAppFlowsPage() {
     setWaTemplates([]);
     setConnectionId('');
     setEnabled(false);
+    setFlowMode('standard');
+    setCadenceConfig(emptyCadenceConfig(cadenceScheduleDefaults));
+    setCadenceErrors([]);
+    setRawMappings({});
     setStoredOutcomeKeys(null);
   };
+
+  useEffect(() => {
+    let isMounted = true;
+    fetchFlowCapabilities()
+      .then(({ cv_24h_cadence: capability }) => {
+        if (!isMounted) return;
+        setCadenceAvailable(capability.available);
+        setCadenceRequirements(capability.templates);
+        setCadenceScheduleDefaults({ ...DEFAULT_CADENCE_SCHEDULE, ...(capability.schedule ?? {}) });
+        setCadenceConfig((current) => ({
+          schedule: { ...current.schedule, ...(capability.schedule ?? {}) },
+          templates: current.templates,
+        }));
+      })
+      .catch((error) => {
+        if (isMounted) console.error('[WhatsAppFlowsPage] fetchFlowCapabilities error:', error);
+      })
+      .finally(() => {
+        if (isMounted) setLoadingCapabilities(false);
+      });
+    return () => { isMounted = false; };
+  }, [fetchFlowCapabilities]);
 
   const handleConnectionChange = (value: string) => {
     setConnectionId(value);
@@ -201,6 +259,16 @@ export default function WhatsAppFlowsPage() {
         if (flow) {
           setConnectionId(flow.whatsapp_channel_connection_id || '');
           setEnabled(Boolean(flow.enabled));
+          setFlowMode(flow.flow_mode);
+          setRawMappings(flow.mappings ?? {});
+          setCadenceErrors(flow.cadence_draft_errors ?? []);
+          setCadenceConfig({
+            schedule: {
+              ...DEFAULT_CADENCE_SCHEDULE,
+              ...(flow.cadence_config?.schedule ?? {}),
+            },
+            templates: { ...(flow.cadence_config?.templates ?? {}) },
+          });
           // Legacy single-template mappings read as a one-step sequence, so a
           // flow saved before the ladder existed opens without any migration.
           setMappings(
@@ -214,6 +282,10 @@ export default function WhatsAppFlowsPage() {
 
         setConnectionId('');
         setEnabled(false);
+        setFlowMode('standard');
+        setRawMappings({});
+        setCadenceErrors([]);
+        setCadenceConfig((current) => emptyCadenceConfig(current.schedule));
         setMappings({});
       })
       .catch((error) => {
@@ -221,6 +293,9 @@ export default function WhatsAppFlowsPage() {
         console.error('[WhatsAppFlowsPage] fetchAssistantFlow error:', error);
         setConnectionId('');
         setEnabled(false);
+        setFlowMode('standard');
+        setRawMappings({});
+        setCadenceErrors([]);
         setMappings({});
       })
       .finally(() => {
@@ -323,31 +398,131 @@ export default function WhatsAppFlowsPage() {
     setWaTemplates([]);
     setConnectionId('');
     setEnabled(false);
+    setFlowMode('standard');
+    setRawMappings({});
+    setCadenceErrors([]);
     setStoredOutcomeKeys(null);
   };
 
-  const handleSave = async () => {
-    if (!assistantId || !templateId || !connectionId || hasInvalidOutcomeKeys) return;
+  const serializedMappings = () => Object.fromEntries(
+    Object.entries(mappings)
+      .map(([key, steps]) => [key, steps.filter((step) => step.template_name)] as const)
+      .filter(([, steps]) => steps.length > 0)
+      .map(([key, steps]) => [key, stepsToMapping(steps)]),
+  );
+
+  const localCadenceErrors = useMemo(() => {
+    if (flowMode !== 'cv_24h_cadence') return [];
+    const errors: string[] = [];
+    const requiredKeys = cadenceRequirements.map((item) => item.key);
+    for (const requirement of cadenceRequirements) {
+      const assignment = cadenceConfig.templates[requirement.key];
+      if (!assignment?.template_name || !assignment.language) {
+        errors.push(`${requirement.key}: select an approved template.`);
+        continue;
+      }
+      if (!/^en(?:_|$)/i.test(assignment.language)) {
+        errors.push(`${requirement.key}: the template language must be English.`);
+      }
+      const template = waTemplates.find((item) =>
+        item.name === assignment.template_name && item.language === assignment.language);
+      if (!template || String(template.status).toUpperCase() !== 'APPROVED') {
+        errors.push(`${requirement.key}: assigned template is not approved.`);
+      } else if (requirement.expected_category
+        && String(template.category).toUpperCase() !== String(requirement.expected_category).toUpperCase()) {
+        errors.push(`${requirement.key}: Meta category must be ${requirement.expected_category}.`);
+      }
+    }
+    if (requiredKeys.length !== 10) errors.push('The backend must return all ten required cadence slots.');
+    if (cadenceConfig.schedule.c4_delay_minutes_min > cadenceConfig.schedule.c4_delay_minutes_max) {
+      errors.push('C4 minimum delay cannot exceed its maximum delay.');
+    }
+    const timeToMinutes = (value: string) => {
+      const match = /^(\d{2}):(\d{2})$/.exec(value);
+      if (!match) return null;
+      const hours = Number(match[1]);
+      const minutes = Number(match[2]);
+      return hours <= 23 && minutes <= 59 ? (hours * 60) + minutes : null;
+    };
+    const timeWindows: Array<[string, string, string]> = [
+      [cadenceConfig.schedule.call_window_start, cadenceConfig.schedule.call_window_end, 'Call window'],
+      [cadenceConfig.schedule.evening_window_start, cadenceConfig.schedule.evening_window_end, 'Evening window'],
+      [cadenceConfig.schedule.late_lead_morning_start, cadenceConfig.schedule.late_lead_morning_end, 'Late-lead window'],
+      [cadenceConfig.schedule.whatsapp_window_start, cadenceConfig.schedule.whatsapp_window_end, 'WhatsApp window'],
+    ];
+    for (const [start, end, label] of timeWindows) {
+      const startMinutes = timeToMinutes(start);
+      const endMinutes = timeToMinutes(end);
+      if (startMinutes === null || endMinutes === null || startMinutes >= endMinutes) {
+        errors.push(`${label} must have valid start and end times.`);
+      }
+    }
+    const integerRanges: Array<[number, number, number, string]> = [
+      [cadenceConfig.schedule.c2_delay_minutes, 1, 720, 'C2 delay'],
+      [cadenceConfig.schedule.c4_delay_minutes_min, 1, 180, 'C4 minimum delay'],
+      [cadenceConfig.schedule.c4_delay_minutes_max, 1, 180, 'C4 maximum delay'],
+      [cadenceConfig.schedule.max_touches_24h, 1, 3, 'Maximum touches'],
+      [cadenceConfig.schedule.m1_delay_days, 1, 30, 'M1 delay'],
+      [cadenceConfig.schedule.m2_delay_days, 1, 30, 'M2 delay'],
+    ];
+    for (const [value, minimum, maximum, label] of integerRanges) {
+      if (!Number.isInteger(value) || value < minimum || value > maximum) {
+        errors.push(`${label} must be an integer from ${minimum} to ${maximum}.`);
+      }
+    }
+    const callStart = timeToMinutes(cadenceConfig.schedule.call_window_start);
+    const callEnd = timeToMinutes(cadenceConfig.schedule.call_window_end);
+    const eveningStart = timeToMinutes(cadenceConfig.schedule.evening_window_start);
+    const eveningEnd = timeToMinutes(cadenceConfig.schedule.evening_window_end);
+    const whatsappStart = timeToMinutes(cadenceConfig.schedule.whatsapp_window_start);
+    const whatsappEnd = timeToMinutes(cadenceConfig.schedule.whatsapp_window_end);
+    if (callStart !== null && callEnd !== null && (callStart < 540 || callEnd > 1260)) {
+      errors.push('Call window must stay within 09:00–21:00 IST.');
+    }
+    if (eveningStart !== null && eveningEnd !== null && callStart !== null && callEnd !== null
+      && (eveningStart < callStart || eveningEnd > callEnd)) {
+      errors.push('Evening window must fit inside the call window.');
+    }
+    if (whatsappStart !== null && whatsappEnd !== null && (whatsappStart < 540 || whatsappEnd > 1200)) {
+      errors.push('WhatsApp window must stay within 09:00–20:00 IST.');
+    }
+    if (cadenceConfig.schedule.timezone !== 'Asia/Kolkata') {
+      errors.push('Timezone must be Asia/Kolkata for this cadence.');
+    }
+    return errors;
+  }, [cadenceConfig, cadenceRequirements, flowMode, waTemplates]);
+
+  const handleSave = async (activateCadence = false) => {
+    if (!assistantId || !templateId || !connectionId
+      || (flowMode === 'standard' && hasInvalidOutcomeKeys)) return;
 
     try {
-      await saveFlow(assistantId, {
+      const cadenceMode = flowMode === 'cv_24h_cadence';
+      const saved = await saveFlow(assistantId, {
         post_processing_template_id: templateId,
         whatsapp_channel_connection_id: connectionId,
-        enabled,
-        mappings: Object.fromEntries(
-          Object.entries(mappings)
-            // A step with no template picked yet must not be sent to the API,
-            // which rejects a step without a template_name.
-            .map(([key, steps]) => [key, steps.filter((step) => step.template_name)] as const)
-            .filter(([, steps]) => steps.length > 0)
-            .map(([key, steps]) => [key, stepsToMapping(steps)]),
-        ),
+        enabled: cadenceMode ? activateCadence : enabled,
+        flow_mode: flowMode,
+        mappings: cadenceMode ? rawMappings : serializedMappings(),
+        cadence_config: cadenceMode ? cadenceConfig : {},
       });
-    } catch {}
+      if (saved) {
+        setEnabled(saved.enabled);
+        setCadenceErrors(saved.cadence_draft_errors);
+        setRawMappings(saved.mappings);
+      }
+    } catch (error) {
+      if (flowMode === 'cv_24h_cadence') setCadenceErrors(apiValidationErrors(error));
+    }
   };
 
   const readyToEdit = assistantId && templateId;
-  const canSave = Boolean(assistantId && templateId && connectionId && !hasInvalidOutcomeKeys);
+  const canSave = Boolean(
+    assistantId
+    && templateId
+    && connectionId
+    && (flowMode === 'cv_24h_cadence' || !hasInvalidOutcomeKeys),
+  );
 
   return (
     <div className="min-h-screen bg-background flex flex-col font-sans">
@@ -445,7 +620,7 @@ export default function WhatsAppFlowsPage() {
                 </Select>
               </div>
 
-              <div className="space-y-2">
+              {flowMode === 'standard' ? <div className="space-y-2">
                 {/* block, not inline: the sibling here is a bare button rather
                     than a full-width Select, so an inline label shares its line
                     and pushes the switch out of the grid cell. */}
@@ -476,8 +651,41 @@ export default function WhatsAppFlowsPage() {
                     )}
                   />
                 </button>
-              </div>
+              </div> : <div />}
             </div>
+
+            {cadenceAvailable ? (
+              <div className="space-y-2 border-t border-border/30 pt-5">
+                <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
+                  Flow mode
+                </span>
+                <div className="grid max-w-2xl gap-3 sm:grid-cols-2">
+                  {([
+                    ['standard', 'Standard', 'Existing post-call outcome mappings.'],
+                    ['cv_24h_cadence', 'CV 24-hour cadence', 'C1–C4 plus N/U/T1/M1/M2 automation.'],
+                  ] as const).map(([value, label, description]) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => {
+                        setFlowMode(value);
+                        setCadenceErrors([]);
+                        if (value === 'cv_24h_cadence') setEnabled(false);
+                      }}
+                      className={cn(
+                        'rounded-md border p-3 text-left transition-colors',
+                        flowMode === value ? 'border-primary bg-primary/5' : 'border-border/40 hover:bg-muted/30',
+                      )}
+                    >
+                      <span className="text-sm font-medium">{label}</span>
+                      <span className="mt-1 block text-[11px] text-muted-foreground">{description}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : loadingCapabilities ? (
+              <p className="text-[10px] text-muted-foreground">Checking available flow modes…</p>
+            ) : null}
           </PaperCardContent>
         </PaperCard>
 
@@ -526,6 +734,7 @@ export default function WhatsAppFlowsPage() {
                           <p>
                             Mappings: {Object.keys(flow.mappings || {}).length}
                           </p>
+                          <p>Mode: {flow.flow_mode === 'cv_24h_cadence' ? 'CV 24-hour cadence' : 'Standard'}</p>
                         </div>
                       </button>
                     ))}
@@ -543,6 +752,69 @@ export default function WhatsAppFlowsPage() {
                   Loading flow...
                 </span>
               </div>
+            ) : flowMode === 'cv_24h_cadence' ? (
+              <>
+                <CadenceEditor
+                  config={cadenceConfig}
+                  requirements={cadenceRequirements}
+                  templates={waTemplates}
+                  loadingTemplates={loadingWaTemplates}
+                  errors={cadenceErrors}
+                  onChange={(next) => {
+                    setCadenceConfig(next);
+                    setCadenceErrors([]);
+                  }}
+                />
+                <div className="flex flex-col gap-3 border-t border-border/20 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="text-[11px] text-muted-foreground">
+                    {enabled
+                      ? 'Cadence is active. Disable it immediately before making draft changes.'
+                      : 'Save draft always keeps this flow disabled. Enable is available only when all ten slots pass local checks.'}
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {enabled ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => handleSave(false)}
+                        disabled={!canSave || savingFlow}
+                        className="h-10 px-4 text-[10px] font-bold uppercase tracking-[0.16em]"
+                      >
+                        {savingFlow ? <Loader2 size={14} className="animate-spin" /> : <Square size={13} />}
+                        Disable cadence
+                      </Button>
+                    ) : (
+                      <>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => handleSave(false)}
+                          disabled={!canSave || savingFlow}
+                          className="h-10 px-4 text-[10px] font-bold uppercase tracking-[0.16em]"
+                        >
+                          {savingFlow ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                          Save disabled draft
+                        </Button>
+                        <Button
+                          type="button"
+                          onClick={() => handleSave(true)}
+                          disabled={!canSave || savingFlow || localCadenceErrors.length > 0}
+                          title={localCadenceErrors[0]}
+                          className="h-10 px-4 text-[10px] font-bold uppercase tracking-[0.16em] bg-foreground text-background hover:bg-foreground/90"
+                        >
+                          {savingFlow ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}
+                          Enable cadence
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                </div>
+                {!enabled && localCadenceErrors.length > 0 ? (
+                  <div className="border-t border-border/20 px-6 py-3 text-[10px] text-muted-foreground">
+                    Enable blocked: {localCadenceErrors[0]}
+                  </div>
+                ) : null}
+              </>
             ) : flowBuckets.length === 0 ? (
               <div className="py-16 px-6 text-center space-y-3">
                 <h3 className="text-lg font-medium tracking-tight">This template has no outcomes yet</h3>
@@ -609,10 +881,6 @@ export default function WhatsAppFlowsPage() {
                                 approvedTemplates={approvedTemplates}
                                 disabled={loadingWaTemplates}
                                 onChange={(next) => updateBucketSteps(bucket.key, next)}
-                                // Without the flag this is a plain ordered list
-                                // of templates: no ladder vocabulary, no
-                                // marketing tail, no branch conditions.
-                                slots={cadenceEnabled ? cadenceSlotsForBucket(bucket.key) : undefined}
                               />
                             ) : (
                               <p className="text-[11px] text-muted-foreground">
@@ -634,7 +902,7 @@ export default function WhatsAppFlowsPage() {
                   </div>
                   <Button
                     type="button"
-                    onClick={handleSave}
+                    onClick={() => handleSave(false)}
                     disabled={!canSave || savingFlow}
                     className="h-10 px-4 text-[10px] font-bold uppercase tracking-[0.18em] bg-foreground text-background hover:bg-foreground/90"
                   >

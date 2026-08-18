@@ -54,6 +54,57 @@ export interface WhatsappFlowMappingEntry {
 
 export type WhatsappFlowMappings = Record<string, WhatsappFlowMappingEntry>;
 
+export type WhatsappFlowMode = 'standard' | 'cv_24h_cadence';
+
+export interface WhatsappCadenceSchedule {
+  timezone: string;
+  call_window_start: string;
+  call_window_end: string;
+  c2_delay_minutes: number;
+  evening_window_start: string;
+  evening_window_end: string;
+  c4_delay_minutes_min: number;
+  c4_delay_minutes_max: number;
+  late_lead_morning_start: string;
+  late_lead_morning_end: string;
+  whatsapp_window_start: string;
+  whatsapp_window_end: string;
+  max_touches_24h: number;
+  m1_delay_days: number;
+  m2_delay_days: number;
+}
+
+export interface WhatsappCadenceTemplateAssignment {
+  template_name: string;
+  language: string;
+  template_name_no_name?: string | null;
+}
+
+export interface WhatsappCadenceConfig {
+  schedule: WhatsappCadenceSchedule;
+  templates: Record<string, WhatsappCadenceTemplateAssignment>;
+}
+
+export interface WhatsappCadenceTemplateRequirement {
+  key: string;
+  label: string;
+  group: string;
+  expected_category?: string;
+  body?: string;
+  footer?: string;
+  buttons?: unknown[];
+}
+
+export interface WhatsappCadenceCapability {
+  available: boolean;
+  schedule: WhatsappCadenceSchedule | null;
+  templates: WhatsappCadenceTemplateRequirement[];
+}
+
+export interface WhatsappFlowCapabilities {
+  cv_24h_cadence: WhatsappCadenceCapability;
+}
+
 /** Read either mapping shape as a step list. */
 export const mappingToSteps = (entry?: WhatsappFlowMappingEntry | null): WhatsappFlowStep[] => {
   if (!entry || typeof entry !== 'object') return [];
@@ -100,6 +151,9 @@ export interface WhatsappFlow {
   post_processing_template_id: string;
   whatsapp_channel_connection_id: string;
   enabled: boolean;
+  flow_mode: WhatsappFlowMode;
+  cadence_config: Partial<WhatsappCadenceConfig>;
+  cadence_draft_errors: string[];
   mappings: WhatsappFlowMappings;
   assistant?: {
     id?: string;
@@ -131,7 +185,78 @@ export interface SaveWhatsappFlowPayload {
   whatsapp_channel_connection_id: string;
   enabled: boolean;
   mappings: WhatsappFlowMappings;
+  flow_mode?: WhatsappFlowMode;
+  cadence_config?: WhatsappCadenceConfig | Record<string, never>;
 }
+
+const CADENCE_SLOT_GROUPS: Record<string, string> = {
+  N1: 'No answer', N2: 'No answer', N3: 'No answer',
+  U1: 'Uncertain', U2a: 'Uncertain', U2b: 'Uncertain', U3: 'Uncertain',
+  T1: 'Qualified', M1: 'Marketing', M2: 'Marketing',
+};
+
+const normalizeErrors = (value: unknown): string[] => {
+  if (!value) return [];
+  if (typeof value === 'string') return [value];
+  if (Array.isArray(value)) {
+    return value.flatMap((item) => normalizeErrors(item));
+  }
+  if (typeof value === 'object') {
+    return Object.entries(value as Record<string, unknown>).flatMap(([key, item]) => {
+      const messages = normalizeErrors(item);
+      return messages.map((message) => `${key}: ${message}`);
+    });
+  }
+
+  return [String(value)];
+};
+
+const normalizeRequirement = (key: string, raw: any): WhatsappCadenceTemplateRequirement => ({
+  key,
+  label: raw?.label ?? raw?.name ?? key,
+  group: raw?.group ?? CADENCE_SLOT_GROUPS[key] ?? 'Cadence',
+  expected_category: raw?.expected_category ?? raw?.category ?? raw?.expected?.category,
+  body: raw?.body
+    ?? raw?.expected?.body
+    ?? raw?.components?.find?.((part: any) => String(part?.type).toUpperCase() === 'BODY')?.text,
+  footer: raw?.footer
+    ?? raw?.expected?.footer
+    ?? raw?.components?.find?.((part: any) => String(part?.type).toUpperCase() === 'FOOTER')?.text,
+  buttons: raw?.buttons
+    ?? raw?.expected?.buttons
+    ?? raw?.components?.find?.((part: any) => String(part?.type).toUpperCase() === 'BUTTONS')?.buttons,
+});
+
+const normalizeCapabilities = (raw: any): WhatsappFlowCapabilities => {
+  const cadence = raw?.cv_24h_cadence ?? raw?.capabilities?.cv_24h_cadence ?? {};
+  const advertisedMode = raw?.available_modes?.find?.(
+    (mode: any) => mode?.value === 'cv_24h_cadence',
+  );
+  const rawTemplates = cadence?.templates
+    ?? cadence?.template_slots
+    ?? cadence?.required_templates
+    ?? cadence?.template_requirements
+    ?? cadence?.defaults?.templates
+    ?? {};
+  const templates = Array.isArray(rawTemplates)
+    ? rawTemplates.map((item: any) => normalizeRequirement(String(item?.key ?? item?.slot ?? ''), item))
+      .filter((item: WhatsappCadenceTemplateRequirement) => item.key)
+    : Object.entries(rawTemplates).map(([key, item]) => normalizeRequirement(key, item));
+
+  return {
+    cv_24h_cadence: {
+      available: cadence?.available === true
+        || advertisedMode?.available === true
+        || Boolean(raw?.cv_24h_cadence),
+      schedule: (cadence?.schedule
+        ?? cadence?.default_schedule
+        ?? cadence?.schedule_defaults
+        ?? cadence?.defaults?.schedule
+        ?? null) as WhatsappCadenceSchedule | null,
+      templates,
+    },
+  };
+};
 
 const normalizeFlow = (raw: any): WhatsappFlow => ({
   id: raw?.id,
@@ -140,6 +265,9 @@ const normalizeFlow = (raw: any): WhatsappFlow => ({
   post_processing_template_id: raw?.post_processing_template_id ?? raw?.postProcessingTemplateId,
   whatsapp_channel_connection_id: raw?.whatsapp_channel_connection_id ?? raw?.whatsappChannelConnectionId,
   enabled: Boolean(raw?.enabled),
+  flow_mode: raw?.flow_mode === 'cv_24h_cadence' ? 'cv_24h_cadence' : 'standard',
+  cadence_config: (raw?.cadence_config && typeof raw.cadence_config === 'object') ? raw.cadence_config : {},
+  cadence_draft_errors: normalizeErrors(raw?.cadence_draft_errors),
   mappings: (raw?.mappings && typeof raw.mappings === 'object') ? raw.mappings : {},
   assistant: raw?.assistant ?? null,
   whatsapp_channel_connection: raw?.whatsapp_channel_connection ?? raw?.whatsappChannelConnection ?? null,
@@ -147,9 +275,16 @@ const normalizeFlow = (raw: any): WhatsappFlow => ({
 });
 
 const normalizeFlowList = (data: any): WhatsappFlow[] => {
-  const list = Array.isArray(data) ? data : (data?.flows ?? data?.data ?? data?.items ?? []);
+  const list = Array.isArray(data)
+    ? data
+    : (data?.flows
+      ?? data?.data
+      ?? data?.items
+      ?? data?.flow
+      ?? (data?.assistant_id || data?.assistantId ? [data] : []));
 
-  return Array.isArray(list) ? list.filter(Boolean).map(normalizeFlow) : [];
+  const normalizedList = Array.isArray(list) ? list : [list];
+  return normalizedList.filter(Boolean).map(normalizeFlow);
 };
 
 /**
@@ -182,6 +317,17 @@ export function useWhatsappFlows() {
     );
 
     return normalizeFlowList(data);
+  }, [userUid]);
+
+  const fetchFlowCapabilities = useCallback(async (): Promise<WhatsappFlowCapabilities> => {
+    if (!userUid) return normalizeCapabilities(null);
+
+    const data = await fetchJson<any>(
+      `${API_BASE}/api/users/${encodeURIComponent(userUid)}/vobiz-whatsapp/flow-capabilities`,
+      { retry: { retries: 1 } },
+    );
+
+    return normalizeCapabilities(data);
   }, [userUid]);
 
   const fetchAssistantFlow = useCallback(async (
@@ -222,7 +368,12 @@ export function useWhatsappFlows() {
       );
       toast.success('WhatsApp flow saved');
       const flows = normalizeFlowList(result);
-      if (flows[0]) return flows[0];
+      if (flows[0]) {
+        if (flows[0].cadence_draft_errors.length === 0 && result?.cadence_draft_errors) {
+          flows[0].cadence_draft_errors = normalizeErrors(result.cadence_draft_errors);
+        }
+        return flows[0];
+      }
 
       return result?.flow ? normalizeFlow(result.flow) : null;
     } catch (err) {
@@ -237,6 +388,7 @@ export function useWhatsappFlows() {
   return {
     savingFlow,
     fetchFlows,
+    fetchFlowCapabilities,
     fetchAssistantFlow,
     saveFlow,
   };
