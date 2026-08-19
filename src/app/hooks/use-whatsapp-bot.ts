@@ -55,6 +55,7 @@ export interface WhatsappBotConfig {
   whatsapp_channel_connection_id: string;
   whatsapp_bot_prompt_id: string | null;
   enabled: boolean;
+  interactive_replies_enabled: boolean;
   model: WhatsappBotModel;
   generation_config: WhatsappBotGenerationConfig;
   qualification_config?: WhatsappBotQualificationConfig;
@@ -77,6 +78,7 @@ export interface WhatsappBotPromptPayload {
 
 export interface SaveWhatsappBotConfigPayload {
   enabled: boolean;
+  interactive_replies_enabled: boolean;
   whatsapp_bot_prompt_id: string | null;
   model: WhatsappBotModel;
   generation_config: WhatsappBotGenerationConfig;
@@ -85,6 +87,7 @@ export interface SaveWhatsappBotConfigPayload {
 
 export const DEFAULT_WHATSAPP_BOT_CONFIG: Omit<WhatsappBotConfig, 'whatsapp_channel_connection_id'> = {
   enabled: false,
+  interactive_replies_enabled: false,
   whatsapp_bot_prompt_id: null,
   model: 'gemini-2.0-flash',
   generation_config: {
@@ -180,6 +183,9 @@ const normalizeBotConfig = (raw: any): WhatsappBotConfig => ({
   whatsapp_channel_connection_id: raw?.whatsapp_channel_connection_id ?? raw?.whatsappChannelConnectionId,
   whatsapp_bot_prompt_id: raw?.whatsapp_bot_prompt_id ?? raw?.whatsappBotPromptId ?? null,
   enabled: Boolean(raw?.enabled),
+  interactive_replies_enabled: Boolean(
+    raw?.interactive_replies_enabled ?? raw?.interactiveRepliesEnabled,
+  ),
   model: raw?.model ?? 'gemini-2.0-flash',
   generation_config: normalizeGenerationConfig(raw?.generation_config ?? raw?.generationConfig ?? {}),
   qualification_config: normalizeQualificationConfig(raw?.qualification_config ?? raw?.qualificationConfig ?? {}),

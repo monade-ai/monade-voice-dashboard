@@ -127,6 +127,7 @@ type OutcomeBucket = QualificationBucket & { system?: boolean };
 
 type BotFormState = {
   enabled: boolean;
+  interactive_replies_enabled: boolean;
   whatsapp_bot_prompt_id: string;
   model: WhatsappBotModel;
   temperature: string;
@@ -175,6 +176,7 @@ const buildFormFromConfig = (config?: WhatsappBotConfig | null): BotFormState =>
 
   return {
     enabled: source.enabled,
+    interactive_replies_enabled: source.interactive_replies_enabled,
     whatsapp_bot_prompt_id: source.whatsapp_bot_prompt_id ?? '',
     model: source.model,
     temperature: String(source.generation_config.temperature),
@@ -248,6 +250,7 @@ const serializeBotPayload = (form: BotFormState): SaveWhatsappBotConfigPayload =
 
   return {
     enabled: form.enabled,
+    interactive_replies_enabled: form.interactive_replies_enabled,
     whatsapp_bot_prompt_id: form.whatsapp_bot_prompt_id || null,
     model: form.model,
     generation_config,
@@ -1085,6 +1088,39 @@ export default function WhatsappBotPage() {
                       className={cn(
                         'absolute top-0.5 h-5 w-5 rounded-full bg-background shadow transition-transform',
                         form.enabled ? 'translate-x-[22px]' : 'translate-x-0.5',
+                      )}
+                    />
+                  </button>
+                </div>
+
+                <div className="rounded-md border border-border/20 bg-muted/[0.03] p-4 flex items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                      Interactive Replies Enabled
+                    </span>
+                    <p className="text-sm text-muted-foreground">
+                      Process WhatsApp button and list selections for this sender number. Required for CV cadence follow-on actions.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-label="Enable interactive WhatsApp replies"
+                    aria-checked={form.interactive_replies_enabled}
+                    onClick={() => setForm((current) => ({
+                      ...current,
+                      interactive_replies_enabled: !current.interactive_replies_enabled,
+                    }))}
+                    className={cn(
+                      'relative h-6 w-11 shrink-0 rounded-full transition-colors',
+                      form.interactive_replies_enabled ? 'bg-primary' : 'bg-muted',
+                    )}
+                    disabled={!effectiveSelectedChannelId}
+                  >
+                    <span
+                      className={cn(
+                        'absolute left-0 top-0.5 h-5 w-5 rounded-full bg-background shadow transition-transform',
+                        form.interactive_replies_enabled ? 'translate-x-[22px]' : 'translate-x-0.5',
                       )}
                     />
                   </button>
