@@ -117,11 +117,14 @@ const AGENT_NAME_OPTIONS = [
   { value: 'voice-agent', label: 'voice-agent' },
   { value: 'monade-test', label: 'monade-test' },
   { value: 'monade-test-2', label: 'monade-test-2' },
+  { value: 'monade-test-pool1', label: 'monade-test-pool1' },
+  { value: 'monade-test-pool3', label: 'monade-test-pool3' },
 ] as const;
 type AgentName = typeof AGENT_NAME_OPTIONS[number]['value'];
 
 const isAgentName = (v: unknown): v is AgentName => (
-  v === 'voice-agent' || v === 'monade-test' || v === 'monade-test-2'
+  v === 'voice-agent' || v === 'monade-test' || v === 'monade-test-2' ||
+  v === 'monade-test-pool1' || v === 'monade-test-pool3'
 );
 
 const readAgentName = (toolsConfig: any): AgentName | null => {
