@@ -18,11 +18,17 @@ import {
   ToggleLeft,
   ToggleRight,
   Info,
+  Timer,
 } from 'lucide-react';
 
 import { useAssistants, Assistant } from '@/app/hooks/use-assistants-context';
 import { useLibrary, type LibraryCategory } from '@/app/hooks/use-knowledge-base';
 import { useRagCorpus } from '@/app/hooks/use-rag-corpus';
+import {
+  useAssistantCallSettings,
+  MIN_CALL_DURATION_SECONDS,
+  DEFAULT_GLOBAL_HARD_LIMIT_SECONDS,
+} from '@/app/hooks/use-assistant-call-settings';
 import { useTrunks } from '@/app/hooks/use-trunks';
 import { useUserTrunks } from '@/app/hooks/use-user-trunks';
 import { useMonadeUser } from '@/app/hooks/use-monade-user';
@@ -74,6 +80,11 @@ const DEFAULT_BACKGROUND_AUDIO = {
 };
 
 const clampBackgroundVolume = (value: number) => Math.min(25, Math.max(0, value));
+
+// Call-duration limit is expressed in whole minutes in the UI; seconds on the wire.
+const clampCallMinutes = (value: number, maxMinutes: number) => (
+  Math.min(maxMinutes, Math.max(1, Math.round(Number.isFinite(value) ? value : 1)))
+);
 
 const readBackgroundAudio = (toolsConfig: any) => ({
   ...DEFAULT_BACKGROUND_AUDIO,
@@ -362,6 +373,49 @@ export default function AssistantStudio() {
   useEffect(() => {
     setTemperatureInput(String(readTemperature(currentAssistant?.toolsConfig)));
   }, [currentAssistant?.id]);
+
+  // Per-assistant hard call-duration limit (session-manager enforces it; null = inherit global).
+  const {
+    settings: callSettings,
+    loading: isLoadingCallSettings,
+    saving: isSavingCallSettings,
+    saveLimit: saveCallDurationLimit,
+  } = useAssistantCallSettings(currentAssistant?.id, !isDraft);
+  const globalHardLimitSeconds = callSettings?.global_hard_limit_seconds ?? DEFAULT_GLOBAL_HARD_LIMIT_SECONDS;
+  const maxCallMinutes = clampCallMinutes(globalHardLimitSeconds / 60, 24 * 60);
+  const minCallMinutes = Math.max(1, Math.round(MIN_CALL_DURATION_SECONDS / 60));
+  const hasCustomCallLimit = callSettings?.max_call_duration_seconds != null;
+  const [callMinutesInput, setCallMinutesInput] = useState<string>('');
+
+  useEffect(() => {
+    const seconds = callSettings?.max_call_duration_seconds
+      ?? callSettings?.effective_max_call_duration_seconds
+      ?? DEFAULT_GLOBAL_HARD_LIMIT_SECONDS;
+    setCallMinutesInput(String(clampCallMinutes(seconds / 60, maxCallMinutes)));
+  }, [
+    callSettings?.assistant_id,
+    callSettings?.max_call_duration_seconds,
+    callSettings?.effective_max_call_duration_seconds,
+    maxCallMinutes,
+  ]);
+
+  const parsedCallMinutes = clampCallMinutes(
+    Number.parseInt(callMinutesInput, 10) || minCallMinutes,
+    maxCallMinutes,
+  );
+  const isCallLimitDirty = hasCustomCallLimit
+    && callSettings?.max_call_duration_seconds !== parsedCallMinutes * 60;
+
+  const toggleCustomCallLimit = async () => {
+    if (!currentAssistant || isSavingCallSettings || isLoadingCallSettings) return;
+    // Toggle off clears the override; toggle on commits whatever the slider currently shows.
+    await saveCallDurationLimit(hasCustomCallLimit ? null : parsedCallMinutes * 60);
+  };
+
+  const commitCallDurationLimit = async () => {
+    if (!hasCustomCallLimit || isSavingCallSettings) return;
+    await saveCallDurationLimit(parsedCallMinutes * 60);
+  };
 
   const syncToolsFromBackend = useCallback(async (assistantId: string) => {
     try {
@@ -1652,6 +1706,119 @@ export default function AssistantStudio() {
                     )}
                   </button>
                 </div>
+                  </div>
+                </div>
+
+                  {/* Per-Call Hard Limit */}
+                  <div className="space-y-3 p-4 rounded-md border border-border/40 bg-muted/[0.03]">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <Timer size={18} className={hasCustomCallLimit ? 'text-primary' : 'text-muted-foreground'} />
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h4 className="text-sm font-bold tracking-tight">Call Duration Limit</h4>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <button
+                                  type="button"
+                                  className="inline-flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+                                  aria-label="About the call duration limit"
+                                >
+                                  <Info size={13} />
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent side="top" className="max-w-[280px] text-[11px] leading-relaxed">
+                                Hard cap on how long a single call can run. Applies to calls started after saving — calls already in progress keep the deadline they began with.
+                              </TooltipContent>
+                            </Tooltip>
+                          </div>
+                          <p className="text-[10px] text-muted-foreground/60">
+                            {isLoadingCallSettings
+                              ? 'Loading current limit…'
+                              : hasCustomCallLimit
+                                ? `Custom limit — calls end after ${Math.round((callSettings?.effective_max_call_duration_seconds ?? 0) / 60)} min.`
+                                : `Inheriting the global maximum of ${Math.round(globalHardLimitSeconds / 60)} min.`}
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        disabled={isSavingCallSettings || isLoadingCallSettings || !callSettings}
+                        onClick={toggleCustomCallLimit}
+                        aria-label="Use a custom call duration limit"
+                        className={cn(
+                          'relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 disabled:opacity-50 disabled:cursor-not-allowed',
+                          hasCustomCallLimit
+                            ? 'bg-green-500 border-green-500'
+                            : 'bg-muted border-border/70',
+                        )}
+                      >
+                        <span
+                          className={cn(
+                            'inline-block h-4 w-4 transform rounded-full shadow-sm transition-transform',
+                            hasCustomCallLimit ? 'bg-background' : 'bg-muted-foreground/70',
+                            hasCustomCallLimit ? 'translate-x-6' : 'translate-x-1',
+                          )}
+                        />
+                        {isSavingCallSettings && (
+                          <Loader2 size={10} className="absolute inset-0 m-auto animate-spin text-white" />
+                        )}
+                      </button>
+                    </div>
+
+                    <div className={cn('space-y-2 pt-1', !hasCustomCallLimit && 'opacity-50')}>
+                      <div className="flex items-center justify-between gap-3">
+                        <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 px-1">
+                          Maximum duration
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <Input
+                            type="number"
+                            min={minCallMinutes}
+                            max={maxCallMinutes}
+                            step={1}
+                            disabled={!hasCustomCallLimit || isSavingCallSettings}
+                            value={callMinutesInput}
+                            onChange={(e) => setCallMinutesInput(e.target.value)}
+                            onBlur={() => setCallMinutesInput(String(parsedCallMinutes))}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') e.currentTarget.blur();
+                            }}
+                            className="h-8 w-16 bg-muted/[0.02] text-center text-xs font-semibold"
+                          />
+                          <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">min</span>
+                        </div>
+                      </div>
+                      <input
+                        type="range"
+                        min={minCallMinutes}
+                        max={maxCallMinutes}
+                        step={1}
+                        disabled={!hasCustomCallLimit || isSavingCallSettings}
+                        value={parsedCallMinutes}
+                        onChange={(e) => setCallMinutesInput(e.target.value)}
+                        className="w-full accent-primary disabled:opacity-50"
+                      />
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-[10px] text-muted-foreground/60 px-1 italic">
+                          {minCallMinutes}–{maxCallMinutes} min. Global safety maximum: {Math.round(globalHardLimitSeconds / 60)} min.
+                        </p>
+                        {isCallLimitDirty && (
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={commitCallDurationLimit}
+                            disabled={isSavingCallSettings}
+                            className="h-7 gap-1.5 text-[10px] font-bold uppercase tracking-widest"
+                          >
+                            {isSavingCallSettings ? (
+                              <Loader2 size={12} className="animate-spin" />
+                            ) : (
+                              <Save size={12} />
+                            )}
+                            Save
+                          </Button>
+                        )}
+                      </div>
                   </div>
                 </div>
               </div>
