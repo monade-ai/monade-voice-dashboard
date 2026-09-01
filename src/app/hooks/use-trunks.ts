@@ -132,12 +132,30 @@ export function useTrunks(options?: { checkAssignments?: boolean }) {
         },
       });
 
+      // That endpoint returns the whole trunks table, inbound rows included, and the payload
+      // is not guaranteed to carry trunk_type — so ask which ids are inbound rather than
+      // trusting the field alone. Everything downstream of this hook (campaign trunk picker,
+      // assistant phone-number selector) is outbound-only. A failure here must not blank the
+      // list, so fall back to filtering on trunk_type alone.
+      let inboundIds = new Set<string>();
+      try {
+        const inboundData = await fetchJson<any>(
+          `${API_BASE_URL}/api/users/${encodeURIComponent(userUid)}/inbound-trunks`,
+          { headers: { 'Content-Type': 'application/json' } },
+        );
+        const inboundList = Array.isArray(inboundData)
+          ? inboundData
+          : (Array.isArray(inboundData?.trunks) ? inboundData.trunks : (Array.isArray(inboundData?.inbound_trunks) ? inboundData.inbound_trunks : []));
+        inboundIds = new Set<string>(inboundList.map((trunk: SipTrunk) => trunk?.id).filter(Boolean));
+      } catch (inboundErr) {
+        console.warn('[useTrunks] Could not load inbound trunks for filtering:', inboundErr);
+      }
+
       // Handle both array and object response formats
       const allTrunks = Array.isArray(data) ? data : (data.trunks && Array.isArray(data.trunks) ? data.trunks : []);
-      // This endpoint returns the whole trunks table. Everything downstream of this hook —
-      // campaign trunk pickers, the assistant phone-number selector — is outbound-only, so
-      // drop the inbound rows here. Inbound trunks are read through useUserTrunks instead.
-      const trunksList = allTrunks.filter((trunk: SipTrunk) => trunk?.trunk_type !== 'inbound');
+      const trunksList = allTrunks.filter(
+        (trunk: SipTrunk) => trunk?.trunk_type !== 'inbound' && !inboundIds.has(trunk?.id),
+      );
 
       if (trunksList.length > 0 || (data.trunks && Array.isArray(data.trunks))) {
         setTrunks(trunksList);

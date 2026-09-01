@@ -67,11 +67,16 @@ export function useUserTrunks(selfHosted: boolean = false) {
     const [error, setError] = useState<string | null>(null);
     const [saving, setSaving] = useState(false);
 
-    // GET /trunks lists the whole trunks table, inbound rows included, so the endpoint
-    // alone can't decide direction — trust the row's own trunk_type and fall back to the
-    // endpoint's direction only when the column is absent.
-    const resolveTrunkType = (trunk: any, fallback: 'inbound' | 'outbound'): 'inbound' | 'outbound' => (
-      trunk?.trunk_type === 'inbound' || trunk?.trunk_type === 'outbound' ? trunk.trunk_type : fallback
+    // GET /trunks lists the whole trunks table, inbound rows included, so the endpoint alone
+    // can't decide direction. Two independent signals settle it, because the payload is not
+    // guaranteed to carry trunk_type: the row's own trunk_type when present, and membership
+    // in the /inbound-trunks response. `id` is the table's primary key and is unique across
+    // both directions, so that id set is an exact discriminator on its own.
+    const resolveTrunkType = (
+      trunk: any,
+      inboundIds: Set<string>,
+    ): 'inbound' | 'outbound' => (
+      trunk?.trunk_type === 'inbound' || inboundIds.has(trunk?.id) ? 'inbound' : 'outbound'
     );
 
     const fetchTrunks = useCallback(async () => {
@@ -96,13 +101,14 @@ export function useUserTrunks(selfHosted: boolean = false) {
             const outboundList = getTrunkList(outboundData);
             const inboundList = getTrunkList(inboundData);
 
-            // Keyed by id + resolved direction so inbound and outbound records stay separate
-            // even when their DB ids match. An inbound row seen in the /trunks response lands
-            // on the same key as its /inbound-trunks record, which then overwrites it — that
-            // one is authoritative and carries livekit_trunk_id, allowed_numbers and krisp.
+            const inboundIds = new Set<string>(inboundList.map((trunk: any) => trunk?.id).filter(Boolean));
+
+            // Keyed by id + resolved direction. An inbound row seen in the /trunks response
+            // lands on the same key as its /inbound-trunks record, which then overwrites it —
+            // that one is authoritative and carries livekit_trunk_id, allowed_numbers, krisp.
             const mergedByKey = new Map<string, UserTrunk>();
             outboundList.forEach((trunk) => {
-                const trunkType = resolveTrunkType(trunk, 'outbound');
+                const trunkType = resolveTrunkType(trunk, inboundIds);
                 mergedByKey.set(`${trunk.id}:${trunkType}`, { ...trunk, trunk_type: trunkType });
             });
             inboundList.forEach((trunk) => {

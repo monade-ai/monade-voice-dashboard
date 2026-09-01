@@ -555,6 +555,17 @@ export default function TrunksPage() {
 
     const [isCreating, setIsCreating] = useState(false);
     const [expandedTrunkId, setExpandedTrunkId] = useState<string | null>(null);
+    const [collapsedSections, setCollapsedSections] = useState<{ outbound: boolean; inbound: boolean }>({
+        outbound: false,
+        inbound: false,
+    });
+
+    const toggleSection = (section: 'outbound' | 'inbound') => {
+        setCollapsedSections(prev => ({ ...prev, [section]: !prev[section] }));
+    };
+
+    const outboundTrunks = trunks.filter(t => t.trunk_type === 'outbound');
+    const inboundTrunks = trunks.filter(t => t.trunk_type === 'inbound');
 
     const handleCreate = async (data: CreateTrunkData) => {
         try {
@@ -714,15 +725,28 @@ export default function TrunksPage() {
                         <div className="space-y-8">
                             {/* Outbound Trunks */}
                             <div className="space-y-3">
-                                <div className="flex items-center gap-3 border-b border-border/30 pb-2">
+                                <button
+                                    type="button"
+                                    onClick={() => toggleSection('outbound')}
+                                    aria-expanded={!collapsedSections.outbound}
+                                    className="w-full flex items-center gap-3 border-b border-border/30 pb-2 text-left group/section"
+                                >
+                                    <ChevronRight
+                                        size={14}
+                                        className={cn(
+                                            'text-muted-foreground transition-transform group-hover/section:text-foreground',
+                                            !collapsedSections.outbound && 'rotate-90',
+                                        )}
+                                    />
                                     <h2 className="text-sm font-semibold text-foreground uppercase tracking-wider">Outbound Trunks</h2>
+                                    <Badge variant="secondary" className="text-[9px] tabular-nums">{outboundTrunks.length}</Badge>
                                     <span className="w-full h-px bg-border/20 flex-1" />
-                                </div>
-                                {trunks.filter(t => t.trunk_type === 'outbound').length === 0 ? (
+                                </button>
+                                {collapsedSections.outbound ? null : outboundTrunks.length === 0 ? (
                                     <p className="text-xs text-muted-foreground italic py-4 text-center">No outbound trunks configured.</p>
                                 ) : (
                                     <div className="space-y-3">
-                                        {trunks.filter(t => t.trunk_type === 'outbound').map((trunk) => (
+                                        {outboundTrunks.map((trunk) => (
                                             <ExpandableTrunkCard
                                                 key={`${trunk.id}:outbound`}
                                                 trunk={trunk}
@@ -739,15 +763,28 @@ export default function TrunksPage() {
 
                             {/* Inbound Trunks */}
                             <div className="space-y-3">
-                                <div className="flex items-center gap-3 border-b border-border/30 pb-2">
+                                <button
+                                    type="button"
+                                    onClick={() => toggleSection('inbound')}
+                                    aria-expanded={!collapsedSections.inbound}
+                                    className="w-full flex items-center gap-3 border-b border-border/30 pb-2 text-left group/section"
+                                >
+                                    <ChevronRight
+                                        size={14}
+                                        className={cn(
+                                            'text-muted-foreground transition-transform group-hover/section:text-foreground',
+                                            !collapsedSections.inbound && 'rotate-90',
+                                        )}
+                                    />
                                     <h2 className="text-sm font-semibold text-foreground uppercase tracking-wider">Inbound Trunks</h2>
+                                    <Badge variant="secondary" className="text-[9px] tabular-nums">{inboundTrunks.length}</Badge>
                                     <span className="w-full h-px bg-border/20 flex-1" />
-                                </div>
-                                {trunks.filter(t => t.trunk_type === 'inbound').length === 0 ? (
+                                </button>
+                                {collapsedSections.inbound ? null : inboundTrunks.length === 0 ? (
                                     <p className="text-xs text-muted-foreground italic py-4 text-center">No inbound trunks configured.</p>
                                 ) : (
                                     <div className="space-y-3">
-                                        {trunks.filter(t => t.trunk_type === 'inbound').map((trunk) => (
+                                        {inboundTrunks.map((trunk) => (
                                             <ExpandableTrunkCard
                                                 key={`${trunk.id}:inbound`}
                                                 trunk={trunk}
