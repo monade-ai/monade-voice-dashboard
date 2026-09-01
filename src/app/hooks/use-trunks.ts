@@ -18,6 +18,7 @@ export interface SipTrunk {
     address: string;
     numbers: string[];
     auth_username?: string;
+    trunk_type?: 'inbound' | 'outbound';
 }
 
 export interface PhoneNumberOption {
@@ -122,19 +123,21 @@ export function useTrunks(options?: { checkAssignments?: boolean }) {
     setError(null);
 
     try {
-      let data: any;
-
       if (!userUid) {
         throw new Error('No user UID available');
       }
-      data = await fetchJson<any>(`${API_BASE_URL}/api/users/${encodeURIComponent(userUid)}/trunks`, {
+      const data = await fetchJson<any>(`${API_BASE_URL}/api/users/${encodeURIComponent(userUid)}/trunks`, {
         headers: {
           'Content-Type': 'application/json',
         },
       });
 
       // Handle both array and object response formats
-      const trunksList = Array.isArray(data) ? data : (data.trunks && Array.isArray(data.trunks) ? data.trunks : []);
+      const allTrunks = Array.isArray(data) ? data : (data.trunks && Array.isArray(data.trunks) ? data.trunks : []);
+      // This endpoint returns the whole trunks table. Everything downstream of this hook —
+      // campaign trunk pickers, the assistant phone-number selector — is outbound-only, so
+      // drop the inbound rows here. Inbound trunks are read through useUserTrunks instead.
+      const trunksList = allTrunks.filter((trunk: SipTrunk) => trunk?.trunk_type !== 'inbound');
 
       if (trunksList.length > 0 || (data.trunks && Array.isArray(data.trunks))) {
         setTrunks(trunksList);

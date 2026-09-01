@@ -67,15 +67,12 @@ export function useUserTrunks(selfHosted: boolean = false) {
     const [error, setError] = useState<string | null>(null);
     const [saving, setSaving] = useState(false);
 
-    const normalizeOutboundTrunk = (trunk: any): UserTrunk => ({
-      ...trunk,
-      trunk_type: 'outbound',
-    });
-
-    const normalizeInboundTrunk = (trunk: any): UserTrunk => ({
-      ...trunk,
-      trunk_type: 'inbound',
-    });
+    // GET /trunks lists the whole trunks table, inbound rows included, so the endpoint
+    // alone can't decide direction — trust the row's own trunk_type and fall back to the
+    // endpoint's direction only when the column is absent.
+    const resolveTrunkType = (trunk: any, fallback: 'inbound' | 'outbound'): 'inbound' | 'outbound' => (
+      trunk?.trunk_type === 'inbound' || trunk?.trunk_type === 'outbound' ? trunk.trunk_type : fallback
+    );
 
     const fetchTrunks = useCallback(async () => {
         if (!userUid) {
@@ -96,17 +93,20 @@ export function useUserTrunks(selfHosted: boolean = false) {
                 { retry: { retries: 1 } },
             );
 
-            // Direction comes from the endpoint, not a possibly stale/missing payload field.
-            // This keeps inbound and outbound records separate even when their DB ids match.
             const outboundList = getTrunkList(outboundData);
             const inboundList = getTrunkList(inboundData);
 
+            // Keyed by id + resolved direction so inbound and outbound records stay separate
+            // even when their DB ids match. An inbound row seen in the /trunks response lands
+            // on the same key as its /inbound-trunks record, which then overwrites it — that
+            // one is authoritative and carries livekit_trunk_id, allowed_numbers and krisp.
             const mergedByKey = new Map<string, UserTrunk>();
-            outboundList.map(normalizeOutboundTrunk).forEach((trunk) => {
-                mergedByKey.set(`${trunk.id}:outbound`, trunk);
+            outboundList.forEach((trunk) => {
+                const trunkType = resolveTrunkType(trunk, 'outbound');
+                mergedByKey.set(`${trunk.id}:${trunkType}`, { ...trunk, trunk_type: trunkType });
             });
-            inboundList.map(normalizeInboundTrunk).forEach((trunk) => {
-                mergedByKey.set(`${trunk.id}:inbound`, trunk);
+            inboundList.forEach((trunk) => {
+                mergedByKey.set(`${trunk.id}:inbound`, { ...trunk, trunk_type: 'inbound' });
             });
 
             setTrunks(Array.from(mergedByKey.values()));
