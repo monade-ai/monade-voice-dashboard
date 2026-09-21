@@ -120,9 +120,18 @@ const GEMINI_VOICE_OPTIONS = [
 const VOICE_MODEL_OPTIONS = [
   { value: 'monade-v1', label: 'Monade V1', tone: 'Stable production model.' },
   { value: 'monade-v2', label: 'Monade V2', tone: 'Newer model with thinking levels and noise cancellation.' },
+  { value: 'monade-v3', label: 'Monade V3', tone: 'Fastest model — no thinking, lowest latency.' },
+  { value: 'monade-v4', label: 'Monade V4', tone: 'V3 with extended thinking — deeper reasoning, slower to first reply.' },
 ] as const;
 type VoiceModelId = typeof VOICE_MODEL_OPTIONS[number]['value'];
-type BackendModelVersion = 'v1' | 'v2';
+type BackendModelVersion = 'v1' | 'v2' | 'v3' | 'v4';
+
+// Only these versions accept model_config.thinking_level. V1 and V3 have no thinking
+// controls at all, so the key is dropped entirely when either is selected.
+const THINKING_CAPABLE_MODELS: readonly VoiceModelId[] = ['monade-v2', 'monade-v4'];
+const isThinkingCapable = (model: VoiceModelId | null): boolean => (
+  !!model && THINKING_CAPABLE_MODELS.includes(model)
+);
 
 const AGENT_NAME_OPTIONS = [
   { value: 'voice-agent', label: 'voice-agent' },
@@ -130,12 +139,16 @@ const AGENT_NAME_OPTIONS = [
   { value: 'monade-test-2', label: 'monade-test-2' },
   { value: 'monade-test-pool1', label: 'monade-test-pool1' },
   { value: 'monade-test-pool3', label: 'monade-test-pool3' },
+  // Alias: shown as monade-test-v4, but SAVED as the worker's real registered
+  // agent_name ("gemini-3.8"). The control-plane dispatches to toolsConfig.agent_name
+  // verbatim, so the value has to be what the worker registers with, not the label.
+  { value: 'gemini-3.8', label: 'monade-test-v4' },
 ] as const;
 type AgentName = typeof AGENT_NAME_OPTIONS[number]['value'];
 
 const isAgentName = (v: unknown): v is AgentName => (
   v === 'voice-agent' || v === 'monade-test' || v === 'monade-test-2' ||
-  v === 'monade-test-pool1' || v === 'monade-test-pool3'
+  v === 'monade-test-pool1' || v === 'monade-test-pool3' || v === 'gemini-3.8'
 );
 
 const readAgentName = (toolsConfig: any): AgentName | null => {
@@ -156,11 +169,32 @@ const isThinkingLevel = (v: unknown): v is ThinkingLevel => (
   v === 'minimal' || v === 'low' || v === 'medium' || v === 'high'
 );
 
-const readThinkingLevel = (toolsConfig: any): ThinkingLevel => {
+// V4 (extended thinking) has no "minimal" level — the API rejects it and the agent
+// raises it to "low". Surface that here too, so the dropdown never shows a value the
+// backend would silently change, and default to "low" instead of "minimal".
+const readThinkingLevel = (toolsConfig: any, version?: BackendModelVersion | null): ThinkingLevel => {
   const raw = String(toolsConfig?.model_config?.thinking_level ?? '').toLowerCase();
+  const level = isThinkingLevel(raw) ? raw : null;
 
-  return isThinkingLevel(raw) ? raw : 'minimal';
+  if (version === 'v4') {
+    return level && level !== 'minimal' ? level : 'low';
+  }
+
+  return level ?? 'minimal';
 };
+
+// V4 drops "minimal"; every other thinking-capable model keeps the full list.
+const thinkingLevelOptionsFor = (model: VoiceModelId | null) => (
+  model === 'monade-v4'
+    ? THINKING_LEVEL_OPTIONS.filter((o) => o.value !== 'minimal')
+    : THINKING_LEVEL_OPTIONS
+);
+
+// Default level to write when a thinking-capable model is selected and nothing valid
+// is stored yet.
+const defaultThinkingLevelFor = (model: VoiceModelId): ThinkingLevel => (
+  model === 'monade-v4' ? 'low' : 'minimal'
+);
 
 const TEMPERATURE_DEFAULT = 0.7;
 const TEMPERATURE_MIN = 0;
@@ -174,19 +208,36 @@ const readTemperature = (toolsConfig: any): number => {
   return Math.min(TEMPERATURE_MAX, Math.max(TEMPERATURE_MIN, n));
 };
 
+const VOICE_MODEL_TO_VERSION: Record<VoiceModelId, BackendModelVersion> = {
+  'monade-v1': 'v1',
+  'monade-v2': 'v2',
+  'monade-v3': 'v3',
+  'monade-v4': 'v4',
+};
+
+const VERSION_TO_VOICE_MODEL: Record<BackendModelVersion, VoiceModelId> = {
+  v1: 'monade-v1',
+  v2: 'monade-v2',
+  v3: 'monade-v3',
+  v4: 'monade-v4',
+};
+
 const mapVoiceModelToBackendVersion = (value: VoiceModelId): BackendModelVersion => (
-  value === 'monade-v2' ? 'v2' : 'v1'
+  VOICE_MODEL_TO_VERSION[value] ?? 'v1'
 );
 
 const mapBackendVersionToVoiceModel = (version: BackendModelVersion): VoiceModelId => (
-  version === 'v2' ? 'monade-v2' : 'monade-v1'
+  VERSION_TO_VOICE_MODEL[version] ?? 'monade-v1'
 );
 
 // Reads model_config.model_version as-is. Returns null when the assistant has no model
 // pinned — never guesses a version, so the UI can stay silent instead of claiming V1.
-// The one inference kept is thinking_level, which only exists on V2.
+// The one inference kept is thinking_level: V2 and V4 both use it, but only legacy
+// V2 assistants ever lack an explicit model_version, so V2 stays the safe guess.
 const readModelVersion = (toolsConfig: any): BackendModelVersion | null => {
   const modelVersion = String(toolsConfig?.model_config?.model_version ?? '').toLowerCase();
+  if (modelVersion === 'v4') return 'v4';
+  if (modelVersion === 'v3') return 'v3';
   if (modelVersion === 'v2') return 'v2';
   if (modelVersion === 'v1') return 'v1';
 
@@ -364,7 +415,7 @@ export default function AssistantStudio() {
 
   const selectedModelVersion = readModelVersion(currentAssistant?.toolsConfig);
   const selectedVoiceModel = selectedModelVersion ? mapBackendVersionToVoiceModel(selectedModelVersion) : null;
-  const thinkingLevel = readThinkingLevel(currentAssistant?.toolsConfig);
+  const thinkingLevel = readThinkingLevel(currentAssistant?.toolsConfig, selectedModelVersion);
   const noiseCancellationModel = readNoiseCancellation(currentAssistant?.toolsConfig);
   const agentName = readAgentName(currentAssistant?.toolsConfig);
   const temperature = readTemperature(currentAssistant?.toolsConfig);
@@ -757,15 +808,19 @@ export default function AssistantStudio() {
     const existing = { ...(currentAssistant.toolsConfig?.model_config || {}) };
     const nextToolsConfig: Record<string, any> = { ...(currentAssistant.toolsConfig || {}) };
     existing.model_version = mapVoiceModelToBackendVersion(next);
-    if (next === 'monade-v2') {
+    if (isThinkingCapable(next)) {
       if ('thinking_budget' in existing) {
         existing.thinking_level = budgetToLevel(Number(existing.thinking_budget));
         delete existing.thinking_budget;
       } else if (!isThinkingLevel(existing.thinking_level)) {
-        existing.thinking_level = 'minimal';
+        existing.thinking_level = defaultThinkingLevelFor(next);
+      }
+      // V4 rejects "minimal" — catches both a stale V2 value and budgetToLevel(0).
+      if (next === 'monade-v4' && existing.thinking_level === 'minimal') {
+        existing.thinking_level = 'low';
       }
     } else {
-      // V1 has no thinking controls — drop both the current and the legacy key.
+      // V1 and V3 have no thinking controls — drop both the current and legacy key.
       delete existing.thinking_level;
       delete existing.thinking_budget;
     }
@@ -777,7 +832,9 @@ export default function AssistantStudio() {
     if (!currentAssistant) return;
     const nextModelConfig = { ...(currentAssistant.toolsConfig?.model_config || {}) };
     nextModelConfig.thinking_level = level;
-    nextModelConfig.model_version = 'v2';
+    // Pin the version that is actually selected — this control is only rendered for
+    // the thinking-capable models, so V4 must not be rewritten to V2 on change.
+    nextModelConfig.model_version = selectedModelVersion === 'v4' ? 'v4' : 'v2';
     delete nextModelConfig.thinking_budget;
     const nextToolsConfig = {
       ...(currentAssistant.toolsConfig || {}),
@@ -1945,7 +2002,9 @@ export default function AssistantStudio() {
                 </div>
               </PaperCardHeader>
               <PaperCardContent className="p-6 pt-3 space-y-4">
-                {/* Model selector — frontend-only switch between Monade V1 (Gemini 2.5 Native Audio) and Monade V2 (Gemini 3.1 Live) */}
+                {/* Model selector — frontend-only switch across Monade V1 (Gemini 2.5 Native
+                    Audio), V2 (Gemini 3.1 Live), V3 (Gemini 3.8 Live) and V4 (Gemini 3.8
+                    Live Extended Thinking). Maps 1:1 onto model_config.model_version. */}
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 px-1">
                     Model
@@ -1976,8 +2035,8 @@ export default function AssistantStudio() {
                   </p>
                 </div>
 
-                {/* Thinking Level — Monade V2 only */}
-                {selectedVoiceModel === 'monade-v2' && (
+                {/* Thinking Level — Monade V2 and V4 only (V1/V3 have no thinking) */}
+                {isThinkingCapable(selectedVoiceModel) && (
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 px-1">
                       Thinking Level
@@ -1990,7 +2049,7 @@ export default function AssistantStudio() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {THINKING_LEVEL_OPTIONS.map((option) => (
+                        {thinkingLevelOptionsFor(selectedVoiceModel).map((option) => (
                           <SelectItem key={option.value} value={option.value}>
                             <div className="flex flex-col">
                               <span className="font-medium">{option.label}</span>
@@ -2002,6 +2061,7 @@ export default function AssistantStudio() {
                     </Select>
                     <p className="text-[10px] text-muted-foreground/60 px-1 italic leading-relaxed">
                       Replaces the legacy <em>thinking_budget</em> field. Sent on save as <span className="font-mono">model_config.thinking_level</span>.
+                      {selectedVoiceModel === 'monade-v4' && ' Monade V4 does not support Minimal — use Monade V3 for a non-thinking model.'}
                     </p>
                   </div>
                 )}
