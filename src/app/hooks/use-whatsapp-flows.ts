@@ -54,7 +54,29 @@ export interface WhatsappFlowMappingEntry {
 
 export type WhatsappFlowMappings = Record<string, WhatsappFlowMappingEntry>;
 
-export type WhatsappFlowMode = 'standard' | 'cv_24h_cadence';
+export type WhatsappFlowMode = 'standard' | 'cv_24h_cadence' | 'cv_counselor_pilot';
+
+export interface WhatsappPilotSchedule {
+  timezone: 'Asia/Kolkata';
+  call_window_start: '09:00';
+  last_dial: '20:45';
+  whatsapp_window_end: '21:00';
+  day1_attempts: 6;
+  day2_attempts: 4;
+  day1_release_hours: 24;
+  day2_release_hours: 48;
+  release_guard_minutes: 30;
+  min_call_gap_minutes: 60;
+  failed_dial_retry_minutes: 15;
+  whatsapp_after_call_minutes: number;
+  reply_pause_minutes: number;
+  band_targets: string[];
+}
+
+export interface WhatsappPilotConfig {
+  schedule: WhatsappPilotSchedule;
+  templates: Record<string, WhatsappCadenceTemplateAssignment>;
+}
 
 export interface WhatsappCadenceSchedule {
   timezone: string;
@@ -103,6 +125,11 @@ export interface WhatsappCadenceCapability {
 
 export interface WhatsappFlowCapabilities {
   cv_24h_cadence: WhatsappCadenceCapability;
+  cv_counselor_pilot: {
+    available: boolean;
+    schedule: WhatsappPilotSchedule | null;
+    templates: WhatsappCadenceTemplateRequirement[];
+  };
 }
 
 /** Read either mapping shape as a step list. */
@@ -152,7 +179,7 @@ export interface WhatsappFlow {
   whatsapp_channel_connection_id: string;
   enabled: boolean;
   flow_mode: WhatsappFlowMode;
-  cadence_config: Partial<WhatsappCadenceConfig>;
+  cadence_config: Partial<WhatsappCadenceConfig> | Partial<WhatsappPilotConfig>;
   cadence_draft_errors: string[];
   mappings: WhatsappFlowMappings;
   assistant?: {
@@ -186,12 +213,12 @@ export interface SaveWhatsappFlowPayload {
   enabled: boolean;
   mappings: WhatsappFlowMappings;
   flow_mode?: WhatsappFlowMode;
-  cadence_config?: WhatsappCadenceConfig | Record<string, never>;
+  cadence_config?: WhatsappCadenceConfig | WhatsappPilotConfig | Record<string, never>;
 }
 
 const CADENCE_SLOT_GROUPS: Record<string, string> = {
   N1: 'No answer', N2: 'No answer', N3: 'No answer',
-  U1: 'Uncertain', U2a: 'Uncertain', U2b: 'Uncertain', U3: 'Uncertain',
+  U1: 'Uncertain', U2: 'Uncertain', U2a: 'Uncertain', U2b: 'Uncertain', U3: 'Uncertain',
   T1: 'Qualified', M1: 'Marketing', M2: 'Marketing',
 };
 
@@ -204,6 +231,7 @@ const normalizeErrors = (value: unknown): string[] => {
   if (typeof value === 'object') {
     return Object.entries(value as Record<string, unknown>).flatMap(([key, item]) => {
       const messages = normalizeErrors(item);
+
       return messages.map((message) => `${key}: ${message}`);
     });
   }
@@ -242,6 +270,12 @@ const normalizeCapabilities = (raw: any): WhatsappFlowCapabilities => {
     ? rawTemplates.map((item: any) => normalizeRequirement(String(item?.key ?? item?.slot ?? ''), item))
       .filter((item: WhatsappCadenceTemplateRequirement) => item.key)
     : Object.entries(rawTemplates).map(([key, item]) => normalizeRequirement(key, item));
+  const pilot = raw?.cv_counselor_pilot ?? raw?.capabilities?.cv_counselor_pilot ?? {};
+  const pilotMode = raw?.available_modes?.find?.((mode: any) => mode?.value === 'cv_counselor_pilot');
+  const pilotSlots = pilot?.templates
+    ?? pilot?.template_slots
+    ?? pilot?.required_templates
+    ?? [];
 
   return {
     cv_24h_cadence: {
@@ -255,6 +289,21 @@ const normalizeCapabilities = (raw: any): WhatsappFlowCapabilities => {
         ?? null) as WhatsappCadenceSchedule | null,
       templates,
     },
+    cv_counselor_pilot: {
+      available: pilot?.available === true
+        || pilotMode?.available === true
+        || Boolean(raw?.cv_counselor_pilot),
+      schedule: (pilot?.schedule
+        ?? pilot?.default_schedule
+        ?? pilot?.schedule_defaults
+        ?? null) as WhatsappPilotSchedule | null,
+      templates: Array.isArray(pilotSlots)
+        ? pilotSlots.map((item: any) => typeof item === 'string'
+          ? normalizeRequirement(item, { category: 'UTILITY' })
+          : normalizeRequirement(String(item?.key ?? item?.slot ?? ''), item))
+          .filter((item: WhatsappCadenceTemplateRequirement) => item.key)
+        : Object.entries(pilotSlots).map(([key, item]) => normalizeRequirement(key, item)),
+    },
   };
 };
 
@@ -265,7 +314,8 @@ const normalizeFlow = (raw: any): WhatsappFlow => ({
   post_processing_template_id: raw?.post_processing_template_id ?? raw?.postProcessingTemplateId,
   whatsapp_channel_connection_id: raw?.whatsapp_channel_connection_id ?? raw?.whatsappChannelConnectionId,
   enabled: Boolean(raw?.enabled),
-  flow_mode: raw?.flow_mode === 'cv_24h_cadence' ? 'cv_24h_cadence' : 'standard',
+  flow_mode: ['cv_24h_cadence', 'cv_counselor_pilot'].includes(raw?.flow_mode)
+    ? raw.flow_mode : 'standard',
   cadence_config: (raw?.cadence_config && typeof raw.cadence_config === 'object') ? raw.cadence_config : {},
   cadence_draft_errors: normalizeErrors(raw?.cadence_draft_errors),
   mappings: (raw?.mappings && typeof raw.mappings === 'object') ? raw.mappings : {},
@@ -284,6 +334,7 @@ const normalizeFlowList = (data: any): WhatsappFlow[] => {
       ?? (data?.assistant_id || data?.assistantId ? [data] : []));
 
   const normalizedList = Array.isArray(list) ? list : [list];
+
   return normalizedList.filter(Boolean).map(normalizeFlow);
 };
 
@@ -372,6 +423,7 @@ export function useWhatsappFlows() {
         if (flows[0].cadence_draft_errors.length === 0 && result?.cadence_draft_errors) {
           flows[0].cadence_draft_errors = normalizeErrors(result.cadence_draft_errors);
         }
+
         return flows[0];
       }
 
