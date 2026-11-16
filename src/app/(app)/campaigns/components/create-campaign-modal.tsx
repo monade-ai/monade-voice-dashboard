@@ -115,7 +115,7 @@ export function CreateCampaignModal({
   const [formData, setFormData] = useState<FormData>(initialFormData);
   const [step, setStep] = useState<1 | 2 | 3>(1);
 
-  const concurrencyOptions = [1, 2, 3, 4, 5, 8, LIMITS.MAX_CONCURRENT]
+  const concurrencyOptions = [1, 2, 3, 4, 5, 8, 10, 15, 20, LIMITS.MAX_CONCURRENT]
     .filter((v, idx, arr) => v <= LIMITS.MAX_CONCURRENT && arr.indexOf(v) === idx);
   const cpsOptions = [1, 2, LIMITS.CALLS_PER_SECOND]
     .filter((v, idx, arr) => v <= LIMITS.CALLS_PER_SECOND && arr.indexOf(v) === idx);
